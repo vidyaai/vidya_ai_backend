@@ -1,28 +1,27 @@
-import os
 from openai import OpenAI
 import base64
 from dotenv import load_dotenv
-import httpx
 from .system_prompt import SYSTEM_PROMPT_FORMATTED, SYSTEM_PROMPT_INITIAL
 from typing import Dict, Any
 import json
+
 # Removed google.generativeai import - using OpenAI instead
 
 # Load environment variables
 load_dotenv()
 
+
 class OpenAIVisionClient:
     def __init__(self):
         """Initialize the OpenAI client with API key from environment variables"""
-        self.client = OpenAI() 
+        self.client = OpenAI()
         self.model = "gpt-4o"  # OpenAI's vision model
-    
+
     def _encode_image(self, image_path):
         """Encode image file to base64 string"""
         with open(image_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
-    
-        
+            return base64.b64encode(image_file.read()).decode("utf-8")
+
     def ask_text_only(self, prompt, context=""):
         """Ask a text-only question with the appropriate system prompt based on transcript type"""
         try:
@@ -30,28 +29,36 @@ class OpenAIVisionClient:
             has_timestamps = False
             if context and isinstance(context, str):
                 # Look for timestamp patterns like "00:00 - 00:00" in the transcript
-                has_timestamps = any(":" in line and " - " in line for line in context.split('\n') if line.strip())
-            
+                has_timestamps = any(
+                    ":" in line and " - " in line
+                    for line in context.split("\n")
+                    if line.strip()
+                )
+
             # Select the appropriate system prompt based on timestamp availability
-            system_prompt = SYSTEM_PROMPT_FORMATTED if has_timestamps else SYSTEM_PROMPT_INITIAL
-            
+            system_prompt = (
+                SYSTEM_PROMPT_FORMATTED if has_timestamps else SYSTEM_PROMPT_INITIAL
+            )
+
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Context: {context}\n\nQuestion: {prompt}"}
+                {
+                    "role": "user",
+                    "content": f"Context: {context}\n\nQuestion: {prompt}",
+                },
             ]
 
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=messages,
                 max_tokens=1000,  # Increased for detailed responses
-                temperature=0.3   # Slightly increased for more natural language
+                temperature=0.3,  # Slightly increased for more natural language
             )
-            
+
             return response.choices[0].message.content
         except Exception as e:
             return f"Error: {str(e)}"
-        
-        
+
     def ask_with_image(self, prompt, image_path, context=""):
         """Ask a question with both text prompt and image with the appropriate system prompt"""
         try:
@@ -59,14 +66,20 @@ class OpenAIVisionClient:
             has_timestamps = False
             if context and isinstance(context, str):
                 # Look for timestamp patterns like "00:00 - 00:00" in the transcript
-                has_timestamps = any(":" in line and " - " in line for line in context.split('\n') if line.strip())
-            
+                has_timestamps = any(
+                    ":" in line and " - " in line
+                    for line in context.split("\n")
+                    if line.strip()
+                )
+
             # Select the appropriate system prompt based on timestamp availability
-            system_prompt = SYSTEM_PROMPT_FORMATTED if has_timestamps else SYSTEM_PROMPT_INITIAL
-            
+            system_prompt = (
+                SYSTEM_PROMPT_FORMATTED if has_timestamps else SYSTEM_PROMPT_INITIAL
+            )
+
             # Encode the image
             base64_image = self._encode_image(image_path)
-            
+
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -76,23 +89,23 @@ class OpenAIVisionClient:
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Context (Video Transcript): {context}\n\nPlease analyze this video frame along with the provided transcript context and answer the following question: {prompt}"
+                                "text": f"Context (Video Transcript): {context}\n\nPlease analyze this video frame along with the provided transcript context and answer the following question: {prompt}",
                             },
                             {
                                 "type": "image_url",
                                 "image_url": {
                                     "url": f"data:image/jpeg;base64,{base64_image}"
-                                }
-                            }
-                        ]
-                    }
+                                },
+                            },
+                        ],
+                    },
                 ],
-                max_tokens=1000  # Increased for detailed responses
+                max_tokens=1000,  # Increased for detailed responses
             )
             return response.choices[0].message.content
         except Exception as e:
             return f"Error: {str(e)}"
-    
+
     def ask_with_image_url(self, prompt, image_url):
         """Ask a question with a text prompt and an image URL"""
         try:
@@ -102,24 +115,17 @@ class OpenAIVisionClient:
                     {
                         "role": "user",
                         "content": [
-                            {
-                                "type": "text",
-                                "text": prompt
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": image_url
-                                }
-                            }
-                        ]
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": image_url}},
+                        ],
                     }
                 ],
-                max_tokens=500
+                max_tokens=500,
             )
             return response.choices[0].message.content
         except Exception as e:
             return f"Error: {str(e)}"
+
 
 class OpenAIQuizClient:
     def __init__(self, model_name: str = "gpt-4o"):
@@ -173,11 +179,9 @@ class OpenAIQuizClient:
                                 "type": "array",
                                 "items": {"type": "string"},
                                 "minItems": 3,
-                                "maxItems": 5
+                                "maxItems": 5,
                             },
-                            "answer": {
-                                "type": "string"
-                            },
+                            "answer": {"type": "string"},
                             "explanation": {"type": "string"},
                         },
                         "required": ["id", "question", "options", "answer"],
@@ -219,17 +223,20 @@ class OpenAIQuizClient:
         try:
             # Create the full prompt
             full_prompt = instruction + "\n" + prompt
-            
+
             # Generate content using OpenAI with structured output
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a quiz generation assistant. Generate only valid JSON responses that match the provided schema exactly."},
-                    {"role": "user", "content": full_prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a quiz generation assistant. Generate only valid JSON responses that match the provided schema exactly.",
+                    },
+                    {"role": "user", "content": full_prompt},
                 ],
                 response_format={"type": "json_object"},
                 max_tokens=4000,
-                temperature=0.3
+                temperature=0.3,
             )
 
             # Parse JSON text
@@ -284,6 +291,7 @@ class OpenAIQuizClient:
         except Exception as e:
             print(f"Error generating quiz: {e}")
             raise
+
 
 # Sample American Civil War transcript for testing
 AMERICAN_CIVIL_WAR_TRANSCRIPT = """
@@ -343,11 +351,11 @@ if __name__ == "__main__":
     # Initialize the clients
     vision_client = OpenAIVisionClient()
     quiz_client = OpenAIQuizClient()
-    
+
     # Test the quiz generation functionality
     print("Testing OpenAI GPT-4o Quiz Generation...")
-    print("="*70)
-    
+    print("=" * 70)
+
     try:
         # Generate a quiz from the American Civil War transcript
         quiz_result = quiz_client.generate_quiz(
@@ -355,46 +363,49 @@ if __name__ == "__main__":
             num_questions=7,
             difficulty="medium",
             include_explanations=True,
-            language="en"
+            language="en",
         )
-        
+
         print("Quiz generation successful!")
         print(f"Generated {len(quiz_result.get('quiz', []))} questions")
         print("\nQuiz Preview:")
         print("-" * 50)
-        
+
         # Display the first few questions as a preview
-        quiz_items = quiz_result.get('quiz', [])
+        quiz_items = quiz_result.get("quiz", [])
         for i, question in enumerate(quiz_items[:3]):  # Show first 3 questions
             print(f"\nQuestion {i+1}: {question.get('question', 'N/A')}")
-            options = question.get('options', [])
+            options = question.get("options", [])
             for j, option in enumerate(options):
                 print(f"  {chr(65+j)}) {option}")
             print(f"Correct Answer: {question.get('answer', 'N/A')}")
-            if question.get('explanation'):
+            if question.get("explanation"):
                 print(f"Explanation: {question.get('explanation')}")
             print("-" * 30)
-        
+
         # Save the full quiz to a file
-        with open('civil_war_quiz.json', 'w') as f:
+        with open("civil_war_quiz.json", "w") as f:
             json.dump(quiz_result, f, indent=2)
         print(f"\nFull quiz saved to 'civil_war_quiz.json'")
-        
+
         # Display metadata
-        metadata = quiz_result.get('metadata', {})
+        metadata = quiz_result.get("metadata", {})
         print(f"\nQuiz Metadata:")
         print(f"- Number of questions: {metadata.get('num_questions')}")
         print(f"- Difficulty: {metadata.get('difficulty')}")
         print(f"- Language: {metadata.get('language')}")
-        print(f"- Context excerpt: {metadata.get('video_context_excerpt', '')[:100]}...")
-        
+        print(
+            f"- Context excerpt: {metadata.get('video_context_excerpt', '')[:100]}..."
+        )
+
     except Exception as e:
         print(f"Error testing quiz generation: {e}")
         import traceback
+
         traceback.print_exc()
-    
-    print("\n" + "="*70)
-    
+
+    print("\n" + "=" * 70)
+
     # Example vision test (if you have an image)
     print("\nTesting Vision Client...")
     try:
@@ -405,8 +416,8 @@ if __name__ == "__main__":
         # )
         # print("Image analysis response:")
         # print(image_response)
-        
+
         print("Vision client test skipped (no test image provided)")
-        
+
     except Exception as e:
         print(f"Error with vision client: {e}")

@@ -32,7 +32,9 @@ class Folder(Base):
 class Video(Base):
     __tablename__ = "videos"
 
-    id = Column(String, primary_key=True)  # we align with existing video_id (uuid or youtube id)
+    id = Column(
+        String, primary_key=True
+    )  # we align with existing video_id (uuid or youtube id)
     user_id = Column(String, index=True, nullable=True)
     source_type = Column(String, nullable=False, index=True)  # "uploaded" or "youtube"
     title = Column(String, nullable=True)
@@ -52,13 +54,13 @@ class Video(Base):
     transcript_json = Column(JSONB, nullable=True)
     formatted_transcript = Column(Text, nullable=True)
     formatting_status = Column(JSONB, nullable=True)
-    
+
     # Download and processing status
     download_status = Column(JSONB, nullable=True)  # Stores download progress/status
-    download_path = Column(String, nullable=True)   # Path to downloaded video file
-    
+    download_path = Column(String, nullable=True)  # Path to downloaded video file
+
     # Upload progress tracking
-    upload_status = Column(JSONB, nullable=True)    # Stores upload progress/status
+    upload_status = Column(JSONB, nullable=True)  # Stores upload progress/status
 
     # Organization
     folder_id = Column(String, ForeignKey("folders.id"), nullable=True, index=True)
@@ -66,5 +68,3 @@ class Video(Base):
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     folder = relationship("Folder", back_populates="videos")
-
-

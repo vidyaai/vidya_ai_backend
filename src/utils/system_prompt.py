@@ -158,5 +158,3 @@ Paragraph providing background information or context that helps understand the 
 - NEVER generate or fabricate timestamps
 - For frame or image queries, analyze BOTH what's visible in the frame AND how it relates to the transcript content
 """
-
-

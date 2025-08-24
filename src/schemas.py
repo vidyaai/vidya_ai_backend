@@ -44,3 +44,28 @@ class MoveVideoRequest(BaseModel):
     target_folder_id: Optional[str]
 
 
+# Requests used by routes
+class YouTubeRequest(BaseModel):
+    url: str
+    user_id: Optional[str] = None
+
+
+class VideoQuery(BaseModel):
+    video_id: str
+    query: str
+    timestamp: Optional[float] = None
+    is_image_query: bool = False
+
+
+class TranslationRequest(BaseModel):
+    youtube_url: str
+    source_language: str = "en"
+    target_language: str
+
+
+class QuizRequest(BaseModel):
+    video_id: str
+    num_questions: int = 5
+    difficulty: str = "medium"
+    include_explanations: bool = True
+    language: str = "en"
