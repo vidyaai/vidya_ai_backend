@@ -3,14 +3,12 @@ import re
 import tempfile
 import shutil
 import uuid
-from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from utils.db import get_db
 from models import Video
 from controllers.config import (
     upload_executor,
-    frames_path,
     video_path,
     s3_client,
     AWS_S3_BUCKET,

@@ -1,28 +1,19 @@
 import os
-import re
-import tempfile
-import shutil
-from sqlalchemy.orm import Session
 from utils.db import SessionLocal
-from utils.youtube_utils import download_video, grab_youtube_frame
+from utils.youtube_utils import download_video
 from utils.format_transcript import create_formatted_transcript
 from models import Video
 from .config import (
     frames_path,
     output_path,
-    download_executor,
-    formatting_executor,
-    upload_executor,
     s3_client,
     AWS_S3_BUCKET,
-    video_path,
 )
 from .storage import s3_upload_file, generate_thumbnail
 from .db_helpers import (
     update_download_status,
     update_formatting_status,
     get_formatting_status,
-    get_download_status,
 )
 
 

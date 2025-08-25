@@ -1,25 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Optional
 from utils.db import get_db
 from utils.youtube_utils import (
     download_transcript_api,
     extract_youtube_id,
-    grab_youtube_frame,
 )
 from controllers.config import (
     download_executor,
     formatting_executor,
-    frames_path,
     s3_client,
     AWS_S3_BUCKET,
 )
 from controllers.db_helpers import (
     get_video_path,
     get_download_status,
-    update_download_status,
     get_transcript_cache,
-    update_transcript_cache,
     get_formatting_status,
 )
 from controllers.background_tasks import (

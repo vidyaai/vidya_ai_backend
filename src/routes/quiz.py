@@ -4,7 +4,6 @@ from utils.db import get_db
 from controllers.db_helpers import get_transcript_cache, update_transcript_cache
 from utils.youtube_utils import download_transcript_api
 from controllers.config import s3_client, AWS_S3_BUCKET
-from controllers.storage import s3_presign_url
 from models import Video
 from schemas import QuizRequest
 from utils.ml_models import OpenAIQuizClient

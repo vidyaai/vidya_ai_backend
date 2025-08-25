@@ -1,10 +1,9 @@
 import os
 from typing import Optional
 from sqlalchemy.orm import Session
-from utils.db import SessionLocal
 from models import Video
 from .config import s3_client, AWS_S3_BUCKET
-from .storage import s3_presign_url
+from .storage import s3_presign_url, s3_client
 
 
 def get_or_create_video(db: Session, video_id: str, **kwargs) -> Video:

@@ -1,3 +1,3 @@
 conda deactivate
-.\venv\Scripts\activate
+.\vai_venv\Scripts\activate
 python src\main.py
