@@ -2,7 +2,6 @@ from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import uvicorn
-from controllers.config import logger
 from routes.youtube import router as youtube_router
 from routes.user_videos import router as user_videos_router
 from routes.quiz import router as quiz_router
@@ -17,12 +16,6 @@ app = FastAPI(
     description="Simple YouTube processing API",
     version="1.0.0",
 )
-
-try:
-    # Base.metadata.create_all(bind=engine)
-    logger.info("Database tables ensured (created if missing)")
-except Exception as e:
-    logger.error(f"DB init failed: {e}")
 
 
 @app.options("/{path:path}")
