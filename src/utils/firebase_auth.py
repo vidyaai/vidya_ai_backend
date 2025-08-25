@@ -19,10 +19,8 @@ def ensure_firebase_initialized() -> None:
             detail="Firebase admin SDK not available on server",
         )
     if not firebase_admin._apps:
-        service_account_path: Optional[str] = os.getenv(
-            "FIREBASE_SERVICE_ACCOUNT_JSON_PATH"
-        )
-        if not service_account_path or not os.path.exists(service_account_path):
+        service_account_path: Optional[str] = os.getenv("FIREBASE_CONFIG")
+        if not service_account_path:  # or not os.path.exists(service_account_path):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Firebase service account path not configured",
