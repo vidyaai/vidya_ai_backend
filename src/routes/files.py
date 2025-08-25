@@ -5,13 +5,16 @@ from sqlalchemy.orm import Session
 from utils.db import get_db
 from controllers.db_helpers import get_video_path
 from controllers.config import frames_path
+from utils.firebase_auth import get_current_user
 
 
 router = APIRouter(prefix="/api", tags=["Files"])
 
 
 @router.get("/videos/{video_id}")
-async def serve_video(video_id: str, db: Session = Depends(get_db)):
+async def serve_video(
+    video_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
     video_path = get_video_path(db, video_id)
     if video_path:
         if video_path.startswith("http"):

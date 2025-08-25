@@ -3,7 +3,7 @@ import re
 import tempfile
 import shutil
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from utils.db import get_db
 from models import Video
@@ -21,6 +21,7 @@ from controllers.storage import (
 )
 from controllers.db_helpers import update_upload_status, get_upload_status
 from controllers.background_tasks import format_uploaded_transcript_background
+from utils.firebase_auth import get_current_user
 
 
 router = APIRouter(prefix="/api/user-videos", tags=["User Videos"])
@@ -33,9 +34,9 @@ async def get_upload_status_endpoint(video_id: str, db: Session = Depends(get_db
 
 @router.post("/upload")
 async def upload_user_video(
-    user_id: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     if not s3_client or not AWS_S3_BUCKET:
         raise HTTPException(status_code=500, detail="S3 is not configured on server")
@@ -58,6 +59,7 @@ async def upload_user_video(
         raise HTTPException(
             status_code=500, detail=f"Failed to buffer uploaded file: {str(e)}"
         )
+    user_id = current_user["uid"]
     upload_executor.submit(
         process_upload_background, vid, user_id, temp_path, original_filename
     )
@@ -278,7 +280,10 @@ def process_upload_background(
 
 
 @router.get("/list")
-async def list_user_videos(user_id: str, db: Session = Depends(get_db)):
+async def list_user_videos(
+    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
+    user_id = current_user["uid"]
     rows = (
         db.query(Video)
         .filter(Video.user_id == user_id, Video.source_type == "uploaded")

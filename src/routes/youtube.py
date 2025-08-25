@@ -24,6 +24,7 @@ from controllers.background_tasks import (
 from controllers.storage import s3_presign_url
 from controllers.video_service import get_video_title
 from schemas import YouTubeRequest
+from utils.firebase_auth import get_current_user
 from models import Video
 
 
@@ -75,7 +76,11 @@ async def get_formatted_transcript(video_id: str, db: Session = Depends(get_db))
 
 
 @router.post("/info")
-async def get_youtube_info(request: YouTubeRequest, db: Session = Depends(get_db)):
+async def get_youtube_info(
+    request: YouTubeRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     url = request.url
     video_id = extract_youtube_id(url)
     if not video_id:
@@ -108,7 +113,7 @@ async def get_youtube_info(request: YouTubeRequest, db: Session = Depends(get_db
             if v is None:
                 v = Video(
                     id=video_id,
-                    user_id=request.user_id,
+                    user_id=current_user["uid"],
                     source_type="youtube",
                     title=title,
                     youtube_id=video_id,
@@ -118,7 +123,7 @@ async def get_youtube_info(request: YouTubeRequest, db: Session = Depends(get_db
                 )
                 db.add(v)
             else:
-                v.user_id = v.user_id or request.user_id
+                v.user_id = v.user_id or current_user["uid"]
                 v.source_type = "youtube"
                 v.title = title or v.title
                 v.youtube_id = video_id

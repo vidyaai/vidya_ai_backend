@@ -14,13 +14,18 @@ from controllers.config import frames_path, download_executor
 from utils.youtube_utils import download_transcript_api, grab_youtube_frame
 from utils.ml_models import OpenAIVisionClient
 from schemas import VideoQuery
+from utils.firebase_auth import get_current_user
 
 
 router = APIRouter(prefix="/api/query", tags=["Query"])
 
 
 @router.post("/video")
-async def process_query(query_request: VideoQuery, db: Session = Depends(get_db)):
+async def process_query(
+    query_request: VideoQuery,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     try:
         video_id = query_request.video_id
         query = query_request.query

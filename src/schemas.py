@@ -3,7 +3,6 @@ from typing import Optional
 
 
 class FolderCreate(BaseModel):
-    user_id: str
     name: str
     parent_id: Optional[str] = None
     source_type: str  # "uploaded" | "youtube"
@@ -47,7 +46,6 @@ class MoveVideoRequest(BaseModel):
 # Requests used by routes
 class YouTubeRequest(BaseModel):
     url: str
-    user_id: Optional[str] = None
 
 
 class VideoQuery(BaseModel):
