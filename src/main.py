@@ -12,8 +12,8 @@ from routes.query import router as query_router
 
 
 app = FastAPI(
-    title="YouTube Backend API - DigitalOcean",
-    description="Simple YouTube processing API",
+    title="Vidya AI Backend API",
+    description="Vidya AI Backend API",
     version="1.0.0",
 )
 
@@ -54,7 +54,7 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"status": "YouTube backend is running on DigitalOcean"}
+    return {"status": "Vidya AI backend is running"}
 
 
 app.include_router(youtube_router)
