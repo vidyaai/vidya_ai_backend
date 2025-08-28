@@ -1,5 +1,7 @@
 import os
 import re
+from urllib.parse import quote
+import time
 import yt_dlp
 import cv2
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -138,9 +140,6 @@ def extract_youtube_id(url: str) -> str:
 
 def download_video(youtube_url, output_path=video_path, debug=False):
     """Simple YouTube video downloader using RapidAPI with progress checking"""
-
-    from urllib.parse import quote
-    import time
 
     def log(msg):
         if debug:

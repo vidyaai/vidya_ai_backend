@@ -1,9 +1,12 @@
 import json
 import os
+import re
 from openai import OpenAI
 from typing import List, Dict
 import sys
 from dotenv import load_dotenv
+from controllers.db_helpers import update_formatting_status
+from utils.db import SessionLocal
 
 load_dotenv()
 
@@ -84,12 +87,13 @@ def format_with_openai(text_chunks: List[str], video_id: str = None) -> List[str
     formatted_chunks = []
     total_chunks = len(text_chunks)
 
+    print(f"Formatting {total_chunks} chunks with OpenAI of video_id: {video_id}...")
+
     # UPDATE progress tracking if video_id provided
     if video_id:
         # Import here to avoid circular imports
         try:
             sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-            from main import update_formatting_status, SessionLocal
 
             db = SessionLocal()
             try:
@@ -118,8 +122,6 @@ def format_with_openai(text_chunks: List[str], video_id: str = None) -> List[str
         # UPDATE progress if video_id provided
         if video_id:
             try:
-                from main import update_formatting_status, SessionLocal
-
                 db = SessionLocal()
                 try:
                     current_progress = int((i / total_chunks) * 100)
@@ -182,9 +184,6 @@ def convert_plain_text_to_transcript_data(
     # Split text into sentences/chunks for processing
     sentences = []
     if plain_text:
-        # Split by sentence endings, but keep reasonable chunk sizes
-        import re
-
         # Split by sentence boundaries but maintain reasonable chunk sizes
         sentence_splits = re.split(r"(?<=[.!?])\s+", plain_text)
 
@@ -274,26 +273,3 @@ def create_formatted_transcript(
         print("Formatted transcript created (not saved to file)")
 
     return formatted_transcript
-
-
-if __name__ == "__main__":
-    # Check if API key is set
-    if not os.getenv("OPENAI_API_KEY"):
-        print("Please set your OPENAI_API_KEY environment variable")
-        print("Example: export OPENAI_API_KEY='your-api-key-here'")
-        exit(1)
-
-    # Load the transcript
-    try:
-        transcript_data = load_transcript("output.json")
-        print(f"Loaded transcript: {transcript_data['title']}")
-
-        # Create formatted transcript
-        create_formatted_transcript(transcript_data)
-
-        print("Formatting complete!")
-
-    except FileNotFoundError:
-        print("Error: output.json file not found")
-    except Exception as e:
-        print(f"Error: {e}")

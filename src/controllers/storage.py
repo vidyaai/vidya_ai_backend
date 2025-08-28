@@ -3,7 +3,7 @@ import os
 import mimetypes
 import subprocess
 import tempfile
-from typing import Optional
+from typing import List, Optional
 from fastapi import HTTPException
 from .config import s3_client, AWS_S3_BUCKET, deepgram_client
 
@@ -98,6 +98,90 @@ def _extract_audio_with_ffmpeg(
         return None
 
 
+def _probe_media_duration_seconds(input_path: str) -> Optional[float]:
+    """Return media duration in seconds using ffprobe, or None if unavailable."""
+    try:
+        cmd = [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            input_path,
+        ]
+        result = subprocess.run(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
+        )
+        output = result.stdout.decode("utf-8").strip()
+        if not output:
+            return None
+        try:
+            return float(output)
+        except Exception:
+            return None
+    except Exception:
+        return None
+
+
+def _segment_media_to_wav_chunks(
+    input_path: str, chunk_seconds: int = 600, sample_rate: int = 16000
+) -> List[str]:
+    """
+    Segment input media into mono WAV chunks using ffmpeg. Returns list of temp file paths.
+
+    Uses accurate seeking per chunk: ffmpeg -ss <start> -t <dur> -i <input> -vn -acodec pcm_s16le -ar 16000 -ac 1 <out>
+    """
+    chunk_paths: List[str] = []
+    duration = _probe_media_duration_seconds(input_path) or 0.0
+    # If duration unknown, fall back to a single extracted WAV to avoid complex logic
+    if duration <= 0.0:
+        extracted = _extract_audio_with_ffmpeg(input_path, sample_rate=sample_rate)
+        return [extracted] if extracted else []
+
+    temp_dir = tempfile.mkdtemp(prefix="vidyai_chunks_")
+    start = 0.0
+    chunk_index = 0
+    # Ensure minimum chunk_seconds > 0
+    chunk_len = max(30, int(chunk_seconds))
+    while start < duration - 0.001:
+        remaining = max(0.0, duration - start)
+        this_len = min(float(chunk_len), remaining)
+        out_path = os.path.join(temp_dir, f"chunk_{chunk_index:04d}.wav")
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-accurate_seek",
+            "-ss",
+            str(start),
+            "-t",
+            str(this_len),
+            "-i",
+            input_path,
+            "-vn",
+            "-acodec",
+            "pcm_s16le",
+            "-ar",
+            str(sample_rate),
+            "-ac",
+            "1",
+            out_path,
+        ]
+        try:
+            subprocess.run(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
+            )
+            if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+                chunk_paths.append(out_path)
+        except Exception:
+            # Stop on failure to avoid infinite loops
+            break
+        chunk_index += 1
+        start += this_len
+    return chunk_paths
+
+
 def transcribe_video_with_deepgram(local_video_path: str) -> str:
     """Transcribe a local video/audio file using Deepgram's prerecorded API.
 
@@ -107,6 +191,8 @@ def transcribe_video_with_deepgram(local_video_path: str) -> str:
         raise Exception("Deepgram is not configured on server")
 
     temp_audio_path: Optional[str] = None
+    transcript_result: str = ""
+    chunk_paths: List[str] = []
     try:
         suffix = os.path.splitext(local_video_path)[1].lower()
         is_video = suffix in [".mp4", ".mov", ".mkv", ".webm", ".avi"]
@@ -123,8 +209,9 @@ def transcribe_video_with_deepgram(local_video_path: str) -> str:
                 source_path = extracted
                 mimetype = "audio/wav"
 
-        with open(source_path, "rb") as f:
-            data = f.read()
+        # Decide whether to chunk based on duration; default to chunking if > 12 minutes
+        duration_seconds = _probe_media_duration_seconds(local_video_path) or 0.0
+        should_chunk = duration_seconds >= 12 * 60
 
         # Lazy import to avoid hard dependency if SDK missing at import time
         try:
@@ -140,19 +227,122 @@ def transcribe_video_with_deepgram(local_video_path: str) -> str:
                 punctuate=True,
             )
 
-        # Prepare payload for Deepgram v4 SDK
-        payload = {"buffer": data}
-        # include mimetype if we know it (harmless, sometimes improves detection)
-        if mimetype:
-            payload["mimetype"] = mimetype
+        def _transcribe_file_bytes(
+            data_bytes: bytes, mimetype_hint: Optional[str]
+        ) -> str:
+            payload = {"buffer": data_bytes}
+            if mimetype_hint:
+                payload["mimetype"] = mimetype_hint
+            response = deepgram_client.listen.rest.v("1").transcribe_file(
+                payload, options
+            )
+            # Extract transcript text robustly
+            transcript_text_inner = ""
+            try:
+                results = (
+                    response.get("results")
+                    if isinstance(response, dict)
+                    else getattr(response, "results", None)
+                )
+                if results:
+                    channels = (
+                        results.get("channels")
+                        if isinstance(results, dict)
+                        else getattr(results, "channels", None)
+                    )
+                    if channels and len(channels) > 0:
+                        alt = (
+                            channels[0].get("alternatives")
+                            if isinstance(channels[0], dict)
+                            else getattr(channels[0], "alternatives", None)
+                        )
+                        if alt and len(alt) > 0:
+                            transcript_text_inner = (
+                                alt[0].get("transcript")
+                                if isinstance(alt[0], dict)
+                                else getattr(alt[0], "transcript", "")
+                            )
+            except Exception:
+                transcript_text_inner = ""
 
-        # Perform request (sync) using v4 client path
-        response = deepgram_client.listen.rest.v("1").transcribe_file(payload, options)
+            if not transcript_text_inner:
+                transcript_text_inner = (
+                    getattr(response, "transcript", "")
+                    if not isinstance(response, dict)
+                    else response.get("transcript", "")
+                )
+            return transcript_text_inner or ""
 
-        # Extract transcript text robustly
+        if not should_chunk:
+            with open(source_path, "rb") as f:
+                data = f.read()
+            transcript_result = _transcribe_file_bytes(data, mimetype)
+            return transcript_result
+
+        # For long media, segment into ~10-minute WAV chunks and transcribe sequentially
+        chunk_paths = _segment_media_to_wav_chunks(local_video_path, chunk_seconds=600)
+        if not chunk_paths:
+            # Fallback to single-file flow if segmentation failed
+            with open(source_path, "rb") as f:
+                data = f.read()
+            transcript_result = _transcribe_file_bytes(data, mimetype)
+            return transcript_result
+
+        transcripts: List[str] = []
+        for chunk_path in chunk_paths:
+            with open(chunk_path, "rb") as f:
+                chunk_data = f.read()
+            part = _transcribe_file_bytes(chunk_data, "audio/wav")
+            if part:
+                transcripts.append(part.strip())
+        # Merge with double newlines to preserve separation
+        transcript_result = "\n\n".join([p for p in transcripts if p])
+        return transcript_result
+    except Exception as e:
+        raise Exception(f"Deepgram transcription failed: {str(e)}")
+    finally:
+        try:
+            if temp_audio_path and os.path.exists(temp_audio_path):
+                os.remove(temp_audio_path)
+        except Exception:
+            pass
+        try:
+            for p in chunk_paths:
+                try:
+                    if p and os.path.exists(p):
+                        os.remove(p)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+
+def transcribe_video_with_deepgram_url(media_url: str) -> str:
+    """Transcribe media accessible via URL using Deepgram prerecorded URL API."""
+    if not deepgram_client:
+        raise Exception("Deepgram is not configured on server")
+    try:
+        try:
+            from deepgram import PrerecordedOptions  # type: ignore
+        except Exception:
+            PrerecordedOptions = None  # type: ignore
+
+        options = None
+        if PrerecordedOptions is not None:
+            options = PrerecordedOptions(
+                model="nova-2",
+                smart_format=True,
+                punctuate=True,
+            )
+
+        payload = {"url": media_url}
+        # Use URL-based transcription to avoid uploading bytes from our server
+        # Prefer the same REST path family as file-based call
+        response = deepgram_client.listen.rest.v("1").transcribe_url(payload, options)
+
+        # Extract transcript similarly to file path
         transcript_text = ""
         try:
-            # dict-like access
             results = (
                 response.get("results")
                 if isinstance(response, dict)
@@ -180,19 +370,11 @@ def transcribe_video_with_deepgram(local_video_path: str) -> str:
             transcript_text = ""
 
         if not transcript_text:
-            # Fallback: some SDK versions expose top-level transcript string
             transcript_text = (
                 getattr(response, "transcript", "")
                 if not isinstance(response, dict)
                 else response.get("transcript", "")
             )
-
         return transcript_text or ""
     except Exception as e:
         raise Exception(f"Deepgram transcription failed: {str(e)}")
-    finally:
-        try:
-            if temp_audio_path and os.path.exists(temp_audio_path):
-                os.remove(temp_audio_path)
-        except Exception:
-            pass

@@ -5,7 +5,7 @@ import shutil
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
-from utils.db import get_db
+from utils.db import SessionLocal, get_db
 from models import Video
 from controllers.config import (
     upload_executor,
@@ -18,6 +18,7 @@ from controllers.storage import (
     s3_presign_url,
     generate_thumbnail,
     transcribe_video_with_deepgram,
+    transcribe_video_with_deepgram_url,
 )
 from controllers.db_helpers import update_upload_status, get_upload_status
 from controllers.background_tasks import format_uploaded_transcript_background
@@ -75,7 +76,6 @@ def process_upload_background(
     video_id: str, user_id: str, temp_path: str, original_filename: str
 ):
     vid = video_id
-    from utils.db import SessionLocal
 
     db = SessionLocal()
     uploaded_s3_objects = []
@@ -181,7 +181,16 @@ def process_upload_background(
                 "total_steps": 6,
             },
         )
-        transcript_text = transcribe_video_with_deepgram(temp_path)
+        transcript_text = ""
+        # Prefer server-to-server URL pull by Deepgram to avoid write timeouts
+        try:
+            presigned = s3_presign_url(s3_key, expires_in=60 * 60 * 12)
+            transcript_text = transcribe_video_with_deepgram_url(presigned)
+        except Exception:
+            transcript_text = ""
+        # Fallback to local chunked transcription if URL approach fails
+        if not transcript_text:
+            transcript_text = transcribe_video_with_deepgram(temp_path)
         if transcript_text:
             with tempfile.NamedTemporaryFile(
                 "w", encoding="utf-8", delete=False, suffix=".txt"
@@ -234,10 +243,6 @@ def process_upload_background(
             )
             db.add(video_row)
             db.commit()
-        if transcript_text:
-            format_uploaded_transcript_background(
-                vid, transcript_text, original_filename or "Uploaded Video"
-            )
         update_upload_status(
             db,
             vid,
@@ -268,6 +273,10 @@ def process_upload_background(
         rollback_upload()
         raise
     finally:
+        if transcript_text:
+            format_uploaded_transcript_background(
+                vid, transcript_text, original_filename or "Uploaded Video"
+            )
         try:
             db.close()
         except Exception:
