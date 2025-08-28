@@ -92,7 +92,10 @@ def format_transcript_background(video_id: str, json_data: dict):
         formatted_transcript_lines = create_formatted_transcript(
             json_data, video_id=video_id
         )
-        formatted_transcript_text = "".join(formatted_transcript_lines)
+        # Ensure all items are strings before join to avoid type errors
+        formatted_transcript_text = "".join(
+            [str(line) for line in formatted_transcript_lines]
+        )
         transcript_s3_key = None
         if s3_client and AWS_S3_BUCKET and formatted_transcript_text:
             temp_transcript_path = os.path.join(
@@ -165,7 +168,9 @@ def format_uploaded_transcript_background(
         formatted_transcript_lines = create_formatted_transcript(
             transcript_data, video_id=video_id
         )
-        formatted_transcript_text = "".join(formatted_transcript_lines)
+        formatted_transcript_text = "".join(
+            [str(line) for line in formatted_transcript_lines]
+        )
         transcript_s3_key = None
         if s3_client and AWS_S3_BUCKET and formatted_transcript_text:
             temp_transcript_path = os.path.join(

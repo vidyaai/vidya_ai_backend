@@ -135,11 +135,7 @@ async def get_youtube_info(
             pass
     formatting_message = "Transcript not formatted"
     status = get_formatting_status(db, video_id)
-    if status["status"] != "not_found":
-        formatting_message = (
-            f"Formatting status: {status['status']} - {status['message']}"
-        )
-    else:
+    if status["status"] == "not_found":
         if json_data:
             formatting_executor.submit(
                 format_transcript_background, video_id, json_data
@@ -147,6 +143,21 @@ async def get_youtube_info(
             formatting_message = "AI transcript formatting started in background"
         else:
             formatting_message = "No JSON data available for formatting"
+    elif status["status"] == "failed":
+        # Retry formatting if previous attempt failed and json data is available
+        if json_data:
+            formatting_executor.submit(
+                format_transcript_background, video_id, json_data
+            )
+            formatting_message = "Retrying AI transcript formatting in background"
+        else:
+            formatting_message = (
+                f"Formatting status: {status['status']} - {status['message']}"
+            )
+    else:
+        formatting_message = (
+            f"Formatting status: {status['status']} - {status['message']}"
+        )
     video_url = None
     thumbnail_url = None
     formatted_transcript_url = None

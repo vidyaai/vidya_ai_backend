@@ -52,7 +52,10 @@ def group_subtitles(
         else:
             # Finalize current group
             combined_text = " ".join(
-                [item.get("text", item.get("subtitle", "")) for item in current_group]
+                [
+                    str(item.get("text", item.get("subtitle", "")))
+                    for item in current_group
+                ]
             )
             groups.append(
                 {"start": current_start, "end": current_end, "text": combined_text}
@@ -66,7 +69,7 @@ def group_subtitles(
     # Add the last group
     if current_group:
         combined_text = " ".join(
-            [item.get("text", item.get("subtitle", "")) for item in current_group]
+            [str(item.get("text", item.get("subtitle", ""))) for item in current_group]
         )
         groups.append(
             {"start": current_start, "end": current_end, "text": combined_text}
