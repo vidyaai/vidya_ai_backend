@@ -6,6 +6,11 @@ from dotenv import load_dotenv
 import boto3
 from botocore.client import Config as BotoConfig
 
+try:
+    from deepgram import DeepgramClient  # type: ignore
+except Exception:  # pragma: no cover - optional dependency at import time
+    DeepgramClient = None  # type: ignore
+
 
 # Basic logging
 logging.basicConfig(level=logging.INFO)
@@ -38,6 +43,7 @@ load_dotenv()
 AWS_S3_BUCKET = os.environ.get("AWS_S3_BUCKET", "")
 AWS_S3_REGION = os.environ.get("AWS_S3_REGION", "us-east-1")
 AWS_S3_ENDPOINT = os.environ.get("AWS_S3_ENDPOINT", "")
+DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 
 
 def create_s3_client():
@@ -62,3 +68,17 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize S3 client: {e}")
     s3_client = None
+
+# Deepgram client
+deepgram_client = None
+try:
+    if DEEPGRAM_API_KEY and DeepgramClient is not None:
+        deepgram_client = DeepgramClient(DEEPGRAM_API_KEY)
+        logger.info("Deepgram client initialized.")
+    elif not DEEPGRAM_API_KEY:
+        logger.warning("DEEPGRAM_API_KEY not set. Deepgram features disabled.")
+    else:
+        logger.warning("Deepgram SDK not available. Install deepgram-sdk to enable.")
+except Exception as e:
+    logger.error(f"Failed to initialize Deepgram client: {e}")
+    deepgram_client = None

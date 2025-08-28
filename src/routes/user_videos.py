@@ -17,7 +17,7 @@ from controllers.storage import (
     s3_upload_file,
     s3_presign_url,
     generate_thumbnail,
-    transcribe_video_with_openai,
+    transcribe_video_with_deepgram,
 )
 from controllers.db_helpers import update_upload_status, get_upload_status
 from controllers.background_tasks import format_uploaded_transcript_background
@@ -181,7 +181,7 @@ def process_upload_background(
                 "total_steps": 6,
             },
         )
-        transcript_text = transcribe_video_with_openai(temp_path)
+        transcript_text = transcribe_video_with_deepgram(temp_path)
         if transcript_text:
             with tempfile.NamedTemporaryFile(
                 "w", encoding="utf-8", delete=False, suffix=".txt"
@@ -253,7 +253,6 @@ def process_upload_background(
         s3_presign_url(thumb_key, expires_in=3600)
         return
     except Exception as e:
-        rollback_upload()
         update_upload_status(
             db,
             vid,
@@ -266,6 +265,7 @@ def process_upload_background(
                 "error": str(e),
             },
         )
+        rollback_upload()
         raise
     finally:
         try:

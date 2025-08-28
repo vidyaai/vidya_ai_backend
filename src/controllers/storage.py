@@ -1,7 +1,11 @@
 import cv2
+import os
+import mimetypes
+import subprocess
+import tempfile
 from typing import Optional
 from fastapi import HTTPException
-from .config import s3_client, AWS_S3_BUCKET
+from .config import s3_client, AWS_S3_BUCKET, deepgram_client
 
 
 def s3_upload_file(
@@ -60,3 +64,135 @@ def transcribe_video_with_openai(local_video_path: str) -> str:
         return text or ""
     except Exception as e:
         raise Exception(f"OpenAI transcription failed: {str(e)}")
+
+
+def _extract_audio_with_ffmpeg(
+    input_video_path: str, sample_rate: int = 16000
+) -> Optional[str]:
+    """Extract mono WAV audio using ffmpeg. Returns temp file path or None if failed."""
+    try:
+        fd, tmp_wav_path = tempfile.mkstemp(suffix=".wav")
+        os.close(fd)
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            input_video_path,
+            "-vn",
+            "-acodec",
+            "pcm_s16le",
+            "-ar",
+            str(sample_rate),
+            "-ac",
+            "1",
+            tmp_wav_path,
+        ]
+        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        return tmp_wav_path
+    except Exception:
+        try:
+            if "tmp_wav_path" in locals() and os.path.exists(tmp_wav_path):
+                os.remove(tmp_wav_path)
+        except Exception:
+            pass
+        return None
+
+
+def transcribe_video_with_deepgram(local_video_path: str) -> str:
+    """Transcribe a local video/audio file using Deepgram's prerecorded API.
+
+    If the input appears to be a video, attempts ffmpeg audio extraction first.
+    """
+    if not deepgram_client:
+        raise Exception("Deepgram is not configured on server")
+
+    temp_audio_path: Optional[str] = None
+    try:
+        suffix = os.path.splitext(local_video_path)[1].lower()
+        is_video = suffix in [".mp4", ".mov", ".mkv", ".webm", ".avi"]
+        source_path = local_video_path
+        mimetype = (
+            mimetypes.guess_type(local_video_path)[0] or "application/octet-stream"
+        )
+
+        if is_video:
+            # Prefer extracting audio to reduce payload size and ensure supported codec
+            extracted = _extract_audio_with_ffmpeg(local_video_path)
+            if extracted and os.path.exists(extracted):
+                temp_audio_path = extracted
+                source_path = extracted
+                mimetype = "audio/wav"
+
+        with open(source_path, "rb") as f:
+            data = f.read()
+
+        # Lazy import to avoid hard dependency if SDK missing at import time
+        try:
+            from deepgram import PrerecordedOptions  # type: ignore
+        except Exception:
+            PrerecordedOptions = None  # type: ignore
+
+        options = None
+        if PrerecordedOptions is not None:
+            options = PrerecordedOptions(
+                model="nova-2",
+                smart_format=True,
+                punctuate=True,
+            )
+
+        # Prepare payload for Deepgram v4 SDK
+        payload = {"buffer": data}
+        # include mimetype if we know it (harmless, sometimes improves detection)
+        if mimetype:
+            payload["mimetype"] = mimetype
+
+        # Perform request (sync) using v4 client path
+        response = deepgram_client.listen.rest.v("1").transcribe_file(payload, options)
+
+        # Extract transcript text robustly
+        transcript_text = ""
+        try:
+            # dict-like access
+            results = (
+                response.get("results")
+                if isinstance(response, dict)
+                else getattr(response, "results", None)
+            )
+            if results:
+                channels = (
+                    results.get("channels")
+                    if isinstance(results, dict)
+                    else getattr(results, "channels", None)
+                )
+                if channels and len(channels) > 0:
+                    alt = (
+                        channels[0].get("alternatives")
+                        if isinstance(channels[0], dict)
+                        else getattr(channels[0], "alternatives", None)
+                    )
+                    if alt and len(alt) > 0:
+                        transcript_text = (
+                            alt[0].get("transcript")
+                            if isinstance(alt[0], dict)
+                            else getattr(alt[0], "transcript", "")
+                        )
+        except Exception:
+            transcript_text = ""
+
+        if not transcript_text:
+            # Fallback: some SDK versions expose top-level transcript string
+            transcript_text = (
+                getattr(response, "transcript", "")
+                if not isinstance(response, dict)
+                else response.get("transcript", "")
+            )
+
+        return transcript_text or ""
+    except Exception as e:
+        raise Exception(f"Deepgram transcription failed: {str(e)}")
+    finally:
+        try:
+            if temp_audio_path and os.path.exists(temp_audio_path):
+                os.remove(temp_audio_path)
+        except Exception:
+            pass
