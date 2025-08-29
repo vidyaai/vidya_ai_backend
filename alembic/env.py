@@ -19,10 +19,14 @@ if config.config_file_name is not None:
 import sys
 import os
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import src.models
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+src_path = os.path.join(project_root, "src")
+if src_path not in sys.path:
+    sys.path.append(src_path)
 
-target_metadata = src.models.Base.metadata
+from utils.db import Base
+
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
