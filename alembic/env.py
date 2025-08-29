@@ -26,7 +26,10 @@ if src_path not in sys.path:
 
 from utils.db import Base
 
+from src.models import *
+
 target_metadata = Base.metadata
+print(target_metadata)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
