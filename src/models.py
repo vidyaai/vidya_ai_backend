@@ -62,6 +62,9 @@ class Video(Base):
     # Upload progress tracking
     upload_status = Column(JSONB, nullable=True)  # Stores upload progress/status
 
+    # Chat history per video per user (array of sessions with messages)
+    chat_sessions = Column(JSONB, nullable=True)
+
     # Organization
     folder_id = Column(String, ForeignKey("folders.id"), nullable=True, index=True)
 
