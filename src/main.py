@@ -2,6 +2,7 @@ from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import uvicorn
+from controllers.config import logger
 from routes.youtube import router as youtube_router
 from routes.user_videos import router as user_videos_router
 from routes.quiz import router as quiz_router
@@ -18,9 +19,40 @@ app = FastAPI(
 )
 
 
+@app.lifespan("startup")
+async def startup_event():
+    logger.info("Vidya AI Backend API starting up...")
+    logger.info("All routes and middleware configured")
+
+
+@app.lifespan("shutdown")
+async def shutdown_event():
+    logger.info("Vidya AI Backend API shutting down...")
+
+
 @app.options("/{path:path}")
 async def options_route(path: str):
     return Response(status_code=200)
+
+
+@app.middleware("http")
+async def logging_middleware(request, call_next):
+    import time
+
+    start_time = time.time()
+
+    # Log incoming request
+    logger.info(f"Incoming request: {request.method} {request.url}")
+
+    response = await call_next(request)
+
+    # Log response time and status
+    process_time = time.time() - start_time
+    logger.info(
+        f"Request completed: {request.method} {request.url} - Status: {response.status_code} - Time: {process_time:.4f}s"
+    )
+
+    return response
 
 
 @app.middleware("http")
@@ -54,6 +86,7 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
+    logger.info("Health check endpoint accessed")
     return {"status": "Vidya AI backend is running"}
 
 
@@ -68,4 +101,12 @@ app.include_router(query_router)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+    logger.info(f"Starting Vidya AI Backend on port {port}")
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=port,
+        reload=False,
+        log_level="info",
+        access_log=True,
+    )
