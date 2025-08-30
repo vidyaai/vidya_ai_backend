@@ -12,8 +12,29 @@ except Exception:  # pragma: no cover - optional dependency at import time
     DeepgramClient = None  # type: ignore
 
 
-# Basic logging
-logging.basicConfig(level=logging.INFO)
+# Basic logging configuration with file output
+import sys
+from logging.handlers import RotatingFileHandler
+
+# Ensure log directory exists
+log_file_path = "/var/log/vidyaai_api.log"
+log_dir = os.path.dirname(log_file_path)
+os.makedirs(log_dir, exist_ok=True)
+
+# Configure logging with both file and console handlers
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        # File handler with rotation
+        RotatingFileHandler(
+            log_file_path, maxBytes=10 * 1024 * 1024, backupCount=5  # 10MB
+        ),
+        # Console handler for development
+        logging.StreamHandler(sys.stdout),
+    ],
+)
+
 logger = logging.getLogger(__name__)
 
 
