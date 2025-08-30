@@ -19,17 +19,6 @@ app = FastAPI(
 )
 
 
-@app.lifespan("startup")
-async def startup_event():
-    logger.info("Vidya AI Backend API starting up...")
-    logger.info("All routes and middleware configured")
-
-
-@app.lifespan("shutdown")
-async def shutdown_event():
-    logger.info("Vidya AI Backend API shutting down...")
-
-
 @app.options("/{path:path}")
 async def options_route(path: str):
     return Response(status_code=200)
