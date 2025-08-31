@@ -19,11 +19,6 @@ app = FastAPI(
 )
 
 
-@app.options("/{path:path}")
-async def options_route(path: str):
-    return Response(status_code=200)
-
-
 @app.middleware("http")
 async def logging_middleware(request, call_next):
     import time
