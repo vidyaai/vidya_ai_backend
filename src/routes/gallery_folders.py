@@ -12,9 +12,37 @@ from schemas import (
     DeleteFolderRequest,
 )
 from utils.firebase_auth import get_current_user
+from controllers.config import s3_client, AWS_S3_BUCKET
 
 
 router = APIRouter(tags=["Gallery & Folders"], prefix="/api")
+
+
+def delete_video_s3_objects(video: Video) -> None:
+    """Delete S3 objects associated with an uploaded video."""
+    if not s3_client or not AWS_S3_BUCKET:
+        return
+
+    # Delete main video file
+    if video.s3_key:
+        try:
+            s3_client.delete_object(Bucket=AWS_S3_BUCKET, Key=video.s3_key)
+        except Exception:
+            pass  # Continue deleting other objects even if one fails
+
+    # Delete thumbnail
+    if video.thumb_key:
+        try:
+            s3_client.delete_object(Bucket=AWS_S3_BUCKET, Key=video.thumb_key)
+        except Exception:
+            pass
+
+    # Delete transcript
+    if video.transcript_s3_key:
+        try:
+            s3_client.delete_object(Bucket=AWS_S3_BUCKET, Key=video.transcript_s3_key)
+        except Exception:
+            pass
 
 
 @router.post("/folders", response_model=FolderOut)
@@ -103,20 +131,13 @@ def delete_video(
         raise HTTPException(status_code=404, detail="Video not found")
 
     # For uploaded videos, check user ownership
-    if v.source_type == "uploaded" and v.user_id != current_user["uid"]:
+    if v.user_id != current_user["uid"]:
         raise HTTPException(
             status_code=403, detail="Not authorized to delete this video"
         )
 
-    # For YouTube videos, allow deletion if user has access (no user_id check needed)
-
-    # TODO: Delete associated S3 objects if this is an uploaded video
-    # if v.s3_key:
-    #     delete from S3
-    # if v.thumb_key:
-    #     delete from S3
-    # if v.transcript_s3_key:
-    #     delete from S3
+    # Delete associated S3 objects if this is an uploaded video
+    delete_video_s3_objects(v)
 
     db.delete(v)
     db.commit()
@@ -161,7 +182,8 @@ def delete_folder(
     # Delete all videos in the folder if confirmed
     if videos_in_folder and req.confirm_delete_videos:
         for video in videos_in_folder:
-            # TODO: Delete associated S3 objects for uploaded videos
+            # Delete associated S3 objects for uploaded videos
+            delete_video_s3_objects(video)
             db.delete(video)
 
     # Delete the folder
