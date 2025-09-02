@@ -43,6 +43,15 @@ class MoveVideoRequest(BaseModel):
     target_folder_id: Optional[str]
 
 
+class DeleteVideoRequest(BaseModel):
+    video_id: str
+
+
+class DeleteFolderRequest(BaseModel):
+    folder_id: str
+    confirm_delete_videos: bool = False
+
+
 # Requests used by routes
 class YouTubeRequest(BaseModel):
     url: str
