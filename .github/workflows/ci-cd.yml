@@ -38,8 +38,8 @@ jobs:
           pip install -r requirements.txt
       - name: Create Firebase Config file
         run: |
-          touch ${{ secrets.FIREBASE_CONFIG }}
-          cat <<EOF >${{ secrets.FIREBASE_CONFIG }}
+          touch src/${{ secrets.FIREBASE_CONFIG }}
+          cat <<EOF >src/${{ secrets.FIREBASE_CONFIG }}
           ${{ secrets.FIREBASE_CONFIG_CONTENT }}
           EOF
       - name: Create .env file
@@ -70,8 +70,8 @@ jobs:
             cd vidya_ai_backend
             pip install -r requirements.txt
             pip install gunicorn
-            touch ${{ secrets.FIREBASE_CONFIG }}
-            cat <<EOF >${{ secrets.FIREBASE_CONFIG }}
+            touch src/${{ secrets.FIREBASE_CONFIG }}
+            cat <<EOF >src/${{ secrets.FIREBASE_CONFIG }}
             ${{ secrets.FIREBASE_CONFIG_CONTENT }}
             EOF
             touch .env
