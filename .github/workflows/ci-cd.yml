@@ -62,12 +62,14 @@ jobs:
           key: ${{ secrets.PROD_KEY }}
           script: |
             sudo systemctl stop vidyaai_backend_gunicorn
+            sudo rm -r venv
             sudo rm -r vidya_ai_backend
             git clone https://github.com/vidyaai/vidya_ai_backend.git
             python3.13 -m venv venv
             source venv/bin/activate
             cd vidya_ai_backend
             pip install -r requirements.txt
+            pip install gunicorn
             touch ${{ secrets.FIREBASE_CONFIG }}
             cat <<EOF >${{ secrets.FIREBASE_CONFIG }}
             ${{ secrets.FIREBASE_CONFIG_CONTENT }}
