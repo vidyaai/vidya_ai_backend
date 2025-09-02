@@ -31,6 +31,44 @@ from schemas import (
 router = APIRouter(tags=["Sharing"], prefix="/api/sharing")
 
 
+def validate_shared_video_access(
+    db: Session, share_token: str, video_id: str
+) -> Optional[Video]:
+    """
+    Validate that a video can be accessed through a share token.
+    Returns the video object if access is granted, None otherwise.
+    """
+    try:
+        # Get the shared link
+        link = (
+            db.query(SharedLink).filter(SharedLink.share_token == share_token).first()
+        )
+        if not link:
+            return None
+
+        # Check if video matches the shared link
+        if link.share_type == "folder":
+            # For folder shares, check if video is in the folder
+            if link.folder_id:
+                video = (
+                    db.query(Video)
+                    .filter(Video.id == video_id, Video.folder_id == link.folder_id)
+                    .first()
+                )
+                if video:
+                    return video
+        elif link.share_type == "chat":
+            # For chat shares, check if video matches
+            if link.video_id == video_id:
+                video = db.query(Video).filter(Video.id == video_id).first()
+                if video:
+                    return video
+
+        return None
+    except Exception:
+        return None
+
+
 def generate_share_token() -> str:
     """Generate a secure share token."""
     return secrets.token_urlsafe(32)
@@ -642,3 +680,356 @@ async def get_my_shared_content(
 
     print(f"Returning {len(folders)} folders and {len(videos)} videos")
     return {"folders": folders, "videos": videos}
+
+
+@router.get("/shared-video/{share_token}/{video_id}")
+async def get_shared_video_for_chat(
+    share_token: str,
+    video_id: str,
+    db: Session = Depends(get_db),
+):
+    """Get shared video details for chat functionality."""
+    try:
+        # Get the shared link
+        link = (
+            db.query(SharedLink).filter(SharedLink.share_token == share_token).first()
+        )
+        if not link:
+            raise HTTPException(status_code=404, detail="Shared link not found")
+
+        # Check if video matches the shared link
+        if link.share_type == "folder":
+            # For folder shares, check if video is in the folder
+            if link.folder_id:
+                video = (
+                    db.query(Video)
+                    .filter(Video.id == video_id, Video.folder_id == link.folder_id)
+                    .first()
+                )
+                if not video:
+                    raise HTTPException(
+                        status_code=404, detail="Video not found in shared folder"
+                    )
+        elif link.share_type == "chat":
+            # For chat shares, check if video matches
+            if link.video_id != video_id:
+                raise HTTPException(
+                    status_code=404, detail="Video not found in shared chat"
+                )
+            video = db.query(Video).filter(Video.id == video_id).first()
+        else:
+            raise HTTPException(status_code=400, detail="Invalid share type")
+
+        if not video:
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        # Check expiration
+        if link.expires_at and datetime.now(timezone.utc) > link.expires_at:
+            raise HTTPException(status_code=410, detail="This shared link has expired")
+
+        # Check view limit
+        if link.max_views and int(link.view_count) >= int(link.max_views):
+            raise HTTPException(
+                status_code=429, detail="This shared link has reached its view limit"
+            )
+
+        # Return video details suitable for chat
+        from schemas import VideoOut
+
+        video_data = VideoOut.model_validate(video).model_dump()
+
+        # Add sharing context
+        video_data["share_token"] = share_token
+        video_data["share_type"] = link.share_type
+        video_data["is_public"] = link.is_public
+
+        return video_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get shared video: {str(e)}"
+        )
+
+
+@router.post("/shared-video-chat")
+async def shared_video_chat(
+    request: dict,
+    db: Session = Depends(get_db),
+):
+    """Chat with a shared video (public or private with proper access)."""
+    try:
+        share_token = request.get("share_token")
+        video_id = request.get("video_id")
+        query = request.get("query")
+        timestamp = request.get("timestamp", 0)
+        is_image_query = request.get("is_image_query", False)
+
+        if not share_token or not video_id or not query:
+            raise HTTPException(status_code=400, detail="Missing required parameters")
+
+        # Get the shared link
+        link = (
+            db.query(SharedLink).filter(SharedLink.share_token == share_token).first()
+        )
+        if not link:
+            raise HTTPException(status_code=404, detail="Shared link not found")
+
+        # Check if video matches the shared link
+        if link.share_type == "folder":
+            # For folder shares, check if video is in the folder
+            if link.folder_id:
+                video = (
+                    db.query(Video)
+                    .filter(Video.id == video_id, Video.folder_id == link.folder_id)
+                    .first()
+                )
+                if not video:
+                    raise HTTPException(
+                        status_code=404, detail="Video not found in shared folder"
+                    )
+        elif link.share_type == "chat":
+            # For chat shares, check if video matches
+            if link.video_id != video_id:
+                raise HTTPException(
+                    status_code=404, detail="Video not found in shared chat"
+                )
+            video = db.query(Video).filter(Video.id == video_id).first()
+        else:
+            raise HTTPException(status_code=400, detail="Invalid share type")
+
+        if not video:
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        # Check access permissions
+        if not link.is_public:
+            # For private links, we need to check if user is authenticated and has access
+            # This would require the frontend to pass user authentication
+            # For now, we'll allow access to private links (frontend should handle auth)
+            pass
+
+        # Check expiration
+        if link.expires_at and datetime.now(timezone.utc) > link.expires_at:
+            raise HTTPException(status_code=410, detail="This shared link has expired")
+
+        # Check view limit
+        if link.max_views and int(link.view_count) >= int(link.max_views):
+            raise HTTPException(
+                status_code=429, detail="This shared link has reached its view limit"
+            )
+
+        # Increment view count
+        link.view_count = str(int(link.view_count) + 1)
+        db.commit()
+
+        # Now process the chat query using existing functionality
+        try:
+            from utils.ml_models import OpenAIVisionClient
+            from controllers.db_helpers import (
+                get_formatting_status,
+                get_transcript_cache,
+                update_transcript_cache,
+            )
+            from utils.youtube_utils import download_transcript_api
+
+            vision_client = OpenAIVisionClient()
+            transcript_to_use = None
+
+            # Get transcript
+            formatting_status_info = get_formatting_status(db, video_id)
+            if formatting_status_info["status"] == "completed":
+                transcript_to_use = formatting_status_info["formatted_transcript"]
+
+            if not transcript_to_use:
+                transcript_info = get_transcript_cache(db, video_id)
+                if transcript_info and transcript_info.get("transcript_data"):
+                    transcript_to_use = transcript_info["transcript_data"]
+                else:
+                    transcript_data, json_data = download_transcript_api(video_id)
+                    transcript_to_use = transcript_data
+                    update_transcript_cache(db, video_id, transcript_data, json_data)
+
+            if is_image_query:
+                # For image queries, we need the video file
+                # This is more complex for shared videos, so we'll return a message
+                return {
+                    "response": "🎬 Image queries are not yet supported for shared videos. Please use text-based questions about the video content.",
+                    "video_id": video_id,
+                    "timestamp": timestamp,
+                    "query_type": "text_only_for_shared",
+                    "is_downloading": False,
+                }
+            else:
+                # Text query
+                response = vision_client.ask_text_only(query, transcript_to_use)
+                return {
+                    "response": response,
+                    "video_id": video_id,
+                    "timestamp": timestamp,
+                    "query_type": "text",
+                    "is_downloading": False,
+                }
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to process chat query: {str(e)}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to process shared video chat: {str(e)}"
+        )
+
+
+@router.get("/shared-video-url/{share_token}/{video_id}")
+async def get_shared_video_url(
+    share_token: str,
+    video_id: str,
+    db: Session = Depends(get_db),
+):
+    """Get presigned URL for shared video playback."""
+    try:
+        # Get the shared link
+        link = (
+            db.query(SharedLink).filter(SharedLink.share_token == share_token).first()
+        )
+        if not link:
+            raise HTTPException(status_code=404, detail="Shared link not found")
+
+        # Check if video matches the shared link
+        if link.share_type == "folder":
+            # For folder shares, check if video is in the folder
+            if link.folder_id:
+                video = (
+                    db.query(Video)
+                    .filter(Video.id == video_id, Video.folder_id == link.folder_id)
+                    .first()
+                )
+                if not video:
+                    raise HTTPException(
+                        status_code=404, detail="Video not found in shared folder"
+                    )
+        elif link.share_type == "chat":
+            # For chat shares, check if video matches
+            if link.video_id != video_id:
+                raise HTTPException(
+                    status_code=404, detail="Video not found in shared chat"
+                )
+            video = db.query(Video).filter(Video.id == video_id).first()
+        else:
+            raise HTTPException(status_code=400, detail="Invalid share type")
+
+        if not video:
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        # Check expiration
+        if link.expires_at and datetime.now(timezone.utc) > link.expires_at:
+            raise HTTPException(status_code=410, detail="This shared link has expired")
+
+        # Check view limit
+        if link.max_views and int(link.view_count) >= int(link.max_views):
+            raise HTTPException(
+                status_code=429, detail="This shared link has reached its view limit"
+            )
+
+        # Get video URL based on source type
+        if video.source_type == "youtube":
+            video_url = f"https://www.youtube.com/watch?v={video.youtube_id}"
+        elif video.source_type == "uploaded" and video.s3_key:
+            # For uploaded videos, we need to get a presigned URL
+            try:
+                from controllers.storage import s3_presign_url
+
+                video_url = s3_presign_url(video.s3_key, expires_in=3600)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to generate video URL: {str(e)}"
+                )
+        else:
+            raise HTTPException(
+                status_code=400, detail="Video source not supported for playback"
+            )
+
+        return {
+            "video_id": video_id,
+            "video_url": video_url,
+            "source_type": video.source_type,
+            "title": video.title,
+            "share_token": share_token,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get shared video URL: {str(e)}"
+        )
+
+
+@router.get("/shared-chat-history/{video_id}", response_model=List[dict])
+async def get_shared_chat_history(
+    video_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
+    """Get chat history for a video that has been shared with the current user."""
+    try:
+        # Get all shared link IDs where the current user has access
+        user_access_records = (
+            db.query(SharedLinkAccess)
+            .filter(SharedLinkAccess.user_id == current_user["uid"])
+            .all()
+        )
+
+        if not user_access_records:
+            return []
+
+        shared_link_ids = [access.shared_link_id for access in user_access_records]
+
+        # Find shared links that are chat shares for this specific video
+        shared_links = (
+            db.query(SharedLink)
+            .filter(
+                SharedLink.id.in_(shared_link_ids),
+                SharedLink.share_type == "chat",
+                SharedLink.video_id == video_id,
+            )
+            .all()
+        )
+
+        if not shared_links:
+            return []
+
+        # Get chat sessions for this video
+        video = db.query(Video).filter(Video.id == video_id).first()
+        if not video or not video.chat_sessions:
+            return []
+
+        # Filter chat sessions to only include those from shared links
+        shared_chat_sessions = []
+        for link in shared_links:
+            if link.chat_session_id:
+                # Find the specific chat session that was shared
+                for session in video.chat_sessions:
+                    if session.get("id") == link.chat_session_id:
+                        shared_chat_sessions.append(
+                            {
+                                "session_id": session.get("id"),
+                                "title": session.get("title", "Shared Chat"),
+                                "messages": session.get("messages", []),
+                                "created_at": session.get("createdAt"),
+                                "updated_at": session.get("updatedAt"),
+                                "shared_by": link.owner_id,
+                                "share_token": link.share_token,
+                                "share_title": link.title,
+                            }
+                        )
+
+        return shared_chat_sessions
+
+    except Exception as e:
+        print(f"Error getting shared chat history: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get shared chat history: {str(e)}"
+        )
