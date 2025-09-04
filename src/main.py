@@ -10,6 +10,7 @@ from routes.gallery_folders import router as gallery_folders_router
 from routes.files import router as files_router
 from routes.misc import router as misc_router
 from routes.query import router as query_router
+from routes.sharing import router as sharing_router
 
 
 app = FastAPI(
@@ -81,6 +82,7 @@ app.include_router(gallery_folders_router)
 app.include_router(files_router)
 app.include_router(misc_router)
 app.include_router(query_router)
+app.include_router(sharing_router)
 
 
 if __name__ == "__main__":

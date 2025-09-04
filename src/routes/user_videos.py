@@ -24,6 +24,7 @@ from controllers.storage import (
 from controllers.db_helpers import update_upload_status, get_upload_status
 from controllers.background_tasks import format_uploaded_transcript_background
 from utils.firebase_auth import get_current_user
+from models import SharedLink, SharedLinkAccess
 
 
 router = APIRouter(prefix="/api/user-videos", tags=["User Videos"])
@@ -329,58 +330,124 @@ async def list_user_videos(
 
 
 @router.get("/info")
-async def get_user_video_info(video_id: str, db: Session = Depends(get_db)):
-    v: Video = (
-        db.query(Video)
-        .filter(Video.id == video_id, Video.source_type == "uploaded")
-        .first()
-    )
-    if not v:
-        raise HTTPException(status_code=404, detail="Unknown video_id")
+async def get_user_video_info(
+    video_id: str, share_token: str = None, db: Session = Depends(get_db)
+):
+    # If share_token is provided, validate it and get video info for shared videos
+    if share_token:
+        from routes.sharing import validate_shared_video_access
+
+        # Validate the shared video access
+        video = validate_shared_video_access(db, share_token, video_id)
+        if not video:
+            raise HTTPException(
+                status_code=404, detail="Video not found in shared content"
+            )
+    else:
+        # Regular user video lookup (existing behavior)
+        video = (
+            db.query(Video)
+            .filter(Video.id == video_id, Video.source_type == "uploaded")
+            .first()
+        )
+        if not video:
+            raise HTTPException(status_code=404, detail="Unknown video_id")
+
     try:
         video_url = (
-            s3_presign_url(v.s3_key, expires_in=3600)
-            if (s3_client and AWS_S3_BUCKET and v.s3_key)
+            s3_presign_url(video.s3_key, expires_in=3600)
+            if (s3_client and AWS_S3_BUCKET and video.s3_key)
             else None
         )
         thumb_url = (
-            s3_presign_url(v.thumb_key, expires_in=3600)
-            if (s3_client and AWS_S3_BUCKET and v.thumb_key)
+            s3_presign_url(video.thumb_key, expires_in=3600)
+            if (s3_client and AWS_S3_BUCKET and video.thumb_key)
             else None
         )
     except Exception:
         video_url = None
         thumb_url = None
-    transcript_text = v.transcript_text or ""
-    if not transcript_text and s3_client and AWS_S3_BUCKET and v.transcript_s3_key:
+
+    transcript_text = video.transcript_text or ""
+    if not transcript_text and s3_client and AWS_S3_BUCKET and video.transcript_s3_key:
         try:
-            obj = s3_client.get_object(Bucket=AWS_S3_BUCKET, Key=v.transcript_s3_key)
+            obj = s3_client.get_object(
+                Bucket=AWS_S3_BUCKET, Key=video.transcript_s3_key
+            )
             transcript_text = obj["Body"].read().decode("utf-8")
-            v.transcript_text = transcript_text
-            db.add(v)
+            video.transcript_text = transcript_text
+            db.add(video)
             db.commit()
         except Exception:
             pass
+
     return {
-        "video_id": v.id,
-        "title": v.title or "Uploaded Video",
+        "video_id": video.id,
+        "title": video.title or "Uploaded Video",
         "video_url": video_url,
         "thumbnail_url": thumb_url,
         "transcript": transcript_text,
-        "chat_sessions": v.chat_sessions or [],
+        "chat_sessions": video.chat_sessions or [],
+        "source_type": video.source_type,
+        "youtube_id": video.youtube_id,
+        "youtube_url": video.youtube_url,
+        "s3_key": video.s3_key,
     }
 
 
 @router.get("/chat-sessions")
 async def get_chat_sessions(
-    video_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    video_id: str,
+    share_id: str = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
+    # If share_id is provided, validate shared access
+    if share_id:
+        from routes.sharing import validate_shared_video_access
+
+        # Get the shared link to validate access
+        shared_link = db.query(SharedLink).filter(SharedLink.id == share_id).first()
+        if not shared_link:
+            raise HTTPException(status_code=404, detail="Shared link not found")
+
+        # Check if user has access to this shared link
+        has_access = (
+            shared_link.owner_id == current_user["uid"]
+            or db.query(SharedLinkAccess)
+            .filter(
+                SharedLinkAccess.shared_link_id == share_id,
+                SharedLinkAccess.user_id == current_user["uid"],
+            )
+            .first()
+            is not None
+        )
+
+        if not has_access:
+            raise HTTPException(
+                status_code=403, detail="Access denied to shared content"
+            )
+
+        # Validate that the video matches the shared link
+        if shared_link.share_type == "chat" and shared_link.video_id == video_id:
+            v = db.query(Video).filter(Video.id == video_id).first()
+            if not v:
+                raise HTTPException(status_code=404, detail="Video not found")
+            return {"video_id": video_id, "chat_sessions": v.chat_sessions or []}
+        else:
+            raise HTTPException(
+                status_code=404, detail="Video not found in shared content"
+            )
+
+    # Regular user video lookup (existing behavior)
     v: Video = db.query(Video).filter(Video.id == video_id).first()
     if not v:
         raise HTTPException(status_code=404, detail="Unknown video_id")
+
     # Optional: enforce user ownership if present on video
     if v.user_id and v.user_id != current_user["uid"]:
         raise HTTPException(status_code=403, detail="Forbidden")
+
     return {"video_id": video_id, "chat_sessions": v.chat_sessions or []}
 
 
