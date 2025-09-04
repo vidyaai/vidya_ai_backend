@@ -39,7 +39,7 @@ async def get_current_user(
         )
     token = authorization.split(" ", 1)[1]
     try:
-        decoded = fb_auth.verify_id_token(token)
+        decoded = fb_auth.verify_id_token(token, check_revoked=False)
         return decoded
     except Exception:
         raise HTTPException(
