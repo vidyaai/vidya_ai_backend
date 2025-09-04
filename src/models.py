@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, DateTime, Text, Enum, ForeignKey
+from sqlalchemy import Column, String, DateTime, Text, Enum, ForeignKey, Boolean
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from utils.db import Base
@@ -71,3 +71,68 @@ class Video(Base):
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     folder = relationship("Folder", back_populates="videos")
+
+
+class ShareTypeEnum(str):
+    FOLDER = "folder"
+    CHAT = "chat"
+
+
+class SharedLink(Base):
+    __tablename__ = "shared_links"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    share_token = Column(
+        String, unique=True, nullable=False, index=True
+    )  # Public shareable token
+    owner_id = Column(String, nullable=False, index=True)  # Firebase UID of the owner
+    share_type = Column(String, nullable=False)  # "folder" or "chat"
+
+    # Resource identifiers
+    folder_id = Column(String, ForeignKey("folders.id"), nullable=True)
+    video_id = Column(String, ForeignKey("videos.id"), nullable=True)
+    chat_session_id = Column(String, nullable=True)  # For specific chat session sharing
+
+    # Sharing settings
+    is_public = Column(
+        Boolean, default=False
+    )  # True for public links, False for invite-only
+    title = Column(String, nullable=True)  # Custom title for the shared link
+    description = Column(String, nullable=True)  # Optional description
+
+    # Access control
+    expires_at = Column(DateTime, nullable=True)  # Optional expiration date
+    max_views = Column(String, nullable=True)  # Optional view limit
+    view_count = Column(String, default="0")  # Current view count
+
+    # Metadata
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=datetime.now(timezone.utc),
+        onupdate=datetime.now(timezone.utc),
+    )
+
+    # Relationships
+    folder = relationship("Folder")
+    video = relationship("Video")
+    shared_accesses = relationship(
+        "SharedLinkAccess", back_populates="shared_link", cascade="all, delete-orphan"
+    )
+
+
+class SharedLinkAccess(Base):
+    __tablename__ = "shared_link_access"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    shared_link_id = Column(String, ForeignKey("shared_links.id"), nullable=False)
+    user_id = Column(String, nullable=False, index=True)  # Firebase UID of invited user
+    permission = Column(String, default="view")  # "view" or "edit"
+
+    # Status tracking
+    invited_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    accessed_at = Column(DateTime, nullable=True)  # First access time
+    last_accessed_at = Column(DateTime, nullable=True)  # Last access time
+
+    # Relationships
+    shared_link = relationship("SharedLink", back_populates="shared_accesses")
