@@ -25,7 +25,7 @@ from controllers.db_helpers import update_upload_status, get_upload_status
 from controllers.background_tasks import format_uploaded_transcript_background
 from utils.firebase_auth import get_current_user
 from models import SharedLink, SharedLinkAccess
-from sharing import validate_shared_video_access
+from routes.sharing import validate_shared_video_access
 
 
 router = APIRouter(prefix="/api/user-videos", tags=["User Videos"])
