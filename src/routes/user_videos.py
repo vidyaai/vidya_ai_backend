@@ -25,6 +25,7 @@ from controllers.db_helpers import update_upload_status, get_upload_status
 from controllers.background_tasks import format_uploaded_transcript_background
 from utils.firebase_auth import get_current_user
 from models import SharedLink, SharedLinkAccess
+from sharing import validate_shared_video_access
 
 
 router = APIRouter(prefix="/api/user-videos", tags=["User Videos"])
@@ -335,8 +336,6 @@ async def get_user_video_info(
 ):
     # If share_token is provided, validate it and get video info for shared videos
     if share_token:
-        from routes.sharing import validate_shared_video_access
-
         # Validate the shared video access
         video = validate_shared_video_access(db, share_token, video_id)
         if not video:
@@ -404,8 +403,6 @@ async def get_chat_sessions(
 ):
     # If share_id is provided, validate shared access
     if share_id:
-        from routes.sharing import validate_shared_video_access
-
         # Get the shared link to validate access
         shared_link = db.query(SharedLink).filter(SharedLink.id == share_id).first()
         if not shared_link:

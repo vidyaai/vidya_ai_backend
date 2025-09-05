@@ -27,6 +27,14 @@ from schemas import (
     FolderOut,
     VideoOut,
 )
+from utils.ml_models import OpenAIVisionClient
+from controllers.db_helpers import (
+    get_formatting_status,
+    get_transcript_cache,
+    update_transcript_cache,
+)
+from utils.youtube_utils import download_transcript_api
+from controllers.storage import s3_presign_url
 
 router = APIRouter(tags=["Sharing"], prefix="/api/sharing")
 
@@ -734,8 +742,6 @@ async def get_shared_video_for_chat(
             )
 
         # Return video details suitable for chat
-        from schemas import VideoOut
-
         video_data = VideoOut.model_validate(video).model_dump()
 
         # Add sharing context
@@ -825,14 +831,6 @@ async def shared_video_chat(
 
         # Now process the chat query using existing functionality
         try:
-            from utils.ml_models import OpenAIVisionClient
-            from controllers.db_helpers import (
-                get_formatting_status,
-                get_transcript_cache,
-                update_transcript_cache,
-            )
-            from utils.youtube_utils import download_transcript_api
-
             vision_client = OpenAIVisionClient()
             transcript_to_use = None
 
@@ -941,8 +939,6 @@ async def get_shared_video_url(
         elif video.source_type == "uploaded" and video.s3_key:
             # For uploaded videos, we need to get a presigned URL
             try:
-                from controllers.storage import s3_presign_url
-
                 video_url = s3_presign_url(video.s3_key, expires_in=3600)
             except Exception as e:
                 raise HTTPException(
