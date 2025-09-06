@@ -1,4 +1,5 @@
 """Sharing functionality routes for folders and chat sessions."""
+import os
 import secrets
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -6,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 
+from controllers.background_tasks import download_video_background
+from controllers.config import download_executor, frames_path
 from utils.db import get_db
 from utils.firebase_auth import get_current_user
 from utils.firebase_users import (
@@ -29,11 +32,13 @@ from schemas import (
 )
 from utils.ml_models import OpenAIVisionClient
 from controllers.db_helpers import (
+    get_download_status,
     get_formatting_status,
     get_transcript_cache,
+    get_video_path,
     update_transcript_cache,
 )
-from utils.youtube_utils import download_transcript_api
+from utils.youtube_utils import download_transcript_api, grab_youtube_frame
 from controllers.storage import s3_presign_url
 
 router = APIRouter(tags=["Sharing"], prefix="/api/sharing")
@@ -849,25 +854,63 @@ async def shared_video_chat(
                     update_transcript_cache(db, video_id, transcript_data, json_data)
 
             if is_image_query:
-                # For image queries, we need the video file
-                # This is more complex for shared videos, so we'll return a message
-                return {
-                    "response": "🎬 Image queries are not yet supported for shared videos. Please use text-based questions about the video content.",
-                    "video_id": video_id,
-                    "timestamp": timestamp,
-                    "query_type": "text_only_for_shared",
-                    "is_downloading": False,
-                }
+                if timestamp is None:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Timestamp is required for image queries",
+                    )
+                video_path_local = get_video_path(db, video_id)
+                if not video_path_local:
+                    download_status_info = get_download_status(db, video_id)
+                    if download_status_info["status"] == "downloading":
+                        return {
+                            "response": "🎬 Something amazing is being loaded! The video is still downloading in the background. Please continue to chat with the video content in the meantime, and try frame-specific questions again in a moment!",
+                            "video_id": video_id,
+                            "timestamp": timestamp,
+                            "query_type": "downloading",
+                            "is_downloading": True,
+                        }
+                    elif download_status_info["status"] == "failed":
+                        raise HTTPException(
+                            status_code=500,
+                            detail=f"Video download failed: {download_status_info['message']}",
+                        )
+                    else:
+                        download_executor.submit(
+                            download_video_background,
+                            video_id,
+                            f"https://www.youtube.com/watch?v={video_id}",
+                        )
+                        return {
+                            "response": "🎬 Something amazing is being loaded! Video download has started in the background. Please continue to chat with the video content in the meantime, and try frame-specific questions again in a moment!",
+                            "video_id": video_id,
+                            "timestamp": timestamp,
+                            "query_type": "downloading",
+                            "is_downloading": True,
+                        }
+                frame_filename = f"frame_{video_id}_{int(timestamp)}.jpg"
+                frame_path = os.path.join(frames_path, frame_filename)
+                output_file, frame = grab_youtube_frame(
+                    video_path_local, timestamp, frame_path
+                )
+                if not output_file:
+                    raise HTTPException(
+                        status_code=500, detail="Frame extraction failed"
+                    )
+                response = vision_client.ask_with_image(
+                    query, frame_path, transcript_to_use
+                )
             else:
                 # Text query
                 response = vision_client.ask_text_only(query, transcript_to_use)
-                return {
-                    "response": response,
-                    "video_id": video_id,
-                    "timestamp": timestamp,
-                    "query_type": "text",
-                    "is_downloading": False,
-                }
+
+            return {
+                "response": response,
+                "video_id": video_id,
+                "timestamp": timestamp,
+                "query_type": "text",
+                "is_downloading": False,
+            }
 
         except Exception as e:
             raise HTTPException(

@@ -441,10 +441,6 @@ async def get_chat_sessions(
     if not v:
         raise HTTPException(status_code=404, detail="Unknown video_id")
 
-    # Optional: enforce user ownership if present on video
-    if v.user_id and v.user_id != current_user["uid"]:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
     return {"video_id": video_id, "chat_sessions": v.chat_sessions or []}
 
 
@@ -458,8 +454,6 @@ async def save_chat_sessions(
     v: Video = db.query(Video).filter(Video.id == video_id).first()
     if not v:
         raise HTTPException(status_code=404, detail="Unknown video_id")
-    if v.user_id and v.user_id != current_user["uid"]:
-        raise HTTPException(status_code=403, detail="Forbidden")
     sessions = payload.get("chat_sessions", [])
     if not isinstance(sessions, list):
         raise HTTPException(status_code=400, detail="chat_sessions must be a list")
