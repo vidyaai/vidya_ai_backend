@@ -10,6 +10,7 @@ except Exception:  # pragma: no cover
     fb_auth = None
 
 from utils.firebase_auth import ensure_firebase_initialized
+from controllers.config import logger
 
 
 async def search_users_by_email(
@@ -52,7 +53,7 @@ async def search_users_by_email(
             page = page.get_next_page() if page.has_next_page else None
 
     except Exception as e:
-        print(f"Error searching users: {e}")
+        logger.error(f"Error searching users: {e}")
         return []
 
     return users
@@ -72,7 +73,7 @@ async def get_user_by_uid(uid: str) -> Optional[Dict[str, Any]]:
             "photoURL": user.photo_url,
         }
     except Exception as e:
-        print(f"Error getting user {uid}: {e}")
+        logger.error(f"Error getting user {uid}: {e}")
         return None
 
 
@@ -83,7 +84,7 @@ async def get_users_by_uids(uids: List[str]) -> List[Dict[str, Any]]:
     if not uids:
         return []
 
-    print(f"Getting users for UIDs: {uids}")
+    logger.debug(f"Getting users for UIDs: {uids}")
 
     users = []
     try:
@@ -103,12 +104,12 @@ async def get_users_by_uids(uids: List[str]) -> List[Dict[str, Any]]:
 
         # Handle users that weren't found
         for not_found in user_records.not_found:
-            print(f"User not found: {not_found.uid}")
+            logger.warning(f"User not found: {not_found.uid}")
 
-        print(f"Successfully retrieved {len(users)} users")
+        logger.debug(f"Successfully retrieved {len(users)} users")
 
     except Exception as e:
-        print(f"Error getting users {uids}: {e}")
+        logger.error(f"Error getting users {uids}: {e}")
 
     return users
 

@@ -89,7 +89,7 @@ def generate_share_token() -> str:
 
 async def populate_user_data(shared_links: List[SharedLink]) -> List[SharedLinkOut]:
     """Populate Firebase user data for shared links."""
-    print(f"Populating user data for {len(shared_links)} links")
+    logger.info(f"Populating user data for {len(shared_links)} links")
 
     # Collect all unique user IDs
     user_ids = set()
@@ -97,19 +97,21 @@ async def populate_user_data(shared_links: List[SharedLink]) -> List[SharedLinkO
         user_ids.add(link.owner_id)
         # Ensure shared_accesses is loaded
         if hasattr(link, "shared_accesses") and link.shared_accesses:
-            print(f"Link {link.id} has {len(link.shared_accesses)} shared accesses")
+            logger.debug(
+                f"Link {link.id} has {len(link.shared_accesses)} shared accesses"
+            )
             for access in link.shared_accesses:
                 user_ids.add(access.user_id)
         else:
-            print(f"Link {link.id} has no shared_accesses or it's not loaded")
+            logger.debug(f"Link {link.id} has no shared_accesses or it's not loaded")
 
-    print(f"Collected user IDs: {user_ids}")
+    logger.debug(f"Collected user IDs: {user_ids}")
 
     # Fetch user data from Firebase
     users_data = await get_users_by_uids(list(user_ids))
     users_map = {user["uid"]: user for user in users_data}
 
-    print(f"Fetched {len(users_data)} users from Firebase")
+    logger.debug(f"Fetched {len(users_data)} users from Firebase")
 
     # Build response with user data
     result = []
@@ -129,7 +131,7 @@ async def populate_user_data(shared_links: List[SharedLink]) -> List[SharedLinkO
 
         result.append(SharedLinkOut(**link_dict))
 
-    print(f"Returning {len(result)} populated links")
+    logger.debug(f"Returning {len(result)} populated links")
     return result
 
 
@@ -250,7 +252,7 @@ async def create_shared_link(
 
     # Return with user data
     populated_links = await populate_user_data([shared_link_with_accesses])
-    print(f"Returning populated link: {populated_links[0]}")
+    logger.debug(f"Returning populated link: {populated_links[0]}")
     return populated_links[0]
 
 
@@ -629,7 +631,7 @@ async def get_my_shared_content(
     db: Session = Depends(get_db), current_user=Depends(get_current_user)
 ):
     """Get all content that has been shared with the current user."""
-    print(f"Getting shared content for user: {current_user['uid']}")
+    logger.info(f"Getting shared content for user: {current_user['uid']}")
 
     # Get shared link IDs where user has access
     access_records = (
@@ -638,13 +640,13 @@ async def get_my_shared_content(
         .all()
     )
 
-    print(f"Found {len(access_records)} access records for user")
+    logger.debug(f"Found {len(access_records)} access records for user")
 
     if not access_records:
         return {"folders": [], "videos": []}
 
     shared_link_ids = [access.shared_link_id for access in access_records]
-    print(f"Shared link IDs: {shared_link_ids}")
+    logger.debug(f"Shared link IDs: {shared_link_ids}")
 
     links = (
         db.query(SharedLink)
@@ -653,7 +655,7 @@ async def get_my_shared_content(
         .all()
     )
 
-    print(f"Found {len(links)} shared links")
+    logger.debug(f"Found {len(links)} shared links")
 
     # Populate user data for all links
     populated_links = await populate_user_data(links)
@@ -677,7 +679,9 @@ async def get_my_shared_content(
                         "videos": [VideoOut.model_validate(v) for v in folder_videos],
                     }
                 )
-                print(f"Added folder: {folder.name} with {len(folder_videos)} videos")
+                logger.debug(
+                    f"Added folder: {folder.name} with {len(folder_videos)} videos"
+                )
 
         elif link.share_type == "chat" and link.video_id:
             video = db.query(Video).filter(Video.id == link.video_id).first()
@@ -689,9 +693,9 @@ async def get_my_shared_content(
                         "chat_session_id": link.chat_session_id,
                     }
                 )
-                print(f"Added video: {video.title}")
+                logger.debug(f"Added video: {video.title}")
 
-    print(f"Returning {len(folders)} folders and {len(videos)} videos")
+    logger.debug(f"Returning {len(folders)} folders and {len(videos)} videos")
     return {"folders": folders, "videos": videos}
 
 
@@ -1068,7 +1072,7 @@ async def get_shared_chat_history(
         return shared_chat_sessions
 
     except Exception as e:
-        print(f"Error getting shared chat history: {str(e)}")
+        logger.error(f"Error getting shared chat history: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Failed to get shared chat history: {str(e)}"
         )

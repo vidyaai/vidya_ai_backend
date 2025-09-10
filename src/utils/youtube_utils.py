@@ -8,7 +8,7 @@ from youtube_transcript_api import YouTubeTranscriptApi
 import http.client
 import requests
 from fastapi import HTTPException
-from controllers.config import video_path
+from controllers.config import video_path, logger
 
 
 def download_youtube_video(
@@ -43,8 +43,8 @@ def download_youtube_video(
         title = data["title"]
         download_url = data["videos"]["items"][0]["url"]
 
-        print(f"Title: {title}")
-        print(f"Downloading...")
+        logger.info(f"Downloading YouTube video: {title}")
+        logger.info(f"Starting download for video ID: {video_id}")
 
         # Download video
         # video_response = requests.get(download_url)
@@ -63,7 +63,7 @@ def download_youtube_video(
                         f.write(chunk)
                         f.flush()  # Ensure data is written to disk
 
-        print(f"***********Downloaded video to: {filename}*******************")
+        logger.info(f"Successfully downloaded video to: {filename}")
 
         # Verify file size is reasonable
         file_size = os.path.getsize(filename)
@@ -143,12 +143,12 @@ def download_video(youtube_url, output_path=video_path, debug=False):
 
     def log(msg):
         if debug:
-            print(msg)
+            logger.debug(msg)
 
     # Extract video ID
     video_id = extract_youtube_id(youtube_url)
     if not video_id:
-        print("ERROR: Invalid YouTube URL")
+        logger.error("Invalid YouTube URL provided")
         return None
 
     # Set file path
@@ -156,7 +156,7 @@ def download_video(youtube_url, output_path=video_path, debug=False):
 
     # Check if file already exists
     if os.path.exists(file_path):
-        print(f"File already exists: {file_path}")
+        logger.info(f"Video file already exists: {file_path}")
         return file_path
 
     # Create output directory if needed
@@ -231,19 +231,21 @@ def download_video(youtube_url, output_path=video_path, debug=False):
                     except Exception as e:
                         log(f"Progress check failed: {e}")
 
-                print("❌ Processing timed out or failed")
+                logger.error("Video processing timed out or failed")
 
             else:
-                print(f"❌ API Response: {data}")
-                print("❌ This API requires contacting them for application use")
-                print("❌ Visit: https://video-download-api.com/")
+                logger.error(f"API Response error: {data}")
+                logger.error("This API requires contacting them for application use")
+                logger.error("Visit: https://video-download-api.com/")
         else:
-            print(f"❌ API failed: {response.status_code} - {response.text}")
+            logger.error(
+                f"API request failed: {response.status_code} - {response.text}"
+            )
 
         return None
 
     except Exception as e:
-        print(f"❌ Error downloading video: {e}")
+        logger.error(f"Error downloading video: {e}")
         return None
 
 
@@ -252,7 +254,7 @@ def download_file_to_path(download_url, file_path, debug=False):
 
     def log(msg):
         if debug:
-            print(msg)
+            logger.debug(msg)
 
     log(f"Downloading from: {download_url[:80]}...")
 
@@ -277,16 +279,18 @@ def download_file_to_path(download_url, file_path, debug=False):
 
             file_size = os.path.getsize(file_path)
             if file_size > 1000:
-                print(f"✅ Downloaded: {file_path} ({file_size / (1024*1024):.1f} MB)")
+                logger.info(
+                    f"Successfully downloaded: {file_path} ({file_size / (1024*1024):.1f} MB)"
+                )
                 return file_path
             else:
-                print(f"❌ File too small: {file_size} bytes")
+                logger.warning(f"Downloaded file too small: {file_size} bytes")
                 os.remove(file_path)
         else:
-            print(f"❌ Download failed: {video_response.status_code}")
+            logger.error(f"Download failed with status: {video_response.status_code}")
 
     except Exception as e:
-        print(f"❌ Download error: {e}")
+        logger.error(f"Download error: {e}")
 
     return None
 
@@ -306,16 +310,16 @@ def download_video1(youtube_url, output_path=".", debug=False):
 
     def log(msg):
         if debug:
-            print(msg)
+            logger.debug(msg)
 
     video_id = extract_youtube_id(youtube_url)
     if not video_id:
-        print("ERROR: Invalid YouTube URL")
+        logger.error("Invalid YouTube URL provided")
         return None
 
     file_path = os.path.join(output_path, f"{video_id}.mp4")
     if os.path.exists(file_path):
-        print(f"File already exists: {file_path}")
+        logger.info(f"Video file already exists: {file_path}")
         return file_path
 
     # Find cookies file
@@ -331,7 +335,7 @@ def download_video1(youtube_url, output_path=".", debug=False):
             break
 
     if not cookie_file:
-        print("WARNING: No cookies.txt file found. YouTube may block download.")
+        logger.warning("No cookies.txt file found. YouTube may block download.")
         return None
 
     log(f"Using cookie file: {cookie_file}")
@@ -359,19 +363,19 @@ def download_video1(youtube_url, output_path=".", debug=False):
             ydl.download([youtube_url])
 
         if os.path.exists(file_path) and os.path.getsize(file_path) > 10000:
-            print(f"Downloaded: {file_path}")
+            logger.info(f"Successfully downloaded: {file_path}")
             return file_path
         else:
             raise Exception("File download failed or incomplete")
     except Exception as e:
-        print(f"ERROR during download: {e}")
+        logger.error(f"Error during download: {e}")
         if "Sign in to confirm you're not a bot" in str(e):
-            print("BOT DETECTION BLOCKED DOWNLOAD.")
-            print("Try the following:")
-            print("1. Login to YouTube in your browser")
-            print("2. Use a cookie exporter like 'Get cookies.txt' extension")
-            print("3. Save cookies to ./cookies.txt")
-            print("4. Retry")
+            logger.error("BOT DETECTION BLOCKED DOWNLOAD.")
+            logger.error("Try the following:")
+            logger.error("1. Login to YouTube in your browser")
+            logger.error("2. Use a cookie exporter like 'Get cookies.txt' extension")
+            logger.error("3. Save cookies to ./cookies.txt")
+            logger.error("4. Retry")
         return None
 
 
@@ -395,10 +399,10 @@ def download_transcript_api1(video_id):
         if "transcript" in transcript_data and transcript_data["transcript"]:
             return transcript_data["transcript"]
         else:
-            print("No transcript data in the response")
+            logger.warning("No transcript data in the response")
             return None
     else:
-        print(f"Error: {response.status_code} - {response.text}")
+        logger.error(f"Transcript API error: {response.status_code} - {response.text}")
         return None
 
 
@@ -427,7 +431,7 @@ def download_transcript_api(video_id):
             ):
                 return transcript_data[0]["transcriptionAsText"], response.json()
             else:
-                print("No transcript data in the response")
+                logger.warning("No transcript data in the response")
                 raise Exception("No transcript data in the response")
         else:
             if "availableLangs" in transcript_data:
@@ -448,12 +452,12 @@ def download_transcript_api(video_id):
                                     response.json(),
                                 )
                             else:
-                                print("No transcript data in the response")
+                                logger.warning("No transcript data in the response")
                                 raise Exception("No transcript data in the response")
-            print("Error: ", transcript_data["error"])
+            logger.error(f"Transcript error: {transcript_data['error']}")
             raise Exception("Transcription Error: ", transcript_data["error"])
     else:
-        print(f"Error: {response.status_code} - {response.text}")
+        logger.error(f"Transcript API error: {response.status_code} - {response.text}")
         raise Exception(
             f"Transcription Error: {response.status_code} - {response.text}"
         )
@@ -533,7 +537,7 @@ def download_transcript(video_url_or_id):
         # print(transcript_text)
         return transcript_text
     except Exception as e:
-        print(f"Error fetching transcript: {e}")
+        logger.error(f"Error fetching transcript: {e}")
         return None
 
 
@@ -556,19 +560,19 @@ def grab_youtube_frame(video_path_func, timestamp, output_file="extracted_frame.
         # Create a temporary directory for video download
 
         video_path = video_path_func
-        print(f"Video downloaded to: {video_path}")
+        logger.info(f"Video downloaded to: {video_path}")
 
         # Open the video with OpenCV
         video = cv2.VideoCapture(video_path)
 
         # Get video properties
         fps = video.get(cv2.CAP_PROP_FPS)
-        print("Video FPS:", fps)
+        logger.info(f"Video FPS: {fps}")
         total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = total_frames / fps
 
-        print(f"Video duration: {duration:.2f} seconds")
-        print(f"FPS: {fps}")
+        logger.info(f"Video duration: {duration:.2f} seconds")
+        logger.info(f"FPS: {fps}")
 
         # Calculate frame number for the given timestamp
         frame_number = int(timestamp * fps)
@@ -588,13 +592,13 @@ def grab_youtube_frame(video_path_func, timestamp, output_file="extracted_frame.
         if ret:
             # Save the frame
             cv2.imwrite(output_file, frame)
-            print(f"Frame saved to: {output_file}")
+            logger.info(f"Frame saved to: {output_file}")
             return output_file, frame
         else:
             raise RuntimeError(f"Failed to extract frame at timestamp {timestamp}")
 
     except Exception as e:
-        print(f"Error: {str(e)}")
+        logger.error(f"Error extracting frame: {str(e)}")
         return None, None
     finally:
         if video is not None:
