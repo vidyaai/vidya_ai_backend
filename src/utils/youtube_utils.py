@@ -12,73 +12,82 @@ from controllers.config import video_path, logger
 
 
 def download_youtube_video(
-    youtube_url,
+    youtube_url, max_retries=3
 ):  # , output_path=video_path, output_filename="video65", resolution="720"):
-    try:
-        # Extract video ID from URL
-        video_id = extract_youtube_id(youtube_url)
-        if not video_id:
-            raise HTTPException(status_code=400, detail="Invalid YouTube URL")
+    for attempt in range(max_retries):
+        try:
+            # Extract video ID from URL
+            video_id = extract_youtube_id(youtube_url)
+            if not video_id:
+                raise HTTPException(status_code=400, detail="Invalid YouTube URL")
 
-        # Get video info from RapidAPI
-        headers = {
-            "x-rapidapi-key": "87cb804577msh2f08e931a0d9bacp19e810jsn4f8fd6ff742b",
-            "x-rapidapi-host": "youtube-media-downloader.p.rapidapi.com",
-        }
+            # Get video info from RapidAPI
+            headers = {
+                "x-rapidapi-key": "87cb804577msh2f08e931a0d9bacp19e810jsn4f8fd6ff742b",
+                "x-rapidapi-host": "youtube-media-downloader.p.rapidapi.com",
+            }
 
-        params = {
-            "videoId": video_id,
-            "urlAccess": "normal",
-            "videos": "auto",
-            "audios": "auto",
-        }
+            params = {
+                "videoId": video_id,
+                "urlAccess": "normal",
+                "videos": "auto",
+                "audios": "auto",
+            }
 
-        response = requests.get(
-            "https://youtube-media-downloader.p.rapidapi.com/v2/video/details",
-            params=params,
-            headers=headers,
-        )
-
-        data = response.json()
-        title = data["title"]
-        download_url = data["videos"]["items"][0]["url"]
-
-        logger.info(f"Downloading YouTube video: {title}")
-        logger.info(f"Starting download for video ID: {video_id}")
-
-        # Download video
-        # video_response = requests.get(download_url)
-
-        # Ensure videos directory exists (use configured temp path)
-        os.makedirs(video_path, exist_ok=True)
-        filename = os.path.join(video_path, f"{video_id}.mp4")
-
-        with requests.get(download_url, stream=True) as video_response:
-            video_response.raise_for_status()  # Raise exception for HTTP errors
-
-            with open(filename, "wb") as f:
-                # Use a smaller chunk size (1MB) to avoid memory issues
-                for chunk in video_response.iter_content(chunk_size=1024 * 1024):
-                    if chunk:
-                        f.write(chunk)
-                        f.flush()  # Ensure data is written to disk
-
-        logger.info(f"Successfully downloaded video to: {filename}")
-
-        # Verify file size is reasonable
-        file_size = os.path.getsize(filename)
-        if file_size < 10000:  # Less than 10KB is probably an error
-            raise ValueError(
-                f"Downloaded file is too small ({file_size} bytes), likely corrupted"
+            response = requests.get(
+                "https://youtube-media-downloader.p.rapidapi.com/v2/video/details",
+                params=params,
+                headers=headers,
             )
 
-        # with open(filename, 'wb') as f:
-        #   f.write(video_response.content)
+            data = response.json()
+            title = data["title"]
+            download_url = data["videos"]["items"][0]["url"]
 
-        return filename
+            logger.info(f"Downloading YouTube video: {title}")
+            logger.info(
+                f"Starting download for video ID: {video_id} (attempt {attempt + 1}/{max_retries})"
+            )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+            # Ensure videos directory exists (use configured temp path)
+            os.makedirs(video_path, exist_ok=True)
+            filename = os.path.join(video_path, f"{video_id}.mp4")
+
+            # Use the improved download function with retry logic
+            result = download_file_to_path(
+                download_url, filename, debug=True, max_retries=1
+            )
+            if result:
+                logger.info(f"Successfully downloaded video to: {filename}")
+                return filename
+            else:
+                raise Exception("Download failed")
+
+        except (
+            requests.exceptions.ChunkedEncodingError,
+            requests.exceptions.ConnectionError,
+            requests.exceptions.IncompleteRead,
+            requests.exceptions.Timeout,
+        ) as e:
+            logger.error(f"Download error (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                wait_time = 2**attempt  # Exponential backoff: 1s, 2s, 4s
+                logger.info(f"Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+                continue
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Download failed after {max_retries} attempts: {str(e)}",
+                )
+        except Exception as e:
+            if attempt < max_retries - 1:
+                logger.error(f"Error (attempt {attempt + 1}/{max_retries}): {e}")
+                wait_time = 2**attempt
+                time.sleep(wait_time)
+                continue
+            else:
+                raise HTTPException(status_code=500, detail=str(e))
 
 
 def download_url(
@@ -249,8 +258,8 @@ def download_video(youtube_url, output_path=video_path, debug=False):
         return None
 
 
-def download_file_to_path(download_url, file_path, debug=False):
-    """Download file from URL to specific path"""
+def download_file_to_path(download_url, file_path, debug=False, max_retries=3):
+    """Download file from URL to specific path with retry logic and resume capability"""
 
     def log(msg):
         if debug:
@@ -259,38 +268,97 @@ def download_file_to_path(download_url, file_path, debug=False):
     log(f"Downloading from: {download_url[:80]}...")
 
     headers = {
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
     }
 
-    try:
-        video_response = requests.get(
-            download_url, stream=True, headers=headers, timeout=300
-        )
+    for attempt in range(max_retries):
+        try:
+            # Check if file already exists for resume
+            resume_header = {}
+            initial_pos = 0
+            if os.path.exists(file_path):
+                initial_pos = os.path.getsize(file_path)
+                if initial_pos > 0:
+                    resume_header["Range"] = f"bytes={initial_pos}-"
+                    log(f"Resuming download from byte {initial_pos}")
 
-        if video_response.status_code == 200:
-            with open(file_path, "wb") as f:
-                downloaded = 0
-                for chunk in video_response.iter_content(chunk_size=1024 * 1024):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        if downloaded % (5 * 1024 * 1024) == 0:
-                            log(f"Downloaded: {downloaded / (1024*1024):.1f} MB")
+            # Merge headers
+            request_headers = {**headers, **resume_header}
 
-            file_size = os.path.getsize(file_path)
-            if file_size > 1000:
-                logger.info(
-                    f"Successfully downloaded: {file_path} ({file_size / (1024*1024):.1f} MB)"
-                )
-                return file_path
+            # Use session for connection pooling and better error handling
+            session = requests.Session()
+            session.mount("http://", requests.adapters.HTTPAdapter(max_retries=3))
+            session.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
+
+            # Increase timeout and use smaller chunk size for better reliability
+            video_response = session.get(
+                download_url,
+                stream=True,
+                headers=request_headers,
+                timeout=(30, 300),  # (connect timeout, read timeout)
+                allow_redirects=True,
+            )
+
+            if video_response.status_code in [
+                200,
+                206,
+            ]:  # 206 for partial content (resume)
+                mode = "ab" if initial_pos > 0 else "wb"
+                with open(file_path, mode) as f:
+                    downloaded = initial_pos
+                    chunk_size = 512 * 1024  # Smaller chunk size for better reliability
+
+                    for chunk in video_response.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            f.write(chunk)
+                            f.flush()  # Ensure data is written to disk immediately
+                            downloaded += len(chunk)
+                            if downloaded % (5 * 1024 * 1024) == 0:
+                                log(f"Downloaded: {downloaded / (1024*1024):.1f} MB")
+
+                file_size = os.path.getsize(file_path)
+                if file_size > 1000:
+                    logger.info(
+                        f"Successfully downloaded: {file_path} ({file_size / (1024*1024):.1f} MB)"
+                    )
+                    return file_path
+                else:
+                    logger.warning(f"Downloaded file too small: {file_size} bytes")
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
             else:
-                logger.warning(f"Downloaded file too small: {file_size} bytes")
-                os.remove(file_path)
-        else:
-            logger.error(f"Download failed with status: {video_response.status_code}")
+                logger.error(
+                    f"Download failed with status: {video_response.status_code}"
+                )
+                if attempt < max_retries - 1:
+                    logger.info(
+                        f"Retrying download (attempt {attempt + 2}/{max_retries})..."
+                    )
+                    time.sleep(2**attempt)  # Exponential backoff
+                    continue
 
-    except Exception as e:
-        logger.error(f"Download error: {e}")
+        except (
+            requests.exceptions.ChunkedEncodingError,
+            requests.exceptions.ConnectionError,
+            requests.exceptions.IncompleteRead,
+            requests.exceptions.Timeout,
+        ) as e:
+            logger.error(f"Download error (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                wait_time = 2**attempt  # Exponential backoff: 1s, 2s, 4s
+                logger.info(f"Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+                continue
+            else:
+                logger.error(f"All {max_retries} download attempts failed")
+        except Exception as e:
+            logger.error(f"Unexpected download error: {e}")
+            break
 
     return None
 
