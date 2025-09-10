@@ -8,6 +8,7 @@ from .config import (
     output_path,
     s3_client,
     AWS_S3_BUCKET,
+    logger,
 )
 from .storage import s3_upload_file, generate_thumbnail
 from .db_helpers import (
@@ -18,6 +19,7 @@ from .db_helpers import (
 
 
 def download_video_background(video_id: str, url: str):
+    logger.info(f"Starting background download for video ID: {video_id}")
     db = SessionLocal()
     try:
         status = {
@@ -26,18 +28,25 @@ def download_video_background(video_id: str, url: str):
             "path": None,
         }
         update_download_status(db, video_id, status)
+        logger.info(f"Downloading video from URL: {url}")
         video_local_path = download_video(url)
         if video_local_path and os.path.exists(video_local_path):
+            logger.info(f"Video downloaded successfully to: {video_local_path}")
             s3_key = None
             thumb_key = None
             if s3_client and AWS_S3_BUCKET:
                 try:
+                    logger.info(f"Uploading video to S3 for video ID: {video_id}")
                     s3_key = f"youtube_videos/{video_id}.mp4"
                     s3_upload_file(video_local_path, s3_key, content_type="video/mp4")
+                    logger.info(f"Video uploaded to S3 with key: {s3_key}")
+
+                    logger.info(f"Generating thumbnail for video ID: {video_id}")
                     thumb_path = os.path.join(frames_path, f"{video_id}_thumb.jpg")
                     if generate_thumbnail(video_local_path, thumb_path, ts_seconds=1.0):
                         thumb_key = f"youtube_thumbnails/{video_id}.jpg"
                         s3_upload_file(thumb_path, thumb_key, content_type="image/jpeg")
+                        logger.info(f"Thumbnail uploaded to S3 with key: {thumb_key}")
                         os.remove(thumb_path)
                     video_row = db.query(Video).filter(Video.id == video_id).first()
                     if video_row:
@@ -46,6 +55,9 @@ def download_video_background(video_id: str, url: str):
                         video_row.download_path = None
                         db.commit()
                     os.remove(video_local_path)
+                    logger.info(
+                        f"Local video file removed after S3 upload for video ID: {video_id}"
+                    )
                     status = {
                         "status": "completed",
                         "message": "Video and thumbnail uploaded to S3 successfully",
@@ -53,20 +65,26 @@ def download_video_background(video_id: str, url: str):
                         "s3_key": s3_key,
                         "thumb_key": thumb_key,
                     }
-                except Exception:
+                except Exception as e:
+                    logger.error(f"S3 upload failed for video ID {video_id}: {e}")
                     status = {
                         "status": "completed",
                         "message": "Video download complete (S3 upload failed)",
                         "path": video_local_path,
                     }
             else:
+                logger.info(
+                    f"S3 not configured, keeping local file for video ID: {video_id}"
+                )
                 status = {
                     "status": "completed",
                     "message": "Video download complete (S3 not configured)",
                     "path": video_local_path,
                 }
             update_download_status(db, video_id, status)
+            logger.info(f"Download status updated for video ID: {video_id}")
         else:
+            logger.error(f"Video download failed for video ID: {video_id}")
             update_download_status(
                 db,
                 video_id,
@@ -77,6 +95,7 @@ def download_video_background(video_id: str, url: str):
 
 
 def format_transcript_background(video_id: str, json_data: dict):
+    logger.info(f"Starting transcript formatting for video ID: {video_id}")
     db = SessionLocal()
     try:
         status = {
@@ -89,6 +108,7 @@ def format_transcript_background(video_id: str, json_data: dict):
             "current_chunk": 0,
         }
         update_formatting_status(db, video_id, status)
+        logger.info(f"Creating formatted transcript for video ID: {video_id}")
         formatted_transcript_lines = create_formatted_transcript(
             json_data, video_id=video_id
         )
@@ -98,6 +118,9 @@ def format_transcript_background(video_id: str, json_data: dict):
         )
         transcript_s3_key = None
         if s3_client and AWS_S3_BUCKET and formatted_transcript_text:
+            logger.info(
+                f"Uploading formatted transcript to S3 for video ID: {video_id}"
+            )
             temp_transcript_path = os.path.join(
                 output_path, f"{video_id}_formatted_transcript.txt"
             )
@@ -106,6 +129,9 @@ def format_transcript_background(video_id: str, json_data: dict):
             transcript_s3_key = f"youtube_transcripts/{video_id}_formatted.txt"
             s3_upload_file(
                 temp_transcript_path, transcript_s3_key, content_type="text/plain"
+            )
+            logger.info(
+                f"Formatted transcript uploaded to S3 with key: {transcript_s3_key}"
             )
             os.remove(temp_transcript_path)
         video = db.query(Video).filter(Video.id == video_id).first()
@@ -126,7 +152,11 @@ def format_transcript_background(video_id: str, json_data: dict):
             "transcript_s3_key": transcript_s3_key,
         }
         update_formatting_status(db, video_id, status)
+        logger.info(
+            f"Transcript formatting completed successfully for video ID: {video_id}"
+        )
     except Exception as e:
+        logger.error(f"Transcript formatting failed for video ID {video_id}: {e}")
         status = {
             "status": "failed",
             "message": f"Transcript formatting failed: {str(e)}",

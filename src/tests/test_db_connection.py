@@ -7,6 +7,7 @@ import sys
 from sqlalchemy import text
 from utils.db import engine, SessionLocal
 from models import Video, Base
+from controllers.config import logger
 
 
 def test_database_connection():
@@ -15,7 +16,7 @@ def test_database_connection():
         # Test connection
         with engine.connect() as conn:
             result = conn.execute(text("SELECT 1"))
-            print("✅ Database connection successful")
+            logger.info("✅ Database connection successful")
 
         # Test table structure
         db = SessionLocal()
@@ -33,7 +34,7 @@ def test_database_connection():
             )
 
             columns = result.fetchall()
-            print(f"✅ Videos table found with {len(columns)} columns:")
+            logger.info(f"✅ Videos table found with {len(columns)} columns:")
 
             required_columns = {
                 "id": "character varying",
@@ -45,9 +46,9 @@ def test_database_connection():
 
             for col_name, expected_type in required_columns.items():
                 if col_name in found_columns:
-                    print(f"  ✅ {col_name}: {found_columns[col_name]}")
+                    logger.info(f"  ✅ {col_name}: {found_columns[col_name]}")
                 else:
-                    print(f"  ❌ {col_name}: MISSING")
+                    logger.info(f"  ❌ {col_name}: MISSING")
 
             # Test creating a video record
             test_video = Video(
@@ -55,18 +56,18 @@ def test_database_connection():
             )
             db.add(test_video)
             db.commit()
-            print("✅ Test video record created successfully")
+            logger.info("✅ Test video record created successfully")
 
             # Clean up test record
             db.delete(test_video)
             db.commit()
-            print("✅ Test video record cleaned up")
+            logger.info("✅ Test video record cleaned up")
 
         finally:
             db.close()
 
     except Exception as e:
-        print(f"❌ Database test failed: {e}")
+        logger.info(f"❌ Database test failed: {e}")
         return False
 
     return True

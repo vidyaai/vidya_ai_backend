@@ -7,6 +7,7 @@ import sys
 from dotenv import load_dotenv
 from controllers.db_helpers import update_formatting_status
 from utils.db import SessionLocal
+from controllers.config import logger
 
 load_dotenv()
 
@@ -87,7 +88,9 @@ def format_with_openai(text_chunks: List[str], video_id: str = None) -> List[str
     formatted_chunks = []
     total_chunks = len(text_chunks)
 
-    print(f"Formatting {total_chunks} chunks with OpenAI of video_id: {video_id}...")
+    logger.info(
+        f"Formatting {total_chunks} chunks with OpenAI of video_id: {video_id}..."
+    )
 
     # UPDATE progress tracking if video_id provided
     if video_id:
@@ -117,7 +120,7 @@ def format_with_openai(text_chunks: List[str], video_id: str = None) -> List[str
             pass  # Continue without progress tracking if import fails
 
     for i, chunk in enumerate(text_chunks):
-        print(f"Processing chunk {i+1}/{total_chunks}...")
+        logger.debug(f"Processing chunk {i+1}/{total_chunks}...")
 
         # UPDATE progress if video_id provided
         if video_id:
@@ -168,10 +171,10 @@ def format_with_openai(text_chunks: List[str], video_id: str = None) -> List[str
 
             formatted_text = response.choices[0].message.content.strip()
             formatted_chunks.append(formatted_text)
-            print(f"✓ Chunk {i+1} formatted successfully")
+            logger.debug(f"✓ Chunk {i+1} formatted successfully")
 
         except Exception as e:
-            print(f"✗ Error formatting chunk {i+1}: {e}")
+            logger.error(f"✗ Error formatting chunk {i+1}: {e}")
             formatted_chunks.append(chunk)  # Use original if formatting fails
 
     return formatted_chunks
@@ -237,7 +240,7 @@ def create_formatted_transcript(
             plain_text, title, duration
         )
 
-    print(f"transcript_data: {transcript_data[0]}")
+    logger.debug(f"transcript_data: {transcript_data[0]}")
 
     # Group subtitles into manageable chunks
     groups = group_subtitles(transcript_data[0]["transcription"], group_duration=15.0)
@@ -246,7 +249,7 @@ def create_formatted_transcript(
     text_chunks = [group["text"] for group in groups]
 
     # Format with OpenAI
-    print("Formatting text with OpenAI...")
+    logger.info("Formatting text with OpenAI...")
     formatted_chunks = format_with_openai(text_chunks, video_id)
 
     # Create final formatted transcript
@@ -268,8 +271,8 @@ def create_formatted_transcript(
     if output_file:
         with open(output_file, "w", encoding="utf-8") as f:
             f.writelines(formatted_transcript)
-        print(f"Formatted transcript saved to {output_file}")
+        logger.info(f"Formatted transcript saved to {output_file}")
     else:
-        print("Formatted transcript created (not saved to file)")
+        logger.info("Formatted transcript created (not saved to file)")
 
     return formatted_transcript
