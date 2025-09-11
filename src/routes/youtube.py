@@ -32,7 +32,18 @@ router = APIRouter(prefix="/api/youtube", tags=["YouTube"])
 
 
 @router.get("/download-status/{video_id}")
-async def get_download_status_endpoint(video_id: str, db: Session = Depends(get_db)):
+async def get_download_status_endpoint(
+    video_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
+    # Check if video belongs to current user
+    video = (
+        db.query(Video)
+        .filter(Video.id == video_id, Video.user_id == current_user["uid"])
+        .first()
+    )
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found or access denied")
+
     video_path = get_video_path(db, video_id)
     if video_path:
         return {
@@ -44,12 +55,25 @@ async def get_download_status_endpoint(video_id: str, db: Session = Depends(get_
 
 
 @router.get("/formatting-status/{video_id}")
-async def get_formatting_status_endpoint(video_id: str, db: Session = Depends(get_db)):
+async def get_formatting_status_endpoint(
+    video_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
+    # Check if video belongs to current user
+    video = (
+        db.query(Video)
+        .filter(Video.id == video_id, Video.user_id == current_user["uid"])
+        .first()
+    )
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found or access denied")
+
     return get_formatting_status(db, video_id)
 
 
 @router.get("/formatted-transcript/{video_id}")
-async def get_formatted_transcript(video_id: str, db: Session = Depends(get_db)):
+async def get_formatted_transcript(
+    video_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
     status = get_formatting_status(db, video_id)
     if status["status"] == "completed":
         return {
@@ -65,7 +89,11 @@ async def get_formatted_transcript(video_id: str, db: Session = Depends(get_db))
         }
     if status["status"] == "failed":
         return {"video_id": video_id, "status": "failed", "error": status["error"]}
-    video = db.query(Video).filter(Video.id == video_id).first()
+    video = (
+        db.query(Video)
+        .filter(Video.id == video_id, Video.user_id == current_user["uid"])
+        .first()
+    )
     if video and video.formatted_transcript:
         return {
             "video_id": video_id,
@@ -161,7 +189,11 @@ async def get_youtube_info(
     video_url = None
     thumbnail_url = None
     formatted_transcript_url = None
-    video_record = db.query(Video).filter(Video.id == video_id).first()
+    video_record = (
+        db.query(Video)
+        .filter(Video.id == video_id, Video.user_id == current_user["uid"])
+        .first()
+    )
     if video_record:
         if video_record.s3_key and s3_client and AWS_S3_BUCKET:
             try:
