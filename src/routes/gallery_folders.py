@@ -88,11 +88,7 @@ def list_gallery(
     current_user=Depends(get_current_user),
 ):
     q = db.query(Video).filter(Video.source_type == source_type)
-    q = (
-        q.filter(Video.user_id == current_user["uid"])
-        if source_type == "uploaded"
-        else q
-    )
+    q = q.filter(Video.user_id == current_user["uid"])
     if folder_id is None:
         q = q.filter(Video.folder_id.is_(None))
     else:
