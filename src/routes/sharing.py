@@ -884,6 +884,7 @@ async def shared_video_chat(
                             download_video_background,
                             video_id,
                             f"https://www.youtube.com/watch?v={video_id}",
+                            link.owner_id,
                         )
                         return {
                             "response": "🎬 Something amazing is being loaded! Video download has started in the background. Please continue to chat with the video content in the meantime, and try frame-specific questions again in a moment!",

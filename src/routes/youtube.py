@@ -128,7 +128,9 @@ async def get_youtube_info(
                 f"Download status: {status['status']} - {status['message']}"
             )
         else:
-            download_executor.submit(download_video_background, video_id, url)
+            download_executor.submit(
+                download_video_background, video_id, url, current_user["uid"]
+            )
             download_message = "Video download, thumbnail generation, and cloud upload started in background"
     transcript_info = get_transcript_cache(db, video_id)
     if transcript_info and transcript_info.get("transcript_data"):

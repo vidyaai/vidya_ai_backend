@@ -47,6 +47,10 @@ def update_download_status(db: Session, video_id: str, status: dict):
     video.download_status = status
     if status.get("path"):
         video.download_path = status["path"]
+    if status.get("s3_key"):
+        video.s3_key = status["s3_key"]
+    if status.get("thumb_key"):
+        video.thumb_key = status["thumb_key"]
     db.add(video)
     db.commit()
 

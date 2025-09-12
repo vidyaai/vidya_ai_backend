@@ -19,7 +19,7 @@ router = APIRouter(tags=["Gallery & Folders"], prefix="/api")
 
 
 def delete_video_s3_objects(video: Video) -> None:
-    """Delete S3 objects associated with an uploaded video."""
+    """Delete S3 objects associated with a video (uploaded or YouTube)."""
     if not s3_client or not AWS_S3_BUCKET:
         return
 
@@ -126,13 +126,13 @@ def delete_video(
     if not v:
         raise HTTPException(status_code=404, detail="Video not found")
 
-    # For uploaded videos, check user ownership
+    # Check user ownership for all video types
     if v.user_id != current_user["uid"]:
         raise HTTPException(
             status_code=403, detail="Not authorized to delete this video"
         )
 
-    # Delete associated S3 objects if this is an uploaded video
+    # Delete associated S3 objects (works for both uploaded and YouTube videos)
     delete_video_s3_objects(v)
 
     db.delete(v)
@@ -178,7 +178,7 @@ def delete_folder(
     # Delete all videos in the folder if confirmed
     if videos_in_folder and req.confirm_delete_videos:
         for video in videos_in_folder:
-            # Delete associated S3 objects for uploaded videos
+            # Delete associated S3 objects (works for both uploaded and YouTube videos)
             delete_video_s3_objects(video)
             db.delete(video)
 
