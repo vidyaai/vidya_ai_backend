@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 
 from controllers.background_tasks import download_video_background
-from controllers.config import download_executor, frames_path
+from controllers.config import download_executor, frames_path, logger
 from utils.db import get_db
 from utils.firebase_auth import get_current_user
 from utils.firebase_users import (
@@ -200,12 +200,23 @@ async def create_shared_link(
         if not video.chat_sessions:
             raise HTTPException(status_code=404, detail="No chat sessions found")
 
-        session_exists = any(
-            session.get("id") == request.chat_session_id
-            for session in video.chat_sessions
-        )
-        if not session_exists:
+        # Find the session and ensure it belongs to the sharer (owner of the session)
+        target_session = None
+        for session in video.chat_sessions:
+            if (
+                isinstance(session, dict)
+                and session.get("id") == request.chat_session_id
+            ):
+                target_session = session
+                break
+
+        if not target_session:
             raise HTTPException(status_code=404, detail="Chat session not found")
+
+        if target_session.get("user_id") != current_user["uid"]:
+            raise HTTPException(
+                status_code=403, detail="You can only share your own chat sessions"
+            )
 
     # Validate invited users exist in Firebase
     if request.invited_users:
@@ -884,6 +895,7 @@ async def shared_video_chat(
                             download_video_background,
                             video_id,
                             f"https://www.youtube.com/watch?v={video_id}",
+                            link.owner_id,
                         )
                         return {
                             "response": "🎬 Something amazing is being loaded! Video download has started in the background. Please continue to chat with the video content in the meantime, and try frame-specific questions again in a moment!",

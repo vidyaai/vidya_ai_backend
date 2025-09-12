@@ -18,7 +18,7 @@ from .db_helpers import (
 )
 
 
-def download_video_background(video_id: str, url: str):
+def download_video_background(video_id: str, url: str, user_id: str):
     logger.info(f"Starting background download for video ID: {video_id}")
     db = SessionLocal()
     try:
@@ -36,15 +36,19 @@ def download_video_background(video_id: str, url: str):
             thumb_key = None
             if s3_client and AWS_S3_BUCKET:
                 try:
-                    logger.info(f"Uploading video to S3 for video ID: {video_id}")
-                    s3_key = f"youtube_videos/{video_id}.mp4"
+                    logger.info(
+                        f"Uploading video to S3 for video ID: {video_id}, user: {user_id}"
+                    )
+                    # Use user-specific S3 key structure
+                    s3_key = f"youtube_videos/{user_id}/{video_id}.mp4"
                     s3_upload_file(video_local_path, s3_key, content_type="video/mp4")
                     logger.info(f"Video uploaded to S3 with key: {s3_key}")
 
                     logger.info(f"Generating thumbnail for video ID: {video_id}")
                     thumb_path = os.path.join(frames_path, f"{video_id}_thumb.jpg")
                     if generate_thumbnail(video_local_path, thumb_path, ts_seconds=1.0):
-                        thumb_key = f"youtube_thumbnails/{video_id}.jpg"
+                        # Use user-specific thumbnail key structure
+                        thumb_key = f"youtube_thumbnails/{user_id}/{video_id}.jpg"
                         s3_upload_file(thumb_path, thumb_key, content_type="image/jpeg")
                         logger.info(f"Thumbnail uploaded to S3 with key: {thumb_key}")
                         os.remove(thumb_path)
@@ -118,22 +122,34 @@ def format_transcript_background(video_id: str, json_data: dict):
         )
         transcript_s3_key = None
         if s3_client and AWS_S3_BUCKET and formatted_transcript_text:
-            logger.info(
-                f"Uploading formatted transcript to S3 for video ID: {video_id}"
-            )
-            temp_transcript_path = os.path.join(
-                output_path, f"{video_id}_formatted_transcript.txt"
-            )
-            with open(temp_transcript_path, "w", encoding="utf-8") as f:
-                f.write(formatted_transcript_text)
-            transcript_s3_key = f"youtube_transcripts/{video_id}_formatted.txt"
-            s3_upload_file(
-                temp_transcript_path, transcript_s3_key, content_type="text/plain"
-            )
-            logger.info(
-                f"Formatted transcript uploaded to S3 with key: {transcript_s3_key}"
-            )
-            os.remove(temp_transcript_path)
+            # Get the video record to find the user_id
+            video = db.query(Video).filter(Video.id == video_id).first()
+            user_id = video.user_id if video else None
+
+            if user_id:
+                logger.info(
+                    f"Uploading formatted transcript to S3 for video ID: {video_id}, user: {user_id}"
+                )
+                temp_transcript_path = os.path.join(
+                    output_path, f"{video_id}_formatted_transcript.txt"
+                )
+                with open(temp_transcript_path, "w", encoding="utf-8") as f:
+                    f.write(formatted_transcript_text)
+                # Use user-specific transcript key structure
+                transcript_s3_key = (
+                    f"youtube_transcripts/{user_id}/{video_id}_formatted.txt"
+                )
+                s3_upload_file(
+                    temp_transcript_path, transcript_s3_key, content_type="text/plain"
+                )
+                logger.info(
+                    f"Formatted transcript uploaded to S3 with key: {transcript_s3_key}"
+                )
+                os.remove(temp_transcript_path)
+            else:
+                logger.warning(
+                    f"User ID not found for video {video_id}, skipping transcript upload"
+                )
         video = db.query(Video).filter(Video.id == video_id).first()
         if video:
             video.formatted_transcript = formatted_transcript_text
