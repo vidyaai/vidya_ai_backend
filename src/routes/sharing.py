@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 
 from controllers.background_tasks import download_video_background
-from controllers.config import download_executor, frames_path
+from controllers.config import download_executor, frames_path, logger
 from utils.db import get_db
 from utils.firebase_auth import get_current_user
 from utils.firebase_users import (
