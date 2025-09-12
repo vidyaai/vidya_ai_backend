@@ -26,6 +26,7 @@ from controllers.background_tasks import format_uploaded_transcript_background
 from utils.firebase_auth import get_current_user
 from models import SharedLink, SharedLinkAccess
 from routes.sharing import validate_shared_video_access
+from routes.gallery_folders import check_content_is_shared
 
 
 router = APIRouter(prefix="/api/user-videos", tags=["User Videos"])
@@ -465,3 +466,146 @@ async def save_chat_sessions(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     return {"success": True}
+
+
+@router.delete("/chat-sessions/{video_id}/{session_id}")
+async def delete_chat_session(
+    video_id: str,
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Delete a specific chat session from a video."""
+    v: Video = db.query(Video).filter(Video.id == video_id).first()
+    if not v:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    # Check user ownership
+    if v.user_id != current_user["uid"]:
+        raise HTTPException(
+            status_code=403, detail="Not authorized to delete this chat session"
+        )
+
+    if not v.chat_sessions:
+        raise HTTPException(status_code=404, detail="No chat sessions found")
+
+    # Check if this specific chat session is part of any shared content
+    shared_links = (
+        db.query(SharedLink)
+        .filter(
+            SharedLink.video_id == video_id,
+            SharedLink.chat_session_id == session_id,
+            SharedLink.share_type == "chat",
+        )
+        .all()
+    )
+
+    if shared_links:
+        link = shared_links[0]
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "content_is_shared",
+                "message": f"This chat session is part of shared content and cannot be deleted. Please delete the share link first to remove it from shared content.",
+                "shared_link": {
+                    "id": link.id,
+                    "title": link.title or "Shared Chat Session",
+                    "share_type": link.share_type,
+                    "is_public": link.is_public,
+                    "created_at": link.created_at.isoformat()
+                    if link.created_at
+                    else None,
+                },
+            },
+        )
+
+    # Find and remove the specific chat session
+    updated_sessions = []
+    session_found = False
+
+    for session in v.chat_sessions:
+        if session.get("id") == session_id:
+            session_found = True
+            # Skip this session (effectively deleting it)
+        else:
+            updated_sessions.append(session)
+
+    if not session_found:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    try:
+        v.chat_sessions = updated_sessions
+        db.add(v)
+        db.commit()
+        return {"success": True, "message": "Chat session deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete chat session: {str(e)}"
+        )
+
+
+@router.get("/chat-sessions/{video_id}/{session_id}/info")
+async def get_chat_session_info(
+    video_id: str,
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get chat session information including sharing status."""
+    v: Video = db.query(Video).filter(Video.id == video_id).first()
+    if not v:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    # Check user ownership
+    if v.user_id != current_user["uid"]:
+        raise HTTPException(
+            status_code=403, detail="Not authorized to view this chat session"
+        )
+
+    if not v.chat_sessions:
+        raise HTTPException(status_code=404, detail="No chat sessions found")
+
+    # Find the specific chat session
+    target_session = None
+    for session in v.chat_sessions:
+        if session.get("id") == session_id:
+            target_session = session
+            break
+
+    if not target_session:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    # Check if this specific chat session is part of any shared content
+    shared_links = (
+        db.query(SharedLink)
+        .filter(
+            SharedLink.video_id == video_id,
+            SharedLink.chat_session_id == session_id,
+            SharedLink.share_type == "chat",
+        )
+        .all()
+    )
+
+    shared_info = None
+    if shared_links:
+        link = shared_links[0]
+        shared_info = {
+            "id": link.id,
+            "title": link.title or "Shared Chat Session",
+            "share_type": link.share_type,
+            "is_public": link.is_public,
+            "created_at": link.created_at.isoformat() if link.created_at else None,
+        }
+
+    return {
+        "video_id": video_id,
+        "session_id": session_id,
+        "session_title": target_session.get("title", "Untitled Chat"),
+        "message_count": len(target_session.get("messages", [])),
+        "created_at": target_session.get("createdAt"),
+        "updated_at": target_session.get("updatedAt"),
+        "can_delete": shared_info is None,
+        "is_shared": shared_info is not None,
+        "shared_link": shared_info,
+    }
