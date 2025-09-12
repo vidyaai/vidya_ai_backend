@@ -200,12 +200,23 @@ async def create_shared_link(
         if not video.chat_sessions:
             raise HTTPException(status_code=404, detail="No chat sessions found")
 
-        session_exists = any(
-            session.get("id") == request.chat_session_id
-            for session in video.chat_sessions
-        )
-        if not session_exists:
+        # Find the session and ensure it belongs to the sharer (owner of the session)
+        target_session = None
+        for session in video.chat_sessions:
+            if (
+                isinstance(session, dict)
+                and session.get("id") == request.chat_session_id
+            ):
+                target_session = session
+                break
+
+        if not target_session:
             raise HTTPException(status_code=404, detail="Chat session not found")
+
+        if target_session.get("user_id") != current_user["uid"]:
+            raise HTTPException(
+                status_code=403, detail="You can only share your own chat sessions"
+            )
 
     # Validate invited users exist in Firebase
     if request.invited_users:

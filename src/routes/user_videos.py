@@ -429,9 +429,13 @@ async def get_chat_sessions(
         # Validate that the video matches the shared link
         if shared_link.share_type == "chat" and shared_link.video_id == video_id:
             v = db.query(Video).filter(Video.id == video_id).first()
-            if not v:
-                raise HTTPException(status_code=404, detail="Video not found")
-            return {"video_id": video_id, "chat_sessions": v.chat_sessions or []}
+            all_chat_sessions = v.chat_sessions or []
+            user_sessions = [
+                s
+                for s in all_chat_sessions
+                if isinstance(s, dict) and s.get("user_id") == current_user["uid"]
+            ]
+            return {"video_id": video_id, "chat_sessions": user_sessions}
         else:
             raise HTTPException(
                 status_code=404, detail="Video not found in shared content"
@@ -441,8 +445,19 @@ async def get_chat_sessions(
     v: Video = db.query(Video).filter(Video.id == video_id).first()
     if not v:
         raise HTTPException(status_code=404, detail="Unknown video_id")
+    if v.user_id != current_user["uid"]:
+        raise HTTPException(
+            status_code=403, detail="Not authorized to view this chat session"
+        )
 
-    return {"video_id": video_id, "chat_sessions": v.chat_sessions or []}
+    # Only return the current user's sessions
+    all_sessions = v.chat_sessions or []
+    user_sessions = [
+        s
+        for s in all_sessions
+        if isinstance(s, dict) and s.get("user_id") == current_user["uid"]
+    ]
+    return {"video_id": video_id, "chat_sessions": user_sessions}
 
 
 @router.post("/chat-sessions")
@@ -455,11 +470,31 @@ async def save_chat_sessions(
     v: Video = db.query(Video).filter(Video.id == video_id).first()
     if not v:
         raise HTTPException(status_code=404, detail="Unknown video_id")
+
     sessions = payload.get("chat_sessions", [])
     if not isinstance(sessions, list):
         raise HTTPException(status_code=400, detail="chat_sessions must be a list")
+
+    # Stamp incoming sessions with the current user's id
+    stamped_incoming = []
+    for s in sessions:
+        if not isinstance(s, dict):
+            continue
+        s_copy = dict(s)
+        s_copy["user_id"] = current_user["uid"]
+        stamped_incoming.append(s_copy)
+
+    # Merge: replace only this user's sessions; keep others intact
+    existing_sessions = v.chat_sessions or []
+    others_sessions = [
+        s
+        for s in existing_sessions
+        if isinstance(s, dict) and s.get("user_id") != current_user["uid"]
+    ]
+    merged = others_sessions + stamped_incoming
+
     try:
-        v.chat_sessions = sessions
+        v.chat_sessions = merged
         db.add(v)
         db.commit()
     except Exception as e:
@@ -479,12 +514,6 @@ async def delete_chat_session(
     v: Video = db.query(Video).filter(Video.id == video_id).first()
     if not v:
         raise HTTPException(status_code=404, detail="Video not found")
-
-    # Check user ownership
-    if v.user_id != current_user["uid"]:
-        raise HTTPException(
-            status_code=403, detail="Not authorized to delete this chat session"
-        )
 
     if not v.chat_sessions:
         raise HTTPException(status_code=404, detail="No chat sessions found")
@@ -520,18 +549,27 @@ async def delete_chat_session(
         )
 
     # Find and remove the specific chat session
-    updated_sessions = []
-    session_found = False
-
+    # Identify target session and enforce ownership (session owner or video owner)
+    target_session = None
     for session in v.chat_sessions:
-        if session.get("id") == session_id:
-            session_found = True
-            # Skip this session (effectively deleting it)
-        else:
-            updated_sessions.append(session)
+        if isinstance(session, dict) and session.get("id") == session_id:
+            target_session = session
+            break
 
-    if not session_found:
+    if not target_session:
         raise HTTPException(status_code=404, detail="Chat session not found")
+
+    is_session_owner = target_session.get("user_id") == current_user["uid"]
+    is_video_owner = v.user_id == current_user["uid"]
+    if not (is_session_owner or is_video_owner):
+        raise HTTPException(
+            status_code=403, detail="Not authorized to delete this chat session"
+        )
+
+    updated_sessions = []
+    for session in v.chat_sessions:
+        if not (isinstance(session, dict) and session.get("id") == session_id):
+            updated_sessions.append(session)
 
     try:
         v.chat_sessions = updated_sessions
@@ -557,24 +595,27 @@ async def get_chat_session_info(
     if not v:
         raise HTTPException(status_code=404, detail="Video not found")
 
-    # Check user ownership
-    if v.user_id != current_user["uid"]:
-        raise HTTPException(
-            status_code=403, detail="Not authorized to view this chat session"
-        )
-
     if not v.chat_sessions:
         raise HTTPException(status_code=404, detail="No chat sessions found")
 
     # Find the specific chat session
     target_session = None
     for session in v.chat_sessions:
-        if session.get("id") == session_id:
+        if isinstance(session, dict) and session.get("id") == session_id:
             target_session = session
             break
 
     if not target_session:
         raise HTTPException(status_code=404, detail="Chat session not found")
+
+    # Authorize: allow session owner or video owner
+    if (
+        target_session.get("user_id") != current_user["uid"]
+        and v.user_id != current_user["uid"]
+    ):
+        raise HTTPException(
+            status_code=403, detail="Not authorized to view this chat session"
+        )
 
     # Check if this specific chat session is part of any shared content
     shared_links = (
