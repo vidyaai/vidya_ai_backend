@@ -1088,3 +1088,22 @@ async def get_shared_chat_history(
         raise HTTPException(
             status_code=500, detail=f"Failed to get shared chat history: {str(e)}"
         )
+
+
+@router.post("/users-by-ids", response_model=List[FirebaseUser])
+async def get_users_by_ids_endpoint(
+    request: dict, current_user=Depends(get_current_user)
+):
+    """Get user details by Firebase UIDs."""
+    try:
+        user_ids = request.get("user_ids", [])
+        if not user_ids:
+            return []
+
+        users = await get_users_by_uids(user_ids)
+        return users
+    except Exception as e:
+        logger.error(f"Error getting users by IDs: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get users by IDs: {str(e)}"
+        )

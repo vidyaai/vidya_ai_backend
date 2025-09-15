@@ -86,12 +86,15 @@ class SharedLink(Base):
         String, unique=True, nullable=False, index=True
     )  # Public shareable token
     owner_id = Column(String, nullable=False, index=True)  # Firebase UID of the owner
-    share_type = Column(String, nullable=False)  # "folder" or "chat"
+    share_type = Column(String, nullable=False)  # "folder", "chat", or "assignment"
 
     # Resource identifiers
     folder_id = Column(String, ForeignKey("folders.id"), nullable=True)
     video_id = Column(String, ForeignKey("videos.id"), nullable=True)
     chat_session_id = Column(String, nullable=True)  # For specific chat session sharing
+    assignment_id = Column(
+        String, ForeignKey("assignments.id"), nullable=True
+    )  # For assignment sharing
 
     # Sharing settings
     is_public = Column(
@@ -116,6 +119,7 @@ class SharedLink(Base):
     # Relationships
     folder = relationship("Folder")
     video = relationship("Video")
+    assignment = relationship("Assignment")
     shared_accesses = relationship(
         "SharedLinkAccess", back_populates="shared_link", cascade="all, delete-orphan"
     )
@@ -127,7 +131,9 @@ class SharedLinkAccess(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     shared_link_id = Column(String, ForeignKey("shared_links.id"), nullable=False)
     user_id = Column(String, nullable=False, index=True)  # Firebase UID of invited user
-    permission = Column(String, default="view")  # "view" or "edit"
+    permission = Column(
+        String, default="view"
+    )  # "view", "edit", or "complete" (for assignments)
 
     # Status tracking
     invited_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
@@ -136,3 +142,104 @@ class SharedLinkAccess(Base):
 
     # Relationships
     shared_link = relationship("SharedLink", back_populates="shared_accesses")
+
+
+# Assignment-related models
+class Assignment(Base):
+    __tablename__ = "assignments"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, index=True, nullable=False)  # Firebase UID of the creator
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+
+    # Assignment metadata
+    due_date = Column(DateTime, nullable=True)
+    total_points = Column(String, default="0")  # Total points possible
+    total_questions = Column(String, default="0")  # Number of questions
+    status = Column(String, default="draft")  # "draft", "published", "archived"
+
+    # Assignment configuration
+    engineering_level = Column(
+        String, default="undergraduate"
+    )  # "undergraduate", "graduate"
+    engineering_discipline = Column(
+        String, default="general"
+    )  # "general", "electrical", etc.
+    question_types = Column(JSONB, nullable=True)  # Array of question types used
+
+    # Content sources (for AI-generated assignments)
+    linked_videos = Column(JSONB, nullable=True)  # Array of video IDs/data
+    uploaded_files = Column(JSONB, nullable=True)  # Array of file metadata
+    generation_prompt = Column(Text, nullable=True)  # Original prompt if AI-generated
+    generation_options = Column(JSONB, nullable=True)  # AI generation settings
+
+    # Questions data
+    questions = Column(JSONB, nullable=False, default=list)  # Array of question objects
+
+    # Sharing and collaboration
+    is_template = Column(Boolean, default=False)  # Can be used as template by others
+    shared_count = Column(String, default="0")  # Number of times shared
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=datetime.now(timezone.utc),
+        onupdate=datetime.now(timezone.utc),
+    )
+
+    # Relationships
+    submissions = relationship(
+        "AssignmentSubmission",
+        back_populates="assignment",
+        cascade="all, delete-orphan",
+    )
+    shared_links = relationship(
+        "SharedLink", back_populates="assignment", cascade="all, delete-orphan"
+    )
+
+
+class AssignmentSubmission(Base):
+    __tablename__ = "assignment_submissions"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    assignment_id = Column(String, ForeignKey("assignments.id"), nullable=False)
+    user_id = Column(String, nullable=False, index=True)  # Firebase UID of submitter
+
+    # Submission data
+    answers = Column(JSONB, nullable=False, default=dict)  # User's answers to questions
+    submission_method = Column(String, default="in-app")  # "in-app", "pdf", "file"
+
+    # File submissions (for PDF/file uploads)
+    submitted_files = Column(JSONB, nullable=True)  # Array of file metadata
+
+    # Grading and feedback
+    score = Column(String, nullable=True)  # Points earned
+    percentage = Column(String, nullable=True)  # Percentage score
+    feedback = Column(JSONB, nullable=True)  # Question-by-question feedback
+    overall_feedback = Column(Text, nullable=True)  # General feedback
+
+    # Status tracking
+    status = Column(
+        String, default="draft"
+    )  # "draft", "submitted", "graded", "returned"
+    is_late = Column(Boolean, default=False)
+    attempt_number = Column(String, default="1")  # For multiple attempts
+
+    # Time tracking
+    time_spent = Column(String, nullable=True)  # Time spent in seconds
+    started_at = Column(DateTime, nullable=True)  # When user started
+    submitted_at = Column(DateTime, nullable=True)  # When submitted
+    graded_at = Column(DateTime, nullable=True)  # When graded
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=datetime.now(timezone.utc),
+        onupdate=datetime.now(timezone.utc),
+    )
+
+    # Relationships
+    assignment = relationship("Assignment", back_populates="submissions")
