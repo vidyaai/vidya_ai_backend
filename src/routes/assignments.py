@@ -19,7 +19,7 @@ from schemas import (
     ShareAssignmentRequest,
     SharedAssignmentOut,
     SharedAssignmentAccessOut,
-    AssignmentSubmissionCreate,
+    AssignmentSubmissionDraft,
     AssignmentSubmissionUpdate,
     AssignmentSubmissionOut,
     AssignmentGenerateRequest,
@@ -44,6 +44,75 @@ def calculate_assignment_stats(assignment: Assignment) -> Assignment:
     assignment.total_questions = str(total_questions)
     assignment.total_points = str(total_points)
     return assignment
+
+
+def filter_sensitive_data_for_students(
+    assignment_data: dict, user_id: str, db: Session
+) -> dict:
+    """Remove sensitive data (rubric, correctAnswer) from assignment for students without edit permission"""
+    # Check if user is the owner
+    if assignment_data.get("user_id") == user_id:
+        return assignment_data  # Owner can see everything
+
+    # Check if user has edit permission via shared access
+    has_edit_permission = (
+        db.query(SharedLinkAccess)
+        .join(SharedLink)
+        .filter(
+            and_(
+                SharedLink.assignment_id == assignment_data.get("id"),
+                SharedLink.share_type == "assignment",
+                SharedLinkAccess.user_id == user_id,
+                SharedLinkAccess.permission == "edit",
+            )
+        )
+        .first()
+        is not None
+    )
+
+    if has_edit_permission:
+        return assignment_data  # User with edit permission can see everything
+
+    # Filter out sensitive data for students
+    filtered_data = assignment_data.copy()
+    if "questions" in filtered_data and filtered_data["questions"]:
+        filtered_questions = []
+        for question in filtered_data["questions"]:
+            filtered_question = question.copy()
+            # Remove sensitive fields
+            filtered_question.pop("rubric", None)
+            filtered_question.pop("correctAnswer", None)
+            filtered_question.pop(
+                "correct_answer", None
+            )  # Handle both naming conventions
+
+            # Handle subquestions for multi-part questions
+            if "subquestions" in filtered_question:
+                filtered_subquestions = []
+                for subq in filtered_question["subquestions"]:
+                    filtered_subq = subq.copy()
+                    filtered_subq.pop("rubric", None)
+                    filtered_subq.pop("correctAnswer", None)
+                    filtered_subq.pop("correct_answer", None)
+
+                    # Handle nested subquestions
+                    if "subquestions" in filtered_subq:
+                        nested_filtered = []
+                        for nested_subq in filtered_subq["subquestions"]:
+                            nested_filtered_subq = nested_subq.copy()
+                            nested_filtered_subq.pop("rubric", None)
+                            nested_filtered_subq.pop("correctAnswer", None)
+                            nested_filtered_subq.pop("correct_answer", None)
+                            nested_filtered.append(nested_filtered_subq)
+                        filtered_subq["subquestions"] = nested_filtered
+
+                    filtered_subquestions.append(filtered_subq)
+                filtered_question["subquestions"] = filtered_subquestions
+
+            filtered_questions.append(filtered_question)
+        filtered_data["questions"] = filtered_questions
+
+    return filtered_data
 
 
 @router.get("/api/assignments", response_model=List[AssignmentSummary])
@@ -132,6 +201,17 @@ async def get_shared_assignments(
 
         shared_links = query.order_by(desc(SharedLink.created_at)).all()
 
+        # Collect all unique owner IDs to fetch user information
+        owner_ids = set()
+        for shared_link in shared_links:
+            owner_ids.add(shared_link.owner_id)
+
+        # Fetch user information for all owners
+        from utils.firebase_users import get_users_by_uids
+
+        users_data = await get_users_by_uids(list(owner_ids))
+        users_map = {user["uid"]: user for user in users_data}
+
         # Convert to the expected format
         shared_assignments = []
         for shared_link in shared_links:
@@ -149,17 +229,51 @@ async def get_shared_assignments(
                     .first()
                 )
 
+                # Get owner information
+                owner_info = users_map.get(shared_link.owner_id, {})
+
+                # Convert assignment to dict for filtering
+                assignment_dict = {
+                    "id": assignment.id,
+                    "user_id": assignment.user_id,
+                    "title": assignment.title,
+                    "description": assignment.description,
+                    "due_date": assignment.due_date,
+                    "total_points": assignment.total_points,
+                    "total_questions": assignment.total_questions,
+                    "status": assignment.status,
+                    "engineering_level": assignment.engineering_level,
+                    "engineering_discipline": assignment.engineering_discipline,
+                    "question_types": assignment.question_types,
+                    "linked_videos": assignment.linked_videos,
+                    "uploaded_files": assignment.uploaded_files,
+                    "generation_prompt": assignment.generation_prompt,
+                    "generation_options": assignment.generation_options,
+                    "questions": assignment.questions,
+                    "is_template": assignment.is_template,
+                    "shared_count": assignment.shared_count,
+                    "created_at": assignment.created_at,
+                    "updated_at": assignment.updated_at,
+                }
+
+                # Filter sensitive data for students
+                filtered_assignment = filter_sensitive_data_for_students(
+                    assignment_dict, user_id, db
+                )
+
                 shared_assignment_data = {
                     "id": shared_link.id,
                     "share_token": shared_link.share_token,
                     "assignment_id": shared_link.assignment_id,
                     "owner_id": shared_link.owner_id,
+                    "owner_name": owner_info.get("displayName", shared_link.owner_id),
+                    "owner_email": owner_info.get("email", ""),
                     "title": shared_link.title,
                     "description": shared_link.description,
                     "is_public": shared_link.is_public,
                     "expires_at": shared_link.expires_at,
                     "created_at": shared_link.created_at,
-                    "assignment": assignment,
+                    "assignment": filtered_assignment,
                     "shared_accesses": [
                         {
                             "id": access.id,
@@ -233,8 +347,37 @@ async def get_assignment(
         # Calculate stats
         assignment = calculate_assignment_stats(assignment)
 
+        # Convert to dict and filter sensitive data for students
+        assignment_dict = {
+            "id": assignment.id,
+            "user_id": assignment.user_id,
+            "title": assignment.title,
+            "description": assignment.description,
+            "due_date": assignment.due_date,
+            "total_points": assignment.total_points,
+            "total_questions": assignment.total_questions,
+            "status": assignment.status,
+            "engineering_level": assignment.engineering_level,
+            "engineering_discipline": assignment.engineering_discipline,
+            "question_types": assignment.question_types,
+            "linked_videos": assignment.linked_videos,
+            "uploaded_files": assignment.uploaded_files,
+            "generation_prompt": assignment.generation_prompt,
+            "generation_options": assignment.generation_options,
+            "questions": assignment.questions,
+            "is_template": assignment.is_template,
+            "shared_count": assignment.shared_count,
+            "created_at": assignment.created_at,
+            "updated_at": assignment.updated_at,
+        }
+
+        # Filter sensitive data for students
+        filtered_assignment = filter_sensitive_data_for_students(
+            assignment_dict, user_id, db
+        )
+
         logger.info(f"Retrieved assignment: {assignment.title}")
-        return assignment
+        return filtered_assignment
 
     except HTTPException:
         raise
@@ -1072,7 +1215,7 @@ async def get_assignment_submissions(
 )
 async def submit_assignment(
     assignment_id: str,
-    submission_data: AssignmentSubmissionCreate,
+    submission_data: AssignmentSubmissionDraft,  # Use same schema as draft
     request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -1125,7 +1268,14 @@ async def submit_assignment(
         )
 
         if existing_submission:
-            # Update existing submission
+            # Check if already submitted - prevent resubmission
+            if existing_submission.status == "submitted":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Assignment has already been submitted and cannot be resubmitted",
+                )
+
+            # Update existing draft submission
             existing_submission.answers = submission_data.answers
             existing_submission.submission_method = submission_data.submission_method
             existing_submission.submitted_files = submission_data.submitted_files
@@ -1144,7 +1294,7 @@ async def submit_assignment(
         else:
             # Create new submission
             submission = AssignmentSubmission(
-                assignment_id=assignment_id,
+                assignment_id=assignment_id,  # Use assignment_id from URL path
                 user_id=user_id,
                 answers=submission_data.answers,
                 submission_method=submission_data.submission_method,
@@ -1222,4 +1372,283 @@ async def get_my_submission(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch submission",
+        )
+
+
+@router.post(
+    "/api/assignments/{assignment_id}/save-draft",
+    response_model=AssignmentSubmissionOut,
+)
+async def save_assignment_draft(
+    assignment_id: str,
+    submission_data: AssignmentSubmissionDraft,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Save assignment as draft"""
+    try:
+        user_id = current_user["uid"]
+        logger.info(f"Saving draft for assignment {assignment_id} by user: {user_id}")
+
+        # Verify assignment access
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+            )
+
+        # Check if user has access
+        has_access = (
+            assignment.user_id == user_id
+            or db.query(SharedLinkAccess)
+            .join(SharedLink)
+            .filter(
+                and_(
+                    SharedLink.assignment_id == assignment_id,
+                    SharedLink.share_type == "assignment",
+                    SharedLinkAccess.user_id == user_id,
+                    SharedLinkAccess.permission.in_(["complete", "edit"]),
+                )
+            )
+            .first()
+            is not None
+        )
+
+        if not has_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to save draft for this assignment",
+            )
+
+        # Check for existing submission/draft
+        existing_submission = (
+            db.query(AssignmentSubmission)
+            .filter(
+                and_(
+                    AssignmentSubmission.assignment_id == assignment_id,
+                    AssignmentSubmission.user_id == user_id,
+                )
+            )
+            .first()
+        )
+
+        if existing_submission:
+            # Update existing draft/submission
+            existing_submission.answers = submission_data.answers
+            existing_submission.submission_method = submission_data.submission_method
+            existing_submission.submitted_files = submission_data.submitted_files
+            existing_submission.time_spent = submission_data.time_spent
+            # Keep status as draft unless it was already submitted
+            if existing_submission.status != "submitted":
+                existing_submission.status = "draft"
+            existing_submission.updated_at = datetime.now(timezone.utc)
+
+            db.commit()
+            db.refresh(existing_submission)
+
+            logger.info(
+                f"Updated draft for assignment {assignment_id} by user {user_id}"
+            )
+            return existing_submission
+        else:
+            # Create new draft
+            submission = AssignmentSubmission(
+                assignment_id=assignment_id,
+                user_id=user_id,
+                answers=submission_data.answers,
+                submission_method=submission_data.submission_method,
+                submitted_files=submission_data.submitted_files,
+                time_spent=submission_data.time_spent,
+                status="draft",
+                started_at=datetime.now(timezone.utc),
+            )
+
+            db.add(submission)
+            db.commit()
+            db.refresh(submission)
+
+            logger.info(
+                f"Created draft for assignment {assignment_id} by user {user_id}"
+            )
+            return submission
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error saving draft for assignment {assignment_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save draft",
+        )
+
+
+@router.get("/api/assignments/{assignment_id}/status")
+async def get_assignment_status(
+    assignment_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get assignment status for current user"""
+    try:
+        user_id = current_user["uid"]
+        logger.info(f"Getting status for assignment {assignment_id} by user: {user_id}")
+
+        # Verify assignment access
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+            )
+
+        # Check if user has access
+        has_access = (
+            assignment.user_id == user_id
+            or db.query(SharedLinkAccess)
+            .join(SharedLink)
+            .filter(
+                and_(
+                    SharedLink.assignment_id == assignment_id,
+                    SharedLink.share_type == "assignment",
+                    SharedLinkAccess.user_id == user_id,
+                )
+            )
+            .first()
+            is not None
+        )
+
+        if not has_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to view this assignment status",
+            )
+
+        # Get user's submission
+        submission = (
+            db.query(AssignmentSubmission)
+            .filter(
+                and_(
+                    AssignmentSubmission.assignment_id == assignment_id,
+                    AssignmentSubmission.user_id == user_id,
+                )
+            )
+            .first()
+        )
+
+        # Calculate status based on submission and due date
+        now = datetime.now(timezone.utc)
+
+        # Ensure due_date is timezone-aware for comparison
+        due_date = None
+        if assignment.due_date:
+            if assignment.due_date.tzinfo is None:
+                # If due_date is naive, assume it's UTC
+                due_date = assignment.due_date.replace(tzinfo=timezone.utc)
+            else:
+                due_date = assignment.due_date
+
+        # Convert submission to dict if it exists
+        submission_dict = None
+        if submission:
+            submission_dict = {
+                "id": submission.id,
+                "assignment_id": submission.assignment_id,
+                "user_id": submission.user_id,
+                "answers": submission.answers,
+                "submission_method": submission.submission_method,
+                "submitted_files": submission.submitted_files,
+                "score": submission.score,
+                "percentage": submission.percentage,
+                "feedback": submission.feedback,
+                "overall_feedback": submission.overall_feedback,
+                "status": submission.status,
+                "is_late": submission.is_late,
+                "attempt_number": submission.attempt_number,
+                "time_spent": submission.time_spent,
+                "started_at": submission.started_at.isoformat()
+                if submission.started_at
+                else None,
+                "submitted_at": submission.submitted_at.isoformat()
+                if submission.submitted_at
+                else None,
+                "graded_at": submission.graded_at.isoformat()
+                if submission.graded_at
+                else None,
+                "created_at": submission.created_at.isoformat()
+                if submission.created_at
+                else None,
+                "updated_at": submission.updated_at.isoformat()
+                if submission.updated_at
+                else None,
+            }
+
+        status_info = {
+            "assignment_id": assignment_id,
+            "user_id": user_id,
+            "submission": submission_dict,
+        }
+
+        if not submission:
+            # No submission yet
+            if due_date and now > due_date:
+                status_info["status"] = "overdue"
+                status_info["progress"] = 0
+            else:
+                status_info["status"] = "not_started"
+                status_info["progress"] = 0
+        else:
+            # Has submission
+            if submission.status == "submitted":
+                if submission.score is not None:
+                    status_info["status"] = "graded"
+                    status_info["grade"] = submission.score
+                    status_info["percentage"] = submission.percentage
+                else:
+                    status_info["status"] = "submitted"
+                status_info["progress"] = 100
+            elif submission.status == "draft":
+                # Calculate progress based on answered questions
+                total_questions = len(assignment.questions or [])
+                answered_questions = len(submission.answers or {})
+                progress = (
+                    (answered_questions / total_questions * 100)
+                    if total_questions > 0
+                    else 0
+                )
+
+                if due_date and now > due_date:
+                    status_info["status"] = "overdue"
+                else:
+                    status_info["status"] = "in_progress"
+                status_info["progress"] = min(progress, 99)  # Max 99% for draft
+            else:
+                status_info["status"] = submission.status
+                status_info["progress"] = (
+                    100 if submission.status == "submitted" else 50
+                )
+
+        # Add due date info
+        if due_date:
+            status_info["due_date"] = due_date.isoformat()
+            status_info["is_overdue"] = now > due_date and (
+                not submission or submission.status != "submitted"
+            )
+            status_info["time_remaining"] = (
+                str(due_date - now) if due_date > now else None
+            )
+
+        logger.info(
+            f"Status for assignment {assignment_id} by user {user_id}: {status_info['status']}"
+        )
+        return status_info
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting status for assignment {assignment_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get assignment status",
         )

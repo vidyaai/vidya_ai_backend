@@ -308,6 +308,8 @@ class SharedAssignmentOut(BaseModel):
     share_token: str  # The shareable token/link
     assignment_id: str
     owner_id: str  # The user who shared the assignment
+    owner_name: Optional[str] = None  # Display name of the owner
+    owner_email: Optional[str] = None  # Email of the owner
     title: Optional[str] = None
     description: Optional[str] = None
     is_public: bool
@@ -340,6 +342,13 @@ class SubmissionAnswerCreate(BaseModel):
 
 class AssignmentSubmissionCreate(BaseModel):
     assignment_id: str
+    answers: dict  # Question ID -> answer mapping
+    submission_method: str = "in-app"
+    submitted_files: Optional[List[dict]] = None
+    time_spent: Optional[str] = None
+
+
+class AssignmentSubmissionDraft(BaseModel):
     answers: dict  # Question ID -> answer mapping
     submission_method: str = "in-app"
     submitted_files: Optional[List[dict]] = None
