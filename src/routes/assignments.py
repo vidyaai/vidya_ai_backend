@@ -483,12 +483,15 @@ async def share_assignment(
                 db.add(shared_access)
                 shared_accesses.append(shared_access)
 
-        # Update shared count
+        db.commit()
+        db.refresh(shared_link)
+
         total_users = (
             db.query(SharedLinkAccess)
             .filter(SharedLinkAccess.shared_link_id == shared_link.id)
             .count()
         )
+        logger.info(f"total_users: {total_users}")
         assignment.shared_count = str(total_users)
 
         db.commit()
