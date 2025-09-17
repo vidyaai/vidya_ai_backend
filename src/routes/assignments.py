@@ -23,6 +23,8 @@ from schemas import (
     AssignmentSubmissionUpdate,
     AssignmentSubmissionOut,
     AssignmentGenerateRequest,
+    DocumentImportRequest,
+    DocumentImportResponse,
 )
 
 router = APIRouter()
@@ -1151,6 +1153,87 @@ async def generate_assignment(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate assignment",
+        )
+
+
+@router.post("/api/assignments/import-document", response_model=DocumentImportResponse)
+async def import_document_to_assignment(
+    import_data: DocumentImportRequest,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+):
+    """Import assignment questions from a document using AI parsing"""
+    try:
+        user_id = current_user["uid"]
+        logger.info(f"Importing document {import_data.file_name} for user: {user_id}")
+
+        # Import document processing services
+        from utils.document_processor import DocumentProcessor, AssignmentDocumentParser
+
+        # Initialize processors
+        doc_processor = DocumentProcessor()
+        assignment_parser = AssignmentDocumentParser()
+
+        # Extract text from the document
+        try:
+            extracted_text = doc_processor.extract_text_from_file(
+                import_data.file_content, import_data.file_name, import_data.file_type
+            )
+
+            if not extracted_text or len(extracted_text.strip()) < 50:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Document appears to be empty or contains insufficient content for assignment extraction",
+                )
+
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+        # Parse the document to extract assignment questions
+        try:
+            parsed_assignment = assignment_parser.parse_document_to_assignment(
+                extracted_text, import_data.file_name, import_data.generation_options
+            )
+        except Exception as e:
+            logger.error(f"Error parsing document with AI: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to extract assignment questions from document. Please ensure the document contains assignment questions, exercises, or problems.",
+            )
+
+        # Prepare the response
+        response_data = DocumentImportResponse(
+            title=parsed_assignment.get(
+                "title", f"Assignment from {import_data.file_name}"
+            ),
+            description=parsed_assignment.get("description"),
+            questions=parsed_assignment.get("questions", []),
+            extracted_text=extracted_text[:1000] + "..."
+            if len(extracted_text) > 1000
+            else extracted_text,  # Truncate for response
+            file_info={
+                "original_filename": import_data.file_name,
+                "file_type": import_data.file_type,
+                "content_length": len(extracted_text),
+                "questions_generated": len(parsed_assignment.get("questions", [])),
+                "total_points": parsed_assignment.get("total_points", 0),
+            },
+        )
+
+        logger.info(
+            f"Successfully imported document {import_data.file_name}: "
+            f"{len(parsed_assignment.get('questions', []))} questions generated"
+        )
+
+        return response_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error importing document {import_data.file_name}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to import document",
         )
 
 

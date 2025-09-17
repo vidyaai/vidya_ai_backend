@@ -402,5 +402,24 @@ class AssignmentGenerateRequest(BaseModel):
     description: Optional[str] = None
 
 
+class DocumentImportRequest(BaseModel):
+    """Request for document import and parsing"""
+
+    file_content: str  # Base64 encoded file content or plain text
+    file_name: str
+    file_type: str  # MIME type or file extension
+    generation_options: Optional[dict] = None  # Additional parsing options
+
+
+class DocumentImportResponse(BaseModel):
+    """Response from document import"""
+
+    title: str
+    description: Optional[str] = None
+    questions: List[dict]
+    extracted_text: Optional[str] = None  # For debugging/review purposes
+    file_info: dict  # Original file metadata
+
+
 # Update MultiPartSubQuestion to handle forward reference
 MultiPartSubQuestion.model_rebuild()
