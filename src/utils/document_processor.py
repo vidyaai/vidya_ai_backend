@@ -16,6 +16,7 @@ from .prompts import (
     create_extraction_prompt,
     create_fallback_prompt,
 )
+from .assignment_schemas import get_assignment_parsing_schema
 
 
 class DocumentProcessor:
@@ -267,157 +268,8 @@ class AssignmentDocumentParser:
         # Create the extraction prompt
         prompt = create_extraction_prompt(document_text, file_name)
 
-        # Define the JSON schema for the response
-        response_schema = {
-            "name": "assignment_parsing_response",
-            "type": "object",
-            "properties": {
-                "title": {"type": "string"},
-                "description": {"type": "string"},
-                "questions": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "id": {"type": "integer"},
-                            "type": {
-                                "type": "string",
-                                "enum": [
-                                    "multiple-choice",
-                                    "fill-blank",
-                                    "short-answer",
-                                    "numerical",
-                                    "long-answer",
-                                    "true-false",
-                                    "code-writing",
-                                    "diagram-analysis",
-                                    "multi-part",
-                                ],
-                            },
-                            "question": {"type": "string"},
-                            "options": {"type": "array", "items": {"type": "string"}},
-                            "correctAnswer": {"type": "string"},
-                            "points": {"type": "number"},
-                            "rubric": {"type": "string"},
-                            "order": {"type": "integer"},
-                            "hasCode": {"type": "boolean"},
-                            "hasDiagram": {"type": "boolean"},
-                            "codeLanguage": {"type": "string"},
-                            "outputType": {"type": "string"},
-                            "analysisType": {"type": "string"},
-                            "rubricType": {
-                                "type": "string",
-                                "enum": ["per-subquestion", "overall"],
-                            },
-                            "code": {"type": "string"},
-                            "subquestions": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "id": {"type": "integer"},
-                                        "type": {
-                                            "type": "string",
-                                            "enum": [
-                                                "multiple-choice",
-                                                "fill-blank",
-                                                "short-answer",
-                                                "numerical",
-                                                "true-false",
-                                                "code-writing",
-                                                "diagram-analysis",
-                                                "multi-part",
-                                            ],
-                                        },
-                                        "question": {"type": "string"},
-                                        "points": {"type": "number"},
-                                        "options": {
-                                            "type": "array",
-                                            "items": {"type": "string"},
-                                        },
-                                        "correctAnswer": {"type": "string"},
-                                        "rubric": {"type": "string"},
-                                        "hasCode": {"type": "boolean"},
-                                        "hasDiagram": {"type": "boolean"},
-                                        "codeLanguage": {"type": "string"},
-                                        "outputType": {"type": "string"},
-                                        "analysisType": {"type": "string"},
-                                        "rubricType": {
-                                            "type": "string",
-                                            "enum": ["per-subquestion", "overall"],
-                                        },
-                                        "code": {"type": "string"},
-                                        "subquestions": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "id": {"type": "integer"},
-                                                    "type": {
-                                                        "type": "string",
-                                                        "enum": [
-                                                            "multiple-choice",
-                                                            "fill-blank",
-                                                            "short-answer",
-                                                            "numerical",
-                                                            "true-false",
-                                                            "code-writing",
-                                                            "diagram-analysis",
-                                                        ],
-                                                    },
-                                                    "question": {"type": "string"},
-                                                    "points": {"type": "number"},
-                                                    "options": {
-                                                        "type": "array",
-                                                        "items": {"type": "string"},
-                                                    },
-                                                    "correctAnswer": {"type": "string"},
-                                                    "rubric": {"type": "string"},
-                                                    "hasCode": {"type": "boolean"},
-                                                    "hasDiagram": {"type": "boolean"},
-                                                    "codeLanguage": {"type": "string"},
-                                                    "outputType": {"type": "string"},
-                                                    "analysisType": {"type": "string"},
-                                                    "rubricType": {
-                                                        "type": "string",
-                                                        "enum": ["overall"],
-                                                    },
-                                                    "code": {"type": "string"},
-                                                },
-                                                "required": [
-                                                    "id",
-                                                    "type",
-                                                    "question",
-                                                    "points",
-                                                    "correctAnswer",
-                                                    "rubric",
-                                                ],
-                                            },
-                                        },
-                                    },
-                                    "required": [
-                                        "id",
-                                        "type",
-                                        "question",
-                                        "points",
-                                        "correctAnswer",
-                                    ],
-                                },
-                            },
-                        },
-                        "required": [
-                            "id",
-                            "type",
-                            "question",
-                            "points",
-                            "correctAnswer",
-                        ],
-                    },
-                },
-                "total_points": {"type": "number"},
-            },
-            "required": ["title", "questions", "total_points"],
-        }
+        # Get the JSON schema for the response with dynamic naming
+        response_schema = get_assignment_parsing_schema("document_parsing_response")
 
         # Call OpenAI to parse the document
         response = self.client.chat.completions.create(
@@ -507,60 +359,10 @@ class AssignmentDocumentParser:
         # Create a simpler prompt for reduced content
         prompt = create_fallback_prompt(document_text, file_name)
 
-        # Define a simplified JSON schema for fallback parsing
-        fallback_schema = {
-            "name": "assignment_parsing_fallback_response",
-            "type": "object",
-            "properties": {
-                "title": {"type": "string"},
-                "description": {"type": "string"},
-                "questions": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "id": {"type": "integer"},
-                            "type": {
-                                "type": "string",
-                                "enum": [
-                                    "multiple-choice",
-                                    "short-answer",
-                                    "long-answer",
-                                    "numerical",
-                                    "true-false",
-                                    "fill-blank",
-                                    "code-writing",
-                                    "multi-part",
-                                ],
-                            },
-                            "question": {"type": "string"},
-                            "options": {"type": "array", "items": {"type": "string"}},
-                            "correctAnswer": {"type": "string"},
-                            "points": {"type": "number"},
-                            "rubric": {"type": "string"},
-                            "order": {"type": "integer"},
-                            "hasCode": {"type": "boolean"},
-                            "hasDiagram": {"type": "boolean"},
-                            "codeLanguage": {"type": "string"},
-                            "outputType": {"type": "string"},
-                            "analysisType": {"type": "string"},
-                            "rubricType": {
-                                "type": "string",
-                                "enum": ["overall", "per-subquestion"],
-                            },
-                            "code": {"type": "string"},
-                            "subquestions": {
-                                "type": "array",
-                                "items": {"type": "object"},
-                            },
-                        },
-                        "required": ["id", "type", "question", "points"],
-                    },
-                },
-                "total_points": {"type": "number"},
-            },
-            "required": ["title", "questions", "total_points"],
-        }
+        # Get the JSON schema for fallback parsing with dynamic naming
+        fallback_schema = get_assignment_parsing_schema(
+            "assignment_parsing_fallback_response"
+        )
 
         # Call OpenAI with reduced content
         response = self.client.chat.completions.create(

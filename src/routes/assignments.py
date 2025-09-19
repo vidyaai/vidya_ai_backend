@@ -1079,61 +1079,52 @@ async def generate_assignment(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """Generate an assignment using AI (mock implementation)"""
+    """Generate an assignment using AI"""
     try:
         user_id = current_user["uid"]
         logger.info(f"Generating assignment for user: {user_id}")
 
-        # Mock AI generation logic (replace with actual AI service)
-        generation_options = generate_data.generation_options
+        # Import the assignment generator
+        from utils.assignment_generator import AssignmentGenerator
 
-        # Generate mock questions based on options
-        questions = []
+        # Initialize the generator
+        generator = AssignmentGenerator()
+
+        # Generate assignment using AI
+        generated_data = generator.generate_assignment(
+            generation_options=generate_data.generation_options,
+            linked_videos=generate_data.linked_videos,
+            uploaded_files=generate_data.uploaded_files,
+            generation_prompt=generate_data.generation_prompt,
+            title=generate_data.title,
+            description=generate_data.description,
+        )
+
+        # Extract question types for database storage
         question_types = []
-        for q_type, enabled in generation_options.get("questionTypes", {}).items():
+        for q_type, enabled in generate_data.generation_options.get(
+            "questionTypes", {}
+        ).items():
             if enabled:
                 question_types.append(q_type)
-
-        num_questions = int(generation_options.get("numQuestions", 5))
-
-        for i in range(num_questions):
-            q_type = (
-                question_types[i % len(question_types)]
-                if question_types
-                else "multiple-choice"
-            )
-            question = {
-                "id": i + 1,
-                "type": q_type,
-                "question": f'Generated {q_type.replace("-", " ")} question {i + 1}',
-                "points": 5,
-                "options": ["Option A", "Option B", "Option C", "Option D"]
-                if q_type == "multiple-choice"
-                else [],
-                "correctAnswer": "Option A"
-                if q_type == "multiple-choice"
-                else "Sample answer",
-            }
-            questions.append(question)
 
         # Create assignment
         assignment = Assignment(
             user_id=user_id,
-            title=generate_data.title
-            or f"{generation_options.get('engineeringLevel', 'Undergraduate')} Assignment",
-            description=generate_data.description or "AI-generated assignment",
-            engineering_level=generation_options.get(
+            title=generated_data["title"],
+            description=generated_data["description"],
+            engineering_level=generate_data.generation_options.get(
                 "engineeringLevel", "undergraduate"
             ),
-            engineering_discipline=generation_options.get(
+            engineering_discipline=generate_data.generation_options.get(
                 "engineeringDiscipline", "general"
             ),
             question_types=question_types,
             linked_videos=generate_data.linked_videos,
             uploaded_files=generate_data.uploaded_files,
             generation_prompt=generate_data.generation_prompt,
-            generation_options=generation_options,
-            questions=questions,
+            generation_options=generate_data.generation_options,
+            questions=generated_data["questions"],
             status="draft",
         )
 
@@ -1153,6 +1144,60 @@ async def generate_assignment(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate assignment",
+        )
+
+
+@router.get("/api/assignments/available-videos")
+async def get_available_videos_for_assignment(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get available videos for assignment generation"""
+    try:
+        user_id = current_user["uid"]
+        logger.info(f"Fetching available videos for user: {user_id}")
+
+        # Get user's videos with transcripts
+        videos = (
+            db.query(Video)
+            .filter(
+                and_(
+                    Video.user_id == user_id,
+                    Video.transcript_text.isnot(None),
+                    Video.transcript_text != "",
+                )
+            )
+            .order_by(desc(Video.created_at))
+            .all()
+        )
+
+        # Format videos for frontend
+        available_videos = []
+        for video in videos:
+            video_data = {
+                "id": video.id,
+                "title": video.title or "Untitled Video",
+                "source_type": video.source_type,
+                "youtube_id": video.youtube_id,
+                "youtube_url": video.youtube_url,
+                "transcript_text": video.transcript_text,
+                "created_at": video.created_at.isoformat()
+                if video.created_at
+                else None,
+            }
+            available_videos.append(video_data)
+
+        logger.info(
+            f"Found {len(available_videos)} videos with transcripts for user {user_id}"
+        )
+        return {"videos": available_videos}
+
+    except Exception as e:
+        logger.error(f"Error fetching available videos: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch available videos",
         )
 
 
