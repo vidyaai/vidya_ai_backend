@@ -438,13 +438,23 @@ class AssignmentDocumentParser:
                 else:
                     out["options"] = []
 
-                # Correct answer
+                # Correct answer - handle both single and multiple correct
                 ca = (
                     src.get("correctAnswer")
                     or src.get("correct_answer")
                     or src.get("answer")
                 )
                 out["correctAnswer"] = str(ca) if ca is not None else ""
+
+                # Multiple correct support
+                out["allowMultipleCorrect"] = src.get("allowMultipleCorrect", False)
+                multiple_correct = src.get("multipleCorrectAnswers", [])
+                if isinstance(multiple_correct, list):
+                    out["multipleCorrectAnswers"] = [
+                        str(ans) for ans in multiple_correct
+                    ]
+                else:
+                    out["multipleCorrectAnswers"] = []
 
                 # Code and diagram flags
                 out["hasCode"] = src.get("hasCode", False)

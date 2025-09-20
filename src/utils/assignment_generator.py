@@ -330,6 +330,10 @@ The response will be automatically structured according to the provided JSON sch
                 else:
                     question["correctAnswer"] = "Sample answer"
 
+            # Set default multiple correct values
+            question.setdefault("allowMultipleCorrect", False)
+            question.setdefault("multipleCorrectAnswers", [])
+
         return questions
 
     def _generate_mock_questions(
@@ -352,6 +356,8 @@ The response will be automatically structured according to the provided JSON sch
                 "difficulty": "medium",
                 "options": ["Option A", "Option B", "Option C", "Option D"],
                 "correctAnswer": "Option A",
+                "allowMultipleCorrect": False,
+                "multipleCorrectAnswers": [],
                 "explanation": "This is a sample explanation for the correct answer.",
             }
             questions.append(question)

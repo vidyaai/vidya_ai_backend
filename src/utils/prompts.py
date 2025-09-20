@@ -3,9 +3,6 @@ Prompts for document processing and assignment parsing.
 """
 
 # System prompt for document parsing
-from controllers.config import logger
-
-
 DOCUMENT_PARSER_SYSTEM_PROMPT = """You are an expert document parser specializing in extracting assignment questions from educational documents. Your task is to identify and extract existing questions, exercises, problems, or assessment items from documents and structure them according to the provided JSON schema.
 
 Key guidelines:
@@ -22,17 +19,6 @@ FALLBACK_PARSER_SYSTEM_PROMPT = """You are a document parser extracting assignme
 
 def create_extraction_prompt(document_text: str, file_name: str) -> str:
     """Create a detailed prompt for extracting existing assignment questions from documents"""
-
-    # Truncate document text if too long (keep within token limits)
-    # Increased limit to allow for larger documents while leaving room for response
-    max_doc_length = (
-        20000  # Characters, roughly 5000 tokens - more space for extraction
-    )
-    if len(document_text) > max_doc_length:
-        logger.warning(
-            f"Document text is too long, truncating to {max_doc_length} characters"
-        )
-        document_text = document_text[:max_doc_length] + "... [document truncated]"
 
     prompt = f"""
 Analyze the following document and extract all existing assignment questions, exercises, problems, or assessment items.
@@ -60,14 +46,16 @@ Extraction guidelines:
 3. Extract all provided information:
    - Exact question text as written
    - Multiple choice options (infer if not explicit)
-   - Correct answers, solutions, or answer keys (if not present, generate if possible)
+   - Correct answers, solutions, or answer keys (if not present, generate)
+   - For multiple choice: determine if single or multiple answers are correct
    - Point values and scoring information
-   - Grading rubrics or evaluation criteria (if not present, generate if possible)
+   - Grading rubrics or evaluation criteria (if not present, generate)
    - Assignment title and description
 
 4. For multi-part questions, structure subquestions properly
 5. Identify code content and set hasCode/codeLanguage appropriately
 6. Identify diagram requirements and set hasDiagram/analysisType appropriately
+7. DO NOT keep question numbers, marks, option number or other metadata in the Question or Options fields
 
 Rubric requirements:
 - rubricType: "overall" for non-multi-part questions, "per-subquestion" for multi-part questions
@@ -89,7 +77,8 @@ Content: {document_text}
 
 Extract:
 - Assignment title and description
-- Questions with their types, text, points, and answers (if not present, generate if possible)
+- Questions with their types, text, points, and answers (if not present, generate)
+- For multiple choice: identify if single or multiple answers are correct
 - Code content and diagram requirements
 - Multi-part question structure
 
