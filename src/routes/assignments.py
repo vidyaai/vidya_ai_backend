@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, asc
 from typing import List, Optional
@@ -6,9 +7,13 @@ from datetime import datetime, timezone
 import json
 import secrets
 import string
+import uuid
+import os
+import mimetypes
 
 from utils.db import get_db
-from controllers.config import logger
+from controllers.config import logger, s3_client, AWS_S3_BUCKET
+from controllers.storage import s3_upload_file, s3_presign_url
 from utils.firebase_auth import get_current_user
 from models import Assignment, SharedLink, SharedLinkAccess, AssignmentSubmission, Video
 from schemas import (
@@ -25,6 +30,8 @@ from schemas import (
     AssignmentGenerateRequest,
     DocumentImportRequest,
     DocumentImportResponse,
+    DiagramUploadResponse,
+    DiagramDeleteResponse,
 )
 
 router = APIRouter()
@@ -1779,4 +1786,366 @@ async def get_assignment_status(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get assignment status",
+        )
+
+
+# Diagram/File Upload Endpoints
+@router.post("/api/assignments/upload-diagram", response_model=DiagramUploadResponse)
+async def upload_assignment_diagram(
+    file: UploadFile = File(...),
+    assignment_id: Optional[str] = None,
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Upload a diagram/image file for assignment questions"""
+    try:
+        user_id = current_user["uid"]
+        logger.info(
+            f"Uploading diagram file for user: {user_id}, assignment: {assignment_id}"
+        )
+
+        # Validate file type
+        allowed_types = [
+            "image/png",
+            "image/jpeg",
+            "image/jpg",
+            "image/gif",
+            "image/svg+xml",
+            "application/pdf",
+        ]
+        allowed_extensions = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".pdf"]
+
+        file_extension = os.path.splitext(file.filename or "")[1].lower()
+        content_type = file.content_type
+
+        if (
+            content_type not in allowed_types
+            and file_extension not in allowed_extensions
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file type. Only images (PNG, JPG, GIF, SVG) and PDF files are allowed.",
+            )
+
+        # Validate file size (max 10MB)
+        file_content = await file.read()
+        if len(file_content) > 10 * 1024 * 1024:  # 10MB
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File size exceeds 10MB limit.",
+            )
+
+        # Check S3 configuration
+        if not s3_client or not AWS_S3_BUCKET:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="File storage is not configured",
+            )
+
+        # If assignment_id is provided, verify user has access
+        if assignment_id:
+            assignment = (
+                db.query(Assignment).filter(Assignment.id == assignment_id).first()
+            )
+            if not assignment:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+                )
+
+            # Check if user owns the assignment or has edit access
+            has_access = (
+                assignment.user_id == user_id
+                or db.query(SharedLinkAccess)
+                .join(SharedLink)
+                .filter(
+                    and_(
+                        SharedLink.assignment_id == assignment_id,
+                        SharedLink.share_type == "assignment",
+                        SharedLinkAccess.user_id == user_id,
+                        SharedLinkAccess.permission == "edit",
+                    )
+                )
+                .first()
+                is not None
+            )
+
+            if not has_access:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied to upload diagrams for this assignment",
+                )
+
+        # Generate unique file ID and S3 key
+        file_id = str(uuid.uuid4())
+        file_extension = file_extension or mimetypes.guess_extension(content_type) or ""
+
+        # Organize files by assignment or user
+        if assignment_id:
+            s3_key = f"assignments/{assignment_id}/diagrams/{file_id}{file_extension}"
+        else:
+            s3_key = f"users/{user_id}/diagrams/{file_id}{file_extension}"
+
+        # Create temporary file and upload to S3
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(
+            delete=False, suffix=file_extension
+        ) as temp_file:
+            temp_file.write(file_content)
+            temp_file_path = temp_file.name
+
+        try:
+            # Upload to S3
+            s3_upload_file(temp_file_path, s3_key, content_type=content_type)
+
+            # Generate presigned URL for immediate access (expires in 1 hour)
+            presigned_url = s3_presign_url(s3_key, expires_in=3600)
+
+            # Clean up temp file
+            os.unlink(temp_file_path)
+
+            logger.info(f"Successfully uploaded diagram: {file_id} to S3: {s3_key}")
+
+            return {
+                "file_id": file_id,
+                "filename": file.filename,
+                "content_type": content_type,
+                "size": len(file_content),
+                "s3_key": s3_key,
+                "url": presigned_url,
+                "uploaded_at": datetime.now(timezone.utc).isoformat(),
+            }
+
+        except Exception as e:
+            # Clean up temp file on error
+            try:
+                os.unlink(temp_file_path)
+            except:
+                pass
+            raise e
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading diagram: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload diagram",
+        )
+
+
+@router.get("/api/assignments/diagrams/{file_id}")
+async def serve_assignment_diagram(
+    file_id: str,
+    assignment_id: Optional[str] = None,
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Serve a diagram file by generating a presigned URL"""
+    try:
+        user_id = current_user["uid"]
+        logger.info(f"Serving diagram {file_id} for user: {user_id}")
+
+        # Check S3 configuration
+        if not s3_client or not AWS_S3_BUCKET:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="File storage is not configured",
+            )
+
+        # Construct potential S3 keys to check
+        possible_keys = []
+
+        if assignment_id:
+            # Check assignment-specific location first
+            possible_keys.append(f"assignments/{assignment_id}/diagrams/{file_id}.png")
+            possible_keys.append(f"assignments/{assignment_id}/diagrams/{file_id}.jpg")
+            possible_keys.append(f"assignments/{assignment_id}/diagrams/{file_id}.jpeg")
+            possible_keys.append(f"assignments/{assignment_id}/diagrams/{file_id}.gif")
+            possible_keys.append(f"assignments/{assignment_id}/diagrams/{file_id}.svg")
+            possible_keys.append(f"assignments/{assignment_id}/diagrams/{file_id}.pdf")
+
+            # Verify user has access to the assignment
+            assignment = (
+                db.query(Assignment).filter(Assignment.id == assignment_id).first()
+            )
+            if assignment:
+                has_access = (
+                    assignment.user_id == user_id
+                    or db.query(SharedLinkAccess)
+                    .join(SharedLink)
+                    .filter(
+                        and_(
+                            SharedLink.assignment_id == assignment_id,
+                            SharedLink.share_type == "assignment",
+                            SharedLinkAccess.user_id == user_id,
+                        )
+                    )
+                    .first()
+                    is not None
+                )
+
+                if not has_access:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Access denied to this diagram",
+                    )
+
+        # Also check user-specific location
+        possible_keys.extend(
+            [
+                f"users/{user_id}/diagrams/{file_id}.png",
+                f"users/{user_id}/diagrams/{file_id}.jpg",
+                f"users/{user_id}/diagrams/{file_id}.jpeg",
+                f"users/{user_id}/diagrams/{file_id}.gif",
+                f"users/{user_id}/diagrams/{file_id}.svg",
+                f"users/{user_id}/diagrams/{file_id}.pdf",
+            ]
+        )
+
+        # Try to find the file by checking if objects exist
+        found_key = None
+        for key in possible_keys:
+            try:
+                s3_client.head_object(Bucket=AWS_S3_BUCKET, Key=key)
+                found_key = key
+                break
+            except:
+                continue
+
+        if not found_key:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Diagram file not found"
+            )
+
+        # Generate presigned URL (expires in 1 hour)
+        presigned_url = s3_presign_url(found_key, expires_in=3600)
+
+        logger.info(f"Generated presigned URL for diagram: {file_id}")
+
+        # Return redirect to presigned URL
+        return RedirectResponse(url=presigned_url)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving diagram {file_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to serve diagram",
+        )
+
+
+@router.delete(
+    "/api/assignments/diagrams/{file_id}", response_model=DiagramDeleteResponse
+)
+async def delete_assignment_diagram(
+    file_id: str,
+    assignment_id: Optional[str] = None,
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a diagram file from storage"""
+    try:
+        user_id = current_user["uid"]
+        logger.info(f"Deleting diagram {file_id} for user: {user_id}")
+
+        # Check S3 configuration
+        if not s3_client or not AWS_S3_BUCKET:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="File storage is not configured",
+            )
+
+        # If assignment_id is provided, verify user has edit access
+        if assignment_id:
+            assignment = (
+                db.query(Assignment).filter(Assignment.id == assignment_id).first()
+            )
+            if not assignment:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+                )
+
+            has_access = (
+                assignment.user_id == user_id
+                or db.query(SharedLinkAccess)
+                .join(SharedLink)
+                .filter(
+                    and_(
+                        SharedLink.assignment_id == assignment_id,
+                        SharedLink.share_type == "assignment",
+                        SharedLinkAccess.user_id == user_id,
+                        SharedLinkAccess.permission == "edit",
+                    )
+                )
+                .first()
+                is not None
+            )
+
+            if not has_access:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied to delete diagrams for this assignment",
+                )
+
+        # Construct potential S3 keys to check and delete
+        possible_keys = []
+
+        if assignment_id:
+            possible_keys.extend(
+                [
+                    f"assignments/{assignment_id}/diagrams/{file_id}.png",
+                    f"assignments/{assignment_id}/diagrams/{file_id}.jpg",
+                    f"assignments/{assignment_id}/diagrams/{file_id}.jpeg",
+                    f"assignments/{assignment_id}/diagrams/{file_id}.gif",
+                    f"assignments/{assignment_id}/diagrams/{file_id}.svg",
+                    f"assignments/{assignment_id}/diagrams/{file_id}.pdf",
+                ]
+            )
+
+        # Also check user-specific location
+        possible_keys.extend(
+            [
+                f"users/{user_id}/diagrams/{file_id}.png",
+                f"users/{user_id}/diagrams/{file_id}.jpg",
+                f"users/{user_id}/diagrams/{file_id}.jpeg",
+                f"users/{user_id}/diagrams/{file_id}.gif",
+                f"users/{user_id}/diagrams/{file_id}.svg",
+                f"users/{user_id}/diagrams/{file_id}.pdf",
+            ]
+        )
+
+        # Find and delete the file
+        deleted_keys = []
+        for key in possible_keys:
+            try:
+                s3_client.head_object(Bucket=AWS_S3_BUCKET, Key=key)
+                s3_client.delete_object(Bucket=AWS_S3_BUCKET, Key=key)
+                deleted_keys.append(key)
+                logger.info(f"Deleted diagram from S3: {key}")
+            except:
+                continue
+
+        if not deleted_keys:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Diagram file not found"
+            )
+
+        return {
+            "message": "Diagram deleted successfully",
+            "file_id": file_id,
+            "deleted_keys": deleted_keys,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting diagram {file_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete diagram",
         )

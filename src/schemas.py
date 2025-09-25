@@ -421,5 +421,22 @@ class DocumentImportResponse(BaseModel):
     file_info: dict  # Original file metadata
 
 
+# Diagram Upload Schemas
+class DiagramUploadResponse(BaseModel):
+    file_id: str
+    filename: str
+    content_type: str
+    size: int
+    s3_key: str
+    url: str
+    uploaded_at: str
+
+
+class DiagramDeleteResponse(BaseModel):
+    message: str
+    file_id: str
+    deleted_keys: List[str]
+
+
 # Update MultiPartSubQuestion to handle forward reference
 MultiPartSubQuestion.model_rebuild()
