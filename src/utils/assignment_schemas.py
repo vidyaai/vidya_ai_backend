@@ -53,7 +53,6 @@ def get_assignment_parsing_schema(
             "hasDiagram": {"type": "boolean"},
             "codeLanguage": {"type": "string"},
             "outputType": {"type": "string"},
-            "analysisType": {"type": "string"},
             "rubricType": {
                 "type": "string",
                 "enum": ["per-subquestion", "overall"],
@@ -96,7 +95,6 @@ def get_assignment_parsing_schema(
                         "hasDiagram": {"type": "boolean"},
                         "codeLanguage": {"type": "string"},
                         "outputType": {"type": "string"},
-                        "analysisType": {"type": "string"},
                         "rubricType": {
                             "type": "string",
                             "enum": ["per-subquestion", "overall"],
@@ -138,7 +136,6 @@ def get_assignment_parsing_schema(
                                     "hasDiagram": {"type": "boolean"},
                                     "codeLanguage": {"type": "string"},
                                     "outputType": {"type": "string"},
-                                    "analysisType": {"type": "string"},
                                     "rubricType": {
                                         "type": "string",
                                         "enum": ["overall"],

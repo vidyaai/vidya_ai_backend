@@ -148,7 +148,6 @@ def test_assignment_extraction():
             print(f"  Has Diagram: {question.get('hasDiagram', False)}")
             print(f"  Code Language: {question.get('codeLanguage', 'N/A')}")
             print(f"  Output Type: {question.get('outputType', 'N/A')}")
-            print(f"  Analysis Type: {question.get('analysisType', 'N/A')}")
             print(f"  Rubric Type: {question.get('rubricType', 'N/A')}")
             if question.get("options"):
                 print(f"  Options: {len(question.get('options'))} choices")
@@ -198,7 +197,6 @@ def test_assignment_extraction():
             "hasDiagram",
             "codeLanguage",
             "outputType",
-            "analysisType",
             "rubricType",
             "code",
             "options",

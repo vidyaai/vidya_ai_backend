@@ -461,7 +461,6 @@ class AssignmentDocumentParser:
                 out["hasDiagram"] = src.get("hasDiagram", False)
                 out["codeLanguage"] = src.get("codeLanguage", "")
                 out["outputType"] = src.get("outputType", "")
-                out["analysisType"] = src.get("analysisType", "")
                 out["rubricType"] = src.get("rubricType", "per-subquestion")
 
                 # Code content

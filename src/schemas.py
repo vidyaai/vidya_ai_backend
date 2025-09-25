@@ -191,7 +191,6 @@ class CodeWritingQuestion(QuestionBase):
 
 
 class DiagramAnalysisQuestion(QuestionBase):
-    analysis_type: str = "description"
     diagram: Optional[dict] = None  # {file: str, url: str}
 
 

@@ -54,7 +54,7 @@ Extraction guidelines:
 
 4. For multi-part questions, structure subquestions properly
 5. Identify code content and set hasCode/codeLanguage appropriately
-6. Identify diagram requirements and set hasDiagram/analysisType appropriately
+6. Identify diagram requirements and set hasDiagram appropriately
 7. DO NOT keep question numbers, marks, option number or other metadata in the Question or Options fields
 
 Rubric requirements:
