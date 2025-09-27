@@ -48,6 +48,7 @@ Extraction guidelines:
    - Multiple choice options (infer if not explicit)
    - Correct answers, solutions, or answer keys (if not present, generate)
    - For multiple choice: determine if single or multiple answers are correct
+   - For multi-part questions: provide empty string for correctAnswer (answers come from sub-questions)
    - Point values and scoring information
    - Grading rubrics or evaluation criteria (if not present, generate)
    - Assignment title and description
@@ -79,6 +80,7 @@ Extract:
 - Assignment title and description
 - Questions with their types, text, points, and answers (if not present, generate)
 - For multiple choice: identify if single or multiple answers are correct
+- For multi-part questions: provide empty string for correctAnswer (answers come from sub-questions)
 - Code content and diagram requirements
 - Multi-part question structure
 

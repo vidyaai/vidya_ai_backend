@@ -8,7 +8,7 @@ After=network.target
 User=ubuntu
 Group=ubuntu
 WorkingDirectory=/home/ubuntu/vidya_ai_backend/src/
-ExecStart=/home/ubuntu/venv/bin/gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --access-logfile /var/log/vidyaai_api_access.log --error-logfile /var/log/vidyaai_api_error.log --log-level info main:app
+ExecStart=/home/ubuntu/venv/bin/gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --timeout 600 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile /var/log/vidyaai_api_access.log --error-logfile /var/log/vidyaai_api_error.log --log-level info main:app
 
 [Install]
 WantedBy=multi-user.target
