@@ -259,7 +259,7 @@ Please generate questions that:
 For each question, provide:
 - Clear, well-structured question text
 - Appropriate answer options (for multiple choice)
-- Correct answer with brief explanation
+- Correct answer with brief explanation (except for multi-part questions which get answers from sub-questions)
 - Point value based on difficulty
 - Any necessary code templates or diagrams
 
@@ -327,6 +327,10 @@ The response will be automatically structured according to the provided JSON sch
                     "options"
                 ):
                     question["correctAnswer"] = question["options"][0]
+                elif question.get("type") == "multi-part":
+                    question[
+                        "correctAnswer"
+                    ] = ""  # Multi-part questions don't have their own answers
                 else:
                     question["correctAnswer"] = "Sample answer"
 
