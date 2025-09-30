@@ -2,6 +2,13 @@ from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import uvicorn
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv(dotenv_path="../.env")
+
+# Debug: Print database URL (remove this after testing)
+print(f"DATABASE_URL loaded: {os.environ.get('DATABASE_URL', 'NOT SET')}")
 from routes.youtube import router as youtube_router
 from routes.user_videos import router as user_videos_router
 from routes.quiz import router as quiz_router
@@ -9,6 +16,7 @@ from routes.gallery_folders import router as gallery_folders_router
 from routes.files import router as files_router
 from routes.misc import router as misc_router
 from routes.query import router as query_router
+from routes.payments import router as payments_router
 
 
 app = FastAPI(
@@ -45,6 +53,7 @@ app.add_middleware(
         "https://www.vidyaai.co",
         "https://upload-video.d2krgf8gkzw2h8.amplifyapp.com",
         "https://upload-video.d2krgf8gkzw2h8.amplifyapp.com/*",
+        "https://7de5d1a559ab.ngrok-free.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -64,6 +73,7 @@ app.include_router(gallery_folders_router)
 app.include_router(files_router)
 app.include_router(misc_router)
 app.include_router(query_router)
+app.include_router(payments_router)
 
 
 if __name__ == "__main__":

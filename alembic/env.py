@@ -19,10 +19,19 @@ if config.config_file_name is not None:
 import sys
 import os
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import src.models
+# Add both the project root and src directory to Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+src_dir = os.path.join(project_root, 'src')
+sys.path.insert(0, project_root)
+sys.path.insert(0, src_dir)
 
-target_metadata = src.models.Base.metadata
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv(os.path.join(project_root, '.env'))
+
+import models
+
+target_metadata = models.Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
