@@ -175,7 +175,6 @@ def download_video(youtube_url, output_path=video_path, debug=False):
         "x-rapidapi-key": api_key,
         "x-rapidapi-host": "youtube-info-download-api.p.rapidapi.com",
     }
-
     try:
         # Get initial response
         log(f"Requesting video info for: {youtube_url}")

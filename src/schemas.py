@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 
@@ -439,3 +439,49 @@ class DiagramDeleteResponse(BaseModel):
 
 # Update MultiPartSubQuestion to handle forward reference
 MultiPartSubQuestion.model_rebuild()
+
+
+# Payment and Subscription schemas
+class PaymentRequest(BaseModel):
+    plan_type: str  # "Vidya Plus" or "Vidya Pro"
+    billing_period: str = "monthly"  # "monthly" or "annual"
+
+
+class SubscriptionResponse(BaseModel):
+    plan_type: str
+    status: str
+    features: Dict[str, Any]
+    current_period_end: Optional[datetime]
+    cancel_at_period_end: bool
+
+    class Config:
+        from_attributes = True
+
+
+class SubscriptionOut(BaseModel):
+    id: str
+    user_id: str
+    stripe_subscription_id: str
+    plan_type: str
+    status: str
+    current_period_start: Optional[datetime]
+    current_period_end: Optional[datetime]
+    cancel_at_period_end: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UserOut(BaseModel):
+    id: str
+    firebase_uid: str
+    email: Optional[str]
+    name: Optional[str]
+    stripe_customer_id: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
