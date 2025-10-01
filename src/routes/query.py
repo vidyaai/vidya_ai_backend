@@ -70,6 +70,7 @@ async def process_query(
                         download_video_background,
                         video_id,
                         f"https://www.youtube.com/watch?v={video_id}",
+                        current_user["uid"],
                     )
                     return {
                         "response": "🎬 Something amazing is being loaded! Video download has started in the background. Please continue to chat with the video content in the meantime, and try frame-specific questions again in a moment!",

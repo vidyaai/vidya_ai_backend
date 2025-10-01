@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from .system_prompt import SYSTEM_PROMPT_FORMATTED, SYSTEM_PROMPT_INITIAL
 from typing import Dict, Any
 import json
+from controllers.config import logger
 
 # Removed google.generativeai import - using OpenAI instead
 
@@ -247,8 +248,8 @@ class OpenAIQuizClient:
             try:
                 data = json.loads(text)
             except json.JSONDecodeError as e:
-                print(f"JSON decode error: {e}")
-                print(f"Raw response: {text}")
+                logger.error(f"JSON decode error: {e}")
+                logger.error(f"Raw response: {text}")
                 raise
 
             # Enrich metadata if missing
@@ -289,7 +290,7 @@ class OpenAIQuizClient:
             return data
 
         except Exception as e:
-            print(f"Error generating quiz: {e}")
+            logger.error(f"Error generating quiz: {e}")
             raise
 
 
@@ -353,8 +354,8 @@ if __name__ == "__main__":
     quiz_client = OpenAIQuizClient()
 
     # Test the quiz generation functionality
-    print("Testing OpenAI GPT-4o Quiz Generation...")
-    print("=" * 70)
+    logger.info("Testing OpenAI GPT-4o Quiz Generation...")
+    logger.info("=" * 70)
 
     try:
         # Generate a quiz from the American Civil War transcript
@@ -366,58 +367,58 @@ if __name__ == "__main__":
             language="en",
         )
 
-        print("Quiz generation successful!")
-        print(f"Generated {len(quiz_result.get('quiz', []))} questions")
-        print("\nQuiz Preview:")
-        print("-" * 50)
+        logger.info("Quiz generation successful!")
+        logger.info(f"Generated {len(quiz_result.get('quiz', []))} questions")
+        logger.info("\nQuiz Preview:")
+        logger.info("-" * 50)
 
         # Display the first few questions as a preview
         quiz_items = quiz_result.get("quiz", [])
         for i, question in enumerate(quiz_items[:3]):  # Show first 3 questions
-            print(f"\nQuestion {i+1}: {question.get('question', 'N/A')}")
+            logger.info(f"\nQuestion {i+1}: {question.get('question', 'N/A')}")
             options = question.get("options", [])
             for j, option in enumerate(options):
-                print(f"  {chr(65+j)}) {option}")
-            print(f"Correct Answer: {question.get('answer', 'N/A')}")
+                logger.info(f"  {chr(65+j)}) {option}")
+            logger.info(f"Correct Answer: {question.get('answer', 'N/A')}")
             if question.get("explanation"):
-                print(f"Explanation: {question.get('explanation')}")
-            print("-" * 30)
+                logger.info(f"Explanation: {question.get('explanation')}")
+            logger.info("-" * 30)
 
         # Save the full quiz to a file
         with open("civil_war_quiz.json", "w") as f:
             json.dump(quiz_result, f, indent=2)
-        print(f"\nFull quiz saved to 'civil_war_quiz.json'")
+        logger.info(f"\nFull quiz saved to 'civil_war_quiz.json'")
 
         # Display metadata
         metadata = quiz_result.get("metadata", {})
-        print(f"\nQuiz Metadata:")
-        print(f"- Number of questions: {metadata.get('num_questions')}")
-        print(f"- Difficulty: {metadata.get('difficulty')}")
-        print(f"- Language: {metadata.get('language')}")
-        print(
+        logger.info(f"\nQuiz Metadata:")
+        logger.info(f"- Number of questions: {metadata.get('num_questions')}")
+        logger.info(f"- Difficulty: {metadata.get('difficulty')}")
+        logger.info(f"- Language: {metadata.get('language')}")
+        logger.info(
             f"- Context excerpt: {metadata.get('video_context_excerpt', '')[:100]}..."
         )
 
     except Exception as e:
-        print(f"Error testing quiz generation: {e}")
+        logger.error(f"Error testing quiz generation: {e}")
         import traceback
 
         traceback.print_exc()
 
-    print("\n" + "=" * 70)
+    logger.info("\n" + "=" * 70)
 
     # Example vision test (if you have an image)
-    print("\nTesting Vision Client...")
+    logger.info("\nTesting Vision Client...")
     try:
         # Uncomment and modify if you have a test image
         # image_response = vision_client.ask_with_image(
         #     "What objects do you see in this image?",
         #     "plane.jpg"
         # )
-        # print("Image analysis response:")
-        # print(image_response)
+        # logger.info("Image analysis response:")
+        # logger.info(image_response)
 
-        print("Vision client test skipped (no test image provided)")
+        logger.info("Vision client test skipped (no test image provided)")
 
     except Exception as e:
-        print(f"Error with vision client: {e}")
+        logger.error(f"Error with vision client: {e}")
