@@ -143,26 +143,6 @@ def sync_stripe_subscriptions():
 
 
 if __name__ == "__main__":
-    # Load environment variables
-    from dotenv import load_dotenv
-
-    # Load .env from current directory (src directory)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    env_path = os.path.join(current_dir, ".env")
-
-    if os.path.exists(env_path):
-        load_dotenv(env_path)
-        print(f"📁 Loaded environment from: {env_path}")
-    else:
-        # Fallback to parent directory
-        parent_env_path = os.path.join(os.path.dirname(current_dir), ".env")
-        if os.path.exists(parent_env_path):
-            load_dotenv(parent_env_path)
-            print(f"📁 Loaded environment from parent: {parent_env_path}")
-        else:
-            load_dotenv()
-            print("📁 Using default .env loading")
-
     # Debug: Check if Stripe key is loaded
     stripe_key = os.getenv("STRIPE_SECRET_KEY")
     if stripe_key:
