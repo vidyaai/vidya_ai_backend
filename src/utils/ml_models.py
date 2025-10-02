@@ -1,15 +1,9 @@
 from openai import OpenAI
 import base64
-from dotenv import load_dotenv
 from .system_prompt import SYSTEM_PROMPT_FORMATTED, SYSTEM_PROMPT_INITIAL
 from typing import Dict, Any
 import json
 from controllers.config import logger
-
-# Removed google.generativeai import - using OpenAI instead
-
-# Load environment variables
-load_dotenv()
 
 
 class OpenAIVisionClient:
