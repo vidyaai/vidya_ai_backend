@@ -1,4 +1,8 @@
-from fastapi import FastAPI, Response
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import uvicorn
@@ -12,6 +16,7 @@ from routes.misc import router as misc_router
 from routes.query import router as query_router
 from routes.sharing import router as sharing_router
 from routes.assignments import router as assignments_router
+from routes.payments import router as payments_router
 
 
 app = FastAPI(
@@ -63,6 +68,7 @@ app.add_middleware(
         "https://www.vidyaai.co",
         "https://upload-video.d2krgf8gkzw2h8.amplifyapp.com",
         "https://upload-video.d2krgf8gkzw2h8.amplifyapp.com/*",
+        "https://7de5d1a559ab.ngrok-free.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -85,6 +91,7 @@ app.include_router(misc_router)
 app.include_router(query_router)
 app.include_router(sharing_router)
 app.include_router(assignments_router)
+app.include_router(payments_router)
 
 
 if __name__ == "__main__":

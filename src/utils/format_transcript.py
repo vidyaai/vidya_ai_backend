@@ -4,12 +4,10 @@ import re
 from openai import OpenAI
 from typing import List, Dict
 import sys
-from dotenv import load_dotenv
+
 from controllers.db_helpers import update_formatting_status
 from utils.db import SessionLocal
 from controllers.config import logger
-
-load_dotenv()
 
 # Initialize OpenAI client (reads OPENAI_API_KEY from environment)
 client = OpenAI()

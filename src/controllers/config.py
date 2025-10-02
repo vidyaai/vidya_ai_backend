@@ -2,7 +2,7 @@ import os
 import logging
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
-from dotenv import load_dotenv
+
 import boto3
 from botocore.client import Config as BotoConfig
 
@@ -58,8 +58,7 @@ formatting_executor = ThreadPoolExecutor(max_workers=3)
 upload_executor = ThreadPoolExecutor(max_workers=3)
 
 
-# Env and S3
-load_dotenv()
+# S3
 
 AWS_S3_BUCKET = os.environ.get("AWS_S3_BUCKET", "")
 AWS_S3_REGION = os.environ.get("AWS_S3_REGION", "us-east-1")
