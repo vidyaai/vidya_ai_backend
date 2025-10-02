@@ -52,6 +52,13 @@ jobs:
           echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ./.env
           echo "FIREBASE_CONFIG=${{ secrets.FIREBASE_CONFIG }}" >> ./.env
           echo "DEEPGRAM_API_KEY=${{ secrets.DEEPGRAM_API_KEY }}" >> ./.env
+          echo "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" >> ./.env
+          echo "STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}" >> ./.env
+          echo "STRIPE_PLUS_MONTHLY_PRICE_ID=${{ secrets.STRIPE_PLUS_MONTHLY_PRICE_ID }}" >> ./.env
+          echo "STRIPE_PLUS_ANNUAL_PRICE_ID=${{ secrets.STRIPE_PLUS_ANNUAL_PRICE_ID }}" >> ./.env
+          echo "STRIPE_PRO_MONTHLY_PRICE_ID=${{ secrets.STRIPE_PRO_MONTHLY_PRICE_ID }}" >> ./.env
+          echo "STRIPE_PRO_ANNUAL_PRICE_ID=${{ secrets.STRIPE_PRO_ANNUAL_PRICE_ID }}" >> ./.env
+          echo "STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}" >> ./.env
       - name: Run Static Checks
         uses: pre-commit/action@v3.0.0
       - name: SSH into ec2 and execute commands
@@ -84,6 +91,13 @@ jobs:
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             FIREBASE_CONFIG=${{ secrets.FIREBASE_CONFIG }}
             DEEPGRAM_API_KEY=${{ secrets.DEEPGRAM_API_KEY }}
+            STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+            STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+            STRIPE_PLUS_MONTHLY_PRICE_ID=${{ secrets.STRIPE_PLUS_MONTHLY_PRICE_ID }}
+            STRIPE_PLUS_ANNUAL_PRICE_ID=${{ secrets.STRIPE_PLUS_ANNUAL_PRICE_ID }}
+            STRIPE_PRO_MONTHLY_PRICE_ID=${{ secrets.STRIPE_PRO_MONTHLY_PRICE_ID }}
+            STRIPE_PRO_ANNUAL_PRICE_ID=${{ secrets.STRIPE_PRO_ANNUAL_PRICE_ID }}
+            STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
             EOF
             alembic upgrade head
             sudo systemctl start vidyaai_backend_gunicorn
