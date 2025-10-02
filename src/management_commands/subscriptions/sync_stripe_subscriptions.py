@@ -11,10 +11,11 @@ load_dotenv()
 import os
 import sys
 from datetime import datetime, timezone
-from sqlalchemy.orm import Session
 
 # Add parent directories to path to access src modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 from utils.db import get_db
 from models import User, Subscription

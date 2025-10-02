@@ -9,13 +9,15 @@ load_dotenv()
 
 import os
 import sys
-from datetime import datetime, timezone
 
 # Add parent directories to path to access src modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 from utils.db import get_db
 from models import User, Subscription, PricingPlan
+from sqlalchemy import text
 
 
 def show_all_users_and_subscriptions():
@@ -117,7 +119,6 @@ def show_subscription_summary():
 
     try:
         # Query for summary data
-        from sqlalchemy import text
 
         query = text(
             """

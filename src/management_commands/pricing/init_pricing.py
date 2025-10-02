@@ -4,6 +4,13 @@ from dotenv import load_dotenv
 # Load environment variables first before importing other modules
 load_dotenv()
 
+import sys
+import os
+from pathlib import Path
+
+# Add the src directory to the Python path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 from controllers.subscription_service import initialize_pricing_plans
 from utils.db import get_db
 

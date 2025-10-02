@@ -3,20 +3,11 @@ from sqlalchemy.orm import Session
 from utils.db import get_db
 from utils.firebase_auth import get_current_user
 from controllers.config import logger
-from controllers.subscription_service import (
-    initialize_pricing_plans,
-    get_user_subscription,
-    create_subscription,
-    check_usage_limits,
-    increment_usage,
-    get_subscription_features,
-)
 from models import User, Subscription, PricingPlan
-from schemas import PaymentRequest, SubscriptionResponse
+from schemas import PaymentRequest
 import stripe
 import os
 from datetime import datetime, timezone
-import json
 
 # Initialize Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
