@@ -9,8 +9,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import sys
+import os
 
-sys.path.append("/opt/vidyaai_backend/src")
+# Add parent directories to path to access src modules
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 from datetime import datetime, timezone
 from utils.db import get_db

@@ -11,8 +11,8 @@ import os
 import sys
 from datetime import datetime, timezone
 
-# Add the src directory to the path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add parent directories to path to access src modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.db import get_db
 from models import User, Subscription, PricingPlan
