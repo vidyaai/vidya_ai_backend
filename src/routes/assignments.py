@@ -311,6 +311,60 @@ async def get_shared_assignments(
         )
 
 
+@router.get("/api/assignments/available-videos")
+async def get_available_videos_for_assignment(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get available videos for assignment generation"""
+    try:
+        user_id = current_user["uid"]
+        logger.info(f"Fetching available videos for user: {user_id}")
+
+        # Get user's videos with transcripts
+        videos = (
+            db.query(Video)
+            .filter(
+                and_(
+                    Video.user_id == user_id,
+                    Video.transcript_text.isnot(None),
+                    Video.transcript_text != "",
+                )
+            )
+            .order_by(desc(Video.created_at))
+            .all()
+        )
+
+        # Format videos for frontend
+        available_videos = []
+        for video in videos:
+            video_data = {
+                "id": video.id,
+                "title": video.title or "Untitled Video",
+                "source_type": video.source_type,
+                "youtube_id": video.youtube_id,
+                "youtube_url": video.youtube_url,
+                "transcript_text": video.transcript_text,
+                "created_at": video.created_at.isoformat()
+                if video.created_at
+                else None,
+            }
+            available_videos.append(video_data)
+
+        logger.info(
+            f"Found {len(available_videos)} videos with transcripts for user {user_id}"
+        )
+        return {"videos": available_videos}
+
+    except Exception as e:
+        logger.error(f"Error fetching available videos: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch available videos",
+        )
+
+
 @router.get("/api/assignments/{assignment_id}", response_model=AssignmentOut)
 async def get_assignment(
     assignment_id: str,
@@ -1150,61 +1204,7 @@ async def generate_assignment(
         logger.error(f"Error generating assignment: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate assignment",
-        )
-
-
-@router.get("/api/assignments/available-videos")
-async def get_available_videos_for_assignment(
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """Get available videos for assignment generation"""
-    try:
-        user_id = current_user["uid"]
-        logger.info(f"Fetching available videos for user: {user_id}")
-
-        # Get user's videos with transcripts
-        videos = (
-            db.query(Video)
-            .filter(
-                and_(
-                    Video.user_id == user_id,
-                    Video.transcript_text.isnot(None),
-                    Video.transcript_text != "",
-                )
-            )
-            .order_by(desc(Video.created_at))
-            .all()
-        )
-
-        # Format videos for frontend
-        available_videos = []
-        for video in videos:
-            video_data = {
-                "id": video.id,
-                "title": video.title or "Untitled Video",
-                "source_type": video.source_type,
-                "youtube_id": video.youtube_id,
-                "youtube_url": video.youtube_url,
-                "transcript_text": video.transcript_text,
-                "created_at": video.created_at.isoformat()
-                if video.created_at
-                else None,
-            }
-            available_videos.append(video_data)
-
-        logger.info(
-            f"Found {len(available_videos)} videos with transcripts for user {user_id}"
-        )
-        return {"videos": available_videos}
-
-    except Exception as e:
-        logger.error(f"Error fetching available videos: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch available videos",
+            detail="Failed to generate assignment:" + str(e),
         )
 
 

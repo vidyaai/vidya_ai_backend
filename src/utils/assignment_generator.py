@@ -11,6 +11,7 @@ from typing import Dict, List, Any, Optional
 from openai import OpenAI
 from controllers.config import logger
 from utils.assignment_schemas import get_assignment_parsing_schema
+from utils.document_processor import DocumentProcessor
 
 
 class AssignmentGenerator:
@@ -82,7 +83,7 @@ class AssignmentGenerator:
             import traceback
 
             logger.error(f"Traceback: {traceback.format_exc()}")
-            raise
+            raise Exception(f"Error generating assignment: {str(e)}")
 
     def _extract_content_sources(
         self,
@@ -114,16 +115,24 @@ class AssignmentGenerator:
             for file_data in uploaded_files:
                 try:
                     # Extract text from uploaded files
-                    if file_data.get("content"):
-                        content_sources["document_texts"].append(
-                            {
-                                "name": file_data.get("name", "Unknown File"),
-                                "content": file_data.get("content"),
-                                "type": file_data.get("type", "text/plain"),
-                            }
-                        )
+                    doc_processor = DocumentProcessor()
+                    content = doc_processor.extract_text_from_file(
+                        file_data.get("content"),
+                        file_data.get("name"),
+                        file_data.get("type"),
+                    )
+                    content_sources["document_texts"].append(
+                        {
+                            "name": file_data.get("name", "Unknown File"),
+                            "content": content,
+                            "type": file_data.get("type", "application/pdf"),
+                        }
+                    )
                 except Exception as e:
                     logger.warning(
+                        f"Failed to process file {file_data.get('name')}: {str(e)}"
+                    )
+                    raise Exception(
                         f"Failed to process file {file_data.get('name')}: {str(e)}"
                     )
 
@@ -277,7 +286,7 @@ The response will be automatically structured according to the provided JSON sch
                         for varying_point in config.get("varyingPoints", []):
                             prompt += f"- {varying_point['count']} {difficulty} questions ({varying_point['points']} points each)\n"
 
-        logger.info(f"Generation prompt: {prompt}")
+        # logger.info(f"Prompt: {prompt}")
         return prompt
 
     def _get_system_prompt(self, generation_options: Dict[str, Any]) -> str:
