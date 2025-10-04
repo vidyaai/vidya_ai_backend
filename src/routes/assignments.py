@@ -1204,7 +1204,7 @@ async def generate_assignment(
         logger.error(f"Error generating assignment: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate assignment",
+            detail="Failed to generate assignment:" + str(e),
         )
 
 
