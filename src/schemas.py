@@ -341,14 +341,34 @@ class SubmissionAnswerCreate(BaseModel):
 
 class AssignmentSubmissionCreate(BaseModel):
     assignment_id: str
-    answers: dict  # Question ID -> answer mapping
+    # Answers can be plain text (string) or structured objects containing optional diagram metadata
+    # Structure examples:
+    # {
+    #   "7": {
+    #       "text": "Circuit explanation",
+    #       "diagram": {
+    #           "s3_key": "submissions/<submission_id>/diagrams/q7.jpg",
+    #           "file_id": "<uuid>",
+    #           "filename": "circuit.jpg",
+    #           "bounding_box": {"x": 120, "y": 240, "width": 460, "height": 320, "page_number": 1}
+    #       }
+    #   },
+    #   "9": {
+    #       "subAnswers": {
+    #           "1": "Sub-answer 1",
+    #           "2": {"text": "Sub-answer 2", "diagram": { ... }}
+    #       }
+    #   }
+    # }
+    answers: dict  # Question ID -> answer mapping (see above structure)
     submission_method: str = "in-app"
     submitted_files: Optional[List[dict]] = None
     time_spent: Optional[str] = None
 
 
 class AssignmentSubmissionDraft(BaseModel):
-    answers: dict  # Question ID -> answer mapping
+    # Same structure as AssignmentSubmissionCreate.answers
+    answers: dict
     submission_method: str = "in-app"
     submitted_files: Optional[List[dict]] = None
     time_spent: Optional[str] = None
@@ -388,6 +408,75 @@ class AssignmentSubmissionOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Diagram-aware answer structures (for documentation and request/response typing)
+class DiagramBoundingBox(BaseModel):
+    x: int
+    y: int
+    width: int
+    height: int
+    page_number: Optional[int] = None  # Present for PDF-derived diagrams
+
+
+class DiagramRef(BaseModel):
+    s3_key: str
+    file_id: Optional[str] = None
+    filename: Optional[str] = None
+    content_type: Optional[str] = None
+    bounding_box: Optional[DiagramBoundingBox] = None
+
+
+class AnswerWithDiagram(BaseModel):
+    text: Optional[str] = None
+    diagram: Optional[DiagramRef] = None  # One diagram per answer/sub-answer
+    subAnswers: Optional[
+        Dict[str, Any]
+    ] = None  # Nested answers (may be string or AnswerWithDiagram)
+
+
+# Grading API schemas
+class GradeSubmissionOptions(BaseModel):
+    regrade: bool = False
+    max_tokens: Optional[int] = 8000
+    model: Optional[str] = "gpt-4o"  # Vision-enabled for diagram grading
+    temperature: Optional[float] = 0.1
+
+
+class GradeSubmissionRequest(BaseModel):
+    options: Optional[GradeSubmissionOptions] = None
+
+
+class BatchGradeRequest(BaseModel):
+    submission_ids: List[str]
+    options: Optional[GradeSubmissionOptions] = None
+
+
+class BatchGradeResponse(BaseModel):
+    message: str
+    queued_count: int
+    submission_ids: List[str]
+    status: str  # "queued" for background processing
+
+
+class QuestionGradeFeedback(BaseModel):
+    score: float
+    max_points: float
+    breakdown: Optional[str] = None
+    strengths: Optional[str] = None
+    areas_for_improvement: Optional[str] = None
+    rubric_alignment: Optional[Dict[str, Any]] = None
+
+
+class GradeSubmissionResponse(BaseModel):
+    submission_id: str
+    assignment_id: str
+    total_score: float
+    total_points: float
+    percentage: float
+    overall_feedback: Optional[str] = None
+    feedback_by_question: Dict[str, QuestionGradeFeedback]
+    graded_at: datetime
 
 
 class AssignmentGenerateRequest(BaseModel):

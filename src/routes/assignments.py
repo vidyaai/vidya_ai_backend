@@ -32,6 +32,10 @@ from schemas import (
     DocumentImportResponse,
     DiagramUploadResponse,
     DiagramDeleteResponse,
+    GradeSubmissionRequest,
+    GradeSubmissionResponse,
+    BatchGradeRequest,
+    BatchGradeResponse,
 )
 
 router = APIRouter()
@@ -53,6 +57,224 @@ def calculate_assignment_stats(assignment: Assignment) -> Assignment:
     assignment.total_questions = str(total_questions)
     assignment.total_points = str(total_points)
     return assignment
+
+
+@router.post(
+    "/api/assignments/{assignment_id}/submissions/{submission_id}/grade",
+    response_model=GradeSubmissionResponse,
+)
+async def grade_submission_endpoint(
+    assignment_id: str,
+    submission_id: str,
+    grade_req: GradeSubmissionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Trigger AI grading for a submission."""
+    try:
+        user_id = current_user["uid"]
+
+        # Verify assignment ownership or edit permission
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+            )
+
+        is_owner = assignment.user_id == user_id
+        has_edit_access = (
+            db.query(SharedLinkAccess)
+            .join(SharedLink)
+            .filter(
+                and_(
+                    SharedLink.assignment_id == assignment_id,
+                    SharedLink.share_type == "assignment",
+                    SharedLinkAccess.user_id == user_id,
+                    SharedLinkAccess.permission == "edit",
+                )
+            )
+            .first()
+            is not None
+        )
+
+        if not (is_owner or has_edit_access):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to grade"
+            )
+
+        submission = (
+            db.query(AssignmentSubmission)
+            .filter(
+                and_(
+                    AssignmentSubmission.id == submission_id,
+                    AssignmentSubmission.assignment_id == assignment_id,
+                )
+            )
+            .first()
+        )
+        if not submission:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+            )
+
+        # Prepare assignment dict for grader
+        assignment = calculate_assignment_stats(assignment)
+        assignment_dict = {
+            "id": assignment.id,
+            "title": assignment.title,
+            "questions": assignment.questions or [],
+        }
+
+        # Run grading
+        from utils.grading_service import LLMGrader
+
+        grader = LLMGrader(
+            model=(
+                grade_req.options.model
+                if grade_req and grade_req.options and grade_req.options.model
+                else "gpt-4o"
+            )
+        )
+        (
+            total_score,
+            total_points,
+            feedback_by_question,
+            overall_feedback,
+        ) = grader.grade_submission(
+            assignment=assignment_dict,
+            submission_answers=submission.answers or {},
+            options=(
+                grade_req.options.dict() if grade_req and grade_req.options else None
+            ),
+        )
+
+        submission.score = f"{total_score:.2f}"
+        submission.percentage = (
+            f"{(total_score/total_points*100.0) if total_points>0 else 0.0:.2f}"
+        )
+        submission.feedback = feedback_by_question
+        submission.overall_feedback = overall_feedback
+        submission.status = "graded"
+        submission.graded_at = datetime.now(timezone.utc)
+        submission.updated_at = datetime.now(timezone.utc)
+
+        db.commit()
+        db.refresh(submission)
+
+        return {
+            "submission_id": submission.id,
+            "assignment_id": assignment_id,
+            "total_score": float(total_score),
+            "total_points": float(total_points),
+            "percentage": float(submission.percentage),
+            "overall_feedback": overall_feedback,
+            "feedback_by_question": feedback_by_question,
+            "graded_at": submission.graded_at,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Error grading submission {submission_id} for assignment {assignment_id}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to grade submission",
+        )
+
+
+@router.post(
+    "/api/assignments/{assignment_id}/submissions/batch-grade",
+    response_model=BatchGradeResponse,
+)
+async def batch_grade_submissions(
+    assignment_id: str,
+    batch_req: BatchGradeRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Trigger batch AI grading for multiple submissions (background processing)."""
+    try:
+        user_id = current_user["uid"]
+
+        # Verify assignment ownership or edit permission
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+            )
+
+        is_owner = assignment.user_id == user_id
+        has_edit_access = (
+            db.query(SharedLinkAccess)
+            .join(SharedLink)
+            .filter(
+                and_(
+                    SharedLink.assignment_id == assignment_id,
+                    SharedLink.share_type == "assignment",
+                    SharedLinkAccess.user_id == user_id,
+                    SharedLinkAccess.permission == "edit",
+                )
+            )
+            .first()
+            is not None
+        )
+
+        if not (is_owner or has_edit_access):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to grade"
+            )
+
+        # Validate all submissions exist and belong to this assignment
+        valid_submission_ids = []
+        for sub_id in batch_req.submission_ids:
+            submission = (
+                db.query(AssignmentSubmission)
+                .filter(
+                    and_(
+                        AssignmentSubmission.id == sub_id,
+                        AssignmentSubmission.assignment_id == assignment_id,
+                    )
+                )
+                .first()
+            )
+            if submission and submission.status == "submitted":
+                # Mark as grading in progress
+                submission.status = "grading"
+                submission.updated_at = datetime.now(timezone.utc)
+                valid_submission_ids.append(sub_id)
+
+        db.commit()
+
+        # Queue background grading task
+        from controllers.background_tasks import queue_batch_grading
+
+        queue_batch_grading(assignment_id, valid_submission_ids, batch_req.options)
+
+        logger.info(f"Queued {len(valid_submission_ids)} submissions for grading")
+
+        return {
+            "message": f"Grading queued for {len(valid_submission_ids)} submissions",
+            "queued_count": len(valid_submission_ids),
+            "submission_ids": valid_submission_ids,
+            "status": "queued",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Error queueing batch grading for assignment {assignment_id}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to queue grading",
+        )
 
 
 def filter_sensitive_data_for_students(
@@ -1355,7 +1577,7 @@ async def submit_assignment(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """Submit an assignment"""
+    """Submit an assignment - handles both in-app and PDF submissions."""
     try:
         user_id = current_user["uid"]
         logger.info(f"Submitting assignment {assignment_id} by user: {user_id}")
@@ -1402,9 +1624,60 @@ async def submit_assignment(
             .first()
         )
 
+        # Handle PDF submission method - convert PDF to JSON immediately
+        if (
+            submission_data.submission_method == "pdf"
+            and submission_data.submitted_files
+        ):
+            # Get the PDF file from submitted_files
+            pdf_file_info = (
+                submission_data.submitted_files[0]
+                if submission_data.submitted_files
+                else None
+            )
+
+            if pdf_file_info and pdf_file_info.get("s3_key"):
+                try:
+                    # Download PDF from S3 temporarily
+                    import tempfile
+
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=".pdf"
+                    ) as tmp:
+                        s3_client.download_fileobj(
+                            AWS_S3_BUCKET, pdf_file_info["s3_key"], tmp
+                        )
+                        tmp_pdf_path = tmp.name
+
+                    # Convert PDF to JSON using PDFAnswerProcessor
+                    from utils.pdf_answer_processor import PDFAnswerProcessor
+
+                    processor = PDFAnswerProcessor()
+                    answers_from_pdf = processor.process_pdf_to_json(tmp_pdf_path)
+
+                    # Clean up temp file
+                    os.unlink(tmp_pdf_path)
+
+                    # Override answers with extracted data
+                    submission_data.answers = answers_from_pdf
+
+                    logger.info(
+                        f"Converted PDF to JSON for submission: {len(answers_from_pdf)} answers extracted"
+                    )
+
+                except Exception as e:
+                    logger.error(f"Error processing PDF to JSON: {str(e)}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Failed to process PDF submission: {str(e)}",
+                    )
+
         if existing_submission:
             # Check if already submitted - prevent resubmission
-            if existing_submission.status == "submitted":
+            if (
+                existing_submission.status == "submitted"
+                or existing_submission.status == "graded"
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Assignment has already been submitted and cannot be resubmitted",
@@ -1421,6 +1694,18 @@ async def submit_assignment(
 
             db.commit()
             db.refresh(existing_submission)
+
+            # Queue background task to extract diagrams if PDF submission
+            if (
+                submission_data.submission_method == "pdf"
+                and submission_data.submitted_files
+            ):
+                from controllers.background_tasks import queue_pdf_diagram_extraction
+
+                queue_pdf_diagram_extraction(
+                    existing_submission.id,
+                    submission_data.submitted_files[0].get("s3_key"),
+                )
 
             logger.info(
                 f"Updated submission for assignment {assignment_id} by user {user_id}"
@@ -1442,6 +1727,17 @@ async def submit_assignment(
             db.add(submission)
             db.commit()
             db.refresh(submission)
+
+            # Queue background task to extract diagrams if PDF submission
+            if (
+                submission_data.submission_method == "pdf"
+                and submission_data.submitted_files
+            ):
+                from controllers.background_tasks import queue_pdf_diagram_extraction
+
+                queue_pdf_diagram_extraction(
+                    submission.id, submission_data.submitted_files[0].get("s3_key")
+                )
 
             logger.info(
                 f"Created submission for assignment {assignment_id} by user {user_id}"
@@ -1758,6 +2054,11 @@ async def get_assignment_status(
                 else:
                     status_info["status"] = "in_progress"
                 status_info["progress"] = min(progress, 99)  # Max 99% for draft
+            elif submission.status == "graded":
+                status_info["status"] = "graded"
+                status_info["progress"] = submission.percentage
+                status_info["grade"] = submission.score
+                status_info["percentage"] = submission.percentage
             else:
                 status_info["status"] = submission.status
                 status_info["progress"] = (

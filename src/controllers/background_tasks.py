@@ -1,8 +1,11 @@
 import os
+import threading
+from datetime import datetime, timezone
+from typing import List, Optional, Dict, Any
 from utils.db import SessionLocal
 from utils.youtube_utils import download_video
 from utils.format_transcript import create_formatted_transcript
-from models import Video
+from models import Video, Assignment, AssignmentSubmission
 from .config import (
     frames_path,
     output_path,
@@ -269,3 +272,214 @@ def format_uploaded_transcript_background(
             db.commit()
     finally:
         db.close()
+
+
+def grade_submission_background(
+    assignment_id: str, submission_id: str, options: Optional[Dict[str, Any]] = None
+):
+    """Grade a single submission in the background."""
+    logger.info(f"Starting background grading for submission {submission_id}")
+    db = SessionLocal()
+    try:
+        # Get assignment and submission
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        submission = (
+            db.query(AssignmentSubmission)
+            .filter(AssignmentSubmission.id == submission_id)
+            .first()
+        )
+
+        if not assignment or not submission:
+            logger.error(
+                f"Assignment or submission not found: {assignment_id}, {submission_id}"
+            )
+            return
+
+        # Prepare assignment dict
+        assignment_dict = {
+            "id": assignment.id,
+            "title": assignment.title,
+            "questions": assignment.questions or [],
+        }
+
+        # Run grading
+        from utils.grading_service import LLMGrader
+
+        model = options.get("model", "gpt-4o") if options else "gpt-4o"
+        grader = LLMGrader(model=model)
+
+        (
+            total_score,
+            total_points,
+            feedback_by_question,
+            overall_feedback,
+        ) = grader.grade_submission(
+            assignment=assignment_dict,
+            submission_answers=submission.answers or {},
+            options=options,
+        )
+
+        # Update submission with results
+        submission.score = f"{total_score:.2f}"
+        submission.percentage = (
+            f"{(total_score/total_points*100.0) if total_points>0 else 0.0:.2f}"
+        )
+        submission.feedback = feedback_by_question
+        submission.overall_feedback = overall_feedback
+        submission.status = "graded"
+        submission.graded_at = datetime.now(timezone.utc)
+        submission.updated_at = datetime.now(timezone.utc)
+
+        db.commit()
+        logger.info(
+            f"Successfully graded submission {submission_id}: {total_score}/{total_points}"
+        )
+
+    except Exception as e:
+        logger.error(f"Error grading submission {submission_id}: {str(e)}")
+        # Update status to failed
+        try:
+            submission = (
+                db.query(AssignmentSubmission)
+                .filter(AssignmentSubmission.id == submission_id)
+                .first()
+            )
+            if submission:
+                submission.status = "submitted"  # Revert to submitted
+                submission.updated_at = datetime.now(timezone.utc)
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
+def queue_batch_grading(
+    assignment_id: str, submission_ids: List[str], options: Optional[Any] = None
+):
+    """Queue multiple submissions for background grading."""
+    logger.info(f"Queueing {len(submission_ids)} submissions for background grading")
+
+    # Convert options to dict if it's a Pydantic model
+    options_dict = options.dict() if hasattr(options, "dict") else (options or {})
+
+    # Start grading each submission in a separate thread
+    for sub_id in submission_ids:
+        thread = threading.Thread(
+            target=grade_submission_background,
+            args=(assignment_id, sub_id, options_dict),
+            daemon=True,
+        )
+        thread.start()
+
+    logger.info(f"Started {len(submission_ids)} grading threads")
+
+
+def extract_pdf_diagrams_background(submission_id: str, pdf_s3_key: str):
+    """Extract diagram images from PDF submission using bounding boxes and upload to S3."""
+    logger.info(f"Starting PDF diagram extraction for submission {submission_id}")
+    db = SessionLocal()
+    try:
+        submission = (
+            db.query(AssignmentSubmission)
+            .filter(AssignmentSubmission.id == submission_id)
+            .first()
+        )
+        if not submission or not submission.answers:
+            logger.warning(f"Submission {submission_id} not found or has no answers")
+            return
+
+        # Download PDF from S3
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            s3_client.download_fileobj(AWS_S3_BUCKET, pdf_s3_key, tmp)
+            tmp_pdf_path = tmp.name
+
+        # Process each answer to extract diagrams
+        from utils.pdf_answer_processor import PDFAnswerProcessor
+
+        processor = PDFAnswerProcessor()
+
+        answers = submission.answers
+        updated = False
+
+        for question_id, answer in answers.items():
+            # Check if answer has diagram with bounding_box but no s3_key
+            if isinstance(answer, dict) and answer.get("diagram"):
+                diagram = answer["diagram"]
+                bounding_box = diagram.get("bounding_box")
+
+                if bounding_box and not diagram.get("s3_key"):
+                    try:
+                        # Extract diagram image from PDF
+                        with tempfile.NamedTemporaryFile(
+                            delete=False, suffix=".jpg"
+                        ) as img_tmp:
+                            img_output_path = img_tmp.name
+
+                        success = processor.extract_diagram_from_pdf(
+                            tmp_pdf_path, bounding_box, img_output_path
+                        )
+
+                        if success and os.path.exists(img_output_path):
+                            # Upload to S3
+                            import uuid
+
+                            file_id = str(uuid.uuid4())
+                            s3_key = f"submissions/{submission_id}/diagrams/q{question_id}_{file_id}.jpg"
+
+                            s3_upload_file(
+                                img_output_path, s3_key, content_type="image/jpeg"
+                            )
+
+                            # Update answer with s3_key
+                            answer["diagram"]["s3_key"] = s3_key
+                            answer["diagram"]["file_id"] = file_id
+                            answer["diagram"][
+                                "filename"
+                            ] = f"diagram_q{question_id}.jpg"
+                            updated = True
+
+                            logger.info(
+                                f"Extracted and uploaded diagram for Q{question_id} to {s3_key}"
+                            )
+
+                            # Clean up temp image
+                            os.unlink(img_output_path)
+
+                    except Exception as e:
+                        logger.error(
+                            f"Error extracting diagram for Q{question_id}: {str(e)}"
+                        )
+                        continue
+
+        # Clean up temp PDF
+        os.unlink(tmp_pdf_path)
+
+        # Update submission if any diagrams were extracted
+        if updated:
+            submission.answers = answers
+            submission.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            logger.info(
+                f"Updated submission {submission_id} with extracted diagram s3_keys"
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Error in PDF diagram extraction for submission {submission_id}: {str(e)}"
+        )
+    finally:
+        db.close()
+
+
+def queue_pdf_diagram_extraction(submission_id: str, pdf_s3_key: str):
+    """Queue PDF diagram extraction as a background task."""
+    logger.info(f"Queueing PDF diagram extraction for submission {submission_id}")
+    thread = threading.Thread(
+        target=extract_pdf_diagrams_background,
+        args=(submission_id, pdf_s3_key),
+        daemon=True,
+    )
+    thread.start()
