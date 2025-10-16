@@ -186,8 +186,8 @@ class AssignmentGenerator:
 
         except Exception as e:
             logger.error(f"Error generating questions with AI: {str(e)}")
-            # Fallback to mock generation
-            return self._generate_mock_questions(generation_options)
+            # Re-raise the exception instead of falling back to mock questions
+            raise Exception(f"Failed to generate questions with AI: {str(e)}")
 
     def _prepare_content_context(self, content_sources: Dict[str, Any]) -> str:
         """Prepare content context for AI generation"""
@@ -348,34 +348,6 @@ class AssignmentGenerator:
             # Set default multiple correct values
             question.setdefault("allowMultipleCorrect", False)
             question.setdefault("multipleCorrectAnswers", [])
-
-        return questions
-
-    def _generate_mock_questions(
-        self, generation_options: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Generate mock questions as fallback"""
-        num_questions = generation_options.get("numQuestions", 5)
-        engineering_level = generation_options.get("engineeringLevel", "undergraduate")
-        engineering_discipline = generation_options.get(
-            "engineeringDiscipline", "general"
-        )
-
-        questions = []
-        for i in range(num_questions):
-            question = {
-                "id": i + 1,
-                "type": "multiple-choice",
-                "question": f"Sample {engineering_discipline} engineering question {i + 1} for {engineering_level} level",
-                "points": 5,
-                "difficulty": "medium",
-                "options": ["Option A", "Option B", "Option C", "Option D"],
-                "correctAnswer": "Option A",
-                "allowMultipleCorrect": False,
-                "multipleCorrectAnswers": [],
-                "explanation": "This is a sample explanation for the correct answer.",
-            }
-            questions.append(question)
 
         return questions
 
