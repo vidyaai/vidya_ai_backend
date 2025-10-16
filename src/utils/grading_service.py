@@ -30,48 +30,598 @@ class LLMGrader:
         submission_answers: Dict[str, Any],
         options: Optional[Dict[str, Any]] = None,
     ) -> Tuple[float, float, Dict[str, Any], str]:
-        """Grade a single submission.
+        """Grade a single submission using bulk LLM call.
 
         Returns: total_score, total_points, feedback_by_question, overall_feedback
         """
         flattened_questions = self._flatten_questions(assignment.get("questions", []))
+        flattened_answers = self._flatten_answers(submission_answers)
 
-        total_points = 0.0
-        total_score = 0.0
-        feedback_by_question: Dict[str, Any] = {}
-
+        # Partition questions: deterministic (MCQ/TF) vs LLM-required
+        deterministic_questions: List[Dict[str, Any]] = []
+        llm_questions: List[Dict[str, Any]] = []
         for q in flattened_questions:
-            q_id = str(q.get("id"))
-            max_points = float(q.get("points", 0) or 0)
-            total_points += max_points
+            if self._is_deterministic_question(q):
+                deterministic_questions.append(q)
+            else:
+                llm_questions.append(q)
 
-            answer_obj = submission_answers.get(q_id)
-            score, fb = self._grade_single_question(q, answer_obj, max_points)
-            total_score += max(0.0, min(score, max_points))
+        feedback_by_question: Dict[str, Any] = {}
+        overall_feedback = ""
+
+        # Grade deterministic questions locally
+        for question in deterministic_questions:
+            q_id = str(question.get("id"))
+            max_points = float(question.get("points", 0) or 0)
+            answer_obj = flattened_answers.get(q_id)
+            q_type = (question.get("type") or "").lower()
+            if q_type == "multiple-choice":
+                score, fb = self._grade_multiple_choice(
+                    question, answer_obj, max_points
+                )
+            elif q_type == "true-false":
+                score, fb = self._grade_true_false(question, answer_obj, max_points)
+            else:
+                score, fb = 0.0, {"breakdown": "Unsupported deterministic type"}
             feedback_by_question[q_id] = {
                 "score": score,
                 "max_points": max_points,
-                **fb,
+                "strengths": fb.get("strengths", ""),
+                "areas_for_improvement": fb.get("areas_for_improvement", ""),
+                "breakdown": fb.get("breakdown", ""),
             }
 
-        percentage = (total_score / total_points * 100.0) if total_points > 0 else 0.0
-        overall_feedback = self._synthesize_overall_feedback(
-            feedback_by_question, percentage
-        )
+        # If there are LLM-required questions, build prompt only for them
+        if llm_questions:
+            prompt_text, diagram_s3_keys = self._build_bulk_prompt(
+                llm_questions, flattened_answers
+            )
+
+            print("prompt_text", prompt_text)
+            # print("diagram_s3_keys", diagram_s3_keys)
+
+            # Build multimodal messages
+            system_msg = {
+                "role": "system",
+                "content": (
+                    "You are an expert academic grader. Grade strictly per rubric and points. "
+                    "Always return concise, fair judgments in the exact JSON format requested."
+                ),
+            }
+
+            user_content: List[Dict[str, Any]] = []
+            user_content.append({"type": "text", "text": prompt_text})
+
+            # Add all diagram images
+            for s3_key in diagram_s3_keys:
+                try:
+                    presigned = s3_presign_url(s3_key, expires_in=3600)
+                    user_content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": presigned},
+                        }
+                    )
+                except Exception:
+                    # If presign fails, proceed without image
+                    pass
+
+            # Make single LLM call
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[system_msg, {"role": "user", "content": user_content}],
+                temperature=0.1,
+                max_tokens=2000,  # Increased for bulk response
+            )
+
+            result_text = (response.choices[0].message.content or "").strip()
+
+            # Parse bulk response
+            (
+                llm_feedback_by_question,
+                overall_feedback_llm,
+            ) = self._parse_bulk_grading_response(result_text, llm_questions)
+
+            # Merge results
+            feedback_by_question.update(llm_feedback_by_question)
+            # Keep overall feedback from LLM if present
+            overall_feedback = overall_feedback_llm or overall_feedback
+
+        # Calculate totals
+        total_points = sum(float(q.get("points", 0) or 0) for q in flattened_questions)
+        total_score = sum(fb.get("score", 0.0) for fb in feedback_by_question.values())
+
         return total_score, total_points, feedback_by_question, overall_feedback
 
+    def _is_deterministic_question(self, question: Dict[str, Any]) -> bool:
+        q_type = (question.get("type") or "").lower()
+        return q_type in {"multiple-choice", "true-false"}
+
+    def _parse_mcq_answer_to_index(
+        self, answer: str, options: List[str]
+    ) -> Optional[str]:
+        """Parse MCQ answer to index string. Handles:
+        - Index strings: "0", "1", "2"
+        - Letter prefixes: "A)", "B.", "a)", "b."
+        - Roman numerals: "i)", "ii)", "I)", "II."
+        - Numbered: "1.", "2.", "3)"
+        - Full option text match
+        """
+        if not answer or not options:
+            return None
+
+        answer = answer.strip()
+
+        # Direct index match
+        if answer.isdigit():
+            idx = int(answer)
+            if 0 <= idx < len(options):
+                return str(idx)
+
+        # Letter prefix match (A, B, C, D, etc.)
+        if len(answer) >= 2 and answer[0].isalpha() and answer[1] in ".)":
+            letter = answer[0].upper()
+            letter_idx = ord(letter) - ord("A")
+            if 0 <= letter_idx < len(options):
+                return str(letter_idx)
+
+        # Roman numeral match (i, ii, iii, iv, etc.)
+        roman_map = {
+            "i": 0,
+            "ii": 1,
+            "iii": 2,
+            "iv": 3,
+            "v": 4,
+            "vi": 5,
+            "vii": 6,
+            "viii": 7,
+            "ix": 8,
+            "x": 9,
+            "I": 0,
+            "II": 1,
+            "III": 2,
+            "IV": 3,
+            "V": 4,
+            "VI": 5,
+            "VII": 6,
+            "VIII": 7,
+            "IX": 8,
+            "X": 9,
+        }
+        if answer.lower() in roman_map:
+            idx = roman_map[answer.lower()]
+            if idx < len(options):
+                return str(idx)
+
+        # Numbered prefix match (1., 2., 3), etc.)
+        if answer[0].isdigit() and len(answer) > 1 and answer[1] in ".)":
+            idx = int(answer[0]) - 1  # Convert 1-based to 0-based
+            if 0 <= idx < len(options):
+                return str(idx)
+
+        # Full text match
+        for i, option in enumerate(options):
+            if answer.lower() == option.lower():
+                return str(i)
+
+        return None
+
+    def _normalize_mcq_correct_set(self, question: Dict[str, Any]) -> List[str]:
+        """Return list of correct answers as indices (strings) when possible.
+        Accepts either `correctAnswer` (single index string) or `multipleCorrectAnswers` which may
+        contain option texts or indices.
+        """
+        options: List[str] = question.get("options") or []
+        correct_set: List[str] = []
+        correct_answer = question.get("correctAnswer")
+        allow_multi = bool(question.get("allowMultipleCorrect"))
+        multi_list: List[str] = question.get("multipleCorrectAnswers") or []
+
+        # If allowMulti and multi_list provided, map texts to indices when needed
+        if allow_multi and multi_list:
+            for item in multi_list:
+                item_str = str(item)
+                parsed_idx = self._parse_mcq_answer_to_index(item_str, options)
+                if parsed_idx is not None:
+                    correct_set.append(parsed_idx)
+            # De-duplicate
+            correct_set = sorted(set(correct_set), key=lambda x: int(x))
+        else:
+            # Single-select: prefer `correctAnswer` if present, otherwise fall back to first of multi_list
+            if correct_answer is not None:
+                parsed_idx = self._parse_mcq_answer_to_index(
+                    str(correct_answer), options
+                )
+                if parsed_idx is not None:
+                    correct_set = [parsed_idx]
+            elif multi_list:
+                # Try to map first entry
+                first = str(multi_list[0])
+                parsed_idx = self._parse_mcq_answer_to_index(first, options)
+                if parsed_idx is not None:
+                    correct_set = [parsed_idx]
+        return correct_set
+
+    def _normalize_mcq_student_selection(
+        self, answer_obj: Any, options: List[str]
+    ) -> List[str]:
+        """Return list of selected indices (strings). Accepts:
+        - single string index (e.g., "1")
+        - list/array of strings/ints (e.g., ["0", "2"]) for multi-select
+        - comma-separated string (e.g., "0,2,3")
+        - text-based answers (e.g., "A)", "B.", "i)", "1.", "b)", full option text)
+        """
+        if answer_obj is None:
+            return []
+        if isinstance(answer_obj, dict):
+            # Accept object answers that may carry text/diagram; in MCQ we expect selection in `text`
+            if "text" in answer_obj:
+                answer_obj = answer_obj.get("text")
+            else:
+                # No text field; nothing to grade
+                return []
+
+        # Handle list/array inputs
+        if isinstance(answer_obj, list):
+            indices = []
+            for item in answer_obj:
+                parsed_idx = self._parse_mcq_answer_to_index(str(item), options)
+                if parsed_idx is not None:
+                    indices.append(parsed_idx)
+            return indices
+
+        # Handle string inputs
+        if isinstance(answer_obj, str):
+            s = answer_obj.strip()
+            if "," in s:
+                # Comma-separated values
+                indices = []
+                for part in s.split(","):
+                    part = part.strip()
+                    if part:
+                        parsed_idx = self._parse_mcq_answer_to_index(part, options)
+                        if parsed_idx is not None:
+                            indices.append(parsed_idx)
+                return indices
+            else:
+                # Single value
+                parsed_idx = self._parse_mcq_answer_to_index(s, options)
+                return [parsed_idx] if parsed_idx is not None else []
+
+        # Handle numeric inputs
+        try:
+            parsed_idx = self._parse_mcq_answer_to_index(str(int(answer_obj)), options)
+            return [parsed_idx] if parsed_idx is not None else []
+        except Exception:
+            return []
+
+    def _grade_multiple_choice(
+        self, question: Dict[str, Any], answer_obj: Any, max_points: float
+    ) -> Tuple[float, Dict[str, Any]]:
+        allow_multi = bool(question.get("allowMultipleCorrect"))
+        options = question.get("options") or []
+        correct_set = set(self._normalize_mcq_correct_set(question))
+        selected_set = set(self._normalize_mcq_student_selection(answer_obj, options))
+
+        if not correct_set:
+            return 0.0, {"breakdown": "No correct answer configured"}
+
+        if not allow_multi:
+            score = (
+                max_points
+                if selected_set and list(selected_set)[0] in correct_set
+                else 0.0
+            )
+        else:
+            if not selected_set:
+                score = 0.0
+            else:
+                intersection = len(correct_set & selected_set)
+                union = len(correct_set | selected_set)
+                score = (intersection / union) * max_points if union > 0 else 0.0
+
+        return score, {
+            "breakdown": f"Selected={sorted(selected_set)} Correct={sorted(correct_set)}",
+            "strengths": "Correct selection" if selected_set == correct_set else "",
+            "areas_for_improvement": "Review correct options"
+            if score < max_points
+            else "",
+        }
+
+    def _grade_true_false(
+        self, question: Dict[str, Any], answer_obj: Any, max_points: float
+    ) -> Tuple[float, Dict[str, Any]]:
+        correct_raw = question.get("correctAnswer")
+        correct_val: Optional[bool] = None
+        if isinstance(correct_raw, bool):
+            correct_val = correct_raw
+        elif isinstance(correct_raw, str):
+            cr = correct_raw.strip().lower()
+            if cr in {"true", "t", "1", "yes", "y"}:
+                correct_val = True
+            elif cr in {"false", "f", "0", "no", "n"}:
+                correct_val = False
+
+        # Normalize student answer
+        student_val: Optional[bool] = None
+        if isinstance(answer_obj, dict) and "text" in answer_obj:
+            answer_obj = answer_obj.get("text")
+        if isinstance(answer_obj, bool):
+            student_val = answer_obj
+        elif isinstance(answer_obj, str):
+            s = answer_obj.strip().lower()
+            if s in {"true", "t", "1", "yes", "y"}:
+                student_val = True
+            elif s in {"false", "f", "0", "no", "n"}:
+                student_val = False
+
+        if correct_val is None or student_val is None:
+            return 0.0, {"breakdown": "Invalid or missing true/false answer"}
+
+        score = max_points if correct_val == student_val else 0.0
+        return score, {
+            "breakdown": f"Student={student_val} Correct={correct_val}",
+            "strengths": "Correct truth value" if score == max_points else "",
+            "areas_for_improvement": "Review statement truth value"
+            if score == 0
+            else "",
+        }
+
     def _flatten_questions(
-        self, questions: List[Dict[str, Any]]
+        self, questions: List[Dict[str, Any]], parent_id: str = ""
     ) -> List[Dict[str, Any]]:
+        """Recursively flatten questions to handle nested multi-part questions at any depth.
+
+        Generates composite IDs that match the flattened answer structure:
+        - Top-level questions: keep original ID
+        - Subquestions: create composite IDs like "1.1", "1.2", "2.1", etc. (sequential numbering)
+        """
         flattened: List[Dict[str, Any]] = []
         for q in questions:
+            original_id = str(q.get("id"))
+
             if q.get("type") == "multi-part" and q.get("subquestions"):
-                # include a synthetic container for scoring by parts later if needed
-                for subq in self._flatten_questions(q.get("subquestions", [])):
-                    flattened.append(subq)
+                # For multi-part questions, flatten subquestions with sequential numbering
+                if parent_id:
+                    # Nested multi-part: use parent_id as prefix
+                    sub_parent_id = f"{parent_id}.{original_id}"
+                else:
+                    # Top-level multi-part: use original ID as prefix
+                    sub_parent_id = original_id
+
+                # Recursively flatten subquestions with composite parent ID
+                sub_flattened = self._flatten_questions(
+                    q.get("subquestions", []), sub_parent_id
+                )
+                flattened.extend(sub_flattened)
             else:
-                flattened.append(q)
+                # Regular question - create composite ID if we have a parent
+                if parent_id:
+                    # Use sequential numbering within the parent (1, 2, 3, etc.)
+                    # Count existing questions with this parent to get next sequence number
+                    existing_count = sum(
+                        1
+                        for fq in flattened
+                        if fq.get("id", "").startswith(f"{parent_id}.")
+                    )
+                    next_seq = existing_count + 1
+
+                    composite_id = f"{parent_id}.{next_seq}"
+                    # Create a copy of the question with the composite ID
+                    q_copy = q.copy()
+                    q_copy["id"] = composite_id
+                    flattened.append(q_copy)
+                else:
+                    # Top-level question - keep original ID
+                    flattened.append(q)
         return flattened
+
+    def _flatten_answers(self, answers: Dict[str, Any]) -> Dict[str, Any]:
+        """Recursively flatten student answers to match the structure of flattened questions.
+
+        Handles different answer structures:
+        - String answers: keep as-is
+        - Object answers with text/diagram: keep object structure
+        - Answers with subAnswers: recursively flatten at any depth
+        """
+        flattened: Dict[str, Any] = {}
+
+        for question_id, answer in answers.items():
+            if isinstance(answer, str):
+                # Simple string answer - keep as-is
+                flattened[question_id] = answer
+            elif isinstance(answer, dict):
+                if "subAnswers" in answer:
+                    # Multi-part answer - recursively flatten subAnswers
+                    sub_answers = answer.get("subAnswers", {})
+                    sub_flattened = self._flatten_answers(sub_answers)
+                    for sub_id, sub_answer in sub_flattened.items():
+                        # Create composite question ID (e.g., "1.1", "1.2")
+                        composite_id = f"{question_id}.{sub_id}"
+                        flattened[composite_id] = sub_answer
+                else:
+                    # Object answer with text/diagram - keep structure
+                    flattened[question_id] = answer
+            else:
+                # Fallback - convert to string
+                flattened[question_id] = str(answer)
+
+        return flattened
+
+    def _build_bulk_prompt(
+        self,
+        flattened_questions: List[Dict[str, Any]],
+        flattened_answers: Dict[str, Any],
+    ) -> Tuple[str, List[str]]:
+        """Build a comprehensive prompt with all questions and answers in interleaved format.
+
+        Returns:
+            Tuple of (prompt_text, list_of_diagram_s3_keys)
+        """
+        prompt_parts = []
+        diagram_s3_keys = []
+
+        prompt_parts.append(
+            "You are an expert academic grader. Grade this student's submission for all questions. "
+            "For each question, provide a score, strengths, areas for improvement, and detailed breakdown. "
+            "Return your response as JSON with the following structure:\n"
+            "{\n"
+            '  "question_<id>": {\n'
+            '    "score": <float in [0, max_points]>,\n'
+            '    "strengths": "<brief strengths>",\n'
+            '    "areas_for_improvement": "<areas to improve>",\n'
+            '    "breakdown": "<detailed analysis>"\n'
+            "  },\n"
+            '  "overall_feedback": "<overall assessment>"\n'
+            "}\n\n"
+            "GRADING CRITERIA:\n"
+        )
+
+        for question in flattened_questions:
+            q_id = str(question.get("id"))
+            q_type = question.get("type", "text")
+            question_text = question.get("question", "")
+            rubric = question.get("rubric", "")
+            correct_answer = question.get("correctAnswer") or question.get(
+                "correct_answer", ""
+            )
+            max_points = float(question.get("points", 0) or 0)
+
+            # Add question details
+            prompt_parts.append(f"QUESTION {q_id} ({q_type}):")
+            prompt_parts.append(f"{question_text}")
+
+            if correct_answer:
+                prompt_parts.append(f"REFERENCE ANSWER:\n{correct_answer}")
+
+            if rubric:
+                prompt_parts.append(f"RUBRIC:\n{rubric}")
+
+            prompt_parts.append(f"MAX POINTS: {max_points}")
+
+            # Add student answer
+            answer_obj = flattened_answers.get(q_id)
+            if answer_obj is not None:
+                if isinstance(answer_obj, str):
+                    prompt_parts.append(f"STUDENT ANSWER:\n{answer_obj}")
+                elif isinstance(answer_obj, dict):
+                    text_answer = answer_obj.get("text", "")
+                    if text_answer:
+                        prompt_parts.append(f"STUDENT ANSWER (text):\n{text_answer}")
+
+                    # Check for diagram
+                    diagram = answer_obj.get("diagram")
+                    if diagram and isinstance(diagram, dict):
+                        s3_key = diagram.get("s3_key")
+                        if s3_key:
+                            diagram_s3_keys.append(s3_key)
+                            prompt_parts.append(
+                                f"STUDENT ANSWER (diagram): [Image attached - see diagram for question {q_id}]"
+                            )
+            else:
+                prompt_parts.append("STUDENT ANSWER: <no answer provided>")
+
+            prompt_parts.append("")  # Empty line between questions
+
+        return "\n".join(prompt_parts), diagram_s3_keys
+
+    def _parse_bulk_grading_response(
+        self, response_text: str, flattened_questions: List[Dict[str, Any]]
+    ) -> Tuple[Dict[str, Any], str]:
+        """Parse JSON response from bulk grading LLM call.
+
+        Returns:
+            Tuple of (feedback_by_question, overall_feedback)
+        """
+        import json
+
+        feedback_by_question = {}
+        overall_feedback = ""
+
+        try:
+            # Try to parse as JSON
+            response_data = json.loads(response_text)
+
+            # Extract overall feedback
+            overall_feedback = response_data.get("overall_feedback", "")
+
+            # Extract per-question feedback
+            for question in flattened_questions:
+                q_id = str(question.get("id"))
+                max_points = float(question.get("points", 0) or 0)
+
+                question_key = f"question_{q_id}"
+                question_data = response_data.get(question_key, {})
+
+                # Extract score and feedback
+                score = float(question_data.get("score", 0.0))
+                score = max(0.0, min(score, max_points))  # Clamp to valid range
+
+                feedback_by_question[q_id] = {
+                    "score": score,
+                    "max_points": max_points,
+                    "strengths": question_data.get("strengths", ""),
+                    "areas_for_improvement": question_data.get(
+                        "areas_for_improvement", ""
+                    ),
+                    "breakdown": question_data.get("breakdown", ""),
+                }
+
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            # Fallback: try to extract information using regex patterns
+            import re
+
+            # Extract overall feedback
+            overall_match = re.search(r'"overall_feedback":\s*"([^"]*)"', response_text)
+            if overall_match:
+                overall_feedback = overall_match.group(1)
+
+            # Extract per-question scores and feedback
+            for question in flattened_questions:
+                q_id = str(question.get("id"))
+                max_points = float(question.get("points", 0) or 0)
+
+                # Try to find score for this question
+                score_pattern = rf'"question_{q_id}":\s*{{[^}}]*"score":\s*([0-9.]+)'
+                score_match = re.search(score_pattern, response_text)
+                score = float(score_match.group(1)) if score_match else 0.0
+                score = max(0.0, min(score, max_points))
+
+                # Extract other fields
+                strengths = ""
+                areas = ""
+                breakdown = ""
+
+                strengths_match = re.search(
+                    rf'"question_{q_id}":\s*{{[^}}]*"strengths":\s*"([^"]*)"',
+                    response_text,
+                )
+                if strengths_match:
+                    strengths = strengths_match.group(1)
+
+                areas_match = re.search(
+                    rf'"question_{q_id}":\s*{{[^}}]*"areas_for_improvement":\s*"([^"]*)"',
+                    response_text,
+                )
+                if areas_match:
+                    areas = areas_match.group(1)
+
+                breakdown_match = re.search(
+                    rf'"question_{q_id}":\s*{{[^}}]*"breakdown":\s*"([^"]*)"',
+                    response_text,
+                )
+                if breakdown_match:
+                    breakdown = breakdown_match.group(1)
+
+                feedback_by_question[q_id] = {
+                    "score": score,
+                    "max_points": max_points,
+                    "strengths": strengths,
+                    "areas_for_improvement": areas,
+                    "breakdown": breakdown,
+                }
+
+        return feedback_by_question, overall_feedback
 
     def _grade_single_question(
         self, question: Dict[str, Any], answer_obj: Any, max_points: float

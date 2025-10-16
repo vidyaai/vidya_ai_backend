@@ -1572,7 +1572,6 @@ async def get_assignment_submissions(
 )
 async def submit_assignment(
     assignment_id: str,
-    submission_data: AssignmentSubmissionDraft,  # Use same schema as draft
     request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -1611,6 +1610,82 @@ async def submit_assignment(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied to submit this assignment",
             )
+
+        # Parse body supporting both JSON and multipart form (for PDF)
+        content_type = request.headers.get("content-type", "")
+        from schemas import AssignmentSubmissionDraft as _SubmissionDraft
+        import json as _json
+
+        submission_data: _SubmissionDraft
+
+        if "multipart/form-data" in content_type:
+            form = await request.form()
+            submission_method = form.get("submission_method") or "pdf"
+            answers_raw = form.get("answers") or "{}"
+            time_spent = form.get("time_spent") or "0"
+            submitted_files_raw = form.get("submitted_files")
+            uploaded_file = form.get("file")  # type: ignore
+
+            # Build submitted_files from uploaded file if provided
+            submitted_files = None
+            if uploaded_file is not None:
+                # uploaded_file is a Starlette UploadFile
+                file_bytes = await uploaded_file.read()
+                import uuid, tempfile, os as _os
+
+                tmp_path = None
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=".pdf"
+                    ) as tmp:
+                        tmp.write(file_bytes)
+                        tmp_path = tmp.name
+                    # Upload to S3 under assignment uploads path
+                    file_id = str(uuid.uuid4())
+                    s3_key = f"assignments/{assignment_id}/uploads/{file_id}.pdf"
+                    s3_upload_file(
+                        tmp_path,
+                        s3_key,
+                        content_type=uploaded_file.content_type or "application/pdf",
+                    )
+                finally:
+                    try:
+                        if tmp_path and _os.path.exists(tmp_path):
+                            _os.unlink(tmp_path)
+                    except Exception:
+                        pass
+
+                submitted_files = [
+                    {
+                        "s3_key": s3_key,
+                        "file_id": file_id,
+                        "filename": uploaded_file.filename,
+                        "content_type": uploaded_file.content_type or "application/pdf",
+                        "size": len(file_bytes),
+                        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                ]
+            elif submitted_files_raw:
+                try:
+                    submitted_files = _json.loads(submitted_files_raw)
+                except Exception:
+                    submitted_files = None
+
+            try:
+                answers_obj = _json.loads(answers_raw)
+            except Exception:
+                answers_obj = {}
+
+            submission_data = _SubmissionDraft(
+                answers=answers_obj,
+                submission_method=submission_method,
+                submitted_files=submitted_files,
+                time_spent=time_spent,
+            )
+        else:
+            # JSON body
+            body_json = await request.json()
+            submission_data = _SubmissionDraft(**body_json)
 
         # Check for existing submission
         existing_submission = (
@@ -1912,6 +1987,122 @@ async def save_assignment_draft(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save draft",
+        )
+
+
+@router.get(
+    "/api/assignments/{assignment_id}/submissions/{submission_id}/files/{file_id}"
+)
+async def download_submission_file(
+    assignment_id: str,
+    submission_id: str,
+    file_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get presigned URL for a submitted file (assignment owner/sharer only)"""
+    try:
+        user_id = current_user["uid"]
+        logger.info(
+            f"Downloading file {file_id} from submission {submission_id} for assignment {assignment_id} by user: {user_id}"
+        )
+
+        # Verify assignment ownership or edit permission
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+            )
+
+        is_owner = assignment.user_id == user_id
+        has_edit_access = (
+            db.query(SharedLinkAccess)
+            .join(SharedLink)
+            .filter(
+                and_(
+                    SharedLink.assignment_id == assignment_id,
+                    SharedLink.share_type == "assignment",
+                    SharedLinkAccess.user_id == user_id,
+                    SharedLinkAccess.permission == "edit",
+                )
+            )
+            .first()
+            is not None
+        )
+
+        if not (is_owner or has_edit_access):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to download files",
+            )
+
+        # Get submission and verify it belongs to this assignment
+        submission = (
+            db.query(AssignmentSubmission)
+            .filter(
+                and_(
+                    AssignmentSubmission.id == submission_id,
+                    AssignmentSubmission.assignment_id == assignment_id,
+                )
+            )
+            .first()
+        )
+
+        if not submission:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+            )
+
+        # Find the file in submitted_files by file_id
+        if not submission.submitted_files:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No files found in submission",
+            )
+
+        file_info = None
+        for file_data in submission.submitted_files:
+            if file_data.get("file_id") == file_id:
+                file_info = file_data
+                break
+
+        if not file_info:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not found in submission",
+            )
+
+        # Generate presigned URL
+        s3_key = file_info.get("s3_key")
+        if not s3_key:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="File S3 key not found"
+            )
+
+        from controllers.storage import s3_presign_url
+
+        presigned_url = s3_presign_url(s3_key, expires_in=3600)  # 1 hour expiry
+
+        logger.info(
+            f"Generated presigned URL for file {file_id} in submission {submission_id}"
+        )
+        return {
+            "url": presigned_url,
+            "filename": file_info.get("filename", "submission.pdf"),
+            "content_type": file_info.get("content_type", "application/pdf"),
+            "size": file_info.get("size", 0),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error downloading file {file_id} from submission {submission_id}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate download URL",
         )
 
 
