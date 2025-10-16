@@ -71,6 +71,8 @@ class LLMGrader:
                 "breakdown": fb.get("breakdown", ""),
             }
 
+        print("feedback_by_question before LLM", feedback_by_question)
+
         # If there are LLM-required questions, build prompt only for them
         if llm_questions:
             prompt_text, diagram_s3_keys = self._build_bulk_prompt(
@@ -126,6 +128,8 @@ class LLMGrader:
             feedback_by_question.update(llm_feedback_by_question)
             # Keep overall feedback from LLM if present
             overall_feedback = overall_feedback_llm or overall_feedback
+
+        print("feedback_by_question after LLM", feedback_by_question)
 
         # Calculate totals
         total_points = sum(float(q.get("points", 0) or 0) for q in flattened_questions)
@@ -623,74 +627,6 @@ class LLMGrader:
 
         return feedback_by_question, overall_feedback
 
-    def _grade_single_question(
-        self, question: Dict[str, Any], answer_obj: Any, max_points: float
-    ) -> Tuple[float, Dict[str, Any]]:
-        """Grade a single question, supporting text-only and diagram-inclusive answers."""
-        q_type = question.get("type")
-        question_text = question.get("question")
-        rubric = question.get("rubric")
-        correct_answer = question.get("correctAnswer") or question.get("correct_answer")
-
-        # Normalize answer
-        text_answer: Optional[str] = None
-        diagram_s3_key: Optional[str] = None
-
-        if isinstance(answer_obj, str):
-            text_answer = answer_obj
-        elif isinstance(answer_obj, dict):
-            text_answer = (
-                answer_obj.get("text")
-                if isinstance(answer_obj.get("text"), str)
-                else None
-            )
-            if answer_obj.get("diagram") and isinstance(
-                answer_obj.get("diagram"), dict
-            ):
-                diagram_s3_key = answer_obj["diagram"].get("s3_key")
-
-        # Build multimodal messages
-        system_msg = {
-            "role": "system",
-            "content": (
-                "You are an expert academic grader. Grade strictly per rubric and points. "
-                "Always return concise, fair judgments."
-            ),
-        }
-
-        user_content: List[Dict[str, Any]] = []
-        prompt_text = self._build_prompt(
-            question_text, q_type, rubric, correct_answer, text_answer, max_points
-        )
-        user_content.append({"type": "text", "text": prompt_text})
-
-        if diagram_s3_key:
-            try:
-                presigned = s3_presign_url(diagram_s3_key, expires_in=3600)
-                user_content.append(
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": presigned},
-                    }
-                )
-            except Exception:
-                # If presign fails, proceed without image
-                pass
-
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[system_msg, {"role": "user", "content": user_content}],
-            temperature=0.1,
-            max_tokens=1200,
-        )
-
-        result_text = (response.choices[0].message.content or "").strip()
-        # Expected lightweight protocol: first line "SCORE: <float>" then feedback lines
-        score, feedback = self._parse_score_and_feedback(
-            result_text, default_max=max_points
-        )
-        return score, feedback
-
     def _build_prompt(
         self,
         question_text: Optional[str],
@@ -756,20 +692,3 @@ class LLMGrader:
             "strengths": strengths,
             "areas_for_improvement": areas,
         }
-
-    def _synthesize_overall_feedback(
-        self, per_q: Dict[str, Any], percentage: float
-    ) -> str:
-        # Concise rollup
-        lines = [f"Overall Percentage: {percentage:.2f}%"]
-        lines.append("Summary:")
-        # Heuristic brief summary from first few questions
-        count = 0
-        for qid, fb in per_q.items():
-            if count >= 3:
-                break
-            s = fb.get("strengths") or ""
-            a = fb.get("areas_for_improvement") or ""
-            lines.append(f"Q{qid} — + {s[:100]} | - {a[:100]}")
-            count += 1
-        return "\n".join(lines)
