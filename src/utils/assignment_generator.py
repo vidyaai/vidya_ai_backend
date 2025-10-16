@@ -7,6 +7,7 @@ It integrates with OpenAI's GPT models to generate engineering-focused assignmen
 
 import json
 import base64
+from textwrap import dedent
 from typing import Dict, List, Any, Optional
 from openai import OpenAI
 from controllers.config import logger
@@ -161,9 +162,9 @@ class AssignmentGenerator:
                 messages=[
                     {
                         "role": "system",
-                        "content": self._get_system_prompt(generation_options),
+                        "content": dedent(self._get_system_prompt(generation_options)),
                     },
-                    {"role": "user", "content": prompt},
+                    {"role": "user", "content": dedent(prompt).strip()},
                 ],
                 response_format={
                     "type": "json_schema",
@@ -246,34 +247,34 @@ class AssignmentGenerator:
         enabled_types = [k for k, v in question_types.items() if v]
 
         prompt = f"""
-Generate {num_questions} engineering assignment questions based on the provided content.
+            Generate {num_questions} engineering assignment questions based on the provided content.
 
-Assignment Requirements:
-- Engineering Level: {engineering_level}
-- Engineering Discipline: {engineering_discipline}
-- Question Types: {', '.join(enabled_types)}
-- Difficulty Level: {difficulty_level}
+            Assignment Requirements:
+            - Engineering Level: {engineering_level}
+            - Engineering Discipline: {engineering_discipline}
+            - Question Types: {', '.join(enabled_types)}
+            - Difficulty Level: {difficulty_level}
 
-Content Context:
-{content_context}
+            Content Context:
+            {content_context}
 
-Please generate questions that:
-1. Are appropriate for {engineering_level}-level {engineering_discipline} engineering students
-2. Test understanding of key concepts from the provided content
-3. Include a mix of question types: {', '.join(enabled_types)}
-4. Have appropriate difficulty levels for the target audience
-5. Include clear, unambiguous questions with proper answer keys
-6. Follow engineering education best practices
+            Please generate questions that:
+            1. Are appropriate for {engineering_level}-level {engineering_discipline} engineering students
+            2. Test understanding of key concepts from the provided content
+            3. Include a mix of question types: {', '.join(enabled_types)}
+            4. Have appropriate difficulty levels for the target audience
+            5. Include clear, unambiguous questions with proper answer keys
+            6. Follow engineering education best practices
 
-For each question, provide:
-- Clear, well-structured question text
-- Appropriate answer options (for multiple choice)
-- Correct answer with brief explanation (except for multi-part questions which get answers from sub-questions)
-- Point value based on difficulty
-- Any necessary code templates or diagrams
+            For each question, provide:
+            - Clear, well-structured question text
+            - Appropriate answer options (for multiple choice) with correctAnswer as index (like "0", "1", "2", "3") of the correct answer in the options array
+            - Correct answer with brief explanation (except for multi-part questions which get answers from sub-questions)
+            - Point value based on difficulty
+            - Any necessary code templates or diagrams
 
-The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
-"""
+            The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
+        """
 
         # Add difficulty distribution if specified
         if difficulty_distribution:
@@ -298,24 +299,25 @@ The response will be automatically structured according to the provided JSON sch
 
         return f"""You are an expert engineering educator specializing in {engineering_discipline} engineering education at the {engineering_level} level.
 
-Your task is to create high-quality assignment questions that:
-1. Test deep understanding of engineering concepts
-2. Require critical thinking and problem-solving skills
-3. Are appropriate for the specified academic level
-4. Follow engineering education best practices
-5. Include clear, unambiguous questions with proper answer keys
-6. Provide educational value beyond simple recall
+            Your task is to create high-quality assignment questions that:
+            1. Test deep understanding of engineering concepts
+            2. Require critical thinking and problem-solving skills
+            3. Are appropriate for the specified academic level
+            4. Follow engineering education best practices
+            5. Include clear, unambiguous questions with proper answer keys
+            6. Provide educational value beyond simple recall
 
-Guidelines:
-- Questions should be challenging but fair
-- Include a variety of question types to assess different skills
-- Provide clear, detailed explanations for answers
-- Ensure questions are self-contained and don't require external resources
-- Use proper engineering terminology and notation
-- Include code examples and diagrams when appropriate
-- Follow academic integrity standards
+            Guidelines:
+            - Questions should be challenging but fair
+            - Include a variety of question types to assess different skills
+            - Provide clear, detailed explanations for answers
+            - Ensure questions are self-contained and don't require external resources
+            - Use proper engineering terminology and notation
+            - Include code examples and diagrams when appropriate
+            - Follow academic integrity standards
 
-The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements."""
+            The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
+        """
 
     def _post_process_questions(
         self, questions: List[Dict[str, Any]], generation_options: Dict[str, Any]
@@ -335,13 +337,13 @@ The response will be automatically structured according to the provided JSON sch
                 if question.get("type") == "multiple-choice" and question.get(
                     "options"
                 ):
-                    question["correctAnswer"] = question["options"][0]
+                    question["correctAnswer"] = "0"
                 elif question.get("type") == "multi-part":
                     question[
                         "correctAnswer"
                     ] = ""  # Multi-part questions don't have their own answers
                 else:
-                    question["correctAnswer"] = "Sample answer"
+                    question["correctAnswer"] = "0"
 
             # Set default multiple correct values
             question.setdefault("allowMultipleCorrect", False)

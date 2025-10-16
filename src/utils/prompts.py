@@ -54,9 +54,10 @@ Extraction guidelines:
    - Assignment title and description
 
 4. For multi-part questions, structure subquestions properly
-5. Identify code content and set hasCode/codeLanguage appropriately
-6. Identify diagram requirements and set hasDiagram appropriately
-7. DO NOT keep question numbers, marks, option number or other metadata in the Question or Options fields
+5. for multiple choice questions' options, correctAnswer should be index (like "0", "1", "2", "3") of the correct answer in the options array
+6. Identify code content and set hasCode/codeLanguage appropriately
+7. Identify diagram requirements and set hasDiagram appropriately
+8. DO NOT keep question numbers, marks, option number or other metadata in the Question or Options fields
 
 Rubric requirements:
 - rubricType: "overall" for non-multi-part questions, "per-subquestion" for multi-part questions
@@ -89,6 +90,7 @@ Rubric rules:
 - "overall": rubric required
 - "per-subquestion": rubric not required for main question, required for non-multi-part subquestions
 
+Note: For multiple choice, set correctAnswer as the index of the correct option (e.g., "0", "1", etc.)
 The response will be automatically structured according to the provided JSON schema.
 """
     return prompt
