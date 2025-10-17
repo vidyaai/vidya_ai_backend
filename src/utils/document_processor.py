@@ -1,6 +1,7 @@
 import base64
 import json
 import re
+from textwrap import dedent
 from typing import Dict, Any, Optional
 from openai import OpenAI
 from controllers.config import logger
@@ -277,9 +278,9 @@ class AssignmentDocumentParser:
             messages=[
                 {
                     "role": "system",
-                    "content": DOCUMENT_PARSER_SYSTEM_PROMPT,
+                    "content": dedent(DOCUMENT_PARSER_SYSTEM_PROMPT),
                 },
-                {"role": "user", "content": prompt},
+                {"role": "user", "content": dedent(prompt).strip()},
             ],
             response_format={
                 "type": "json_schema",
@@ -370,9 +371,9 @@ class AssignmentDocumentParser:
             messages=[
                 {
                     "role": "system",
-                    "content": FALLBACK_PARSER_SYSTEM_PROMPT,
+                    "content": dedent(FALLBACK_PARSER_SYSTEM_PROMPT),
                 },
-                {"role": "user", "content": prompt},
+                {"role": "user", "content": dedent(prompt).strip()},
             ],
             response_format={
                 "type": "json_schema",

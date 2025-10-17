@@ -32,6 +32,10 @@ from schemas import (
     DocumentImportResponse,
     DiagramUploadResponse,
     DiagramDeleteResponse,
+    GradeSubmissionRequest,
+    GradeSubmissionResponse,
+    BatchGradeRequest,
+    BatchGradeResponse,
 )
 
 router = APIRouter()
@@ -53,6 +57,224 @@ def calculate_assignment_stats(assignment: Assignment) -> Assignment:
     assignment.total_questions = str(total_questions)
     assignment.total_points = str(total_points)
     return assignment
+
+
+@router.post(
+    "/api/assignments/{assignment_id}/submissions/{submission_id}/grade",
+    response_model=GradeSubmissionResponse,
+)
+async def grade_submission_endpoint(
+    assignment_id: str,
+    submission_id: str,
+    grade_req: GradeSubmissionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Trigger AI grading for a submission."""
+    try:
+        user_id = current_user["uid"]
+
+        # Verify assignment ownership or edit permission
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+            )
+
+        is_owner = assignment.user_id == user_id
+        has_edit_access = (
+            db.query(SharedLinkAccess)
+            .join(SharedLink)
+            .filter(
+                and_(
+                    SharedLink.assignment_id == assignment_id,
+                    SharedLink.share_type == "assignment",
+                    SharedLinkAccess.user_id == user_id,
+                    SharedLinkAccess.permission == "edit",
+                )
+            )
+            .first()
+            is not None
+        )
+
+        if not (is_owner or has_edit_access):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to grade"
+            )
+
+        submission = (
+            db.query(AssignmentSubmission)
+            .filter(
+                and_(
+                    AssignmentSubmission.id == submission_id,
+                    AssignmentSubmission.assignment_id == assignment_id,
+                )
+            )
+            .first()
+        )
+        if not submission:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+            )
+
+        # Prepare assignment dict for grader
+        assignment = calculate_assignment_stats(assignment)
+        assignment_dict = {
+            "id": assignment.id,
+            "title": assignment.title,
+            "questions": assignment.questions or [],
+        }
+
+        # Run grading
+        from utils.grading_service import LLMGrader
+
+        grader = LLMGrader(
+            model=(
+                grade_req.options.model
+                if grade_req and grade_req.options and grade_req.options.model
+                else "gpt-4o"
+            )
+        )
+        (
+            total_score,
+            total_points,
+            feedback_by_question,
+            overall_feedback,
+        ) = grader.grade_submission(
+            assignment=assignment_dict,
+            submission_answers=submission.answers or {},
+            options=(
+                grade_req.options.dict() if grade_req and grade_req.options else None
+            ),
+        )
+
+        submission.score = f"{total_score:.2f}"
+        submission.percentage = (
+            f"{(total_score/total_points*100.0) if total_points>0 else 0.0:.2f}"
+        )
+        submission.feedback = feedback_by_question
+        submission.overall_feedback = overall_feedback
+        submission.status = "graded"
+        submission.graded_at = datetime.now(timezone.utc)
+        submission.updated_at = datetime.now(timezone.utc)
+
+        db.commit()
+        db.refresh(submission)
+
+        return {
+            "submission_id": submission.id,
+            "assignment_id": assignment_id,
+            "total_score": float(total_score),
+            "total_points": float(total_points),
+            "percentage": float(submission.percentage),
+            "overall_feedback": overall_feedback,
+            "feedback_by_question": feedback_by_question,
+            "graded_at": submission.graded_at,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Error grading submission {submission_id} for assignment {assignment_id}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to grade submission",
+        )
+
+
+@router.post(
+    "/api/assignments/{assignment_id}/submissions/batch-grade",
+    response_model=BatchGradeResponse,
+)
+async def batch_grade_submissions(
+    assignment_id: str,
+    batch_req: BatchGradeRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Trigger batch AI grading for multiple submissions (background processing)."""
+    try:
+        user_id = current_user["uid"]
+
+        # Verify assignment ownership or edit permission
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+            )
+
+        is_owner = assignment.user_id == user_id
+        has_edit_access = (
+            db.query(SharedLinkAccess)
+            .join(SharedLink)
+            .filter(
+                and_(
+                    SharedLink.assignment_id == assignment_id,
+                    SharedLink.share_type == "assignment",
+                    SharedLinkAccess.user_id == user_id,
+                    SharedLinkAccess.permission == "edit",
+                )
+            )
+            .first()
+            is not None
+        )
+
+        if not (is_owner or has_edit_access):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to grade"
+            )
+
+        # Validate all submissions exist and belong to this assignment
+        valid_submission_ids = []
+        for sub_id in batch_req.submission_ids:
+            submission = (
+                db.query(AssignmentSubmission)
+                .filter(
+                    and_(
+                        AssignmentSubmission.id == sub_id,
+                        AssignmentSubmission.assignment_id == assignment_id,
+                    )
+                )
+                .first()
+            )
+            if submission and submission.status == "submitted":
+                # Mark as grading in progress
+                submission.status = "grading"
+                submission.updated_at = datetime.now(timezone.utc)
+                valid_submission_ids.append(sub_id)
+
+        db.commit()
+
+        # Queue background grading task
+        from controllers.background_tasks import queue_batch_grading
+
+        queue_batch_grading(assignment_id, valid_submission_ids, batch_req.options)
+
+        logger.info(f"Queued {len(valid_submission_ids)} submissions for grading")
+
+        return {
+            "message": f"Grading queued for {len(valid_submission_ids)} submissions",
+            "queued_count": len(valid_submission_ids),
+            "submission_ids": valid_submission_ids,
+            "status": "queued",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Error queueing batch grading for assignment {assignment_id}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to queue grading",
+        )
 
 
 def filter_sensitive_data_for_students(
@@ -1350,12 +1572,11 @@ async def get_assignment_submissions(
 )
 async def submit_assignment(
     assignment_id: str,
-    submission_data: AssignmentSubmissionDraft,  # Use same schema as draft
     request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """Submit an assignment"""
+    """Submit an assignment - handles both in-app and PDF submissions."""
     try:
         user_id = current_user["uid"]
         logger.info(f"Submitting assignment {assignment_id} by user: {user_id}")
@@ -1390,6 +1611,82 @@ async def submit_assignment(
                 detail="Access denied to submit this assignment",
             )
 
+        # Parse body supporting both JSON and multipart form (for PDF)
+        content_type = request.headers.get("content-type", "")
+        from schemas import AssignmentSubmissionDraft as _SubmissionDraft
+        import json as _json
+
+        submission_data: _SubmissionDraft
+
+        if "multipart/form-data" in content_type:
+            form = await request.form()
+            submission_method = form.get("submission_method") or "pdf"
+            answers_raw = form.get("answers") or "{}"
+            time_spent = form.get("time_spent") or "0"
+            submitted_files_raw = form.get("submitted_files")
+            uploaded_file = form.get("file")  # type: ignore
+
+            # Build submitted_files from uploaded file if provided
+            submitted_files = None
+            if uploaded_file is not None:
+                # uploaded_file is a Starlette UploadFile
+                file_bytes = await uploaded_file.read()
+                import uuid, tempfile, os as _os
+
+                tmp_path = None
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=".pdf"
+                    ) as tmp:
+                        tmp.write(file_bytes)
+                        tmp_path = tmp.name
+                    # Upload to S3 under assignment uploads path
+                    file_id = str(uuid.uuid4())
+                    s3_key = f"assignments/{assignment_id}/uploads/{file_id}.pdf"
+                    s3_upload_file(
+                        tmp_path,
+                        s3_key,
+                        content_type=uploaded_file.content_type or "application/pdf",
+                    )
+                finally:
+                    try:
+                        if tmp_path and _os.path.exists(tmp_path):
+                            _os.unlink(tmp_path)
+                    except Exception:
+                        pass
+
+                submitted_files = [
+                    {
+                        "s3_key": s3_key,
+                        "file_id": file_id,
+                        "filename": uploaded_file.filename,
+                        "content_type": uploaded_file.content_type or "application/pdf",
+                        "size": len(file_bytes),
+                        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                ]
+            elif submitted_files_raw:
+                try:
+                    submitted_files = _json.loads(submitted_files_raw)
+                except Exception:
+                    submitted_files = None
+
+            try:
+                answers_obj = _json.loads(answers_raw)
+            except Exception:
+                answers_obj = {}
+
+            submission_data = _SubmissionDraft(
+                answers=answers_obj,
+                submission_method=submission_method,
+                submitted_files=submitted_files,
+                time_spent=time_spent,
+            )
+        else:
+            # JSON body
+            body_json = await request.json()
+            submission_data = _SubmissionDraft(**body_json)
+
         # Check for existing submission
         existing_submission = (
             db.query(AssignmentSubmission)
@@ -1402,9 +1699,60 @@ async def submit_assignment(
             .first()
         )
 
+        # Handle PDF submission method - convert PDF to JSON immediately
+        if (
+            submission_data.submission_method == "pdf"
+            and submission_data.submitted_files
+        ):
+            # Get the PDF file from submitted_files
+            pdf_file_info = (
+                submission_data.submitted_files[0]
+                if submission_data.submitted_files
+                else None
+            )
+
+            if pdf_file_info and pdf_file_info.get("s3_key"):
+                try:
+                    # Download PDF from S3 temporarily
+                    import tempfile
+
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=".pdf"
+                    ) as tmp:
+                        s3_client.download_fileobj(
+                            AWS_S3_BUCKET, pdf_file_info["s3_key"], tmp
+                        )
+                        tmp_pdf_path = tmp.name
+
+                    # Convert PDF to JSON using PDFAnswerProcessor
+                    from utils.pdf_answer_processor import PDFAnswerProcessor
+
+                    processor = PDFAnswerProcessor()
+                    answers_from_pdf = processor.process_pdf_to_json(tmp_pdf_path)
+
+                    # Clean up temp file
+                    os.unlink(tmp_pdf_path)
+
+                    # Override answers with extracted data
+                    submission_data.answers = answers_from_pdf
+
+                    logger.info(
+                        f"Converted PDF to JSON for submission: {len(answers_from_pdf)} answers extracted"
+                    )
+
+                except Exception as e:
+                    logger.error(f"Error processing PDF to JSON: {str(e)}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Failed to process PDF submission: {str(e)}",
+                    )
+
         if existing_submission:
             # Check if already submitted - prevent resubmission
-            if existing_submission.status == "submitted":
+            if (
+                existing_submission.status == "submitted"
+                or existing_submission.status == "graded"
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Assignment has already been submitted and cannot be resubmitted",
@@ -1421,6 +1769,18 @@ async def submit_assignment(
 
             db.commit()
             db.refresh(existing_submission)
+
+            # Queue background task to extract diagrams if PDF submission
+            if (
+                submission_data.submission_method == "pdf"
+                and submission_data.submitted_files
+            ):
+                from controllers.background_tasks import queue_pdf_diagram_extraction
+
+                queue_pdf_diagram_extraction(
+                    existing_submission.id,
+                    submission_data.submitted_files[0].get("s3_key"),
+                )
 
             logger.info(
                 f"Updated submission for assignment {assignment_id} by user {user_id}"
@@ -1442,6 +1802,17 @@ async def submit_assignment(
             db.add(submission)
             db.commit()
             db.refresh(submission)
+
+            # Queue background task to extract diagrams if PDF submission
+            if (
+                submission_data.submission_method == "pdf"
+                and submission_data.submitted_files
+            ):
+                from controllers.background_tasks import queue_pdf_diagram_extraction
+
+                queue_pdf_diagram_extraction(
+                    submission.id, submission_data.submitted_files[0].get("s3_key")
+                )
 
             logger.info(
                 f"Created submission for assignment {assignment_id} by user {user_id}"
@@ -1619,6 +1990,122 @@ async def save_assignment_draft(
         )
 
 
+@router.get(
+    "/api/assignments/{assignment_id}/submissions/{submission_id}/files/{file_id}"
+)
+async def download_submission_file(
+    assignment_id: str,
+    submission_id: str,
+    file_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get presigned URL for a submitted file (assignment owner/sharer only)"""
+    try:
+        user_id = current_user["uid"]
+        logger.info(
+            f"Downloading file {file_id} from submission {submission_id} for assignment {assignment_id} by user: {user_id}"
+        )
+
+        # Verify assignment ownership or edit permission
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+            )
+
+        is_owner = assignment.user_id == user_id
+        has_edit_access = (
+            db.query(SharedLinkAccess)
+            .join(SharedLink)
+            .filter(
+                and_(
+                    SharedLink.assignment_id == assignment_id,
+                    SharedLink.share_type == "assignment",
+                    SharedLinkAccess.user_id == user_id,
+                    SharedLinkAccess.permission == "edit",
+                )
+            )
+            .first()
+            is not None
+        )
+
+        if not (is_owner or has_edit_access):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to download files",
+            )
+
+        # Get submission and verify it belongs to this assignment
+        submission = (
+            db.query(AssignmentSubmission)
+            .filter(
+                and_(
+                    AssignmentSubmission.id == submission_id,
+                    AssignmentSubmission.assignment_id == assignment_id,
+                )
+            )
+            .first()
+        )
+
+        if not submission:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+            )
+
+        # Find the file in submitted_files by file_id
+        if not submission.submitted_files:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No files found in submission",
+            )
+
+        file_info = None
+        for file_data in submission.submitted_files:
+            if file_data.get("file_id") == file_id:
+                file_info = file_data
+                break
+
+        if not file_info:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not found in submission",
+            )
+
+        # Generate presigned URL
+        s3_key = file_info.get("s3_key")
+        if not s3_key:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="File S3 key not found"
+            )
+
+        from controllers.storage import s3_presign_url
+
+        presigned_url = s3_presign_url(s3_key, expires_in=3600)  # 1 hour expiry
+
+        logger.info(
+            f"Generated presigned URL for file {file_id} in submission {submission_id}"
+        )
+        return {
+            "url": presigned_url,
+            "filename": file_info.get("filename", "submission.pdf"),
+            "content_type": file_info.get("content_type", "application/pdf"),
+            "size": file_info.get("size", 0),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error downloading file {file_id} from submission {submission_id}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate download URL",
+        )
+
+
 @router.get("/api/assignments/{assignment_id}/status")
 async def get_assignment_status(
     assignment_id: str,
@@ -1758,6 +2245,11 @@ async def get_assignment_status(
                 else:
                     status_info["status"] = "in_progress"
                 status_info["progress"] = min(progress, 99)  # Max 99% for draft
+            elif submission.status == "graded":
+                status_info["status"] = "graded"
+                status_info["progress"] = submission.percentage
+                status_info["grade"] = submission.score
+                status_info["percentage"] = submission.percentage
             else:
                 status_info["status"] = submission.status
                 status_info["progress"] = (
