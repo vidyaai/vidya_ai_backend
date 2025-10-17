@@ -60,6 +60,7 @@ jobs:
           echo "STRIPE_PRO_ANNUAL_PRICE_ID=${{ secrets.STRIPE_PRO_ANNUAL_PRICE_ID }}" >> ./.env
           echo "STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}" >> ./.env
           echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" >> ./.env
+          echo "POPPLER_PATH=/usr/bin/pdftoppm" >> ./.env
       - name: Run Static Checks
         uses: pre-commit/action@v3.0.0
       - name: SSH into ec2 and execute commands
@@ -100,6 +101,7 @@ jobs:
             STRIPE_PRO_ANNUAL_PRICE_ID=${{ secrets.STRIPE_PRO_ANNUAL_PRICE_ID }}
             STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+            POPPLER_PATH=/usr/bin/pdftoppm
             EOF
             alembic upgrade head
             sudo systemctl start vidyaai_backend_gunicorn
