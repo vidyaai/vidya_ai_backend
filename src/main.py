@@ -64,14 +64,14 @@ app.add_middleware(
     allow_origins=[
         "https://d1xrorvpgizypa.cloudfront.net",
         "https://vidyaai.co",
-        "http://localhost:5173",
+        "http://localhost:3000",
         "https://www.vidyaai.co",
         "https://upload-video.d2krgf8gkzw2h8.amplifyapp.com",
         "https://upload-video.d2krgf8gkzw2h8.amplifyapp.com/*",
         "https://7de5d1a559ab.ngrok-free.app",
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
 
