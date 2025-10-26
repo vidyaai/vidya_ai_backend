@@ -17,7 +17,7 @@ class LLMGrader:
     `diagram` (with `s3_key`), and nested `subAnswers` for multi-part questions.
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o") -> None:
+    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-5") -> None:
         if api_key:
             self.client = OpenAI(api_key=api_key)
         else:
@@ -146,6 +146,7 @@ class LLMGrader:
     ) -> Optional[str]:
         """Parse MCQ answer to index string. Handles:
         - Index strings: "0", "1", "2"
+        - Single letters: "A", "B", "C", "D" (most common format)
         - Letter prefixes: "A)", "B.", "a)", "b."
         - Roman numerals: "i)", "ii)", "I)", "II."
         - Numbered: "1.", "2.", "3)"
@@ -162,7 +163,15 @@ class LLMGrader:
             if 0 <= idx < len(options):
                 return str(idx)
 
-        # Letter prefix match (A, B, C, D, etc.)
+        # Single letter match (A, B, C, D, etc.) - Handle before letter prefix
+        # This is the most common format in student answers
+        if len(answer) == 1 and answer.isalpha():
+            letter = answer.upper()
+            letter_idx = ord(letter) - ord("A")
+            if 0 <= letter_idx < len(options):
+                return str(letter_idx)
+
+        # Letter prefix match (A), B., a), b.)
         if len(answer) >= 2 and answer[0].isalpha() and answer[1] in ".)":
             letter = answer[0].upper()
             letter_idx = ord(letter) - ord("A")
@@ -198,7 +207,7 @@ class LLMGrader:
                 return str(idx)
 
         # Numbered prefix match (1., 2., 3), etc.)
-        if answer[0].isdigit() and len(answer) > 1 and answer[1] in ".)":
+        if len(answer) > 1 and answer[0].isdigit() and answer[1] in ".)":
             idx = int(answer[0]) - 1  # Convert 1-based to 0-based
             if 0 <= idx < len(options):
                 return str(idx)
@@ -376,19 +385,23 @@ class LLMGrader:
     ) -> List[Dict[str, Any]]:
         """Recursively flatten questions to handle nested multi-part questions at any depth.
 
-        Generates composite IDs that match the flattened answer structure:
-        - Top-level questions: keep original ID
-        - Subquestions: create composite IDs like "1.1", "1.2", "2.1", etc. (sequential numbering)
+        Generates composite IDs that match the PDF extraction format:
+        - Top-level questions: keep original ID (e.g., "1", "17", "33")
+        - Subquestions: create composite IDs like "17.1", "17.2", "33.1.1" using sequential numbering
+        This matches the format from _normalize_question_number() in pdf_answer_processor.py
         """
         flattened: List[Dict[str, Any]] = []
+        subquestion_counter = 0  # Counter for subquestions at current level
+
         for q in questions:
             original_id = str(q.get("id"))
 
             if q.get("type") == "multi-part" and q.get("subquestions"):
-                # For multi-part questions, flatten subquestions with sequential numbering
+                # For multi-part questions, flatten subquestions
                 if parent_id:
-                    # Nested multi-part: use parent_id as prefix
-                    sub_parent_id = f"{parent_id}.{original_id}"
+                    # Nested multi-part: increment counter and use as part of parent ID
+                    subquestion_counter += 1
+                    sub_parent_id = f"{parent_id}.{subquestion_counter}"
                 else:
                     # Top-level multi-part: use original ID as prefix
                     sub_parent_id = original_id
@@ -401,19 +414,14 @@ class LLMGrader:
             else:
                 # Regular question - create composite ID if we have a parent
                 if parent_id:
-                    # Use sequential numbering within the parent (1, 2, 3, etc.)
-                    # Count existing questions with this parent to get next sequence number
-                    existing_count = sum(
-                        1
-                        for fq in flattened
-                        if fq.get("id", "").startswith(f"{parent_id}.")
-                    )
-                    next_seq = existing_count + 1
-
-                    composite_id = f"{parent_id}.{next_seq}"
+                    # Use SEQUENTIAL numbering (1, 2, 3...) to match PDF extraction format
+                    # This matches how 17(a) -> 17.1, 17(b) -> 17.2 in pdf_answer_processor
+                    subquestion_counter += 1
+                    composite_id = f"{parent_id}.{subquestion_counter}"
                     # Create a copy of the question with the composite ID
                     q_copy = q.copy()
                     q_copy["id"] = composite_id
+                    q_copy["original_id"] = original_id  # Keep original for reference
                     flattened.append(q_copy)
                 else:
                     # Top-level question - keep original ID
@@ -427,6 +435,7 @@ class LLMGrader:
         - String answers: keep as-is
         - Object answers with text/diagram: keep object structure
         - Answers with subAnswers: recursively flatten at any depth
+        - Direct answers to multi-part questions: stored at parent level for fallback
         """
         flattened: Dict[str, Any] = {}
 
@@ -440,11 +449,20 @@ class LLMGrader:
                     sub_answers = answer.get("subAnswers", {})
                     sub_flattened = self._flatten_answers(sub_answers)
                     for sub_id, sub_answer in sub_flattened.items():
-                        # Create composite question ID (e.g., "1.1", "1.2")
+                        # Create composite question ID (e.g., "17.171", "29.294.1761205736950")
                         composite_id = f"{question_id}.{sub_id}"
                         flattened[composite_id] = sub_answer
+
+                    # Also store the parent-level answer if it has text/diagram
+                    # This handles cases where student provides answer at parent level
+                    if answer.get("text") or answer.get("diagram"):
+                        flattened[question_id] = {
+                            k: v for k, v in answer.items() if k != "subAnswers"
+                        }
                 else:
-                    # Object answer with text/diagram - keep structure
+                    # Object answer with text/diagram but no subAnswers
+                    # This might be a direct answer to a multi-part question
+                    # Store it at the parent level - the grading logic will handle it
                     flattened[question_id] = answer
             else:
                 # Fallback - convert to string

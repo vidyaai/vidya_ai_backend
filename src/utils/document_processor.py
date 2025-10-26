@@ -1,16 +1,22 @@
 import base64
 import json
 import re
+import uuid
+import tempfile
+import os
 from textwrap import dedent
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
 from openai import OpenAI
-from controllers.config import logger
+from controllers.config import logger, s3_client, AWS_S3_BUCKET
+from controllers.storage import s3_upload_file
 import PyPDF2
 import docx
 from io import BytesIO
+from PIL import Image
 import csv
 import html2text
 import markdown
+from pdf2image import convert_from_bytes
 from .prompts import (
     DOCUMENT_PARSER_SYSTEM_PROMPT,
     FALLBACK_PARSER_SYSTEM_PROMPT,
@@ -24,6 +30,8 @@ class DocumentProcessor:
     """Service for processing various document types and extracting text content"""
 
     def __init__(self):
+        self.client = OpenAI()
+        self.model = "gpt-4o"  # Vision-capable model for PDF extraction
         self.supported_types = {
             "application/pdf": self._extract_pdf_text,
             "text/plain": self._extract_text,
@@ -85,19 +93,70 @@ class DocumentProcessor:
         return extension_map.get(extension, "text/plain")
 
     def _extract_pdf_text(self, content: bytes) -> str:
-        """Extract text from PDF files"""
+        """Extract text from PDF files using Poppler and GPT-4o vision"""
         try:
-            pdf_file = BytesIO(content)
-            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            # Convert PDF pages to images using Poppler
+            images = convert_from_bytes(content, dpi=200)
+            logger.info(f"Converted PDF to {len(images)} images")
 
-            text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
+            # Convert all images to base64
+            image_contents = []
+            for page_num, image in enumerate(images, 1):
+                buffered = BytesIO()
+                image.save(buffered, format="PNG")
+                img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                image_contents.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{img_base64}"},
+                    }
+                )
 
-            return text.strip()
+            # Build message content with text instruction followed by all images
+            user_content = [
+                {
+                    "type": "text",
+                    "text": f"Extract ALL text from this {len(images)}-page PDF document. For each page, start with '--- Page N ---' followed by all the text from that page. Maintain the original formatting, structure, and layout. Extract text in page order.",
+                }
+            ]
+            user_content.extend(image_contents)
+
+            # Single API call to extract text from all pages
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a precise OCR system. Extract ALL text from images exactly as it appears, maintaining formatting, structure, and layout. Include all text visible in the images.",
+                    },
+                    {"role": "user", "content": user_content},
+                ],
+                max_tokens=16000,
+            )
+
+            extracted_text = response.choices[0].message.content
+            if extracted_text:
+                logger.info(
+                    f"Successfully extracted text from all {len(images)} pages in one API call"
+                )
+                return extracted_text.strip()
+            else:
+                raise ValueError("Empty response from GPT-4o")
+
         except Exception as e:
-            logger.error(f"Error extracting PDF text: {str(e)}")
-            raise ValueError("Failed to extract text from PDF file")
+            logger.error(f"Error extracting PDF text with Poppler/GPT-4o: {str(e)}")
+            # Fallback to PyPDF2 if vision extraction fails
+            logger.info("Attempting fallback to PyPDF2 text extraction...")
+            try:
+                pdf_file = BytesIO(content)
+                pdf_reader = PyPDF2.PdfReader(pdf_file)
+                text = ""
+                for page in pdf_reader.pages:
+                    text += page.extract_text() + "\n"
+                return text.strip()
+            except Exception as fallback_error:
+                logger.error(f"Fallback extraction also failed: {str(fallback_error)}")
+                raise ValueError("Failed to extract text from PDF file")
 
     def _extract_text(self, content: bytes) -> str:
         """Extract text from plain text files"""
@@ -227,6 +286,356 @@ class AssignmentDocumentParser:
     def __init__(self):
         self.client = OpenAI()
         self.model = "gpt-5"
+
+    def parse_pdf_images_to_assignment(
+        self,
+        pdf_content: bytes,
+        file_name: str,
+        generation_options: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Parse PDF pages directly as images to extract assignment questions with diagram support.
+        This method sends all PDF page images to the LLM in a single call for better diagram detection.
+
+        Args:
+            pdf_content: Raw PDF file content (bytes)
+            file_name: Original file name for context
+            generation_options: Additional options for parsing (mostly ignored for extraction)
+
+        Returns:
+            Dictionary containing assignment data with extracted questions and diagram metadata
+        """
+        try:
+            # Convert PDF pages to images using Poppler
+            images = convert_from_bytes(pdf_content, dpi=200)
+            logger.info(
+                f"Converted PDF to {len(images)} images for question extraction"
+            )
+
+            # Convert all images to base64
+            image_contents = []
+            for page_num, image in enumerate(images, 1):
+                buffered = BytesIO()
+                image.save(buffered, format="PNG")
+                img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                image_contents.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{img_base64}"},
+                    }
+                )
+
+            # Build prompt for question extraction from images
+            prompt_text = f"""
+                Analyze the following {len(images)}-page PDF document and extract ALL existing assignment questions, exercises, problems, or assessment items.
+
+                Document: {file_name}
+
+                CRITICAL INSTRUCTIONS:
+                1. EXTRACT only existing questions - do NOT create new ones
+                2. Preserve exact question text as written in the document
+                3. Map question types appropriately:
+                - multiple-choice: Questions with options (A, B, C, D or 1, 2, 3, 4)
+                - fill-blank: Questions with blanks (e.g., "The capital of France is ___")
+                - short-answer: Brief responses (1-2 sentences)
+                - numerical: Questions requiring numeric answers
+                - long-answer: Extended written responses (paragraphs)
+                - true-false: Binary true/false questions
+                - code-writing: Questions requiring code solutions
+                - diagram-analysis: Questions involving diagram interpretation
+                - multi-part: Questions with sub-parts (a, b, c) or (i, ii, iii)
+
+                4. For questions with DIAGRAMS/IMAGES:
+                - Set hasDiagram: true
+                - Provide diagram metadata in the "diagram" field with:
+                  * page_number: Page where diagram appears (1-indexed)
+                  * bounding_box: Tight coordinates around the diagram (x, y, width, height in pixels)
+                    - x, y: Top-left corner of the diagram (origin at top-left of page)
+                    - width, height: Dimensions of the diagram
+                  * caption: Descriptive label or caption for the diagram
+                  * s3_key: null (will be filled after extraction)
+                  * s3_url: null
+                - Include reference to the diagram in the question text
+
+                5. Extract all information:
+                - Question text (without question numbers or marks)
+                - Multiple choice options (without option letters/numbers)
+                - Correct answers or solutions (if present, generate if not)
+                - For multiple choice: correctAnswer should be index string ("0", "1", "2", "3")
+                - For multi-part: provide empty string for correctAnswer (answers in subquestions)
+                - Point values
+                - Grading rubrics (generate if not present)
+                - Assignment title and description
+
+                6. Multi-part questions:
+                - Use type "multi-part"
+                - Structure subquestions properly
+                - rubricType: "per-subquestion"
+                - Main question rubric not required, but required for all non-multi-part subquestions
+
+                7. Regular questions:
+                - rubricType: "overall"
+                - rubric is required
+
+                8. Code content:
+                - Set hasCode: true
+                - Specify codeLanguage
+                - Extract code in the code field
+
+                Return the structured data according to the JSON schema.
+            """
+
+            # Get the JSON schema for the response
+            response_schema = get_assignment_parsing_schema(
+                "pdf_image_parsing_response"
+            )
+
+            # Build multimodal message content
+            user_content = [{"type": "text", "text": dedent(prompt_text).strip()}]
+            user_content.extend(image_contents)
+
+            # Call OpenAI with all images in one request
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": dedent(DOCUMENT_PARSER_SYSTEM_PROMPT),
+                    },
+                    {"role": "user", "content": user_content},
+                ],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": response_schema["name"],
+                        "schema": response_schema,
+                    },
+                },
+            )
+
+            # Parse the response
+            response_text = response.choices[0].message.content
+            if not response_text:
+                raise ValueError("Empty response from AI")
+
+            try:
+                parsed_data = json.loads(response_text)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error: {e}")
+                logger.error(f"Raw response length: {len(response_text)}")
+                raise ValueError("Failed to parse AI response as JSON")
+
+            # Validate and normalize the response
+            result = self._normalize_assignment_data(parsed_data, file_name)
+            logger.info(
+                f"Successfully extracted {len(result.get('questions', []))} questions from PDF images"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error parsing PDF images: {str(e)}")
+            raise
+
+    def parse_non_pdf_document_to_assignment(
+        self,
+        document_content: bytes,
+        file_name: str,
+        file_type: str,
+        user_id: str,
+        generation_options: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Parse non-PDF documents (DOCX, MD, HTML, CSV, JSON, TXT) to extract assignment questions.
+
+        Args:
+            document_content: Raw document content (bytes)
+            file_name: Original file name
+            file_type: MIME type
+            user_id: User ID for S3 storage paths
+            generation_options: Additional parsing options
+
+        Returns:
+            Dictionary containing assignment data with extracted questions
+        """
+        try:
+            # Extract text content based on file type
+            processor = DocumentProcessor()
+
+            # Special handling for DOCX: extract images first
+            extracted_images = []
+            if (
+                file_type
+                == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ):
+                extracted_images = self._extract_docx_images(document_content, user_id)
+
+            # Extract text content from document
+            # Use base64 encoding as expected by DocumentProcessor
+            file_content_b64 = base64.b64encode(document_content).decode("utf-8")
+            document_text = processor.extract_text_from_file(
+                file_content_b64, file_name, file_type
+            )
+
+            # For text-based formats with S3 URLs, detect them
+            s3_urls = []
+            if file_type in [
+                "text/markdown",
+                "text/html",
+                "text/csv",
+                "application/json",
+            ]:
+                s3_urls = self._detect_s3_urls(document_text)
+
+            # Build prompt based on document type
+            if file_type == "text/plain":
+                # TXT: No diagram support
+                prompt = f"""
+                    Analyze the following text document and extract ALL existing assignment questions.
+
+                    Document: {file_name}
+
+                    Content:
+                    ---
+                    {document_text}
+                    ---
+
+                    INSTRUCTIONS:
+                    - EXTRACT only existing questions - do NOT create new ones
+                    - Map question types appropriately (multiple-choice, short-answer, long-answer, etc.)
+                    - Extract all information: question text, correct answers, points, rubrics
+                    - For multiple choice: correctAnswer should be index string ("0", "1", "2", "3")
+                    - Generate rubrics if not present
+                    - NO DIAGRAM SUPPORT for TXT files (hasDiagram must be false)
+
+                    Return the structured data according to the JSON schema.
+                """
+            elif file_type in [
+                "text/markdown",
+                "text/html",
+                "text/csv",
+                "application/json",
+            ]:
+                # MD/HTML/CSV/JSON: Support S3 URLs for diagrams
+                s3_urls_info = (
+                    "\n".join([f"- {url}" for url in s3_urls])
+                    if s3_urls
+                    else "None detected"
+                )
+                prompt = f"""
+                    Analyze the following document and extract ALL existing assignment questions.
+
+                    Document: {file_name}
+                    Type: {file_type}
+
+                    Detected S3 URLs in content:
+                    {s3_urls_info}
+
+                    Content:
+                    ---
+                    {document_text}
+                    ---
+
+                    INSTRUCTIONS:
+                    - EXTRACT only existing questions - do NOT create new ones
+                    - Map question types appropriately
+                    - Extract all information: question text, correct answers, points, rubrics
+                    - For diagrams: If a question references an S3 URL (image), set:
+                      * hasDiagram: true
+                      * diagram.s3_url: the full S3 URL
+                      * diagram.s3_key: null
+                      * diagram.caption: description of the image
+                      * NO bounding_box or page_number for URL-based diagrams
+                    - For multiple choice: correctAnswer should be index string ("0", "1", "2", "3")
+                    - Generate rubrics if not present
+
+                    Return the structured data according to the JSON schema.
+                """
+            else:
+                # DOCX: Support embedded images
+                images_info = (
+                    "\n".join(
+                        [
+                            f"- Image {img['image_id']}: {img['s3_key']}"
+                            for img in extracted_images
+                        ]
+                    )
+                    if extracted_images
+                    else "None"
+                )
+                prompt = f"""
+                    Analyze the following DOCX document and extract ALL existing assignment questions.
+
+                    Document: {file_name}
+
+                    Extracted images (already uploaded to S3):
+                    {images_info}
+
+                    Content:
+                    ---
+                    {document_text}
+                    ---
+
+                    INSTRUCTIONS:
+                    - EXTRACT only existing questions - do NOT create new ones
+                    - Map question types appropriately
+                    - Extract all information: question text, correct answers, points, rubrics
+                    - For diagrams/images in the document:
+                      * hasDiagram: true
+                      * diagram.s3_key: use the s3_key from extracted images list above
+                      * diagram.s3_url: null
+                      * diagram.caption: description of the image
+                      * NO bounding_box or page_number for DOCX images
+                    - For multiple choice: correctAnswer should be index string ("0", "1", "2", "3")
+                    - Generate rubrics if not present
+
+                    Return the structured data according to the JSON schema.
+                """
+
+            # Get the JSON schema for the response
+            response_schema = get_assignment_parsing_schema("non_pdf_parsing_response")
+
+            # Call OpenAI for parsing
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": dedent(DOCUMENT_PARSER_SYSTEM_PROMPT),
+                    },
+                    {"role": "user", "content": dedent(prompt).strip()},
+                ],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": response_schema["name"],
+                        "schema": response_schema,
+                    },
+                },
+            )
+
+            # Parse the response
+            response_text = response.choices[0].message.content
+            if not response_text:
+                raise ValueError("Empty response from AI")
+
+            try:
+                parsed_data = json.loads(response_text)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error: {e}")
+                raise ValueError("Failed to parse AI response as JSON")
+
+            # Validate and normalize the response
+            result = self._normalize_assignment_data(parsed_data, file_name)
+            logger.info(
+                f"Successfully extracted {len(result.get('questions', []))} questions from {file_type}"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error parsing non-PDF document: {str(e)}")
+            raise
 
     def parse_document_to_assignment(
         self,
@@ -547,3 +956,255 @@ class AssignmentDocumentParser:
                 return float(match.group(1))
 
         return 0.0
+
+    def _extract_docx_images(
+        self, docx_content: bytes, user_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Extract embedded images from DOCX file and upload to S3.
+
+        Returns list of image metadata with s3_key and temporary reference ID.
+        """
+        extracted_images = []
+
+        try:
+            doc_file = BytesIO(docx_content)
+            doc = docx.Document(doc_file)
+
+            # Extract images from document relationships
+            for rel_id, rel in doc.part.rels.items():
+                if "image" in rel.target_ref:
+                    try:
+                        image_data = rel.target_part.blob
+
+                        # Determine image format
+                        image_format = "png"
+                        if rel.target_ref.endswith(".jpg") or rel.target_ref.endswith(
+                            ".jpeg"
+                        ):
+                            image_format = "jpeg"
+                        elif rel.target_ref.endswith(".gif"):
+                            image_format = "gif"
+
+                        # Generate unique ID for this image
+                        image_id = str(uuid.uuid4())
+
+                        # Create temporary file
+                        with tempfile.NamedTemporaryFile(
+                            delete=False, suffix=f".{image_format}"
+                        ) as tmp:
+                            tmp.write(image_data)
+                            tmp_path = tmp.name
+
+                        # Upload to S3
+                        s3_key = f"users/{user_id}/temp_docx_images/{image_id}.{image_format}"
+                        content_type = f"image/{image_format}"
+
+                        if s3_client and AWS_S3_BUCKET:
+                            s3_upload_file(tmp_path, s3_key, content_type=content_type)
+
+                            extracted_images.append(
+                                {
+                                    "image_id": image_id,
+                                    "s3_key": s3_key,
+                                    "format": image_format,
+                                    "rel_id": rel_id,
+                                }
+                            )
+
+                            logger.info(
+                                f"Extracted DOCX image {image_id} to S3: {s3_key}"
+                            )
+
+                        # Clean up temp file
+                        os.unlink(tmp_path)
+
+                    except Exception as e:
+                        logger.error(f"Error extracting DOCX image {rel_id}: {str(e)}")
+                        continue
+
+            logger.info(f"Extracted {len(extracted_images)} images from DOCX")
+            return extracted_images
+
+        except Exception as e:
+            logger.error(f"Error processing DOCX images: {str(e)}")
+            return []
+
+    def _detect_s3_urls(self, content: str) -> List[str]:
+        """
+        Detect S3 URLs in text content (for MD, HTML, CSV, JSON formats).
+
+        Returns list of S3 URLs found in the content.
+        """
+        # Pattern to match S3 URLs (both s3:// and https://s3.amazonaws.com or https://bucket.s3.amazonaws.com)
+        s3_url_patterns = [
+            r"s3://[a-zA-Z0-9.\-_/]+",
+            r"https://s3[.-][a-zA-Z0-9.\-_]+\.amazonaws\.com/[a-zA-Z0-9.\-_/]+",
+            r"https://[a-zA-Z0-9.\-_]+\.s3[.-][a-zA-Z0-9.\-_]*\.amazonaws\.com/[a-zA-Z0-9.\-_/]+",
+        ]
+
+        found_urls = []
+        for pattern in s3_url_patterns:
+            matches = re.findall(pattern, content)
+            found_urls.extend(matches)
+
+        # Remove duplicates while preserving order
+        unique_urls = list(dict.fromkeys(found_urls))
+
+        logger.info(f"Detected {len(unique_urls)} S3 URLs in content")
+        return unique_urls
+
+    def extract_and_upload_diagrams(
+        self,
+        parsed_data: Dict[str, Any],
+        file_content: bytes,
+        file_type: str,
+        user_id: str,
+        assignment_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Extract diagrams from source document and upload to S3.
+        Updates question JSON with s3_key for each diagram.
+
+        Args:
+            parsed_data: Parsed assignment data with diagram metadata
+            file_content: Raw file content (bytes)
+            file_type: MIME type of the file
+            user_id: User ID for S3 path organization
+            assignment_id: Optional assignment ID (if None, uses user_id path)
+
+        Returns:
+            Updated parsed_data with s3_keys populated
+        """
+        try:
+            # Use assignment_id if provided, otherwise use user_id for temporary storage
+            base_s3_path = (
+                f"assignments/{assignment_id}/question_diagrams"
+                if assignment_id
+                else f"users/{user_id}/temp_diagrams"
+            )
+
+            questions = parsed_data.get("questions", [])
+
+            # For PDF: extract diagrams using bounding boxes
+            if file_type == "application/pdf":
+                updated_questions = self._extract_pdf_diagrams(
+                    questions, file_content, base_s3_path
+                )
+                parsed_data["questions"] = updated_questions
+
+            # For DOCX: diagrams already extracted, just update references
+            elif (
+                file_type
+                == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ):
+                # DOCX images are already uploaded during parsing
+                # Just ensure the s3_keys are properly set
+                pass
+
+            # For MD/HTML/CSV/JSON: S3 URLs already detected, no extraction needed
+            elif file_type in [
+                "text/markdown",
+                "text/html",
+                "text/csv",
+                "application/json",
+            ]:
+                # s3_url already populated by LLM, no extraction needed
+                pass
+
+            logger.info(f"Diagram extraction completed for {file_type}")
+            return parsed_data
+
+        except Exception as e:
+            logger.error(f"Error in extract_and_upload_diagrams: {str(e)}")
+            # Return original data if extraction fails
+            return parsed_data
+
+    def _extract_pdf_diagrams(
+        self, questions: List[Dict[str, Any]], pdf_content: bytes, base_s3_path: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Extract diagrams from PDF using bounding boxes and upload to S3.
+        """
+        try:
+            # Convert PDF pages to images
+            images = convert_from_bytes(pdf_content, dpi=200)
+            logger.info(f"Converted PDF to {len(images)} images for diagram extraction")
+
+            def process_question_diagrams(question: Dict[str, Any]) -> Dict[str, Any]:
+                """Recursively process diagrams in questions and subquestions"""
+                # Process main question diagram
+                if question.get("hasDiagram") and question.get("diagram"):
+                    diagram = question["diagram"]
+                    bounding_box = diagram.get("bounding_box")
+                    page_number = diagram.get("page_number", 1)
+
+                    if bounding_box and not diagram.get("s3_key"):
+                        # Extract diagram from PDF
+                        if 1 <= page_number <= len(images):
+                            try:
+                                page_img = images[
+                                    page_number - 1
+                                ]  # Convert 1-indexed to 0-indexed
+
+                                # Crop using bounding box
+                                x = bounding_box.get("x", 0)
+                                y = bounding_box.get("y", 0)
+                                width = bounding_box.get("width", 100)
+                                height = bounding_box.get("height", 100)
+
+                                cropped = page_img.crop((x, y, x + width, y + height))
+
+                                # Save to temporary file
+                                diagram_id = str(uuid.uuid4())
+                                with tempfile.NamedTemporaryFile(
+                                    delete=False, suffix=".jpg"
+                                ) as tmp:
+                                    cropped.save(tmp, "JPEG", quality=95)
+                                    tmp_path = tmp.name
+
+                                # Upload to S3
+                                question_id = question.get("id", "unknown")
+                                s3_key = (
+                                    f"{base_s3_path}/q{question_id}_{diagram_id}.jpg"
+                                )
+
+                                if s3_client and AWS_S3_BUCKET:
+                                    s3_upload_file(
+                                        tmp_path, s3_key, content_type="image/jpeg"
+                                    )
+                                    diagram["s3_key"] = s3_key
+                                    diagram["s3_url"] = None
+                                    logger.info(
+                                        f"Uploaded diagram for Q{question_id} to {s3_key}"
+                                    )
+
+                                # Clean up temp file
+                                os.unlink(tmp_path)
+
+                            except Exception as e:
+                                logger.error(
+                                    f"Error extracting diagram for Q{question.get('id')}: {str(e)}"
+                                )
+
+                # Process subquestions recursively
+                if question.get("subquestions"):
+                    updated_subquestions = []
+                    for subq in question["subquestions"]:
+                        updated_subq = process_question_diagrams(subq)
+                        updated_subquestions.append(updated_subq)
+                    question["subquestions"] = updated_subquestions
+
+                return question
+
+            # Process all questions
+            updated_questions = []
+            for question in questions:
+                updated_q = process_question_diagrams(question)
+                updated_questions.append(updated_q)
+
+            return updated_questions
+
+        except Exception as e:
+            logger.error(f"Error extracting PDF diagrams: {str(e)}")
+            return questions

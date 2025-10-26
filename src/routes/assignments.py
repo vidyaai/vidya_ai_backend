@@ -1,3 +1,4 @@
+import base64
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -1436,43 +1437,108 @@ async def import_document_to_assignment(
     request: Request,
     current_user: dict = Depends(get_current_user),
 ):
-    """Import assignment questions from a document using AI parsing"""
+    """Import assignment questions from documents (PDF, DOCX, MD, HTML, CSV, JSON, TXT) using AI parsing with diagram support"""
     try:
         user_id = current_user["uid"]
-        logger.info(f"Importing document {import_data.file_name} for user: {user_id}")
+        logger.info(
+            f"Importing document {import_data.file_name} ({import_data.file_type}) for user: {user_id}"
+        )
+
+        # Validate supported file types
+        supported_types = [
+            "application/pdf",
+            "text/plain",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/markdown",
+            "text/html",
+            "text/csv",
+            "application/json",
+        ]
+
+        # Also check file extension
+        file_extension = (
+            import_data.file_name.lower().split(".")[-1]
+            if "." in import_data.file_name
+            else ""
+        )
+
+        if import_data.file_type not in supported_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported file type: {import_data.file_type}. Supported types: PDF, DOCX, TXT, MD, HTML, CSV, JSON",
+            )
 
         # Import document processing services
-        from utils.document_processor import DocumentProcessor, AssignmentDocumentParser
+        from utils.document_processor import AssignmentDocumentParser
 
-        # Initialize processors
-        doc_processor = DocumentProcessor()
+        # Initialize parser
         assignment_parser = AssignmentDocumentParser()
 
-        # Extract text from the document
+        # Decode document content
         try:
-            extracted_text = doc_processor.extract_text_from_file(
-                import_data.file_content, import_data.file_name, import_data.file_type
+            document_content = base64.b64decode(import_data.file_content)
+        except Exception as e:
+            logger.error(f"Error decoding document content: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file content. Please ensure the file is properly encoded.",
             )
 
-            if not extracted_text or len(extracted_text.strip()) < 50:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Document appears to be empty or contains insufficient content for assignment extraction",
+        # Parse document based on type
+        try:
+            if import_data.file_type == "application/pdf" or file_extension == "pdf":
+                # PDF: Use image-based parsing with diagram bounding boxes
+                parsed_assignment = assignment_parser.parse_pdf_images_to_assignment(
+                    document_content,
+                    import_data.file_name,
+                    import_data.generation_options,
                 )
 
-        except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+                # Extract diagrams from PDF and upload to S3
+                parsed_assignment = assignment_parser.extract_and_upload_diagrams(
+                    parsed_assignment,
+                    document_content,
+                    "application/pdf",
+                    user_id,
+                    assignment_id=None,  # Temporary storage under user_id
+                )
 
-        # Parse the document to extract assignment questions
-        try:
-            parsed_assignment = assignment_parser.parse_document_to_assignment(
-                extracted_text, import_data.file_name, import_data.generation_options
-            )
+                text_preview = "PDF content processed via image analysis"
+            elif (
+                import_data.file_type
+                == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ):
+                # For DOCX: extract and upload diagrams
+                # DOCX images already extracted during parsing, but run extraction pipeline for consistency
+                parsed_assignment = assignment_parser.extract_and_upload_diagrams(
+                    parsed_assignment,
+                    document_content,
+                    import_data.file_type,
+                    user_id,
+                    assignment_id=None,
+                )
+
+                text_preview = f"{import_data.file_type} content processed"
+            else:
+                # Non-PDF: Use text-based parsing
+                parsed_assignment = (
+                    assignment_parser.parse_non_pdf_document_to_assignment(
+                        document_content,
+                        import_data.file_name,
+                        import_data.file_type,
+                        user_id,
+                        import_data.generation_options,
+                    )
+                )
+
+                text_preview = f"{import_data.file_type} content processed"
+
         except Exception as e:
             logger.error(f"Error parsing document with AI: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to extract assignment questions from document. Please ensure the document contains assignment questions, exercises, or problems.",
+                detail=f"Failed to extract assignment questions from document. Please ensure the document contains assignment questions, exercises, or problems. Error: {str(e)}",
             )
 
         # Prepare the response
@@ -1482,13 +1548,11 @@ async def import_document_to_assignment(
             ),
             description=parsed_assignment.get("description"),
             questions=parsed_assignment.get("questions", []),
-            extracted_text=extracted_text[:1000] + "..."
-            if len(extracted_text) > 1000
-            else extracted_text,  # Truncate for response
+            extracted_text=text_preview,  # Preview of extracted text
             file_info={
                 "original_filename": import_data.file_name,
                 "file_type": import_data.file_type,
-                "content_length": len(extracted_text),
+                "content_length": len(text_preview),
                 "questions_generated": len(parsed_assignment.get("questions", [])),
                 "total_points": parsed_assignment.get("total_points", 0),
             },

@@ -58,6 +58,25 @@ def get_assignment_parsing_schema(
                 "enum": ["per-subquestion", "overall"],
             },
             "code": {"type": "string"},
+            "diagram": {
+                "type": "object",
+                "properties": {
+                    "page_number": {"type": "integer"},
+                    "bounding_box": {
+                        "type": "object",
+                        "properties": {
+                            "x": {"type": "integer"},
+                            "y": {"type": "integer"},
+                            "width": {"type": "integer"},
+                            "height": {"type": "integer"},
+                        },
+                        "required": ["x", "y", "width", "height"],
+                    },
+                    "caption": {"type": "string"},
+                    "s3_key": {"type": ["string", "null"]},
+                    "s3_url": {"type": ["string", "null"]},
+                },
+            },
             "subquestions": {
                 "type": "array",
                 "items": {
@@ -100,6 +119,25 @@ def get_assignment_parsing_schema(
                             "enum": ["per-subquestion", "overall"],
                         },
                         "code": {"type": "string"},
+                        "diagram": {
+                            "type": "object",
+                            "properties": {
+                                "page_number": {"type": "integer"},
+                                "bounding_box": {
+                                    "type": "object",
+                                    "properties": {
+                                        "x": {"type": "integer"},
+                                        "y": {"type": "integer"},
+                                        "width": {"type": "integer"},
+                                        "height": {"type": "integer"},
+                                    },
+                                    "required": ["x", "y", "width", "height"],
+                                },
+                                "caption": {"type": "string"},
+                                "s3_key": {"type": ["string", "null"]},
+                                "s3_url": {"type": ["string", "null"]},
+                            },
+                        },
                         "subquestions": {
                             "type": "array",
                             "items": {
@@ -141,6 +179,30 @@ def get_assignment_parsing_schema(
                                         "enum": ["overall"],
                                     },
                                     "code": {"type": "string"},
+                                    "diagram": {
+                                        "type": "object",
+                                        "properties": {
+                                            "page_number": {"type": "integer"},
+                                            "bounding_box": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "x": {"type": "integer"},
+                                                    "y": {"type": "integer"},
+                                                    "width": {"type": "integer"},
+                                                    "height": {"type": "integer"},
+                                                },
+                                                "required": [
+                                                    "x",
+                                                    "y",
+                                                    "width",
+                                                    "height",
+                                                ],
+                                            },
+                                            "caption": {"type": "string"},
+                                            "s3_key": {"type": ["string", "null"]},
+                                            "s3_url": {"type": ["string", "null"]},
+                                        },
+                                    },
                                 },
                                 "required": [
                                     "id",

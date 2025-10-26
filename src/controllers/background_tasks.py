@@ -483,3 +483,83 @@ def queue_pdf_diagram_extraction(submission_id: str, pdf_s3_key: str):
         daemon=True,
     )
     thread.start()
+
+
+# not used
+def extract_question_diagrams_background(
+    assignment_id: str, file_content_s3_key: str, file_type: str, user_id: str
+):
+    """Extract diagrams from question paper (PDF or DOCX) and update assignment in database."""
+    logger.info(f"Starting question diagram extraction for assignment {assignment_id}")
+    db = SessionLocal()
+    try:
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        if not assignment:
+            logger.warning(f"Assignment {assignment_id} not found")
+            return
+
+        # Download file from S3
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(
+            delete=False, suffix=".pdf" if file_type == "application/pdf" else ".docx"
+        ) as tmp:
+            s3_client.download_fileobj(AWS_S3_BUCKET, file_content_s3_key, tmp)
+            tmp_file_path = tmp.name
+
+        # Read file content
+        with open(tmp_file_path, "rb") as f:
+            file_content = f.read()
+
+        # Process diagrams
+        from utils.document_processor import AssignmentDocumentParser
+
+        parser = AssignmentDocumentParser()
+
+        # Create assignment data structure from existing questions
+        assignment_data = {
+            "title": assignment.title,
+            "description": assignment.description,
+            "questions": assignment.questions or [],
+            "total_points": assignment.total_points,
+        }
+
+        # Extract and upload diagrams
+        updated_data = parser.extract_and_upload_diagrams(
+            assignment_data,
+            file_content,
+            file_type,
+            user_id,
+            assignment_id=assignment_id,
+        )
+
+        # Update assignment with new diagram s3_keys
+        assignment.questions = updated_data.get("questions", [])
+        assignment.updated_at = datetime.now(timezone.utc)
+        db.commit()
+
+        # Clean up temp file
+        os.unlink(tmp_file_path)
+
+        logger.info(f"Successfully extracted diagrams for assignment {assignment_id}")
+
+    except Exception as e:
+        logger.error(
+            f"Error in question diagram extraction for assignment {assignment_id}: {str(e)}"
+        )
+    finally:
+        db.close()
+
+
+# not used
+def queue_question_diagram_extraction(
+    assignment_id: str, file_content_s3_key: str, file_type: str, user_id: str
+):
+    """Queue question diagram extraction as a background task."""
+    logger.info(f"Queueing question diagram extraction for assignment {assignment_id}")
+    thread = threading.Thread(
+        target=extract_question_diagrams_background,
+        args=(assignment_id, file_content_s3_key, file_type, user_id),
+        daemon=True,
+    )
+    thread.start()
