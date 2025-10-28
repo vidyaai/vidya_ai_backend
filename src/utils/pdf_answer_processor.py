@@ -87,7 +87,7 @@ class PDFAnswerProcessor:
               "answer": "Applying coating of zinc",
               "diagram": {{
                 "label": "Circuit diagram",
-                "bounding_box": {{"x": 120, "y": 240, "width": 460, "height": 320, "page_number": 1}}
+                "bounding_box": {{"ymin": 240, "xmin": 120, "ymax": 560, "xmax": 580, "page_number": 1}}
               }}
             }},
             {{
@@ -125,6 +125,9 @@ class PDFAnswerProcessor:
           - diagram: null if no diagram; otherwise include label and a tight bounding_box around the drawn diagram for that question only.
         - Bounding boxes must be integers in image pixel coordinates of the provided JPEGs (top-left origin).
         - CRITICAL: Each bounding_box must include a "page_number" field indicating which page (1, 2, 3, etc.) the diagram appears on.
+        - Bounding box format: [ymin, xmin, ymax, xmax] where:
+          * ymin, xmin: Top-left corner of the diagram
+          * ymax, xmax: Bottom-right corner of the diagram
         - If a diagram is present but unlabeled, just put "unlabeled" in the label field.
         - Preserve question order and ignore non-answer metadata.
         - Return only valid JSON that conforms to the schema.
@@ -149,24 +152,18 @@ class PDFAnswerProcessor:
                                         "properties": {
                                             "label": {"type": "string"},
                                             "bounding_box": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "x": {"type": "integer"},
-                                                    "y": {"type": "integer"},
-                                                    "width": {"type": "integer"},
-                                                    "height": {"type": "integer"},
-                                                    "page_number": {"type": "integer"},
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer",
                                                 },
-                                                "required": [
-                                                    "x",
-                                                    "y",
-                                                    "width",
-                                                    "height",
-                                                    "page_number",
-                                                ],
                                             },
+                                            "page_number": {"type": "integer"},
                                         },
-                                        "required": ["label", "bounding_box"],
+                                        "required": [
+                                            "label",
+                                            "bounding_box",
+                                            "page_number",
+                                        ],
                                     },
                                 ]
                             },
@@ -246,15 +243,17 @@ class PDFAnswerProcessor:
         return answers_dict
 
     def extract_diagram_from_pdf(
-        self, pdf_path: str, bounding_box: Dict[str, int], output_path: str
+        self, pdf_path: str, bounding_box: List[int], output_path: str
     ) -> bool:
         """Extract a single diagram from PDF using bounding box coordinates."""
         try:
             page_num = bounding_box.get("page_number", 1)
-            x = bounding_box.get("x", 0)
-            y = bounding_box.get("y", 0)
-            width = bounding_box.get("width", 100)
-            height = bounding_box.get("height", 100)
+
+            # Handle both old format [x, y, width, height] and new format [ymin, xmin, ymax, xmax]
+            if isinstance(bounding_box, list) and len(bounding_box) == 4:
+                pass
+            else:
+                raise ValueError("Invalid bounding box format")
 
             # Convert specific page to image
             poppler_path = os.getenv("POPPLER_PATH", None)
@@ -272,7 +271,14 @@ class PDFAnswerProcessor:
             page_img = pages[0]
 
             # Crop diagram using bounding box
-            cropped = page_img.crop((x, y, x + width, y + height))
+            cropped = page_img.crop(
+                (
+                    bounding_box[1] / 1000 * page_img.width,
+                    bounding_box[0] / 1000 * page_img.height,
+                    bounding_box[3] / 1000 * page_img.width,
+                    bounding_box[2] / 1000 * page_img.height,
+                )
+            )
 
             # Save as JPEG
             cropped.save(output_path, "JPEG", quality=95)

@@ -1,5 +1,14 @@
 import base64
-from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+    Request,
+    UploadFile,
+    File,
+    Form,
+)
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, asc
@@ -1433,16 +1442,78 @@ async def generate_assignment(
 
 @router.post("/api/assignments/import-document", response_model=DocumentImportResponse)
 async def import_document_to_assignment(
-    import_data: DocumentImportRequest,
     request: Request,
     current_user: dict = Depends(get_current_user),
+    file: UploadFile = File(None),
+    file_name: str = Form(None),
+    file_type: str = Form(None),
+    generation_options: str = Form(None),
+    # Legacy support for base64 JSON
+    import_data: DocumentImportRequest = None,
 ):
-    """Import assignment questions from documents (PDF, DOCX, MD, HTML, CSV, JSON, TXT) using AI parsing with diagram support"""
+    """Import assignment questions from documents (PDF, DOCX, MD, HTML, CSV, JSON, TXT) using AI parsing with diagram support
+
+    Supports two modes:
+    1. File upload (multipart/form-data) - Preferred for better performance
+    2. Legacy base64 JSON - For backward compatibility
+    """
     try:
         user_id = current_user["uid"]
-        logger.info(
-            f"Importing document {import_data.file_name} ({import_data.file_type}) for user: {user_id}"
-        )
+
+        # Determine if this is a file upload or JSON request
+        is_file_upload = file is not None
+
+        if is_file_upload:
+            # File upload mode (preferred)
+            actual_file_name = file_name or file.filename
+            actual_file_type = file_type or file.content_type
+            logger.info(
+                f"Importing document via file upload: {actual_file_name} ({actual_file_type}) for user: {user_id}"
+            )
+
+            # Read file content
+            document_content = await file.read()
+
+            # Parse generation options
+            gen_options = None
+            if generation_options:
+                try:
+                    gen_options = json.loads(generation_options)
+                except:
+                    gen_options = None
+
+            if import_data is None:
+                import_data = DocumentImportRequest(
+                    file_name=actual_file_name,
+                    file_type=actual_file_type,
+                    generation_options=gen_options,
+                    file_content="",
+                )
+        else:
+            # Legacy base64 JSON mode (backward compatibility)
+            if import_data is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Either file upload or import_data JSON is required",
+                )
+
+            actual_file_name = import_data.file_name
+            actual_file_type = import_data.file_type
+            gen_options = import_data.generation_options
+
+            logger.info(
+                f"Importing document via base64 JSON: {actual_file_name} ({actual_file_type}) for user: {user_id}"
+            )
+
+            # Decode document content
+            try:
+                document_content = base64.b64decode(import_data.file_content)
+            except Exception as e:
+                logger.error(f"Error decoding document content: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file content. Please ensure the file is properly encoded.",
+                )
 
         # Validate supported file types
         supported_types = [
@@ -1458,15 +1529,13 @@ async def import_document_to_assignment(
 
         # Also check file extension
         file_extension = (
-            import_data.file_name.lower().split(".")[-1]
-            if "." in import_data.file_name
-            else ""
+            actual_file_name.lower().split(".")[-1] if "." in actual_file_name else ""
         )
 
-        if import_data.file_type not in supported_types:
+        if actual_file_type not in supported_types:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported file type: {import_data.file_type}. Supported types: PDF, DOCX, TXT, MD, HTML, CSV, JSON",
+                detail=f"Unsupported file type: {actual_file_type}. Supported types: PDF, DOCX, TXT, MD, HTML, CSV, JSON",
             )
 
         # Import document processing services
@@ -1475,25 +1544,17 @@ async def import_document_to_assignment(
         # Initialize parser
         assignment_parser = AssignmentDocumentParser()
 
-        # Decode document content
-        try:
-            document_content = base64.b64decode(import_data.file_content)
-        except Exception as e:
-            logger.error(f"Error decoding document content: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid file content. Please ensure the file is properly encoded.",
-            )
-
         # Parse document based on type
         try:
-            if import_data.file_type == "application/pdf" or file_extension == "pdf":
+            if actual_file_type == "application/pdf" or file_extension == "pdf":
                 # PDF: Use image-based parsing with diagram bounding boxes
                 parsed_assignment = assignment_parser.parse_pdf_images_to_assignment(
                     document_content,
-                    import_data.file_name,
-                    import_data.generation_options,
+                    actual_file_name,
+                    gen_options,
                 )
+
+                # logger.info(f"Parsed assignment: {parsed_assignment}")
 
                 # Extract diagrams from PDF and upload to S3
                 parsed_assignment = assignment_parser.extract_and_upload_diagrams(
@@ -1504,35 +1565,44 @@ async def import_document_to_assignment(
                     assignment_id=None,  # Temporary storage under user_id
                 )
 
-                text_preview = "PDF content processed via image analysis"
-            elif (
-                import_data.file_type
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            ):
-                # For DOCX: extract and upload diagrams
-                # DOCX images already extracted during parsing, but run extraction pipeline for consistency
-                parsed_assignment = assignment_parser.extract_and_upload_diagrams(
-                    parsed_assignment,
-                    document_content,
-                    import_data.file_type,
-                    user_id,
-                    assignment_id=None,
-                )
+                # logger.info(f"Parsed assignment after extracting diagrams: {parsed_assignment}")
 
-                text_preview = f"{import_data.file_type} content processed"
+                text_preview = "PDF content processed via image analysis"
             else:
                 # Non-PDF: Use text-based parsing
                 parsed_assignment = (
                     assignment_parser.parse_non_pdf_document_to_assignment(
                         document_content,
-                        import_data.file_name,
-                        import_data.file_type,
+                        actual_file_name,
+                        actual_file_type,
                         user_id,
-                        import_data.generation_options,
+                        gen_options,
                     )
                 )
 
-                text_preview = f"{import_data.file_type} content processed"
+                logger.info(
+                    f"Parsed assignment after parsing non-PDF document: {parsed_assignment}"
+                )
+
+                if (
+                    actual_file_type
+                    == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ):
+                    # For DOCX: extract and upload diagrams
+                    # DOCX images already extracted during parsing, but run extraction pipeline for consistency
+                    parsed_assignment = assignment_parser.extract_and_upload_diagrams(
+                        parsed_assignment,
+                        document_content,
+                        actual_file_type,
+                        user_id,
+                        assignment_id=None,
+                    )
+
+                    text_preview = f"{actual_file_type} content processed"
+
+                    logger.info(
+                        f"Parsed assignment after extracting diagrams: {parsed_assignment}"
+                    )
 
         except Exception as e:
             logger.error(f"Error parsing document with AI: {str(e)}")
@@ -1568,7 +1638,9 @@ async def import_document_to_assignment(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error importing document {import_data.file_name}: {str(e)}")
+        logger.error(
+            f"Error importing document {import_data.file_name if import_data else 'unknown file'}: {str(e)}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to import document",

@@ -20,6 +20,8 @@ def get_assignment_parsing_schema(
         JSON schema dictionary for structured output
     """
 
+    no_bbox = "no_bbox" in schema_name
+
     # Define the base question schema that can be reused
     base_question_schema = {
         "type": "object",
@@ -60,22 +62,22 @@ def get_assignment_parsing_schema(
             "code": {"type": "string"},
             "diagram": {
                 "type": "object",
-                "properties": {
-                    "page_number": {"type": "integer"},
-                    "bounding_box": {
-                        "type": "object",
-                        "properties": {
-                            "x": {"type": "integer"},
-                            "y": {"type": "integer"},
-                            "width": {"type": "integer"},
-                            "height": {"type": "integer"},
+                "properties": (
+                    {"page_number": {"type": "integer"}, "caption": {"type": "string"}}
+                    if no_bbox
+                    else {
+                        "page_number": {"type": "integer"},
+                        "bounding_box": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "minItems": 4,
+                            "maxItems": 4,
                         },
-                        "required": ["x", "y", "width", "height"],
-                    },
-                    "caption": {"type": "string"},
-                    "s3_key": {"type": ["string", "null"]},
-                    "s3_url": {"type": ["string", "null"]},
-                },
+                        "caption": {"type": "string"},
+                        "s3_key": {"type": ["string", "null"]},
+                        "s3_url": {"type": ["string", "null"]},
+                    }
+                ),
             },
             "subquestions": {
                 "type": "array",
@@ -121,22 +123,25 @@ def get_assignment_parsing_schema(
                         "code": {"type": "string"},
                         "diagram": {
                             "type": "object",
-                            "properties": {
-                                "page_number": {"type": "integer"},
-                                "bounding_box": {
-                                    "type": "object",
-                                    "properties": {
-                                        "x": {"type": "integer"},
-                                        "y": {"type": "integer"},
-                                        "width": {"type": "integer"},
-                                        "height": {"type": "integer"},
+                            "properties": (
+                                {
+                                    "page_number": {"type": "integer"},
+                                    "caption": {"type": "string"},
+                                }
+                                if no_bbox
+                                else {
+                                    "page_number": {"type": "integer"},
+                                    "bounding_box": {
+                                        "type": "array",
+                                        "items": {"type": "number"},
+                                        "minItems": 4,
+                                        "maxItems": 4,
                                     },
-                                    "required": ["x", "y", "width", "height"],
-                                },
-                                "caption": {"type": "string"},
-                                "s3_key": {"type": ["string", "null"]},
-                                "s3_url": {"type": ["string", "null"]},
-                            },
+                                    "caption": {"type": "string"},
+                                    "s3_key": {"type": ["string", "null"]},
+                                    "s3_url": {"type": ["string", "null"]},
+                                }
+                            ),
                         },
                         "subquestions": {
                             "type": "array",
@@ -181,27 +186,25 @@ def get_assignment_parsing_schema(
                                     "code": {"type": "string"},
                                     "diagram": {
                                         "type": "object",
-                                        "properties": {
-                                            "page_number": {"type": "integer"},
-                                            "bounding_box": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "x": {"type": "integer"},
-                                                    "y": {"type": "integer"},
-                                                    "width": {"type": "integer"},
-                                                    "height": {"type": "integer"},
+                                        "properties": (
+                                            {
+                                                "page_number": {"type": "integer"},
+                                                "caption": {"type": "string"},
+                                            }
+                                            if no_bbox
+                                            else {
+                                                "page_number": {"type": "integer"},
+                                                "bounding_box": {
+                                                    "type": "array",
+                                                    "items": {"type": "number"},
+                                                    "minItems": 4,
+                                                    "maxItems": 4,
                                                 },
-                                                "required": [
-                                                    "x",
-                                                    "y",
-                                                    "width",
-                                                    "height",
-                                                ],
-                                            },
-                                            "caption": {"type": "string"},
-                                            "s3_key": {"type": ["string", "null"]},
-                                            "s3_url": {"type": ["string", "null"]},
-                                        },
+                                                "caption": {"type": "string"},
+                                                "s3_key": {"type": ["string", "null"]},
+                                                "s3_url": {"type": ["string", "null"]},
+                                            }
+                                        ),
                                     },
                                 },
                                 "required": [

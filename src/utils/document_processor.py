@@ -325,7 +325,7 @@ class AssignmentDocumentParser:
                     }
                 )
 
-            # Build prompt for question extraction from images
+            # Build prompt for question extraction from images (no bbox from GPT-5)
             prompt_text = f"""
                 Analyze the following {len(images)}-page PDF document and extract ALL existing assignment questions, exercises, problems, or assessment items.
 
@@ -349,13 +349,7 @@ class AssignmentDocumentParser:
                 - Set hasDiagram: true
                 - Provide diagram metadata in the "diagram" field with:
                   * page_number: Page where diagram appears (1-indexed)
-                  * bounding_box: Tight coordinates around the diagram (x, y, width, height in pixels)
-                    - x, y: Top-left corner of the diagram (origin at top-left of page)
-                    - width, height: Dimensions of the diagram
                   * caption: Descriptive label or caption for the diagram
-                  * s3_key: null (will be filled after extraction)
-                  * s3_url: null
-                - Include reference to the diagram in the question text
 
                 5. Extract all information:
                 - Question text (without question numbers or marks)
@@ -387,7 +381,7 @@ class AssignmentDocumentParser:
 
             # Get the JSON schema for the response
             response_schema = get_assignment_parsing_schema(
-                "pdf_image_parsing_response"
+                "pdf_image_parsing_response_no_bbox"
             )
 
             # Build multimodal message content
@@ -415,6 +409,7 @@ class AssignmentDocumentParser:
 
             # Parse the response
             response_text = response.choices[0].message.content
+            logger.info(f"Response text: {response_text}")
             if not response_text:
                 raise ValueError("Empty response from AI")
 
@@ -427,6 +422,52 @@ class AssignmentDocumentParser:
 
             # Validate and normalize the response
             result = self._normalize_assignment_data(parsed_data, file_name)
+
+            # Enrich with bounding boxes using Gemini for diagrammed questions
+            try:
+                from controllers.vision_gemini import detect_diagram_bbox
+
+                page_images = images  # already computed
+
+                def enrich_question(q: Dict[str, Any]) -> Dict[str, Any]:
+                    if q.get("hasDiagram") and isinstance(q.get("diagram"), dict):
+                        diagram = q["diagram"]
+                        page_number = diagram.get("page_number")
+                        bbox = diagram.get("bounding_box")
+                        if page_number and not bbox:
+                            if 1 <= page_number <= len(page_images):
+                                page_img = page_images[page_number - 1]
+                                try:
+                                    predicted_bbox = detect_diagram_bbox(
+                                        page_img, q.get("question", "")
+                                    )
+                                    if (
+                                        isinstance(predicted_bbox, list)
+                                        and len(predicted_bbox) == 4
+                                    ):
+                                        diagram["bounding_box"] = [
+                                            float(predicted_bbox[0]),
+                                            float(predicted_bbox[1]),
+                                            float(predicted_bbox[2]),
+                                            float(predicted_bbox[3]),
+                                        ]
+                                except Exception as _e:
+                                    logger.warning(
+                                        f"Gemini bbox detection failed: {_e}"
+                                    )
+
+                    # Recurse into subquestions
+                    if isinstance(q.get("subquestions"), list):
+                        q["subquestions"] = [
+                            enrich_question(sq) for sq in q["subquestions"]
+                        ]
+                    return q
+
+                questions = result.get("questions", [])
+                result["questions"] = [enrich_question(q) for q in questions]
+            except Exception as e:
+                logger.warning(f"Skipping Gemini bbox enrichment due to error: {e}")
+
             logger.info(
                 f"Successfully extracted {len(result.get('questions', []))} questions from PDF images"
             )
@@ -868,7 +909,8 @@ class AssignmentDocumentParser:
 
                 # Code and diagram flags
                 out["hasCode"] = src.get("hasCode", False)
-                out["hasDiagram"] = src.get("hasDiagram", False)
+                # Derive hasDiagram from presence of diagram object if not explicitly provided
+                has_diagram_flag = src.get("hasDiagram", False)
                 out["codeLanguage"] = src.get("codeLanguage", "")
                 out["outputType"] = src.get("outputType", "")
                 out["rubricType"] = src.get("rubricType", "per-subquestion")
@@ -880,6 +922,42 @@ class AssignmentDocumentParser:
                     out["hasCode"] = True
                 else:
                     out["code"] = ""
+
+                # Diagram metadata
+                diagram = src.get("diagram")
+                if diagram and isinstance(diagram, dict):
+                    # Normalize diagram metadata
+                    normalized_diagram = {}
+
+                    # Page number (for PDF/DOCX)
+                    if "page_number" in diagram:
+                        normalized_diagram["page_number"] = diagram["page_number"]
+
+                    # Bounding box (for PDF/DOCX)
+                    if "bounding_box" in diagram and isinstance(
+                        diagram["bounding_box"], list
+                    ):
+                        normalized_diagram["bounding_box"] = diagram["bounding_box"]
+
+                    # Caption
+                    if "caption" in diagram:
+                        normalized_diagram["caption"] = str(diagram["caption"])
+
+                    # S3 key (for extracted diagrams from PDF/DOCX)
+                    if "s3_key" in diagram:
+                        normalized_diagram["s3_key"] = diagram["s3_key"]
+
+                    # S3 URL (for URL-based diagrams from MD/HTML/CSV/JSON)
+                    if "s3_url" in diagram:
+                        normalized_diagram["s3_url"] = diagram["s3_url"]
+
+                    out["diagram"] = normalized_diagram
+                    has_diagram_flag = True
+                elif has_diagram_flag:
+                    # If hasDiagram is true but no diagram object, create empty one
+                    out["diagram"] = None
+
+                out["hasDiagram"] = bool(has_diagram_flag)
 
                 return out
 
@@ -893,6 +971,26 @@ class AssignmentDocumentParser:
                         continue
                     nq = normalize_question_fields(sub, is_subquestion=True)
                     nq["id"] = sub.get("id", sub_index + 1)
+
+                    # Handle nested subquestions (sub-sub-questions)
+                    nested_subqs_src = (
+                        sub.get("subquestions")
+                        or sub.get("sub_questions")
+                        or sub.get("parts")
+                    )
+                    if nested_subqs_src and isinstance(nested_subqs_src, list):
+                        nested_normalized = []
+                        for nested_index, nested_sub in enumerate(nested_subqs_src):
+                            if not isinstance(nested_sub, dict):
+                                continue
+                            nested_nq = normalize_question_fields(
+                                nested_sub, is_subquestion=True
+                            )
+                            nested_nq["id"] = nested_sub.get("id", nested_index + 1)
+                            nested_normalized.append(nested_nq)
+                        if nested_normalized:
+                            nq["subquestions"] = nested_normalized
+
                     normalized_list.append(nq)
                 return normalized_list
 
@@ -1127,49 +1225,98 @@ class AssignmentDocumentParser:
         Extract diagrams from PDF using bounding boxes and upload to S3.
         """
         try:
+            logger.info(
+                f"Starting diagram extraction for {len(questions)} questions with base_s3_path: {base_s3_path}"
+            )
+
             # Convert PDF pages to images
             images = convert_from_bytes(pdf_content, dpi=200)
             logger.info(f"Converted PDF to {len(images)} images for diagram extraction")
+            logger.info(f"PDF image dimensions: {[img.size for img in images[:3]]}")
 
             def process_question_diagrams(question: Dict[str, Any]) -> Dict[str, Any]:
                 """Recursively process diagrams in questions and subquestions"""
+                question_id = question.get("id", "unknown")
+                logger.info(f"Processing question {question_id} for diagrams")
+
                 # Process main question diagram
                 if question.get("hasDiagram") and question.get("diagram"):
                     diagram = question["diagram"]
                     bounding_box = diagram.get("bounding_box")
                     page_number = diagram.get("page_number", 1)
 
+                    logger.info(
+                        f"Q{question_id}: hasDiagram=True, bounding_box={bounding_box}, page_number={page_number}, existing_s3_key={diagram.get('s3_key')}"
+                    )
+
                     if bounding_box and not diagram.get("s3_key"):
                         # Extract diagram from PDF
                         if 1 <= page_number <= len(images):
                             try:
-                                page_img = images[
+                                logger.info(
+                                    f"Q{question_id}: Extracting diagram from page {page_number} (0-indexed: {page_number-1})"
+                                )
+
+                                page_img: Image.Image = images[
                                     page_number - 1
                                 ]  # Convert 1-indexed to 0-indexed
 
-                                # Crop using bounding box
-                                x = bounding_box.get("x", 0)
-                                y = bounding_box.get("y", 0)
-                                width = bounding_box.get("width", 100)
-                                height = bounding_box.get("height", 100)
+                                logger.info(
+                                    f"Q{question_id}: Page image size: {page_img.size} (width={page_img.width}, height={page_img.height})"
+                                )
 
-                                cropped = page_img.crop((x, y, x + width, y + height))
+                                # Crop using bounding box - handle both old and new formats
+                                if (
+                                    isinstance(bounding_box, list)
+                                    and len(bounding_box) == 4
+                                ):
+                                    # New format: [xmin, ymin, xmax, ymax]
+                                    ymin = bounding_box[0] / 1000 * page_img.height
+                                    xmin = bounding_box[1] / 1000 * page_img.width
+                                    ymax = bounding_box[2] / 1000 * page_img.height
+                                    xmax = bounding_box[3] / 1000 * page_img.width
+
+                                    logger.info(
+                                        f"Q{question_id}: Bounding box values: {bounding_box}"
+                                    )
+                                    logger.info(
+                                        f"Q{question_id}: Computed crop coordinates: ymin={ymin:.2f}, xmin={xmin:.2f}, ymax={ymax:.2f}, xmax={xmax:.2f}"
+                                    )
+
+                                    cropped = page_img.crop((xmin, ymin, xmax, ymax))
+                                    logger.info(
+                                        f"Q{question_id}: Cropped image size: {cropped.size}"
+                                    )
+                                else:
+                                    raise ValueError("Invalid bounding box format")
 
                                 # Save to temporary file
                                 diagram_id = str(uuid.uuid4())
+                                logger.info(
+                                    f"Q{question_id}: Generated diagram_id={diagram_id}"
+                                )
+
                                 with tempfile.NamedTemporaryFile(
                                     delete=False, suffix=".jpg"
                                 ) as tmp:
                                     cropped.save(tmp, "JPEG", quality=95)
                                     tmp_path = tmp.name
+                                    logger.info(
+                                        f"Q{question_id}: Saved cropped diagram to temp file: {tmp_path}"
+                                    )
 
                                 # Upload to S3
-                                question_id = question.get("id", "unknown")
                                 s3_key = (
                                     f"{base_s3_path}/q{question_id}_{diagram_id}.jpg"
                                 )
+                                logger.info(
+                                    f"Q{question_id}: Prepared S3 key: {s3_key}"
+                                )
 
                                 if s3_client and AWS_S3_BUCKET:
+                                    logger.info(
+                                        f"Q{question_id}: Uploading to S3 bucket: {AWS_S3_BUCKET}"
+                                    )
                                     s3_upload_file(
                                         tmp_path, s3_key, content_type="image/jpeg"
                                     )
@@ -1181,30 +1328,62 @@ class AssignmentDocumentParser:
 
                                 # Clean up temp file
                                 os.unlink(tmp_path)
+                                logger.info(f"Q{question_id}: Cleaned up temp file")
 
                             except Exception as e:
                                 logger.error(
                                     f"Error extracting diagram for Q{question.get('id')}: {str(e)}"
                                 )
+                                import traceback
+
+                                logger.info(f"Traceback: {traceback.format_exc()}")
+                        else:
+                            logger.warning(
+                                f"Q{question_id}: Page number {page_number} out of range (1-{len(images)})"
+                            )
+                    elif not bounding_box:
+                        logger.info(f"Q{question_id}: No bounding box provided")
+                    elif diagram.get("s3_key"):
+                        logger.info(
+                            f"Q{question_id}: Diagram already has s3_key={diagram.get('s3_key')}"
+                        )
+                else:
+                    logger.info(
+                        f"Q{question_id}: hasDiagram=False or no diagram object"
+                    )
 
                 # Process subquestions recursively
                 if question.get("subquestions"):
+                    logger.info(
+                        f"Q{question_id}: Processing {len(question['subquestions'])} subquestions"
+                    )
                     updated_subquestions = []
-                    for subq in question["subquestions"]:
+                    for idx, subq in enumerate(question["subquestions"]):
+                        logger.info(
+                            f"Q{question_id}: Processing subquestion {idx+1}/{len(question['subquestions'])}"
+                        )
                         updated_subq = process_question_diagrams(subq)
                         updated_subquestions.append(updated_subq)
                     question["subquestions"] = updated_subquestions
+                    logger.info(
+                        f"Q{question_id}: Completed processing all subquestions"
+                    )
 
                 return question
 
             # Process all questions
             updated_questions = []
-            for question in questions:
+            for idx, question in enumerate(questions):
+                logger.info(f"Processing question {idx+1}/{len(questions)}")
                 updated_q = process_question_diagrams(question)
                 updated_questions.append(updated_q)
 
+            logger.info(f"Completed diagram extraction for all questions")
             return updated_questions
 
         except Exception as e:
             logger.error(f"Error extracting PDF diagrams: {str(e)}")
+            import traceback
+
+            logger.info(f"Traceback: {traceback.format_exc()}")
             return questions
