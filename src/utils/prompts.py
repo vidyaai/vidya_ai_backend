@@ -11,86 +11,15 @@ Key guidelines:
 - Map question types to the exact schema types provided
 - Extract all relevant metadata (points, rubrics, correct answers, etc.)
 - For multi-part questions, properly structure subquestions
-- Identify code content and diagram requirements accurately"""
+- Identify code content and diagram requirements accurately
 
-# Fallback system prompt for reduced content parsing
-FALLBACK_PARSER_SYSTEM_PROMPT = """You are a document parser extracting assignment questions from educational content. Focus on identifying key questions and structure them according to the provided JSON schema. Keep responses concise due to token limits."""
+DIAGRAM IDENTIFICATION CRITICAL RULES:
+When processing documents with diagrams/images, you must carefully determine which question or sub-question each diagram belongs to:
 
+1. SPATIAL ANALYSIS: Analyze the position of diagrams relative to question text
+2. TEXTUAL REFERENCES: Look for explicit mentions like "see diagram", "refer to figure", "using the image"
+3. LOGICAL ASSOCIATION: Determine if the diagram supports the entire question or just a specific sub-part
+4. HIERARCHY PRECEDENCE: When uncertain, associate diagrams with the most specific question/sub-question that references them
+5. MULTI-PART CONSIDERATION: For questions with sub-parts, determine if diagrams apply to the whole question or individual sub-questions
 
-def create_extraction_prompt(document_text: str, file_name: str) -> str:
-    """Create a detailed prompt for extracting existing assignment questions from documents"""
-
-    prompt = f"""
-Analyze the following document and extract all existing assignment questions, exercises, problems, or assessment items.
-
-Document: {file_name}
-
-Content:
----
-{document_text}
----
-
-Extraction guidelines:
-1. EXTRACT only existing questions - do NOT create new ones
-2. Map question types to schema types:
-   - multiple-choice: Questions with options (A, B, C, D or 1, 2, 3, 4)
-   - fill-blank: Questions with blanks (e.g., "The capital of France is ___")
-   - short-answer: Brief responses (1-2 sentences)
-   - numerical: Questions requiring numeric answers
-   - long-answer: Extended written responses (paragraphs)
-   - true-false: Binary true/false questions
-   - code-writing: Questions requiring code solutions
-   - diagram-analysis: Questions involving diagram interpretation
-   - multi-part: Questions with sub-parts (a, b, c) or (i, ii, iii)
-
-3. Extract all provided information:
-   - Exact question text as written
-   - Multiple choice options (infer if not explicit)
-   - Correct answers, solutions, or answer keys (if not present, generate)
-   - For multiple choice: determine if single or multiple answers are correct
-   - For multi-part questions: provide empty string for correctAnswer (answers come from sub-questions)
-   - Point values and scoring information
-   - Grading rubrics or evaluation criteria (if not present, generate)
-   - Assignment title and description
-
-4. For multi-part questions, structure subquestions properly
-5. for multiple choice questions' options, correctAnswer should be index (like "0", "1", "2", "3") of the correct answer in the options array
-6. Identify code content and set hasCode/codeLanguage appropriately
-7. Identify diagram requirements and set hasDiagram appropriately
-8. DO NOT keep question numbers, marks, option number or other metadata in the Question or Options fields
-
-Rubric requirements:
-- rubricType: "overall" for non-multi-part questions, "per-subquestion" for multi-part questions
-- If rubricType is "overall": rubric is required (generate if not present)
-- If rubricType is "per-subquestion": rubric not required for main question, but required for all non-multi-part subquestions
-
-Note: The response will be automatically structured according to the provided JSON schema. Focus on accurate extraction rather than formatting.
-"""
-    return prompt
-
-
-def create_fallback_prompt(document_text: str, file_name: str) -> str:
-    """Create a simpler prompt for reduced content parsing"""
-    prompt = f"""
-Extract assignment questions from this document. Focus on key questions due to token limits.
-
-Document: {file_name}
-Content: {document_text}
-
-Extract:
-- Assignment title and description
-- Questions with their types, text, points, and answers (if not present, generate)
-- For multiple choice: identify if single or multiple answers are correct
-- For multi-part questions: provide empty string for correctAnswer (answers come from sub-questions)
-- Code content and diagram requirements
-- Multi-part question structure
-
-Rubric rules:
-- rubricType: "overall" for non-multi-part, "per-subquestion" for multi-part
-- "overall": rubric required
-- "per-subquestion": rubric not required for main question, required for non-multi-part subquestions
-
-Note: For multiple choice, set correctAnswer as the index of the correct option (e.g., "0", "1", etc.)
-The response will be automatically structured according to the provided JSON schema.
-"""
-    return prompt
+This ensures accurate diagram-question relationships for proper educational content structure."""

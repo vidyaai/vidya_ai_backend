@@ -19,9 +19,6 @@ import markdown
 from pdf2image import convert_from_bytes
 from .prompts import (
     DOCUMENT_PARSER_SYSTEM_PROMPT,
-    FALLBACK_PARSER_SYSTEM_PROMPT,
-    create_extraction_prompt,
-    create_fallback_prompt,
 )
 from .assignment_schemas import get_assignment_parsing_schema
 
@@ -345,11 +342,33 @@ class AssignmentDocumentParser:
                 - diagram-analysis: Questions involving diagram interpretation
                 - multi-part: Questions with sub-parts (a, b, c) or (i, ii, iii)
 
-                4. For questions with DIAGRAMS/IMAGES:
-                - Set hasDiagram: true
-                - Provide diagram metadata in the "diagram" field with:
-                  * page_number: Page where diagram appears (1-indexed)
-                  * caption: Descriptive label or caption for the diagram
+                4. DIAGRAM IDENTIFICATION AND ASSOCIATION:
+                When identifying diagrams/images, carefully determine which question or sub-question they belong to:
+
+                a) DIAGRAM BELONGS TO MAIN QUESTION if:
+                   - The diagram appears before or immediately after the main question text
+                   - The diagram is referenced in the main question text (e.g., "Refer to the diagram below", "Using the figure shown")
+                   - The diagram is positioned between the main question and its sub-questions
+                   - The diagram is clearly associated with the overall question concept
+
+                b) DIAGRAM BELONGS TO SUB-QUESTION if:
+                   - The diagram appears immediately before or after a specific sub-question (a, b, c, etc.)
+                   - The diagram is referenced only in that specific sub-question text
+                   - The diagram is positioned between sub-questions
+                   - The diagram is clearly associated with only that sub-question's content
+
+                c) DIAGRAM ASSOCIATION RULES:
+                   - Analyze the spatial relationship between diagrams and text
+                   - Look for explicit references in question text ("see diagram", "refer to figure", etc.)
+                   - Consider the logical flow: diagram → question or question → diagram
+                   - For multi-part questions, determine if diagram applies to entire question or specific sub-part
+                   - If uncertain, prefer associating with the most specific question/sub-question that references it
+
+                d) DIAGRAM METADATA:
+                   - Set hasDiagram: true for the appropriate question/sub-question
+                   - Provide diagram metadata in the "diagram" field with:
+                     * page_number: Page where diagram appears (1-indexed)
+                     * caption: Descriptive label or caption for the diagram
 
                 5. Extract all information:
                 - Question text (without question numbers or marks)
@@ -366,6 +385,7 @@ class AssignmentDocumentParser:
                 - Structure subquestions properly
                 - rubricType: "per-subquestion"
                 - Main question rubric not required, but required for all non-multi-part subquestions
+                - Apply diagram association rules to determine if diagrams belong to main question or specific sub-questions
 
                 7. Regular questions:
                 - rubricType: "overall"
@@ -546,7 +566,7 @@ class AssignmentDocumentParser:
                     - Map question types appropriately (multiple-choice, short-answer, long-answer, etc.)
                     - Extract all information: question text, correct answers, points, rubrics
                     - For multiple choice: correctAnswer should be index string ("0", "1", "2", "3")
-                    - Generate rubrics if not present
+                    - Generate rubrics and correct answers if not present
                     - NO DIAGRAM SUPPORT for TXT files (hasDiagram must be false)
 
                     Return the structured data according to the JSON schema.
@@ -581,14 +601,37 @@ class AssignmentDocumentParser:
                     - EXTRACT only existing questions - do NOT create new ones
                     - Map question types appropriately
                     - Extract all information: question text, correct answers, points, rubrics
-                    - For diagrams: If a question references an S3 URL (image), set:
-                      * hasDiagram: true
-                      * diagram.s3_url: the full S3 URL
-                      * diagram.s3_key: null
-                      * diagram.caption: description of the image
-                      * NO bounding_box or page_number for URL-based diagrams
                     - For multiple choice: correctAnswer should be index string ("0", "1", "2", "3")
-                    - Generate rubrics if not present
+                    - Generate rubrics and correct answers if not present
+                    - For multi-part questions, structure subquestions properly and apply rubric rules
+
+                    DIAGRAM IDENTIFICATION AND ASSOCIATION:
+                    When identifying diagrams/images referenced by S3 URLs, carefully determine which question or sub-question they belong to:
+
+                    a) DIAGRAM BELONGS TO MAIN QUESTION if:
+                       - The S3 URL appears before or immediately after the main question text
+                       - The diagram is referenced in the main question text (e.g., "Refer to the diagram at [URL]", "Using the figure shown")
+                       - The diagram is positioned between the main question and its sub-questions
+                       - The diagram is clearly associated with the overall question concept
+
+                    b) DIAGRAM BELONGS TO SUB-QUESTION if:
+                       - The S3 URL appears immediately before or after a specific sub-question (a, b, c, etc.)
+                       - The diagram is referenced only in that specific sub-question text
+                       - The diagram is positioned between sub-questions
+                       - The diagram is clearly associated with only that sub-question's content
+
+                    c) DIAGRAM ASSOCIATION RULES:
+                       - Analyze the spatial relationship between S3 URLs and question text
+                       - Look for explicit references in question text ("see diagram", "refer to figure", etc.)
+                       - Consider the logical flow: diagram → question or question → diagram
+                       - For multi-part questions, determine if diagram applies to entire question or specific sub-part
+                       - If uncertain, prefer associating with the most specific question/sub-question that references it
+
+                    d) DIAGRAM METADATA:
+                       - Set hasDiagram: true for the appropriate question/sub-question
+                       - For diagrams: If a question references an S3 URL (image), set:
+                         * hasDiagram: true
+                         * diagram.s3_url: the full S3 URL
 
                     Return the structured data according to the JSON schema.
                 """
@@ -621,14 +664,41 @@ class AssignmentDocumentParser:
                     - EXTRACT only existing questions - do NOT create new ones
                     - Map question types appropriately
                     - Extract all information: question text, correct answers, points, rubrics
-                    - For diagrams/images in the document:
-                      * hasDiagram: true
-                      * diagram.s3_key: use the s3_key from extracted images list above
-                      * diagram.s3_url: null
-                      * diagram.caption: description of the image
-                      * NO bounding_box or page_number for DOCX images
                     - For multiple choice: correctAnswer should be index string ("0", "1", "2", "3")
                     - Generate rubrics if not present
+                    - For multi-part questions, structure subquestions properly and apply rubric rules
+
+                    DIAGRAM IDENTIFICATION AND ASSOCIATION:
+                    When identifying diagrams/images in the DOCX document, carefully determine which question or sub-question they belong to:
+
+                    a) DIAGRAM BELONGS TO MAIN QUESTION if:
+                       - The image appears before or immediately after the main question text
+                       - The diagram is referenced in the main question text (e.g., "Refer to the diagram below", "Using the figure shown")
+                       - The diagram is positioned between the main question and its sub-questions
+                       - The diagram is clearly associated with the overall question concept
+
+                    b) DIAGRAM BELONGS TO SUB-QUESTION if:
+                       - The image appears immediately before or after a specific sub-question (a, b, c, etc.)
+                       - The diagram is referenced only in that specific sub-question text
+                       - The diagram is positioned between sub-questions
+                       - The diagram is clearly associated with only that sub-question's content
+
+                    c) DIAGRAM ASSOCIATION RULES:
+                       - Analyze the spatial relationship between images and question text
+                       - Look for explicit references in question text ("see diagram", "refer to figure", etc.)
+                       - Consider the logical flow: diagram → question or question → diagram
+                       - For multi-part questions, determine if diagram applies to entire question or specific sub-part
+                       - If uncertain, prefer associating with the most specific question/sub-question that references it
+
+                    d) DIAGRAM METADATA:
+                       - Set hasDiagram: true for the appropriate question/sub-question
+                       - For diagrams/images in the document:
+                         * hasDiagram: true
+                         * diagram.s3_key: use the s3_key from extracted images list above
+                         * diagram.s3_url: null
+                         * diagram.caption: description of the image
+                         * diagram.description: brief description of what the diagram shows
+                         * NO bounding_box or page_number for DOCX images
 
                     Return the structured data according to the JSON schema.
                 """
@@ -677,175 +747,6 @@ class AssignmentDocumentParser:
         except Exception as e:
             logger.error(f"Error parsing non-PDF document: {str(e)}")
             raise
-
-    def parse_document_to_assignment(
-        self,
-        document_text: str,
-        file_name: str,
-        generation_options: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Parse a document and extract existing assignment questions using AI
-
-        Args:
-            document_text: Extracted text content from the document
-            file_name: Original file name for context
-            generation_options: Additional options for parsing (mostly ignored for extraction)
-
-        Returns:
-            Dictionary containing assignment data with extracted questions
-        """
-        try:
-            # Try the standard approach first
-            return self._parse_with_standard_approach(document_text, file_name)
-
-        except Exception as e:
-            logger.warning(f"Standard parsing failed for {file_name}: {str(e)}")
-            logger.info("Attempting fallback parsing with reduced content...")
-
-            # Fallback: try with reduced content if the document is very large
-            try:
-                return self._parse_with_reduced_content(document_text, file_name)
-            except Exception as fallback_error:
-                logger.error(
-                    f"Fallback parsing also failed for {file_name}: {str(fallback_error)}"
-                )
-                raise e  # Re-raise the original error
-
-    def _parse_with_standard_approach(
-        self, document_text: str, file_name: str
-    ) -> Dict[str, Any]:
-        """Standard parsing approach with full document content"""
-        # Create the extraction prompt
-        prompt = create_extraction_prompt(document_text, file_name)
-
-        # Get the JSON schema for the response with dynamic naming
-        response_schema = get_assignment_parsing_schema("document_parsing_response")
-
-        # Call OpenAI to parse the document
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": dedent(DOCUMENT_PARSER_SYSTEM_PROMPT),
-                },
-                {"role": "user", "content": dedent(prompt).strip()},
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": response_schema["name"],
-                    "schema": response_schema,
-                },
-            },
-        )
-
-        # Parse the response
-        response_text = response.choices[0].message.content
-        if not response_text:
-            raise ValueError("Empty response from AI")
-
-        try:
-            parsed_data = json.loads(response_text)
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {e}")
-            logger.error(f"Raw response length: {len(response_text)}")
-            logger.error(f"Raw response (first 1000 chars): {response_text[:1000]}")
-            logger.error(f"Raw response (last 1000 chars): {response_text[-1000:]}")
-
-            # Try to fix common JSON issues
-            try:
-                # Check if response was truncated
-                if not response_text.strip().endswith("}"):
-                    logger.warning(
-                        "Response appears to be truncated, attempting to fix..."
-                    )
-                    # Try to find the last complete object
-                    last_brace = response_text.rfind("}")
-                    if last_brace > 0:
-                        # Try to close the JSON structure
-                        fixed_response = response_text[: last_brace + 1]
-                        parsed_data = json.loads(fixed_response)
-                        logger.info("Successfully fixed truncated JSON response")
-                    else:
-                        raise ValueError("Response is too truncated to fix")
-                else:
-                    raise ValueError("Failed to parse AI response as JSON")
-            except (json.JSONDecodeError, ValueError) as fix_error:
-                logger.error(f"Failed to fix JSON: {fix_error}")
-                raise ValueError(
-                    "Failed to parse AI response as JSON and unable to fix truncation"
-                )
-
-        # Validate and normalize the response
-        return self._normalize_assignment_data(parsed_data, file_name)
-
-    def _parse_with_reduced_content(
-        self, document_text: str, file_name: str
-    ) -> Dict[str, Any]:
-        """Fallback parsing with reduced content to avoid token limits"""
-        # Reduce document content significantly
-        max_doc_length = 10000  # Much smaller limit for fallback
-        if len(document_text) > max_doc_length:
-            # Try to find a good breaking point (e.g., end of a question)
-            truncated_text = document_text[:max_doc_length]
-            # Look for the last complete question or section
-            last_question = max(
-                truncated_text.rfind("Question"),
-                truncated_text.rfind("Problem"),
-                truncated_text.rfind("Exercise"),
-                truncated_text.rfind("Part"),
-            )
-            if last_question > max_doc_length * 0.7:  # If we found a good break point
-                document_text = (
-                    truncated_text[:last_question]
-                    + "... [document truncated for processing]"
-                )
-            else:
-                document_text = (
-                    truncated_text + "... [document truncated for processing]"
-                )
-
-        # Create a simpler prompt for reduced content
-        prompt = create_fallback_prompt(document_text, file_name)
-
-        # Get the JSON schema for fallback parsing with dynamic naming
-        fallback_schema = get_assignment_parsing_schema(
-            "assignment_parsing_fallback_response"
-        )
-
-        # Call OpenAI with reduced content
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": dedent(FALLBACK_PARSER_SYSTEM_PROMPT),
-                },
-                {"role": "user", "content": dedent(prompt).strip()},
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": fallback_schema["name"],
-                    "schema": fallback_schema,
-                },
-            },
-            max_completion_tokens=4000,  # Smaller token limit for fallback
-        )
-
-        response_text = response.choices[0].message.content
-        if not response_text:
-            raise ValueError("Empty response from AI")
-
-        try:
-            parsed_data = json.loads(response_text)
-        except json.JSONDecodeError as e:
-            logger.error(f"Fallback JSON decode error: {e}")
-            raise ValueError("Failed to parse fallback AI response as JSON")
-
-        return self._normalize_assignment_data(parsed_data, file_name)
 
     def _normalize_assignment_data(
         self, data: Dict[str, Any], file_name: str

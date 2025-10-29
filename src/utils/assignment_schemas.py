@@ -66,16 +66,8 @@ def get_assignment_parsing_schema(
                     {"page_number": {"type": "integer"}, "caption": {"type": "string"}}
                     if no_bbox
                     else {
-                        "page_number": {"type": "integer"},
-                        "bounding_box": {
-                            "type": "array",
-                            "items": {"type": "number"},
-                            "minItems": 4,
-                            "maxItems": 4,
-                        },
-                        "caption": {"type": "string"},
-                        "s3_key": {"type": ["string", "null"]},
                         "s3_url": {"type": ["string", "null"]},
+                        "s3_key": {"type": ["string", "null"]},
                     }
                 ),
             },
@@ -130,16 +122,8 @@ def get_assignment_parsing_schema(
                                 }
                                 if no_bbox
                                 else {
-                                    "page_number": {"type": "integer"},
-                                    "bounding_box": {
-                                        "type": "array",
-                                        "items": {"type": "number"},
-                                        "minItems": 4,
-                                        "maxItems": 4,
-                                    },
-                                    "caption": {"type": "string"},
-                                    "s3_key": {"type": ["string", "null"]},
                                     "s3_url": {"type": ["string", "null"]},
+                                    "s3_key": {"type": ["string", "null"]},
                                 }
                             ),
                         },
@@ -193,16 +177,8 @@ def get_assignment_parsing_schema(
                                             }
                                             if no_bbox
                                             else {
-                                                "page_number": {"type": "integer"},
-                                                "bounding_box": {
-                                                    "type": "array",
-                                                    "items": {"type": "number"},
-                                                    "minItems": 4,
-                                                    "maxItems": 4,
-                                                },
-                                                "caption": {"type": "string"},
-                                                "s3_key": {"type": ["string", "null"]},
                                                 "s3_url": {"type": ["string", "null"]},
+                                                "s3_key": {"type": ["string", "null"]},
                                             }
                                         ),
                                     },
@@ -237,7 +213,7 @@ def get_assignment_parsing_schema(
             "points",
             "difficulty",
             "correctAnswer",
-            "explanation",
+            "rubric",
         ],
     }
 
