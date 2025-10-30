@@ -16,6 +16,16 @@ except Exception:  # pragma: no cover - optional dependency at import time
 import sys
 from logging.handlers import RotatingFileHandler
 
+# Ensure stdout/stderr use UTF-8 on platforms where the default is cp1252 (e.g., Windows)
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    # Best-effort; if reconfigure isn't supported, continue with defaults
+    pass
+
 # Ensure log directory exists
 log_file_path = "/var/log/vidyaai_api.log"
 log_dir = os.path.dirname(log_file_path)
@@ -28,7 +38,10 @@ logging.basicConfig(
     handlers=[
         # File handler with rotation
         RotatingFileHandler(
-            log_file_path, maxBytes=10 * 1024 * 1024, backupCount=5  # 10MB
+            log_file_path,
+            maxBytes=10 * 1024 * 1024,  # 10MB
+            backupCount=5,
+            encoding="utf-8",
         ),
         # Console handler for development
         logging.StreamHandler(sys.stdout),

@@ -665,7 +665,7 @@ class AssignmentDocumentParser:
                     - Map question types appropriately
                     - Extract all information: question text, correct answers, points, rubrics
                     - For multiple choice: correctAnswer should be index string ("0", "1", "2", "3")
-                    - Generate rubrics if not present
+                    - Generate rubrics and correct answers if not present
                     - For multi-part questions, structure subquestions properly and apply rubric rules
 
                     DIAGRAM IDENTIFICATION AND ASSOCIATION:
@@ -697,8 +697,6 @@ class AssignmentDocumentParser:
                          * diagram.s3_key: use the s3_key from extracted images list above
                          * diagram.s3_url: null
                          * diagram.caption: description of the image
-                         * diagram.description: brief description of what the diagram shows
-                         * NO bounding_box or page_number for DOCX images
 
                     Return the structured data according to the JSON schema.
                 """
