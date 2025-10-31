@@ -59,13 +59,39 @@ def generate_share_token() -> str:
 
 
 def calculate_assignment_stats(assignment: Assignment) -> Assignment:
-    """Calculate total points and questions for an assignment"""
+    """Calculate total points and questions for an assignment, handling optional parts correctly"""
     questions = assignment.questions or []
     total_questions = len(questions)
-    total_points = sum(q.get("points", 0) for q in questions)
+
+    def calculate_question_points(question: dict) -> float:
+        """Recursively calculate points for a question, accounting for optional parts"""
+        q_type = question.get("type", "")
+
+        if q_type == "multi-part":
+            subquestions = question.get("subquestions", [])
+            if not subquestions:
+                return float(question.get("points", 0))
+
+            # For optional parts, only count required number of parts
+            if question.get("optionalParts"):
+                required_count = question.get("requiredPartsCount", len(subquestions))
+                # Sort subquestions by points (descending) to get realistic total
+                # This assumes students will choose higher-point questions
+                subq_points = [calculate_question_points(sq) for sq in subquestions]
+                subq_points.sort(reverse=True)
+                # Sum only the required number of highest-point subquestions
+                return sum(subq_points[:required_count])
+            else:
+                # Non-optional multi-part: sum all subquestion points
+                return sum(calculate_question_points(sq) for sq in subquestions)
+        else:
+            # Regular question: return its points
+            return float(question.get("points", 0))
+
+    total_points = sum(calculate_question_points(q) for q in questions)
 
     assignment.total_questions = str(total_questions)
-    assignment.total_points = str(total_points)
+    assignment.total_points = str(int(total_points))
     return assignment
 
 
@@ -1882,6 +1908,53 @@ async def submit_assignment(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                         detail=f"Failed to process PDF submission: {str(e)}",
                     )
+
+        # Validate optional parts selection
+        questions = assignment.questions or []
+        for question in questions:
+            q_id = str(question.get("id"))
+            if question.get("type") == "multi-part" and question.get("optionalParts"):
+                required_count = question.get("requiredPartsCount", 0)
+                answer_obj = submission_data.answers.get(q_id)
+
+                answered_subqs = []
+                if answer_obj and isinstance(answer_obj, dict):
+                    subanswers = answer_obj.get("subAnswers", {})
+                    # Count non-empty answers
+                    answered_subqs = [k for k, v in subanswers.items() if v]
+
+                if len(answered_subqs) != required_count:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Question {q_id}: Must answer exactly {required_count} of {len(question.get('subquestions', []))} parts (answered {len(answered_subqs)})",
+                    )
+
+                # Recursively validate nested optional parts
+                if question.get("subquestions"):
+                    for subq in question.get("subquestions", []):
+                        subq_id = str(subq.get("id"))
+                        if subq.get("type") == "multi-part" and subq.get(
+                            "optionalParts"
+                        ):
+                            subq_required_count = subq.get("requiredPartsCount", 0)
+                            subq_answer = (
+                                answer_obj.get("subAnswers", {}).get(subq_id)
+                                if answer_obj
+                                else None
+                            )
+
+                            subq_answered = []
+                            if subq_answer and isinstance(subq_answer, dict):
+                                subq_subanswers = subq_answer.get("subAnswers", {})
+                                subq_answered = [
+                                    k for k, v in subq_subanswers.items() if v
+                                ]
+
+                            if len(subq_answered) != subq_required_count:
+                                raise HTTPException(
+                                    status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail=f"Question {q_id}, Sub-question {subq_id}: Must answer exactly {subq_required_count} of {len(subq.get('subquestions', []))} parts",
+                                )
 
         if existing_submission:
             # Check if already submitted - prevent resubmission

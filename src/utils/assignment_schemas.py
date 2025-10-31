@@ -71,6 +71,8 @@ def get_assignment_parsing_schema(
                     }
                 ),
             },
+            "optionalParts": {"type": "boolean"},
+            "requiredPartsCount": {"type": "integer"},
             "subquestions": {
                 "type": "array",
                 "items": {
@@ -127,6 +129,8 @@ def get_assignment_parsing_schema(
                                 }
                             ),
                         },
+                        "optionalParts": {"type": "boolean"},
+                        "requiredPartsCount": {"type": "integer"},
                         "subquestions": {
                             "type": "array",
                             "items": {
@@ -182,6 +186,8 @@ def get_assignment_parsing_schema(
                                             }
                                         ),
                                     },
+                                    "optionalParts": {"type": "boolean"},
+                                    "requiredPartsCount": {"type": "integer"},
                                 },
                                 "required": [
                                     "id",

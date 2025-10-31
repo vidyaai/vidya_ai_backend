@@ -34,7 +34,14 @@ class LLMGrader:
 
         Returns: total_score, total_points, feedback_by_question, overall_feedback
         """
-        flattened_questions = self._flatten_questions(assignment.get("questions", []))
+        # Extract answered subquestion IDs for optional parts filtering
+        answered_subquestion_ids = self._extract_answered_subquestion_ids(
+            assignment.get("questions", []), submission_answers
+        )
+
+        flattened_questions = self._flatten_questions(
+            assignment.get("questions", []), "", answered_subquestion_ids
+        )
         flattened_answers = self._flatten_answers(submission_answers)
 
         # Partition questions: deterministic (MCQ/TF) vs LLM-required
@@ -381,7 +388,10 @@ class LLMGrader:
         }
 
     def _flatten_questions(
-        self, questions: List[Dict[str, Any]], parent_id: str = ""
+        self,
+        questions: List[Dict[str, Any]],
+        parent_id: str = "",
+        answered_subquestion_ids: Dict[str, List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Recursively flatten questions to handle nested multi-part questions at any depth.
 
@@ -389,7 +399,12 @@ class LLMGrader:
         - Top-level questions: keep original ID (e.g., "1", "17", "33")
         - Subquestions: create composite IDs like "17.1", "17.2", "33.1.1" using sequential numbering
         This matches the format from _normalize_question_number() in pdf_answer_processor.py
+
+        For optional parts (optionalParts: true), only includes subquestions that were answered.
         """
+        if answered_subquestion_ids is None:
+            answered_subquestion_ids = {}
+
         flattened: List[Dict[str, Any]] = []
         subquestion_counter = 0  # Counter for subquestions at current level
 
@@ -406,9 +421,21 @@ class LLMGrader:
                     # Top-level multi-part: use original ID as prefix
                     sub_parent_id = original_id
 
+                # For optional parts, filter to only include answered subquestions
+                subquestions_to_process = q.get("subquestions", [])
+                if q.get("optionalParts"):
+                    # Get list of answered subquestion IDs for this question
+                    answered_subq_ids = answered_subquestion_ids.get(original_id, [])
+                    # Filter to only include answered subquestions
+                    subquestions_to_process = [
+                        subq
+                        for subq in subquestions_to_process
+                        if str(subq.get("id")) in answered_subq_ids
+                    ]
+
                 # Recursively flatten subquestions with composite parent ID
                 sub_flattened = self._flatten_questions(
-                    q.get("subquestions", []), sub_parent_id
+                    subquestions_to_process, sub_parent_id, answered_subquestion_ids
                 )
                 flattened.extend(sub_flattened)
             else:
@@ -469,6 +496,42 @@ class LLMGrader:
                 flattened[question_id] = str(answer)
 
         return flattened
+
+    def _extract_answered_subquestion_ids(
+        self, questions: List[Dict[str, Any]], answers: Dict[str, Any]
+    ) -> Dict[str, List[str]]:
+        """Extract which subquestions were answered for optional parts questions.
+
+        Returns a dictionary mapping question IDs to lists of answered subquestion IDs.
+        """
+        answered_map = {}
+
+        for q in questions:
+            q_id = str(q.get("id"))
+            if q.get("type") == "multi-part" and q.get("optionalParts"):
+                answer_obj = answers.get(q_id)
+                if answer_obj and isinstance(answer_obj, dict):
+                    subanswers = answer_obj.get("subAnswers", {})
+                    # Track which subquestions have non-empty answers
+                    answered_subq_ids = [k for k, v in subanswers.items() if v]
+                    answered_map[q_id] = answered_subq_ids
+
+                    # Recursively handle nested optional parts
+                    if q.get("subquestions"):
+                        for subq in q.get("subquestions"):
+                            subq_id = str(subq.get("id"))
+                            if subq.get("type") == "multi-part" and subq.get(
+                                "optionalParts"
+                            ):
+                                subq_answer = subanswers.get(subq_id)
+                                if subq_answer and isinstance(subq_answer, dict):
+                                    subq_subanswers = subq_answer.get("subAnswers", {})
+                                    answered_subsubq_ids = [
+                                        k for k, v in subq_subanswers.items() if v
+                                    ]
+                                    answered_map[subq_id] = answered_subsubq_ids
+
+        return answered_map
 
     def _build_bulk_prompt(
         self,

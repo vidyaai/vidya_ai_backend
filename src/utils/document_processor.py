@@ -651,6 +651,10 @@ class AssignmentDocumentParser:
                 else:
                     out["code"] = ""
 
+                # Optional parts configuration
+                out["optionalParts"] = src.get("optionalParts", False)
+                out["requiredPartsCount"] = src.get("requiredPartsCount", 0)
+
                 # Diagram metadata
                 diagram = src.get("diagram")
                 if diagram and isinstance(diagram, dict):
@@ -751,6 +755,20 @@ class AssignmentDocumentParser:
                     subqs = normalize_subquestions(subqs_src)
                     if subqs:
                         normalized_q["subquestions"] = subqs
+
+                # Validate optional parts configuration
+                if normalized_q.get("optionalParts"):
+                    required_count = normalized_q.get("requiredPartsCount", 0)
+                    subquestion_count = len(normalized_q.get("subquestions", []))
+
+                    if required_count <= 0 or required_count > subquestion_count:
+                        logger.warning(
+                            f"Question {normalized_q.get('id')}: Invalid optional parts config. "
+                            f"Required count ({required_count}) must be between 1 and {subquestion_count}. "
+                            f"Disabling optional parts."
+                        )
+                        normalized_q["optionalParts"] = False
+                        normalized_q["requiredPartsCount"] = 0
 
                 normalized_questions.append(normalized_q)
                 total_points += normalized_q["points"] or 0
