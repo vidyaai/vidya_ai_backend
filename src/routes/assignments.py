@@ -1598,11 +1598,11 @@ async def import_document_to_assignment(
                         assignment_id=None,
                     )
 
-                    text_preview = f"{actual_file_type} content processed"
+                text_preview = f"{actual_file_type} content processed"
 
-                    logger.info(
-                        f"Parsed assignment after extracting diagrams: {parsed_assignment}"
-                    )
+                logger.info(
+                    f"Parsed assignment after extracting diagrams: {parsed_assignment}"
+                )
 
         except Exception as e:
             logger.error(f"Error parsing document with AI: {str(e)}")

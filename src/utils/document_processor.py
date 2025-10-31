@@ -19,6 +19,7 @@ import markdown
 from pdf2image import convert_from_bytes
 from .prompts import (
     DOCUMENT_PARSER_SYSTEM_PROMPT,
+    get_question_extraction_prompt,
 )
 from .assignment_schemas import get_assignment_parsing_schema
 
@@ -323,81 +324,13 @@ class AssignmentDocumentParser:
                 )
 
             # Build prompt for question extraction from images (no bbox from GPT-5)
-            prompt_text = f"""
-                Analyze the following {len(images)}-page PDF document and extract ALL existing assignment questions, exercises, problems, or assessment items.
-
-                Document: {file_name}
-
-                CRITICAL INSTRUCTIONS:
-                1. EXTRACT only existing questions - do NOT create new ones
-                2. Preserve exact question text as written in the document
-                3. Map question types appropriately:
-                - multiple-choice: Questions with options (A, B, C, D or 1, 2, 3, 4)
-                - fill-blank: Questions with blanks (e.g., "The capital of France is ___")
-                - short-answer: Brief responses (1-2 sentences)
-                - numerical: Questions requiring numeric answers
-                - long-answer: Extended written responses (paragraphs)
-                - true-false: Binary true/false questions
-                - code-writing: Questions requiring code solutions
-                - diagram-analysis: Questions involving diagram interpretation
-                - multi-part: Questions with sub-parts (a, b, c) or (i, ii, iii)
-
-                4. DIAGRAM IDENTIFICATION AND ASSOCIATION:
-                When identifying diagrams/images, carefully determine which question or sub-question they belong to:
-
-                a) DIAGRAM BELONGS TO MAIN QUESTION if:
-                   - The diagram appears before or immediately after the main question text
-                   - The diagram is referenced in the main question text (e.g., "Refer to the diagram below", "Using the figure shown")
-                   - The diagram is positioned between the main question and its sub-questions
-                   - The diagram is clearly associated with the overall question concept
-
-                b) DIAGRAM BELONGS TO SUB-QUESTION if:
-                   - The diagram appears immediately before or after a specific sub-question (a, b, c, etc.)
-                   - The diagram is referenced only in that specific sub-question text
-                   - The diagram is positioned between sub-questions
-                   - The diagram is clearly associated with only that sub-question's content
-
-                c) DIAGRAM ASSOCIATION RULES:
-                   - Analyze the spatial relationship between diagrams and text
-                   - Look for explicit references in question text ("see diagram", "refer to figure", etc.)
-                   - Consider the logical flow: diagram → question or question → diagram
-                   - For multi-part questions, determine if diagram applies to entire question or specific sub-part
-                   - If uncertain, prefer associating with the most specific question/sub-question that references it
-
-                d) DIAGRAM METADATA:
-                   - Set hasDiagram: true for the appropriate question/sub-question
-                   - Provide diagram metadata in the "diagram" field with:
-                     * page_number: Page where diagram appears (1-indexed)
-                     * caption: Descriptive label or caption for the diagram
-
-                5. Extract all information:
-                - Question text (without question numbers or marks)
-                - Multiple choice options (without option letters/numbers)
-                - Correct answers or solutions (if present, generate if not)
-                - For multiple choice: correctAnswer should be index string ("0", "1", "2", "3")
-                - For multi-part: provide empty string for correctAnswer (answers in subquestions)
-                - Point values
-                - Grading rubrics (generate if not present)
-                - Assignment title and description
-
-                6. Multi-part questions:
-                - Use type "multi-part"
-                - Structure subquestions properly
-                - rubricType: "per-subquestion"
-                - Main question rubric not required, but required for all non-multi-part subquestions
-                - Apply diagram association rules to determine if diagrams belong to main question or specific sub-questions
-
-                7. Regular questions:
-                - rubricType: "overall"
-                - rubric is required
-
-                8. Code content:
-                - Set hasCode: true
-                - Specify codeLanguage
-                - Extract code in the code field
-
-                Return the structured data according to the JSON schema.
-            """
+            prompt_text = get_question_extraction_prompt(
+                file_name=file_name,
+                file_type="application/pdf",
+                images=image_contents,
+                document_text="",
+                s3_urls_info="",
+            )
 
             # Get the JSON schema for the response
             response_schema = get_assignment_parsing_schema(
@@ -551,26 +484,13 @@ class AssignmentDocumentParser:
             # Build prompt based on document type
             if file_type == "text/plain":
                 # TXT: No diagram support
-                prompt = f"""
-                    Analyze the following text document and extract ALL existing assignment questions.
-
-                    Document: {file_name}
-
-                    Content:
-                    ---
-                    {document_text}
-                    ---
-
-                    INSTRUCTIONS:
-                    - EXTRACT only existing questions - do NOT create new ones
-                    - Map question types appropriately (multiple-choice, short-answer, long-answer, etc.)
-                    - Extract all information: question text, correct answers, points, rubrics
-                    - For multiple choice: correctAnswer should be index string ("0", "1", "2", "3")
-                    - Generate rubrics and correct answers if not present
-                    - NO DIAGRAM SUPPORT for TXT files (hasDiagram must be false)
-
-                    Return the structured data according to the JSON schema.
-                """
+                prompt = get_question_extraction_prompt(
+                    file_name=file_name,
+                    file_type="text/plain",
+                    images=None,
+                    document_text=document_text,
+                    s3_urls_info=None,
+                )
             elif file_type in [
                 "text/markdown",
                 "text/html",
@@ -583,58 +503,13 @@ class AssignmentDocumentParser:
                     if s3_urls
                     else "None detected"
                 )
-                prompt = f"""
-                    Analyze the following document and extract ALL existing assignment questions.
-
-                    Document: {file_name}
-                    Type: {file_type}
-
-                    Detected S3 URLs in content:
-                    {s3_urls_info}
-
-                    Content:
-                    ---
-                    {document_text}
-                    ---
-
-                    INSTRUCTIONS:
-                    - EXTRACT only existing questions - do NOT create new ones
-                    - Map question types appropriately
-                    - Extract all information: question text, correct answers, points, rubrics
-                    - For multiple choice: correctAnswer should be index string ("0", "1", "2", "3")
-                    - Generate rubrics and correct answers if not present
-                    - For multi-part questions, structure subquestions properly and apply rubric rules
-
-                    DIAGRAM IDENTIFICATION AND ASSOCIATION:
-                    When identifying diagrams/images referenced by S3 URLs, carefully determine which question or sub-question they belong to:
-
-                    a) DIAGRAM BELONGS TO MAIN QUESTION if:
-                       - The S3 URL appears before or immediately after the main question text
-                       - The diagram is referenced in the main question text (e.g., "Refer to the diagram at [URL]", "Using the figure shown")
-                       - The diagram is positioned between the main question and its sub-questions
-                       - The diagram is clearly associated with the overall question concept
-
-                    b) DIAGRAM BELONGS TO SUB-QUESTION if:
-                       - The S3 URL appears immediately before or after a specific sub-question (a, b, c, etc.)
-                       - The diagram is referenced only in that specific sub-question text
-                       - The diagram is positioned between sub-questions
-                       - The diagram is clearly associated with only that sub-question's content
-
-                    c) DIAGRAM ASSOCIATION RULES:
-                       - Analyze the spatial relationship between S3 URLs and question text
-                       - Look for explicit references in question text ("see diagram", "refer to figure", etc.)
-                       - Consider the logical flow: diagram → question or question → diagram
-                       - For multi-part questions, determine if diagram applies to entire question or specific sub-part
-                       - If uncertain, prefer associating with the most specific question/sub-question that references it
-
-                    d) DIAGRAM METADATA:
-                       - Set hasDiagram: true for the appropriate question/sub-question
-                       - For diagrams: If a question references an S3 URL (image), set:
-                         * hasDiagram: true
-                         * diagram.s3_url: the full S3 URL
-
-                    Return the structured data according to the JSON schema.
-                """
+                prompt = get_question_extraction_prompt(
+                    file_name=file_name,
+                    file_type=file_type,
+                    images=None,
+                    document_text=document_text,
+                    s3_urls_info=s3_urls_info,
+                )
             else:
                 # DOCX: Support embedded images
                 images_info = (
@@ -647,59 +522,13 @@ class AssignmentDocumentParser:
                     if extracted_images
                     else "None"
                 )
-                prompt = f"""
-                    Analyze the following DOCX document and extract ALL existing assignment questions.
-
-                    Document: {file_name}
-
-                    Extracted images (already uploaded to S3):
-                    {images_info}
-
-                    Content:
-                    ---
-                    {document_text}
-                    ---
-
-                    INSTRUCTIONS:
-                    - EXTRACT only existing questions - do NOT create new ones
-                    - Map question types appropriately
-                    - Extract all information: question text, correct answers, points, rubrics
-                    - For multiple choice: correctAnswer should be index string ("0", "1", "2", "3")
-                    - Generate rubrics and correct answers if not present
-                    - For multi-part questions, structure subquestions properly and apply rubric rules
-
-                    DIAGRAM IDENTIFICATION AND ASSOCIATION:
-                    When identifying diagrams/images in the DOCX document, carefully determine which question or sub-question they belong to:
-
-                    a) DIAGRAM BELONGS TO MAIN QUESTION if:
-                       - The image appears before or immediately after the main question text
-                       - The diagram is referenced in the main question text (e.g., "Refer to the diagram below", "Using the figure shown")
-                       - The diagram is positioned between the main question and its sub-questions
-                       - The diagram is clearly associated with the overall question concept
-
-                    b) DIAGRAM BELONGS TO SUB-QUESTION if:
-                       - The image appears immediately before or after a specific sub-question (a, b, c, etc.)
-                       - The diagram is referenced only in that specific sub-question text
-                       - The diagram is positioned between sub-questions
-                       - The diagram is clearly associated with only that sub-question's content
-
-                    c) DIAGRAM ASSOCIATION RULES:
-                       - Analyze the spatial relationship between images and question text
-                       - Look for explicit references in question text ("see diagram", "refer to figure", etc.)
-                       - Consider the logical flow: diagram → question or question → diagram
-                       - For multi-part questions, determine if diagram applies to entire question or specific sub-part
-                       - If uncertain, prefer associating with the most specific question/sub-question that references it
-
-                    d) DIAGRAM METADATA:
-                       - Set hasDiagram: true for the appropriate question/sub-question
-                       - For diagrams/images in the document:
-                         * hasDiagram: true
-                         * diagram.s3_key: use the s3_key from extracted images list above
-                         * diagram.s3_url: null
-                         * diagram.caption: description of the image
-
-                    Return the structured data according to the JSON schema.
-                """
+                prompt = get_question_extraction_prompt(
+                    file_name=file_name,
+                    file_type=file_type,
+                    images=images_info,
+                    document_text=document_text,
+                    s3_urls_info=None,
+                )
 
             # Get the JSON schema for the response
             response_schema = get_assignment_parsing_schema("non_pdf_parsing_response")
