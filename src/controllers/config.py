@@ -17,7 +17,7 @@ import sys
 from logging.handlers import RotatingFileHandler
 
 # Ensure log directory exists
-log_file_path = "/var/log/vidyaai_api.log"
+log_file_path = "/Users/pingakshyagoswami/Library/Mobile Documents/com~apple~CloudDocs/vidya_ai_backend/vidyaai_api.log"
 log_dir = os.path.dirname(log_file_path)
 os.makedirs(log_dir, exist_ok=True)
 
