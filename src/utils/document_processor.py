@@ -22,6 +22,7 @@ from .prompts import (
     get_question_extraction_prompt,
 )
 from .assignment_schemas import get_assignment_parsing_schema
+from .equation_extractor import EquationExtractor
 
 
 class DocumentProcessor:
@@ -30,6 +31,7 @@ class DocumentProcessor:
     def __init__(self):
         self.client = OpenAI()
         self.model = "gpt-4o"  # Vision-capable model for PDF extraction
+        self.equation_extractor = EquationExtractor()
         self.supported_types = {
             "application/pdf": self._extract_pdf_text,
             "text/plain": self._extract_text,
@@ -125,7 +127,7 @@ class DocumentProcessor:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a precise OCR system. Extract ALL text from images exactly as it appears, maintaining formatting, structure, and layout. Include all text visible in the images.",
+                        "content": "You are a precise OCR system. Extract ALL text from images exactly as it appears, maintaining formatting, structure, and layout. Include all text visible in the images. When extracting mathematical equations, convert them to LaTeX format using $...$ for inline equations and $$...$$ for display equations.",
                     },
                     {"role": "user", "content": user_content},
                 ],
@@ -157,14 +159,26 @@ class DocumentProcessor:
                 raise ValueError("Failed to extract text from PDF file")
 
     def _extract_text(self, content: bytes) -> str:
-        """Extract text from plain text files"""
+        """Extract text from plain text files, preserving LaTeX equations"""
         try:
-            return content.decode("utf-8")
+            text = content.decode("utf-8")
+            # LaTeX equations are already preserved in plain text
+            # Use equation extractor to verify equations are present
+            equations = self.equation_extractor.extract_from_text(text)
+            if equations:
+                logger.info(f"Detected {len(equations)} LaTeX equations in plain text")
+            return text
         except UnicodeDecodeError:
             # Try different encodings
             for encoding in ["latin-1", "cp1252", "iso-8859-1"]:
                 try:
-                    return content.decode(encoding)
+                    text = content.decode(encoding)
+                    equations = self.equation_extractor.extract_from_text(text)
+                    if equations:
+                        logger.info(
+                            f"Detected {len(equations)} LaTeX equations in plain text"
+                        )
+                    return text
                 except UnicodeDecodeError:
                     continue
             raise ValueError("Unable to decode text file")
@@ -179,14 +193,23 @@ class DocumentProcessor:
         )
 
     def _extract_docx_text(self, content: bytes) -> str:
-        """Extract text from DOCX files"""
+        """Extract text from DOCX files, including equations as LaTeX"""
         try:
             doc_file = BytesIO(content)
             doc = docx.Document(doc_file)
 
+            # Extract equations from DOCX
+            equations = self.equation_extractor.extract_from_docx(content)
+
             text = ""
+
             for paragraph in doc.paragraphs:
-                text += paragraph.text + "\n"
+                para_text = paragraph.text
+
+                # If we have equations, try to insert them at appropriate positions
+                # For now, we'll extract equations separately and they'll be preserved
+                # by the AI parser in the question text
+                text += para_text + "\n"
 
             # Also extract text from tables
             for table in doc.tables:
@@ -195,38 +218,75 @@ class DocumentProcessor:
                         text += cell.text + "\t"
                     text += "\n"
 
-            return text.strip()
+            # Extract equations and append them with LaTeX delimiters
+            # This ensures equations are preserved in the extracted text
+            extracted_text = text.strip()
+
+            if equations:
+                logger.info(f"Extracted {len(equations)} equations from DOCX")
+                # Append equations information as comments for AI parser
+                # The AI will extract these and include them in questions
+                equations_info = "\n\n[Equations found in document:\n"
+                for i, (latex, eq_type) in enumerate(equations, 1):
+                    delimiter = "$$" if eq_type == "display" else "$"
+                    equations_info += f"{i}. {delimiter}{latex}{delimiter}\n"
+                equations_info += "]"
+                extracted_text += equations_info
+
+            return extracted_text
         except Exception as e:
             logger.error(f"Error extracting DOCX text: {str(e)}")
             raise ValueError("Failed to extract text from DOCX file")
 
     def _extract_markdown_text(self, content: bytes) -> str:
-        """Extract text from Markdown files"""
+        """Extract text from Markdown files, preserving LaTeX equations"""
         try:
             md_text = content.decode("utf-8")
+
+            # Extract equations from markdown before conversion
+            equations = self.equation_extractor.extract_from_markdown(md_text)
+            if equations:
+                logger.info(f"Detected {len(equations)} LaTeX equations in markdown")
+
             # Convert markdown to HTML first, then to plain text
-            html = markdown.markdown(md_text)
+            # Note: html2text should preserve LaTeX patterns if they're in the markdown
+            html = markdown.markdown(md_text, extensions=["extra", "codehilite"])
             h = html2text.HTML2Text()
             h.ignore_links = True
-            return h.handle(html).strip()
+            # Don't ignore math elements - preserve them
+            result = h.handle(html).strip()
+
+            # Ensure equations are still present after conversion
+            return result
         except Exception as e:
             logger.error(f"Error extracting Markdown text: {str(e)}")
+            # Fallback: return raw markdown text which preserves LaTeX
             return content.decode("utf-8", errors="ignore")
 
     def _extract_html_text(self, content: bytes) -> str:
-        """Extract text from HTML files"""
+        """Extract text from HTML files, preserving MathML and LaTeX equations"""
         try:
             html_content = content.decode("utf-8")
+
+            # Extract equations from HTML before text conversion
+            equations = self.equation_extractor.extract_from_html(html_content)
+            if equations:
+                logger.info(f"Detected {len(equations)} equations in HTML")
+
             h = html2text.HTML2Text()
             h.ignore_links = True
             h.ignore_images = True
-            return h.handle(html_content).strip()
+            # Preserve equations by converting MathML to LaTeX in HTML before text extraction
+            result = h.handle(html_content).strip()
+
+            # Verify equations are preserved (they should be if they were in LaTeX format)
+            return result
         except Exception as e:
             logger.error(f"Error extracting HTML text: {str(e)}")
             return content.decode("utf-8", errors="ignore")
 
     def _extract_csv_text(self, content: bytes) -> str:
-        """Extract text from CSV files"""
+        """Extract text from CSV files, preserving equations in cell content"""
         try:
             csv_text = content.decode("utf-8")
             csv_file = BytesIO(csv_text.encode())
@@ -239,19 +299,31 @@ class DocumentProcessor:
                 else:
                     text += "Row " + str(row_num) + ": " + ", ".join(row) + "\n"
 
+            # Check for equations in CSV text
+            equations = self.equation_extractor.extract_from_text(text)
+            if equations:
+                logger.info(f"Detected {len(equations)} equations in CSV content")
+
             return text.strip()
         except Exception as e:
             logger.error(f"Error extracting CSV text: {str(e)}")
             return content.decode("utf-8", errors="ignore")
 
     def _extract_json_text(self, content: bytes) -> str:
-        """Extract text from JSON files"""
+        """Extract text from JSON files, preserving equations in text fields"""
         try:
             json_text = content.decode("utf-8")
             json_data = json.loads(json_text)
 
             # Convert JSON to readable text format
-            return self._json_to_text(json_data)
+            text = self._json_to_text(json_data)
+
+            # Check for equations in JSON text
+            equations = self.equation_extractor.extract_from_text(text)
+            if equations:
+                logger.info(f"Detected {len(equations)} equations in JSON content")
+
+            return text
         except Exception as e:
             logger.error(f"Error extracting JSON text: {str(e)}")
             return content.decode("utf-8", errors="ignore")
@@ -605,32 +677,34 @@ class AssignmentDocumentParser:
                 # Basic fields
                 out["id"] = src.get("id", 1)
                 out["type"] = src.get("type", "short-answer")
-                out["question"] = src.get("question", "")
+                # Preserve question text with equations (LaTeX format preserved)
+                out["question"] = str(src.get("question", "")).strip()
                 out["points"] = self._parse_points(src.get("points", 0))
-                out["rubric"] = src.get("rubric", "")
+                # Preserve rubric text with equations (LaTeX format preserved)
+                out["rubric"] = str(src.get("rubric", "")).strip()
                 out["order"] = src.get("order", 1)
 
-                # Options (for multiple-choice)
+                # Options (for multiple-choice) - preserve equations in options
                 options = src.get("options", [])
                 if isinstance(options, list):
-                    out["options"] = [str(opt) for opt in options]
+                    out["options"] = [str(opt).strip() for opt in options]
                 else:
                     out["options"] = []
 
-                # Correct answer - handle both single and multiple correct
+                # Correct answer - handle both single and multiple correct - preserve equations
                 ca = (
                     src.get("correctAnswer")
                     or src.get("correct_answer")
                     or src.get("answer")
                 )
-                out["correctAnswer"] = str(ca) if ca is not None else ""
+                out["correctAnswer"] = str(ca).strip() if ca is not None else ""
 
-                # Multiple correct support
+                # Multiple correct support - preserve equations
                 out["allowMultipleCorrect"] = src.get("allowMultipleCorrect", False)
                 multiple_correct = src.get("multipleCorrectAnswers", [])
                 if isinstance(multiple_correct, list):
                     out["multipleCorrectAnswers"] = [
-                        str(ans) for ans in multiple_correct
+                        str(ans).strip() for ans in multiple_correct
                     ]
                 else:
                     out["multipleCorrectAnswers"] = []

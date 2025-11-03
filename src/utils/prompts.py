@@ -19,6 +19,16 @@ DOCUMENT_PARSER_SYSTEM_PROMPT = """
     - For multi-part questions, properly structure subquestions
     - Identify code content and diagram requirements accurately
 
+    EQUATION EXTRACTION CRITICAL RULES:
+    When processing documents with mathematical equations or formulas:
+    1. EXTRACT equations as LaTeX format using standard delimiters:
+       - Use $...$ for inline equations (e.g., $E = mc^2$)
+       - Use $$...$$ for display equations (e.g., $$\\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}$$)
+    2. PRESERVE equations exactly as they appear in the document, converting to LaTeX syntax
+    3. INCLUDE equations in question text, options, answers, and rubrics where they appear
+    4. MAINTAIN mathematical notation accuracy - ensure all symbols, subscripts, superscripts are correctly converted
+    5. If equations are detected in images or visual format, extract them as LaTeX from the visual representation
+
     DIAGRAM IDENTIFICATION CRITICAL RULES:
     When processing documents with diagrams/images, you must carefully determine which question or sub-question each diagram belongs to:
 
@@ -148,6 +158,12 @@ QUESTION_EXTRACTION_PROMPT_HEADER_DOCX = """
 QUESTION_EXTRACTION_PROMPT_BODY_1 = """
     - EXTRACT only existing questions - do NOT create new ones
     - Preserve exact question text as written in the document
+    - EQUATION EXTRACTION: When you encounter mathematical equations or formulas:
+        -- Extract them as LaTeX format using $...$ for inline equations and $$...$$ for display equations
+        -- Preserve all mathematical notation accurately (symbols, subscripts, superscripts, fractions, integrals, etc.)
+        -- Include equations in question text, options, answers, and rubrics where they appear
+        -- Convert visual equations to LaTeX syntax when extracting from images
+        -- Examples: $x^2 + y^2 = r^2$, $$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$, $\\int_0^\\infty f(x)dx$
     - Identify and set question type appropriately:
         -- multiple-choice: Questions with options (A, B, C, D or 1, 2, 3, 4)
         -- fill-blank: Questions with blanks (e.g., "The capital of France is ___")
@@ -230,13 +246,13 @@ QUESTION_EXTRACTION_PROMPT_BODY_3 = """
             --- If no optional instruction found, leave optionalParts: false (default)
             --- Apply this at any nesting level (main questions, subquestions, nested subquestions)
     - Extract following information:
-        -- Question text (without question numbers or marks)
-        -- Multiple choice options (without option letters/numbers)
-        -- Correct answers or solutions (DO generate if not present in the document)
+        -- Question text (without question numbers or marks) - PRESERVE equations as LaTeX with $...$ or $$...$$
+        -- Multiple choice options (without option letters/numbers) - PRESERVE equations as LaTeX where they appear
+        -- Correct answers or solutions (DO generate if not present in the document) - PRESERVE equations as LaTeX
             --- For multiple choice: correctAnswer should be index string ("0", "1", "2", "3")
             --- For multi-part: provide empty string for correctAnswer (provide answers in subquestions)
         -- Point values
-        -- Grading rubrics (DO generate if not present in the document)
+        -- Grading rubrics (DO generate if not present in the document) - PRESERVE equations as LaTeX where they appear
         -- Assignment title and description
     - Multi-part questions:
         -- Use type "multi-part"
@@ -247,12 +263,15 @@ QUESTION_EXTRACTION_PROMPT_BODY_3 = """
         -- if sub-question is not multi-part, set rubricType: "overall" for the sub-question
         -- remember to set rubric for each sub-question and sub-sub-questions
         -- Apply diagram association rules to determine if diagrams belong to main question or specific sub-questions
+        -- PRESERVE equations in all sub-question text and rubrics as LaTeX
     - Regular questions:
         -- rubricType: "overall"
         -- rubric is required
+        -- PRESERVE equations in question text and rubric as LaTeX
     - Code content:
         -- Set hasCode: true
         -- Specify codeLanguage
         -- Extract code in the code field
+    - EQUATION PRESERVATION: Ensure all mathematical equations are preserved in question text, options, answers, and rubrics using LaTeX format ($...$ for inline, $$...$$ for display)
     Return the structured data according to the JSON schema.
 """
