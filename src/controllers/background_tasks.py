@@ -512,7 +512,7 @@ def extract_question_diagrams_background(
             file_content = f.read()
 
         # Process diagrams
-        from utils.document_processor import AssignmentDocumentParser
+        from utils.assignment_document_parser import AssignmentDocumentParser
 
         parser = AssignmentDocumentParser()
 

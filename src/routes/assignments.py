@@ -1565,7 +1565,7 @@ async def import_document_to_assignment(
             )
 
         # Import document processing services
-        from utils.document_processor import AssignmentDocumentParser
+        from utils.assignment_document_parser import AssignmentDocumentParser
 
         # Initialize parser
         assignment_parser = AssignmentDocumentParser()
