@@ -16,6 +16,7 @@ from PIL import Image
 from pdf2image import convert_from_bytes
 from .prompts import (
     DOCUMENT_PARSER_SYSTEM_PROMPT,
+    DOCUMENT_PARSER_SYSTEM_PROMPT_STEP1,
     get_question_extraction_prompt,
 )
 from .assignment_schemas import get_assignment_parsing_schema
@@ -37,7 +38,10 @@ class AssignmentDocumentParser:
     ) -> Dict[str, Any]:
         """
         Parse PDF pages directly as images to extract assignment questions with diagram support.
-        This method sends all PDF page images to the LLM in a single call for better diagram detection.
+        Uses efficient 3-step extraction:
+        1. Single LLM call to extract all content (questions, diagrams, equations, answers if present)
+        2. Gemini calls to extract diagram bounding boxes
+        3. Single LLM call to generate missing answers/rubrics
 
         Args:
             pdf_content: Raw PDF file content (bytes)
@@ -54,77 +58,19 @@ class AssignmentDocumentParser:
                 f"Converted PDF to {len(images)} images for question extraction"
             )
 
-            # Convert all images to base64
-            image_contents = []
-            for page_num, image in enumerate(images, 1):
-                buffered = BytesIO()
-                image.save(buffered, format="PNG")
-                img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                image_contents.append(
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{img_base64}"},
-                    }
-                )
-
-            # Build prompt for question extraction from images (no bbox from GPT-5)
-            prompt_text = get_question_extraction_prompt(
-                file_name=file_name,
-                file_type="application/pdf",
-                images=image_contents,
-                document_text="",
-                s3_urls_info="",
+            # STEP 1: Single LLM call to extract ALL content including equations
+            logger.info(
+                "Step 1: Extracting all content (questions, diagrams, equations, answers)..."
             )
-
-            # Get the JSON schema for the response
-            response_schema = get_assignment_parsing_schema(
-                "pdf_image_parsing_response_no_bbox"
-            )
-
-            # Build multimodal message content
-            user_content = [{"type": "text", "text": dedent(prompt_text).strip()}]
-            user_content.extend(image_contents)
-
-            # Call OpenAI with all images in one request
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": dedent(DOCUMENT_PARSER_SYSTEM_PROMPT),
-                    },
-                    {"role": "user", "content": user_content},
-                ],
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": response_schema["name"],
-                        "schema": response_schema,
-                    },
-                },
-            )
-
-            # Parse the response
-            response_text = response.choices[0].message.content
-            logger.info(f"Response text: {response_text}")
-            if not response_text:
-                raise ValueError("Empty response from AI")
-
-            try:
-                parsed_data = json.loads(response_text)
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON decode error: {e}")
-                logger.error(f"Raw response length: {len(response_text)}")
-                raise ValueError("Failed to parse AI response as JSON")
+            extracted_data = self._extract_all_content(images, file_name)
 
             # Validate and normalize the response
-            result = self._normalize_assignment_data(parsed_data, file_name)
+            result = self._normalize_assignment_data(extracted_data, file_name)
 
-            # Enrich with bounding boxes using Gemini for diagrammed questions
+            # STEP 2: Gemini calls to extract diagram bounding boxes
+            logger.info("Step 2: Extracting diagram bounding boxes with Gemini...")
             try:
                 from controllers.vision_gemini import detect_diagram_bbox
-
-                page_images = images  # already computed
 
                 def enrich_question(q: Dict[str, Any]) -> Dict[str, Any]:
                     if q.get("hasDiagram") and isinstance(q.get("diagram"), dict):
@@ -132,8 +78,8 @@ class AssignmentDocumentParser:
                         page_number = diagram.get("page_number")
                         bbox = diagram.get("bounding_box")
                         if page_number and not bbox:
-                            if 1 <= page_number <= len(page_images):
-                                page_img = page_images[page_number - 1]
+                            if 1 <= page_number <= len(images):
+                                page_img = images[page_number - 1]
                                 try:
                                     predicted_bbox = detect_diagram_bbox(
                                         page_img, q.get("question", "")
@@ -148,9 +94,12 @@ class AssignmentDocumentParser:
                                             float(predicted_bbox[2]),
                                             float(predicted_bbox[3]),
                                         ]
+                                        logger.info(
+                                            f"Q{q.get('id')}: Gemini bbox detected: {predicted_bbox}"
+                                        )
                                 except Exception as _e:
                                     logger.warning(
-                                        f"Gemini bbox detection failed: {_e}"
+                                        f"Q{q.get('id')}: Gemini bbox detection failed: {_e}"
                                     )
 
                     # Recurse into subquestions
@@ -165,6 +114,12 @@ class AssignmentDocumentParser:
             except Exception as e:
                 logger.warning(f"Skipping Gemini bbox enrichment due to error: {e}")
 
+            # STEP 3: Single LLM call to generate missing answers/rubrics
+            logger.info("Step 3: Generating missing answers and rubrics...")
+            result = self._generate_missing_answers_and_rubrics(result, images)
+
+            result = self._normalize_assignment_data(result, file_name)
+
             logger.info(
                 f"Successfully extracted {len(result.get('questions', []))} questions from PDF images"
             )
@@ -174,6 +129,315 @@ class AssignmentDocumentParser:
         except Exception as e:
             logger.error(f"Error parsing PDF images: {str(e)}")
             raise
+
+    def _extract_all_content(
+        self, images: List[Image.Image], file_name: str
+    ) -> Dict[str, Any]:
+        """
+        Step 1: Single LLM call to extract ALL content.
+        Extracts: title, description, questions, types, points, options, diagrams, equations,
+        correct answers (if present), rubrics (if present).
+        """
+        # Convert images to base64
+        image_contents = []
+        for page_num, image in enumerate(images, 1):
+            buffered = BytesIO()
+            image.save(buffered, format="PNG")
+            img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            image_contents.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{img_base64}"},
+                }
+            )
+
+        # Create comprehensive extraction prompt
+        prompt = f"""
+            Analyze this {len(images)}-page PDF document: {file_name}
+
+            Extract ALL assignment content and return the results in JSON format.
+
+            For each question, extract:
+            1. Question text (with placeholder for equations)
+            2. Question type (multiple-choice, short-answer, long-answer, etc.)
+            3. Points/marks
+            4. Options (if multiple-choice) (with placeholder for equations)
+            5. Diagrams:
+            - page_number (which page the diagram appears on)
+            - caption (description/title of the diagram)
+            - DO NOT include bounding_box (will be extracted separately)
+            6. Equations:
+            - latex (the LaTeX formatted equation)
+            - position (char_index: character position in question text, context: 'question' or 'options')
+            - type ('inline' or 'display')
+            7. Correct answers (with placeholder for equations) (if clearly stated in the document, otherwise leave as empty string)
+            8. Grading rubrics (if provided in the document, otherwise leave as empty string)
+            9. Sub-questions (if multi-part question) and sub-sub-question (if sub-question of multi-part question is of multi-part type)
+
+            Also extract:
+            - Assignment title (or generate from filename)
+            - Assignment description (or brief summary)
+
+            IMPORTANT for equations:
+            - char_index is the character count in the question text AFTER which the equation appears
+            - Count from the start of the question text (starting at 0)
+            - For equations in options, set context to 'options' and include option_index
+            - insert placeholders in the appropriate places in the format <eq equation_id>. example: <eq 1>, <eq A1_Q4>
+
+            Return your response as a structured JSON object matching the provided schema.
+        """
+
+        # Get comprehensive schema (includes equations, allows empty answers/rubrics)
+        response_schema = get_assignment_parsing_schema("step1_pdf_parsing_no_bbox")
+
+        # Build message
+        user_content = [{"type": "text", "text": dedent(prompt).strip()}]
+        user_content.extend(image_contents)
+
+        # Call LLM
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": dedent(DOCUMENT_PARSER_SYSTEM_PROMPT_STEP1),
+                },
+                {"role": "user", "content": user_content},
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": response_schema["name"],
+                    "schema": response_schema,
+                },
+            },
+        )
+
+        extracted_data = json.loads(response.choices[0].message.content)
+
+        logger.info(
+            f"Step 1: Extracted {len(extracted_data.get('questions', []))} questions"
+        )
+
+        # Log sample of what was extracted
+        sample_questions = extracted_data.get("questions", [])[:3]
+        for q in sample_questions:
+            logger.info(
+                f"Step 1: Sample Q{q.get('id')} - answer='{q.get('correctAnswer', '')}', rubric='{q.get('rubric', '')}'"
+            )
+
+        logger.info("Step 1: Extracted all content including equations")
+        return extracted_data
+
+    def _generate_missing_answers_and_rubrics(
+        self, data: Dict[str, Any], images: List[Image.Image]
+    ) -> Dict[str, Any]:
+        """
+        Step 3: Single LLM call to generate missing answers and rubrics for ALL questions.
+        Only processes questions that have empty correctAnswer or rubric fields.
+        """
+        questions = data.get("questions", [])
+        logger.info(f"Step 3: Starting with {len(questions)} total questions")
+
+        # Collect all questions that need answers/rubrics
+        questions_needing_generation = []
+
+        def collect_incomplete_questions(q: Dict[str, Any], path: str = "") -> None:
+            """Recursively collect questions with missing answers/rubrics"""
+            q_id = q.get("id", "unknown")
+            current_path = f"{path}.{q_id}" if path else str(q_id)
+
+            current_answer = q.get("correctAnswer", "")
+            current_rubric = q.get("rubric", "")
+
+            logger.info(
+                f"Step 3: Checking Q{current_path} - answer='{current_answer}', rubric='{current_rubric}'"
+            )
+
+            needs_answer = not current_answer or current_answer == ""
+            needs_rubric = not current_rubric or current_rubric == ""
+
+            if needs_answer or needs_rubric:
+                logger.info(
+                    f"Step 3: Q{current_path} needs generation (answer={needs_answer}, rubric={needs_rubric})"
+                )
+                questions_needing_generation.append(
+                    {
+                        "path": current_path,
+                        "question": q,
+                        "needs_answer": needs_answer,
+                        "needs_rubric": needs_rubric,
+                    }
+                )
+
+            # Recurse into subquestions
+            if q.get("subquestions"):
+                logger.info(
+                    f"Step 3: Q{current_path} has {len(q['subquestions'])} subquestions"
+                )
+                for sq in q["subquestions"]:
+                    collect_incomplete_questions(sq, current_path)
+
+        for q in questions:
+            collect_incomplete_questions(q)
+
+        if not questions_needing_generation:
+            logger.info("Step 3: All questions already have answers and rubrics")
+            return data
+
+        logger.info(
+            f"Step 3: Found {len(questions_needing_generation)} questions needing generation"
+        )
+
+        # Build batch prompt with all incomplete questions
+        prompt_parts = [
+            f"Generate missing correct answers and/or grading rubrics for the following {len(questions_needing_generation)} questions.",
+            "Return your response in JSON format as an array of objects, each containing:",
+            "- question_path: The path identifier (e.g., '1', '2.1', '3.2.1')",
+            "- correct_answer: The correct answer (if needed) (if answer contains diagram, simply explain the diagram.)",
+            "- rubric: Detailed grading criteria (if needed)",
+            "",
+            "Questions requiring generation:",
+            "",
+        ]
+
+        for item in questions_needing_generation:
+            q = item["question"]
+            prompt_parts.append(f"Question Path: {item['path']}")
+            prompt_parts.append(f"Type: {q.get('type', 'unknown')}")
+            prompt_parts.append(f"Points: {q.get('points', 0)}")
+            prompt_parts.append(f"Question: {q.get('question', '')}")
+
+            if q.get("options"):
+                prompt_parts.append(f"Options: {', '.join(q['options'])}")
+
+            if q.get("equations"):
+                eq_list = []
+                for eq in q["equations"]:
+                    eq_list.append(
+                        f"  - {eq['latex']} (type: {eq['type']}, context: {eq['position']['context']})"
+                    )
+                prompt_parts.append("Equations:")
+                prompt_parts.extend(eq_list)
+
+            if q.get("hasDiagram") and q.get("diagram"):
+                prompt_parts.append(
+                    f"Diagram: {q['diagram'].get('caption', 'See diagram')}"
+                )
+
+            prompt_parts.append(
+                f"Needs: {'answer' if item['needs_answer'] else ''}{' and ' if item['needs_answer'] and item['needs_rubric'] else ''}{'rubric' if item['needs_rubric'] else ''}"
+            )
+            prompt_parts.append("")
+
+        prompt = "\n".join(prompt_parts)
+
+        logger.info(f"Step 3: Prompt length: {len(prompt)} characters")
+        logger.info(f"Step 3: First 500 chars of prompt: {prompt[:500]}")
+
+        # Call LLM for batch generation
+        logger.info("Step 3: Calling LLM for answer/rubric generation...")
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert educator. Generate accurate answers and detailed grading rubrics. Return your response as a JSON array.",
+                },
+                {"role": "user", "content": dedent(prompt).strip()},
+            ],
+            response_format={"type": "json_object"},
+        )
+
+        response_content = response.choices[0].message.content
+        logger.info(f"Step 3: LLM response length: {len(response_content)} characters")
+        logger.info(f"Step 3: First 1000 chars of response: {response_content[:1000]}")
+
+        result = json.loads(response_content)
+        logger.info(f"Step 3: Parsed JSON keys: {list(result.keys())}")
+
+        # Try multiple possible keys where the LLM might return the data
+        generated_answers = (
+            result.get("responses", [])
+            or result.get("answers", [])
+            or result.get("questions", [])
+            or result.get("result", [])
+            or result.get("results", [])
+            or result.get("data", [])
+            or []
+        )
+        logger.info(
+            f"Step 3: Found {len(generated_answers)} generated answers in response"
+        )
+
+        # If still empty, log the full response for debugging
+        if not generated_answers:
+            logger.warning(
+                f"Step 3: Could not find answers in expected keys. Full response: {response_content[:2000]}"
+            )
+
+        # Create a mapping of path to generated data
+        path_to_generation = {}
+        for gen in generated_answers:
+            path = gen.get("question_path")
+            if path:
+                path_to_generation[path] = gen
+                logger.info(
+                    f"Step 3: Mapped path '{path}' -> answer='{gen.get('correct_answer', '')[:50]}...', rubric='{gen.get('rubric', '')[:50]}...'"
+                )
+
+        logger.info(
+            f"Step 3: Created mapping for {len(path_to_generation)} paths: {list(path_to_generation.keys())}"
+        )
+
+        # Update questions with generated answers/rubrics
+        def update_question_with_generation(
+            q: Dict[str, Any], path: str = ""
+        ) -> Dict[str, Any]:
+            """Recursively update questions with generated answers/rubrics"""
+            q_id = q.get("id", "unknown")
+            current_path = f"{path}.{q_id}" if path else str(q_id)
+
+            logger.info(
+                f"Step 3: Updating Q{current_path}, looking for path in mapping..."
+            )
+
+            if current_path in path_to_generation:
+                gen = path_to_generation[current_path]
+                logger.info(f"Step 3: Found generation data for Q{current_path}")
+
+                if not q.get("correctAnswer") and gen.get("correct_answer"):
+                    q["correctAnswer"] = gen["correct_answer"]
+                    logger.info(
+                        f"Step 3: Updated Q{current_path} correctAnswer: {gen['correct_answer'][:100]}"
+                    )
+
+                if not q.get("rubric") and gen.get("rubric"):
+                    q["rubric"] = gen["rubric"]
+                    logger.info(
+                        f"Step 3: Updated Q{current_path} rubric: {gen['rubric'][:100]}"
+                    )
+            else:
+                logger.warning(f"Step 3: No generation data found for Q{current_path}")
+
+            # Recurse into subquestions
+            if q.get("subquestions"):
+                logger.info(
+                    f"Step 3: Processing {len(q['subquestions'])} subquestions of Q{current_path}"
+                )
+                q["subquestions"] = [
+                    update_question_with_generation(sq, current_path)
+                    for sq in q["subquestions"]
+                ]
+
+            return q
+
+        data["questions"] = [update_question_with_generation(q) for q in questions]
+        logger.info(f"Step 3: Completed updating all questions")
+        logger.info(
+            f"Step 3: Successfully generated answers/rubrics for {len(path_to_generation)} questions"
+        )
+        return data
 
     def parse_non_pdf_document_to_assignment(
         self,
@@ -360,6 +624,9 @@ class AssignmentDocumentParser:
                     out["options"] = [str(opt) for opt in options]
                 else:
                     out["options"] = []
+
+                # Equations
+                out["equations"] = src.get("equations", [])
 
                 # Correct answer - handle both single and multiple correct
                 ca = (
