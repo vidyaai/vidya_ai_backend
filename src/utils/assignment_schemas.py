@@ -39,7 +39,7 @@ def get_assignment_parsing_schema(
                     },
                     "context": {
                         "type": "string",
-                        "enum": ["question_text", "options", "correctAnswer"],
+                        "enum": ["question_text", "options", "correctAnswer", "rubric"],
                         "description": "Where in the question structure this equation appears",
                     },
                 },

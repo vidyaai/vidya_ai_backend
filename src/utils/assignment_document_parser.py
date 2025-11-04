@@ -158,31 +158,53 @@ class AssignmentDocumentParser:
             Extract ALL assignment content and return the results in JSON format.
 
             For each question, extract:
-            1. Question text (with placeholder for equations)
+            1. Question text (with placeholders for equations in format <eq equation_id>)
             2. Question type (multiple-choice, short-answer, long-answer, etc.)
             3. Points/marks
-            4. Options (if multiple-choice) (with placeholder for equations)
+            4. Options (if multiple-choice) (with placeholders for equations)
             5. Diagrams:
-            - page_number (which page the diagram appears on)
-            - caption (description/title of the diagram)
-            - DO NOT include bounding_box (will be extracted separately)
-            6. Equations:
-            - latex (the LaTeX formatted equation)
-            - position (char_index: character position in question text, context: 'question' or 'options')
-            - type ('inline' or 'display')
-            7. Correct answers (with placeholder for equations) (if clearly stated in the document, otherwise leave as empty string)
-            8. Grading rubrics (if provided in the document, otherwise leave as empty string)
-            9. Sub-questions (if multi-part question) and sub-sub-question (if sub-question of multi-part question is of multi-part type)
+               - page_number (which page the diagram appears on)
+               - caption (description/title of the diagram)
+               - DO NOT include bounding_box (will be extracted separately)
+            6. Equations (in ALL contexts):
+               - Extract from: question text, options, correct answers, rubrics
+               - latex (the LaTeX formatted equation)
+               - position (char_index: character position, context: 'question_text', 'options', 'correctAnswer', or 'rubric')
+               - type ('inline' or 'display')
+               - Use naming convention:
+                 * Question text: q{{question_id}}_eq{{number}}
+                 * Options: q{{question_id}}_opt{{letter}}_eq{{number}}
+                 * Correct Answer: q{{question_id}}_ans_eq{{number}}
+                 * Rubric: q{{question_id}}_rub_eq{{number}}
+            7. Correct answers (with placeholders for equations) (if clearly stated in the document, otherwise leave as empty string)
+               - If the document contains step-by-step solutions or derivations, extract them COMPLETELY
+               - Preserve all intermediate steps, explanations, and working shown in the document
+               - Use equation placeholders for each mathematical expression in the derivation
+            8. Grading rubrics (with placeholders for equations) (if provided in the document, otherwise leave as empty string)
+            9. Sub-questions (if multi-part question) and sub-sub-questions (if nested)
 
             Also extract:
             - Assignment title (or generate from filename)
             - Assignment description (or brief summary)
 
             IMPORTANT for equations:
-            - char_index is the character count in the question text AFTER which the equation appears
-            - Count from the start of the question text (starting at 0)
-            - For equations in options, set context to 'options' and include option_index
-            - insert placeholders in the appropriate places in the format <eq equation_id>. example: <eq 1>, <eq A1_Q4>
+            - Insert placeholders in text where equations appear: <eq equation_id>
+            - char_index is the character count AFTER which the placeholder appears
+            - Count from the start of the respective context (question, option, answer, rubric)
+            - For equations in options, context should be 'options'
+            - For equations in correctAnswer, context should be 'correctAnswer'
+            - For equations in rubric, context should be 'rubric'
+            - Store all equations in the single 'equations' array
+
+            Example:
+            Question: "Solve <eq q1_eq1> for x."
+            Correct Answer: "The solution is <eq q1_ans_eq1>"
+            Rubric: "Award full marks for <eq q1_rub_eq1>"
+            Equations: [
+              {{"id": "q1_eq1", "latex": "2x + 5 = 13", "position": {{"char_index": 6, "context": "question_text"}}, "type": "inline"}},
+              {{"id": "q1_ans_eq1", "latex": "x = 4", "position": {{"char_index": 16, "context": "correctAnswer"}}, "type": "inline"}},
+              {{"id": "q1_rub_eq1", "latex": "x = 4", "position": {{"char_index": 21, "context": "rubric"}}, "type": "inline"}}
+            ]
 
             Return your response as a structured JSON object matching the provided schema.
         """
@@ -292,10 +314,85 @@ class AssignmentDocumentParser:
         # Build batch prompt with all incomplete questions
         prompt_parts = [
             f"Generate missing correct answers and/or grading rubrics for the following {len(questions_needing_generation)} questions.",
-            "Return your response in JSON format as an array of objects, each containing:",
-            "- question_path: The path identifier (e.g., '1', '2.1', '3.2.1')",
-            "- correct_answer: The correct answer (if needed) (if answer contains diagram, simply explain the diagram.)",
-            "- rubric: Detailed grading criteria (if needed)",
+            "",
+            "ANSWER GENERATION GUIDELINES:",
+            "- For mathematical/scientific questions: Provide FULL STEP-BY-STEP DERIVATIONS",
+            "- Show all intermediate steps, formulas, and calculations",
+            "- Explain the reasoning behind each step",
+            "- For algebraic problems: Show equation manipulation step-by-step",
+            "- For calculus problems: Show differentiation/integration steps with chain rule, u-substitution, etc.",
+            "- For physics problems: List given values, formulas, substitutions, and final answer",
+            "- For numerical questions: Show the complete calculation process",
+            "- For conceptual questions: Provide thorough explanations with key concepts",
+            "",
+            "EQUATION HANDLING:",
+            "- Use placeholders in format <eq equation_id> where equations appear",
+            "- For answer equations: q{question_path}_ans_eq{number}",
+            "- For rubric equations: q{question_path}_rub_eq{number}",
+            "- Include equation metadata in the 'equations' array",
+            "- Set position.context to 'correctAnswer' or 'rubric'",
+            "- Set position.char_index to character position after which equation appears",
+            "",
+            "DERIVATION EXAMPLES:",
+            "",
+            "Example 1 - Algebraic Equation (path: '1'):",
+            'Question: "Solve 7x - 3 = 4 for x"',
+            'Answer: "To solve <eq q1_ans_eq1>, we follow these steps:',
+            "Step 1: Add 3 to both sides: <eq q1_ans_eq2>",
+            "Step 2: Simplify: <eq q1_ans_eq3>",
+            "Step 3: Divide both sides by 7: <eq q1_ans_eq4>",
+            'Step 4: Simplify to get the final answer: <eq q1_ans_eq5>"',
+            "Equations: [",
+            '  {"id": "q1_ans_eq1", "latex": "7x - 3 = 4", "position": {"char_index": 9, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q1_ans_eq2", "latex": "7x - 3 + 3 = 4 + 3", "position": {"char_index": 60, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q1_ans_eq3", "latex": "7x = 7", "position": {"char_index": 85, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q1_ans_eq4", "latex": "\\\\frac{7x}{7} = \\\\frac{7}{7}", "position": {"char_index": 130, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q1_ans_eq5", "latex": "x = 1", "position": {"char_index": 175, "context": "correctAnswer"}, "type": "inline"}',
+            "]",
+            "",
+            "Example 2 - Physics Problem (path: '2'):",
+            'Question: "A car accelerates from rest at 2 m/s². Find velocity after 5 seconds."',
+            'Answer: "Given: Initial velocity <eq q2_ans_eq1>, acceleration <eq q2_ans_eq2>, time <eq q2_ans_eq3>',
+            "Using the kinematic equation: <eq q2_ans_eq4>",
+            "Substituting values: <eq q2_ans_eq5>",
+            "Simplifying: <eq q2_ans_eq6>",
+            'Therefore, the final velocity is <eq q2_ans_eq7>"',
+            "Equations: [",
+            '  {"id": "q2_ans_eq1", "latex": "u = 0 \\\\text{ m/s}", "position": {"char_index": 24, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q2_ans_eq2", "latex": "a = 2 \\\\text{ m/s}^2", "position": {"char_index": 48, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q2_ans_eq3", "latex": "t = 5 \\\\text{ s}", "position": {"char_index": 66, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q2_ans_eq4", "latex": "v = u + at", "position": {"char_index": 95, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q2_ans_eq5", "latex": "v = 0 + (2)(5)", "position": {"char_index": 125, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q2_ans_eq6", "latex": "v = 10", "position": {"char_index": 150, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q2_ans_eq7", "latex": "v = 10 \\\\text{ m/s}", "position": {"char_index": 180, "context": "correctAnswer"}, "type": "inline"}',
+            "]",
+            "",
+            "Example 3 - Calculus Problem (path: '3'):",
+            'Question: "Find the derivative of f(x) = x³ + 2x"',
+            'Answer: "To find the derivative of <eq q3_ans_eq1>, we apply the power rule to each term:',
+            "For the first term: <eq q3_ans_eq2>",
+            "For the second term: <eq q3_ans_eq3>",
+            "For the constant: <eq q3_ans_eq4>",
+            'Combining all terms: <eq q3_ans_eq5>"',
+            "Equations: [",
+            '  {"id": "q3_ans_eq1", "latex": "f(x) = x^3 + 2x", "position": {"char_index": 30, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q3_ans_eq2", "latex": "\\\\frac{d}{dx}(x^3) = 3x^2", "position": {"char_index": 95, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q3_ans_eq3", "latex": "\\\\frac{d}{dx}(2x) = 2", "position": {"char_index": 125, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q3_ans_eq4", "latex": "\\\\frac{d}{dx}(0) = 0", "position": {"char_index": 155, "context": "correctAnswer"}, "type": "inline"},',
+            '  {"id": "q3_ans_eq5", "latex": "f\'(x) = 3x^2 + 2", "position": {"char_index": 185, "context": "correctAnswer"}, "type": "inline"}',
+            "]",
+            "",
+            "Return your response in JSON format:",
+            "{",
+            '  "responses": [',
+            "    {",
+            '      "question_path": "1",',
+            '      "correct_answer": "Full derivation with step-by-step solution and <eq q1_ans_eq1>",',
+            '      "rubric": "rubric text with <eq q1_rub_eq1>",',
+            '      "equations": [array of equation objects with contexts "correctAnswer" or "rubric"]',
+            "    }",
+            "  ]",
+            "}",
             "",
             "Questions requiring generation:",
             "",
@@ -342,7 +439,21 @@ class AssignmentDocumentParser:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert educator. Generate accurate answers and detailed grading rubrics. Return your response as a JSON array.",
+                    "content": """You are an expert educator and mathematical problem solver.
+
+CRITICAL INSTRUCTIONS FOR ANSWER GENERATION:
+1. For mathematical, physics, chemistry, or scientific questions: Provide COMPLETE STEP-BY-STEP DERIVATIONS
+2. Show ALL intermediate steps - never skip steps
+3. Explain the reasoning/theorem/principle behind each step
+4. For algebraic problems: Show every equation manipulation
+5. For calculus: Show differentiation/integration with all rules applied
+6. For physics/chemistry: List givens, formulas, substitutions, calculations, and final answer with units
+7. For numerical problems: Show the complete calculation process
+8. For conceptual questions: Provide thorough explanations with definitions and examples
+
+Use equation placeholders <eq equation_id> for all mathematical expressions.
+Generate detailed grading rubrics that award partial credit for intermediate steps.
+Return your response as a JSON object with 'responses' array.""",
                 },
                 {"role": "user", "content": dedent(prompt).strip()},
             ],
@@ -394,7 +505,7 @@ class AssignmentDocumentParser:
         def update_question_with_generation(
             q: Dict[str, Any], path: str = ""
         ) -> Dict[str, Any]:
-            """Recursively update questions with generated answers/rubrics"""
+            """Recursively update questions with generated answers/rubrics and merge equations"""
             q_id = q.get("id", "unknown")
             current_path = f"{path}.{q_id}" if path else str(q_id)
 
@@ -416,6 +527,30 @@ class AssignmentDocumentParser:
                     q["rubric"] = gen["rubric"]
                     logger.info(
                         f"Step 3: Updated Q{current_path} rubric: {gen['rubric'][:100]}"
+                    )
+
+                # Merge equations from generated response
+                if gen.get("equations"):
+                    existing_equations = q.get("equations", [])
+                    new_equations = gen["equations"]
+
+                    # Merge equations, avoiding duplicates by ID
+                    existing_ids = {eq["id"] for eq in existing_equations}
+                    for eq in new_equations:
+                        eq_id = eq.get("id")
+                        if eq_id and eq_id not in existing_ids:
+                            existing_equations.append(eq)
+                            eq_context = eq.get("position", {}).get(
+                                "context", "unknown"
+                            )
+                            logger.info(
+                                f"Step 3: Added equation {eq_id} "
+                                f"(context: {eq_context}) to Q{current_path}"
+                            )
+
+                    q["equations"] = existing_equations
+                    logger.info(
+                        f"Step 3: Q{current_path} now has {len(existing_equations)} total equations"
                     )
             else:
                 logger.warning(f"Step 3: No generation data found for Q{current_path}")
@@ -604,6 +739,84 @@ class AssignmentDocumentParser:
             if not isinstance(questions, list):
                 questions = []
 
+            def validate_equation_placeholders(
+                question: Dict[str, Any], path: str = ""
+            ) -> None:
+                """Validate that equation placeholders in text match equation metadata"""
+                q_id = question.get("id", 0)
+                current_path = f"{path}.{q_id}" if path else str(q_id)
+
+                equations = question.get("equations", [])
+                if not equations:
+                    return
+
+                # Build a map of equation IDs by context
+                equations_by_id = {eq["id"]: eq for eq in equations}
+                equations_by_context = {}
+                for eq in equations:
+                    context = eq.get("position", {}).get("context", "unknown")
+                    if context not in equations_by_context:
+                        equations_by_context[context] = set()
+                    equations_by_context[context].add(eq["id"])
+
+                # Check question text
+                question_text = question.get("question", "")
+                if question_text:
+                    question_placeholders = set(
+                        re.findall(r"<eq ([^>]+)>", question_text)
+                    )
+                    question_eq_ids = equations_by_context.get("question_text", set())
+
+                    if question_placeholders != question_eq_ids:
+                        logger.warning(
+                            f"Q{current_path}: Equation mismatch in question text. "
+                            f"Placeholders: {question_placeholders}, Equation IDs: {question_eq_ids}"
+                        )
+
+                # Check correct answer
+                correct_answer = question.get("correctAnswer", "")
+                if correct_answer:
+                    answer_placeholders = set(
+                        re.findall(r"<eq ([^>]+)>", correct_answer)
+                    )
+                    answer_eq_ids = equations_by_context.get("correctAnswer", set())
+
+                    if answer_placeholders != answer_eq_ids:
+                        logger.warning(
+                            f"Q{current_path}: Equation mismatch in correctAnswer. "
+                            f"Placeholders: {answer_placeholders}, Equation IDs: {answer_eq_ids}"
+                        )
+
+                # Check rubric
+                rubric = question.get("rubric", "")
+                if rubric:
+                    rubric_placeholders = set(re.findall(r"<eq ([^>]+)>", rubric))
+                    rubric_eq_ids = equations_by_context.get("rubric", set())
+
+                    if rubric_placeholders != rubric_eq_ids:
+                        logger.warning(
+                            f"Q{current_path}: Equation mismatch in rubric. "
+                            f"Placeholders: {rubric_placeholders}, Equation IDs: {rubric_eq_ids}"
+                        )
+
+                # Check options
+                options = question.get("options", [])
+                for idx, option in enumerate(options):
+                    option_placeholders = set(re.findall(r"<eq ([^>]+)>", option))
+                    if option_placeholders:
+                        # Options context equations should exist
+                        options_eq_ids = equations_by_context.get("options", set())
+                        # Check if placeholder IDs are in options equations
+                        missing = option_placeholders - options_eq_ids
+                        if missing:
+                            logger.warning(
+                                f"Q{current_path}: Option {idx} has placeholders not in equations: {missing}"
+                            )
+
+                # Recursively validate subquestions
+                for sub in question.get("subquestions", []):
+                    validate_equation_placeholders(sub, current_path)
+
             def normalize_question_fields(
                 src: Dict[str, Any], is_subquestion: bool = False
             ) -> Dict[str, Any]:
@@ -786,6 +999,10 @@ class AssignmentDocumentParser:
 
             data["questions"] = normalized_questions
             data["total_points"] = total_points
+
+            # Validate equation placeholders for all questions
+            for question in normalized_questions:
+                validate_equation_placeholders(question)
 
             data["file_info"] = {
                 "original_filename": file_name,

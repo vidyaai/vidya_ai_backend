@@ -35,14 +35,7 @@ DOCUMENT_PARSER_SYSTEM_PROMPT = """
 DOCUMENT_PARSER_SYSTEM_PROMPT_STEP1 = """
 You are an expert document parser for STEP 1 of a two-step extraction process.
 
-Your task: Extract questions, diagrams, and identify equation locations using CHARACTER COUNTS.
-
-DO NOT extract:
-- Correct answers
-- Grading rubrics
-- Answer explanations
-
-These will be extracted in Step 2 with full context (questions + diagrams + equations).
+Your task: Extract questions, diagrams, and equations from all contexts (question text, options, correct answers, and rubrics).
 
 Focus on:
 1. Accurate question text extraction
@@ -50,33 +43,126 @@ Focus on:
 3. Diagram detection (page_number and caption only)
 4. Multi-part question structure
 5. Point values
-6. Equation detection with ACCURATE character positions
+6. Equation detection with ACCURATE character positions in ALL contexts
+7. Complete derivation extraction (if present in document)
 
-For equations:
-- Extract LaTeX representation
-- Count exact character position where equation appears in question text
-- Mark as "inline" or "display" type
-- Identify context: question_text, options, explanation, or subquestion
+CORRECT ANSWER EXTRACTION - CRITICAL:
+For documents that contain answer keys or solutions:
+- Extract COMPLETE step-by-step derivations if present
+- Preserve ALL intermediate steps, calculations, and explanations
+- Do NOT summarize or skip steps that are shown in the document
+- For mathematical proofs: Extract every line of the proof
+- For calculations: Extract every computational step
+- If only final answers are given (no derivation), extract just the final answer
+
+EQUATIONS HANDLING - CRITICAL:
+For ALL mathematical equations found in questions, options, correct answers, and rubrics:
+
+1. Extract LaTeX representation of each equation
+2. Replace equation with placeholder: <eq equation_id>
+3. Store equation metadata in the 'equations' array
+
+EQUATION ID NAMING CONVENTION:
+- Question text: q{question_id}_eq{number}
+  Example: q1_eq1, q1_eq2, q2_1_eq1 (for subquestion 2.1)
+
+- Options: q{question_id}_opt{option_letter}_eq{number}
+  Example: q1_optA_eq1, q2_optB_eq2
+
+- Correct Answer: q{question_id}_ans_eq{number}
+  Example: q1_ans_eq1, q2_1_ans_eq1
+
+- Rubric: q{question_id}_rub_eq{number}
+  Example: q1_rub_eq1, q3_2_rub_eq1
+
+EQUATION OBJECT STRUCTURE:
+{
+  "id": "q1_ans_eq1",
+  "latex": "x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}",
+  "mathml": null,
+  "position": {
+    "char_index": 25,
+    "context": "correctAnswer"  // or "question_text", "options", "rubric"
+  },
+  "type": "display"  // or "inline"
+}
 
 EQUATION CHARACTER POSITION GUIDELINES:
-1. Count characters from the START of the question text (0-indexed)
+1. Count characters from the START of the respective text (0-indexed)
 2. Include all characters: letters, spaces, punctuation
-3. Position is where the equation BEGINS in the text
+3. Position is where the equation placeholder appears
+4. For context "question_text": count from start of question text
+5. For context "options": count from start of that specific option
+6. For context "correctAnswer": count from start of answer text
+7. For context "rubric": count from start of rubric text
 
-Examples:
-- Text: "Solve for x in x + 5 = 10"
-  Equation "x + 5 = 10" starts at character 14 (after "Solve for x in ")
+EXAMPLES:
 
-- Text: "Calculate the integral ∫ x² dx from 0 to 5"
-  Equation "∫ x² dx" starts at character 23 (after "Calculate the integral ")
+Example 1 - Question with equation:
+Original: "Solve the equation 2x + 5 = 13 for x."
+Processed: "Solve the equation <eq q1_eq1> for x."
+Equations: [{
+  "id": "q1_eq1",
+  "latex": "2x + 5 = 13",
+  "mathml": null,
+  "position": {"char_index": 19, "context": "question_text"},
+  "type": "inline"
+}]
 
-4. For inline equations: Position where equation starts within sentence
-5. For display equations: Position of the line break before equation
+Example 2 - Correct Answer with equations:
+Original: "The solution is x = 4 because 2(4) + 5 = 13"
+Processed: "The solution is <eq q1_ans_eq1> because <eq q1_ans_eq2>"
+Equations: [
+  {
+    "id": "q1_ans_eq1",
+    "latex": "x = 4",
+    "mathml": null,
+    "position": {"char_index": 16, "context": "correctAnswer"},
+    "type": "inline"
+  },
+  {
+    "id": "q1_ans_eq2",
+    "latex": "2(4) + 5 = 13",
+    "mathml": null,
+    "position": {"char_index": 35, "context": "correctAnswer"},
+    "type": "inline"
+  }
+]
 
-6. For equations in options:
-   - Count from start of that specific option text
-   - Mark context as "options"
-   - Include option_index in position metadata
+Example 3 - Rubric with equation:
+Original: "Award 2 points for correct formula x = (13-5)/2, 1 point for substitution x = 8/2"
+Processed: "Award 2 points for correct formula <eq q1_rub_eq1>, 1 point for substitution <eq q1_rub_eq2>"
+Equations: [
+  {
+    "id": "q1_rub_eq1",
+    "latex": "x = \\frac{13-5}{2}",
+    "mathml": null,
+    "position": {"char_index": 35, "context": "rubric"},
+    "type": "inline"
+  },
+  {
+    "id": "q1_rub_eq2",
+    "latex": "x = \\frac{8}{2}",
+    "mathml": null,
+    "position": {"char_index": 70, "context": "rubric"},
+    "type": "inline"
+  }
+]
+
+Example 4 - Options with equations:
+Original Options: ["A) x = 2", "B) x = 4", "C) x = 6"]
+Processed: ["<eq q1_optA_eq1>", "<eq q1_optB_eq1>", "<eq q1_optC_eq1>"]
+Equations: [
+  {"id": "q1_optA_eq1", "latex": "x = 2", "position": {"char_index": 0, "context": "options"}, "type": "inline"},
+  {"id": "q1_optB_eq1", "latex": "x = 4", "position": {"char_index": 0, "context": "options"}, "type": "inline"},
+  {"id": "q1_optC_eq1", "latex": "x = 6", "position": {"char_index": 0, "context": "options"}, "type": "inline"}
+]
+
+INLINE vs DISPLAY:
+- inline: Equations within text flow (e.g., "The value of x in x + 5 = 10 is 5")
+- display: Standalone equations on separate lines or centered
+
+Extract correct answers and rubrics if clearly stated in the document, otherwise leave as empty strings.
 """
 
 DOCUMENT_PARSER_SYSTEM_PROMPT_STEP2 = """
