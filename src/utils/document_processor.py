@@ -1,8 +1,6 @@
 import base64
 import json
-import re
-from textwrap import dedent
-from typing import Dict, Any, Optional
+from typing import Any
 from openai import OpenAI
 from controllers.config import logger
 import PyPDF2
@@ -11,19 +9,15 @@ from io import BytesIO
 import csv
 import html2text
 import markdown
-from .prompts import (
-    DOCUMENT_PARSER_SYSTEM_PROMPT,
-    FALLBACK_PARSER_SYSTEM_PROMPT,
-    create_extraction_prompt,
-    create_fallback_prompt,
-)
-from .assignment_schemas import get_assignment_parsing_schema
+from pdf2image import convert_from_bytes
 
 
 class DocumentProcessor:
     """Service for processing various document types and extracting text content"""
 
     def __init__(self):
+        self.client = OpenAI()
+        self.model = "gpt-4o"  # Vision-capable model for PDF extraction
         self.supported_types = {
             "application/pdf": self._extract_pdf_text,
             "text/plain": self._extract_text,
@@ -85,19 +79,70 @@ class DocumentProcessor:
         return extension_map.get(extension, "text/plain")
 
     def _extract_pdf_text(self, content: bytes) -> str:
-        """Extract text from PDF files"""
+        """Extract text from PDF files using Poppler and GPT-4o vision"""
         try:
-            pdf_file = BytesIO(content)
-            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            # Convert PDF pages to images using Poppler
+            images = convert_from_bytes(content, dpi=200)
+            logger.info(f"Converted PDF to {len(images)} images")
 
-            text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
+            # Convert all images to base64
+            image_contents = []
+            for page_num, image in enumerate(images, 1):
+                buffered = BytesIO()
+                image.save(buffered, format="PNG")
+                img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                image_contents.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{img_base64}"},
+                    }
+                )
 
-            return text.strip()
+            # Build message content with text instruction followed by all images
+            user_content = [
+                {
+                    "type": "text",
+                    "text": f"Extract ALL text from this {len(images)}-page PDF document. For each page, start with '--- Page N ---' followed by all the text from that page. Maintain the original formatting, structure, and layout. Extract text in page order.",
+                }
+            ]
+            user_content.extend(image_contents)
+
+            # Single API call to extract text from all pages
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a precise OCR system. Extract ALL text from images exactly as it appears, maintaining formatting, structure, and layout. Include all text visible in the images.",
+                    },
+                    {"role": "user", "content": user_content},
+                ],
+                max_tokens=16000,
+            )
+
+            extracted_text = response.choices[0].message.content
+            if extracted_text:
+                logger.info(
+                    f"Successfully extracted text from all {len(images)} pages in one API call"
+                )
+                return extracted_text.strip()
+            else:
+                raise ValueError("Empty response from GPT-4o")
+
         except Exception as e:
-            logger.error(f"Error extracting PDF text: {str(e)}")
-            raise ValueError("Failed to extract text from PDF file")
+            logger.error(f"Error extracting PDF text with Poppler/GPT-4o: {str(e)}")
+            # Fallback to PyPDF2 if vision extraction fails
+            logger.info("Attempting fallback to PyPDF2 text extraction...")
+            try:
+                pdf_file = BytesIO(content)
+                pdf_reader = PyPDF2.PdfReader(pdf_file)
+                text = ""
+                for page in pdf_reader.pages:
+                    text += page.extract_text() + "\n"
+                return text.strip()
+            except Exception as fallback_error:
+                logger.error(f"Fallback extraction also failed: {str(fallback_error)}")
+                raise ValueError("Failed to extract text from PDF file")
 
     def _extract_text(self, content: bytes) -> str:
         """Extract text from plain text files"""
@@ -219,331 +264,3 @@ class DocumentProcessor:
             text += f"{prefix}{data}\n"
 
         return text
-
-
-class AssignmentDocumentParser:
-    """AI-powered parser for extracting existing assignment questions from documents"""
-
-    def __init__(self):
-        self.client = OpenAI()
-        self.model = "gpt-5"
-
-    def parse_document_to_assignment(
-        self,
-        document_text: str,
-        file_name: str,
-        generation_options: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Parse a document and extract existing assignment questions using AI
-
-        Args:
-            document_text: Extracted text content from the document
-            file_name: Original file name for context
-            generation_options: Additional options for parsing (mostly ignored for extraction)
-
-        Returns:
-            Dictionary containing assignment data with extracted questions
-        """
-        try:
-            # Try the standard approach first
-            return self._parse_with_standard_approach(document_text, file_name)
-
-        except Exception as e:
-            logger.warning(f"Standard parsing failed for {file_name}: {str(e)}")
-            logger.info("Attempting fallback parsing with reduced content...")
-
-            # Fallback: try with reduced content if the document is very large
-            try:
-                return self._parse_with_reduced_content(document_text, file_name)
-            except Exception as fallback_error:
-                logger.error(
-                    f"Fallback parsing also failed for {file_name}: {str(fallback_error)}"
-                )
-                raise e  # Re-raise the original error
-
-    def _parse_with_standard_approach(
-        self, document_text: str, file_name: str
-    ) -> Dict[str, Any]:
-        """Standard parsing approach with full document content"""
-        # Create the extraction prompt
-        prompt = create_extraction_prompt(document_text, file_name)
-
-        # Get the JSON schema for the response with dynamic naming
-        response_schema = get_assignment_parsing_schema("document_parsing_response")
-
-        # Call OpenAI to parse the document
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": dedent(DOCUMENT_PARSER_SYSTEM_PROMPT),
-                },
-                {"role": "user", "content": dedent(prompt).strip()},
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": response_schema["name"],
-                    "schema": response_schema,
-                },
-            },
-        )
-
-        # Parse the response
-        response_text = response.choices[0].message.content
-        if not response_text:
-            raise ValueError("Empty response from AI")
-
-        try:
-            parsed_data = json.loads(response_text)
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {e}")
-            logger.error(f"Raw response length: {len(response_text)}")
-            logger.error(f"Raw response (first 1000 chars): {response_text[:1000]}")
-            logger.error(f"Raw response (last 1000 chars): {response_text[-1000:]}")
-
-            # Try to fix common JSON issues
-            try:
-                # Check if response was truncated
-                if not response_text.strip().endswith("}"):
-                    logger.warning(
-                        "Response appears to be truncated, attempting to fix..."
-                    )
-                    # Try to find the last complete object
-                    last_brace = response_text.rfind("}")
-                    if last_brace > 0:
-                        # Try to close the JSON structure
-                        fixed_response = response_text[: last_brace + 1]
-                        parsed_data = json.loads(fixed_response)
-                        logger.info("Successfully fixed truncated JSON response")
-                    else:
-                        raise ValueError("Response is too truncated to fix")
-                else:
-                    raise ValueError("Failed to parse AI response as JSON")
-            except (json.JSONDecodeError, ValueError) as fix_error:
-                logger.error(f"Failed to fix JSON: {fix_error}")
-                raise ValueError(
-                    "Failed to parse AI response as JSON and unable to fix truncation"
-                )
-
-        # Validate and normalize the response
-        return self._normalize_assignment_data(parsed_data, file_name)
-
-    def _parse_with_reduced_content(
-        self, document_text: str, file_name: str
-    ) -> Dict[str, Any]:
-        """Fallback parsing with reduced content to avoid token limits"""
-        # Reduce document content significantly
-        max_doc_length = 10000  # Much smaller limit for fallback
-        if len(document_text) > max_doc_length:
-            # Try to find a good breaking point (e.g., end of a question)
-            truncated_text = document_text[:max_doc_length]
-            # Look for the last complete question or section
-            last_question = max(
-                truncated_text.rfind("Question"),
-                truncated_text.rfind("Problem"),
-                truncated_text.rfind("Exercise"),
-                truncated_text.rfind("Part"),
-            )
-            if last_question > max_doc_length * 0.7:  # If we found a good break point
-                document_text = (
-                    truncated_text[:last_question]
-                    + "... [document truncated for processing]"
-                )
-            else:
-                document_text = (
-                    truncated_text + "... [document truncated for processing]"
-                )
-
-        # Create a simpler prompt for reduced content
-        prompt = create_fallback_prompt(document_text, file_name)
-
-        # Get the JSON schema for fallback parsing with dynamic naming
-        fallback_schema = get_assignment_parsing_schema(
-            "assignment_parsing_fallback_response"
-        )
-
-        # Call OpenAI with reduced content
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": dedent(FALLBACK_PARSER_SYSTEM_PROMPT),
-                },
-                {"role": "user", "content": dedent(prompt).strip()},
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": fallback_schema["name"],
-                    "schema": fallback_schema,
-                },
-            },
-            max_completion_tokens=4000,  # Smaller token limit for fallback
-        )
-
-        response_text = response.choices[0].message.content
-        if not response_text:
-            raise ValueError("Empty response from AI")
-
-        try:
-            parsed_data = json.loads(response_text)
-        except json.JSONDecodeError as e:
-            logger.error(f"Fallback JSON decode error: {e}")
-            raise ValueError("Failed to parse fallback AI response as JSON")
-
-        return self._normalize_assignment_data(parsed_data, file_name)
-
-    def _normalize_assignment_data(
-        self, data: Dict[str, Any], file_name: str
-    ) -> Dict[str, Any]:
-        """Normalize and validate the parsed assignment data to match frontend schema"""
-        try:
-            if not isinstance(data, dict):
-                raise ValueError("Response is not a valid dictionary")
-
-            # Title/description defaults
-            if "title" not in data or not data["title"]:
-                data["title"] = f"Assignment from {file_name.replace('.', ' ').title()}"
-            if "description" not in data or not data["description"]:
-                data[
-                    "description"
-                ] = "Imported from document. Please review for accuracy."
-
-            # Questions list
-            questions = data.get("questions", [])
-            if not isinstance(questions, list):
-                questions = []
-
-            def normalize_question_fields(
-                src: Dict[str, Any], is_subquestion: bool = False
-            ) -> Dict[str, Any]:
-                """Normalize question fields to match frontend schema"""
-                out: Dict[str, Any] = {}
-
-                # Basic fields
-                out["id"] = src.get("id", 1)
-                out["type"] = src.get("type", "short-answer")
-                out["question"] = src.get("question", "")
-                out["points"] = self._parse_points(src.get("points", 0))
-                out["rubric"] = src.get("rubric", "")
-                out["order"] = src.get("order", 1)
-
-                # Options (for multiple-choice)
-                options = src.get("options", [])
-                if isinstance(options, list):
-                    out["options"] = [str(opt) for opt in options]
-                else:
-                    out["options"] = []
-
-                # Correct answer - handle both single and multiple correct
-                ca = (
-                    src.get("correctAnswer")
-                    or src.get("correct_answer")
-                    or src.get("answer")
-                )
-                out["correctAnswer"] = str(ca) if ca is not None else ""
-
-                # Multiple correct support
-                out["allowMultipleCorrect"] = src.get("allowMultipleCorrect", False)
-                multiple_correct = src.get("multipleCorrectAnswers", [])
-                if isinstance(multiple_correct, list):
-                    out["multipleCorrectAnswers"] = [
-                        str(ans) for ans in multiple_correct
-                    ]
-                else:
-                    out["multipleCorrectAnswers"] = []
-
-                # Code and diagram flags
-                out["hasCode"] = src.get("hasCode", False)
-                out["hasDiagram"] = src.get("hasDiagram", False)
-                out["codeLanguage"] = src.get("codeLanguage", "")
-                out["outputType"] = src.get("outputType", "")
-                out["rubricType"] = src.get("rubricType", "per-subquestion")
-
-                # Code content
-                code_text = src.get("code", "")
-                if code_text:
-                    out["code"] = str(code_text)
-                    out["hasCode"] = True
-                else:
-                    out["code"] = ""
-
-                return out
-
-            def normalize_subquestions(subqs: Any) -> list:
-                """Normalize subquestions for multi-part questions"""
-                if not isinstance(subqs, list):
-                    return []
-                normalized_list: list = []
-                for sub_index, sub in enumerate(subqs):
-                    if not isinstance(sub, dict):
-                        continue
-                    nq = normalize_question_fields(sub, is_subquestion=True)
-                    nq["id"] = sub.get("id", sub_index + 1)
-                    normalized_list.append(nq)
-                return normalized_list
-
-            normalized_questions: list = []
-            total_points = 0
-
-            for i, question in enumerate(questions):
-                if not isinstance(question, dict):
-                    continue
-
-                # Check if it's a multi-part question
-                subqs_src = (
-                    question.get("subquestions")
-                    or question.get("sub_questions")
-                    or question.get("parts")
-                )
-                is_multi_part = bool(subqs_src)
-
-                # Normalize main question
-                normalized_q = normalize_question_fields(question)
-                normalized_q["id"] = question.get("id", i + 1)
-                normalized_q["order"] = question.get("order", i + 1)
-
-                # Set type to multi-part if subquestions exist
-                if is_multi_part:
-                    normalized_q["type"] = "multi-part"
-
-                # Handle subquestions for multi-part questions
-                if is_multi_part:
-                    subqs = normalize_subquestions(subqs_src)
-                    if subqs:
-                        normalized_q["subquestions"] = subqs
-
-                normalized_questions.append(normalized_q)
-                total_points += normalized_q["points"] or 0
-
-            data["questions"] = normalized_questions
-            data["total_points"] = total_points
-
-            data["file_info"] = {
-                "original_filename": file_name,
-                "processed_at": str(json.dumps(None, default=str)),
-                "question_count": len(normalized_questions),
-            }
-
-            return data
-
-        except Exception as e:
-            logger.error(f"Error normalizing assignment data: {str(e)}")
-            raise ValueError(f"Failed to normalize assignment data: {str(e)}")
-
-    def _parse_points(self, points: Any) -> float:
-        """Parse points from various formats"""
-        if isinstance(points, (int, float)):
-            return float(points)
-
-        if isinstance(points, str):
-            # Extract numeric value from strings like "(10 points)" or "10 pts"
-            match = re.search(r"(\d+(?:\.\d+)?)", points)
-            if match:
-                return float(match.group(1))
-
-        return 0.0

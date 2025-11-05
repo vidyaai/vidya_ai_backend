@@ -65,6 +65,7 @@ app.add_middleware(
         "https://d1xrorvpgizypa.cloudfront.net",
         "https://vidyaai.co",
         "http://localhost:3000",
+        "http://localhost:5173",
         "https://www.vidyaai.co",
         "https://upload-video.d2krgf8gkzw2h8.amplifyapp.com",
         "https://upload-video.d2krgf8gkzw2h8.amplifyapp.com/*",

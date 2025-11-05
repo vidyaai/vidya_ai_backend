@@ -63,6 +63,7 @@ class VideoQuery(BaseModel):
     query: str
     timestamp: Optional[float] = None
     is_image_query: bool = False
+    conversation_history: Optional[List[Dict[str, Any]]] = []
 
 
 class TranslationRequest(BaseModel):

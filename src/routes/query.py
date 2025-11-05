@@ -87,10 +87,12 @@ async def process_query(
             if not output_file:
                 raise HTTPException(status_code=500, detail="Frame extraction failed")
             response = vision_client.ask_with_image(
-                query, frame_path, transcript_to_use
+                query, frame_path, transcript_to_use, query_request.conversation_history
             )
         else:
-            response = vision_client.ask_text_only(query, transcript_to_use)
+            response = vision_client.ask_text_only(
+                query, transcript_to_use, query_request.conversation_history
+            )
         return {
             "response": response,
             "video_id": video_id,

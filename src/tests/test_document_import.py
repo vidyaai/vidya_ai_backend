@@ -5,7 +5,8 @@ Test script for document import functionality
 
 import base64
 import json
-from utils.document_processor import DocumentProcessor, AssignmentDocumentParser
+from utils.document_processor import DocumentProcessor
+from utils.assignment_document_parser import AssignmentDocumentParser
 
 
 def test_text_extraction():

@@ -17,7 +17,7 @@ class OpenAIVisionClient:
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
-    def ask_text_only(self, prompt, context=""):
+    def ask_text_only(self, prompt, context="", conversation_history=None):
         """Ask a text-only question with the appropriate system prompt based on transcript type"""
         try:
             # Check if the context contains timestamp markers
@@ -37,11 +37,22 @@ class OpenAIVisionClient:
 
             messages = [
                 {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": f"Context: {context}\n\nQuestion: {prompt}",
-                },
             ]
+            
+            # Add conversation history if provided
+            if conversation_history and isinstance(conversation_history, list):
+                for msg in conversation_history:
+                    if isinstance(msg, dict) and "role" in msg and "content" in msg:
+                        messages.append({
+                            "role": msg["role"],
+                            "content": msg["content"]
+                        })
+            
+            # Add the current question
+            messages.append({
+                "role": "user",
+                "content": f"Context: {context}\n\nQuestion: {prompt}",
+            })
 
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -54,7 +65,7 @@ class OpenAIVisionClient:
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def ask_with_image(self, prompt, image_path, context=""):
+    def ask_with_image(self, prompt, image_path, context="", conversation_history=None):
         """Ask a question with both text prompt and image with the appropriate system prompt"""
         try:
             # Check if the context contains timestamp markers
@@ -75,26 +86,39 @@ class OpenAIVisionClient:
             # Encode the image
             base64_image = self._encode_image(image_path)
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
+            messages = [
+                {"role": "system", "content": system_prompt},
+            ]
+            
+            # Add conversation history if provided
+            if conversation_history and isinstance(conversation_history, list):
+                for msg in conversation_history:
+                    if isinstance(msg, dict) and "role" in msg and "content" in msg:
+                        messages.append({
+                            "role": msg["role"],
+                            "content": msg["content"]
+                        })
+            
+            # Add the current question with image
+            messages.append({
+                "role": "user",
+                "content": [
                     {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": f"Context (Video Transcript): {context}\n\nPlease analyze this video frame along with the provided transcript context and answer the following question: {prompt}",
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}"
-                                },
-                            },
-                        ],
+                        "type": "text",
+                        "text": f"Context (Video Transcript): {context}\n\nPlease analyze this video frame along with the provided transcript context and answer the following question: {prompt}",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}"
+                        },
                     },
                 ],
+            })
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
                 max_tokens=1000,  # Increased for detailed responses
             )
             return response.choices[0].message.content
