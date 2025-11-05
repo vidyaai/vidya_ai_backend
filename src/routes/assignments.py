@@ -1,4 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
+import base64
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+    Request,
+    UploadFile,
+    File,
+    Form,
+)
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, asc
@@ -49,13 +59,39 @@ def generate_share_token() -> str:
 
 
 def calculate_assignment_stats(assignment: Assignment) -> Assignment:
-    """Calculate total points and questions for an assignment"""
+    """Calculate total points and questions for an assignment, handling optional parts correctly"""
     questions = assignment.questions or []
     total_questions = len(questions)
-    total_points = sum(q.get("points", 0) for q in questions)
+
+    def calculate_question_points(question: dict) -> float:
+        """Recursively calculate points for a question, accounting for optional parts"""
+        q_type = question.get("type", "")
+
+        if q_type == "multi-part":
+            subquestions = question.get("subquestions", [])
+            if not subquestions:
+                return float(question.get("points", 0))
+
+            # For optional parts, only count required number of parts
+            if question.get("optionalParts"):
+                required_count = question.get("requiredPartsCount", len(subquestions))
+                # Sort subquestions by points (descending) to get realistic total
+                # This assumes students will choose higher-point questions
+                subq_points = [calculate_question_points(sq) for sq in subquestions]
+                subq_points.sort(reverse=True)
+                # Sum only the required number of highest-point subquestions
+                return sum(subq_points[:required_count])
+            else:
+                # Non-optional multi-part: sum all subquestion points
+                return sum(calculate_question_points(sq) for sq in subquestions)
+        else:
+            # Regular question: return its points
+            return float(question.get("points", 0))
+
+    total_points = sum(calculate_question_points(q) for q in questions)
 
     assignment.total_questions = str(total_questions)
-    assignment.total_points = str(total_points)
+    assignment.total_points = str(int(total_points))
     return assignment
 
 
@@ -1432,47 +1468,174 @@ async def generate_assignment(
 
 @router.post("/api/assignments/import-document", response_model=DocumentImportResponse)
 async def import_document_to_assignment(
-    import_data: DocumentImportRequest,
     request: Request,
     current_user: dict = Depends(get_current_user),
+    file: UploadFile = File(None),
+    file_name: str = Form(None),
+    file_type: str = Form(None),
+    generation_options: str = Form(None),
+    # Legacy support for base64 JSON
+    import_data: DocumentImportRequest = None,
 ):
-    """Import assignment questions from a document using AI parsing"""
+    """Import assignment questions from documents (PDF, DOCX, MD, HTML, CSV, JSON, TXT) using AI parsing with diagram support
+
+    Supports two modes:
+    1. File upload (multipart/form-data) - Preferred for better performance
+    2. Legacy base64 JSON - For backward compatibility
+    """
     try:
         user_id = current_user["uid"]
-        logger.info(f"Importing document {import_data.file_name} for user: {user_id}")
 
-        # Import document processing services
-        from utils.document_processor import DocumentProcessor, AssignmentDocumentParser
+        # Determine if this is a file upload or JSON request
+        is_file_upload = file is not None
 
-        # Initialize processors
-        doc_processor = DocumentProcessor()
-        assignment_parser = AssignmentDocumentParser()
-
-        # Extract text from the document
-        try:
-            extracted_text = doc_processor.extract_text_from_file(
-                import_data.file_content, import_data.file_name, import_data.file_type
+        if is_file_upload:
+            # File upload mode (preferred)
+            actual_file_name = file_name or file.filename
+            actual_file_type = file_type or file.content_type
+            logger.info(
+                f"Importing document via file upload: {actual_file_name} ({actual_file_type}) for user: {user_id}"
             )
 
-            if not extracted_text or len(extracted_text.strip()) < 50:
+            # Read file content
+            document_content = await file.read()
+
+            # Parse generation options
+            gen_options = None
+            if generation_options:
+                try:
+                    gen_options = json.loads(generation_options)
+                except:
+                    gen_options = None
+
+            if import_data is None:
+                import_data = DocumentImportRequest(
+                    file_name=actual_file_name,
+                    file_type=actual_file_type,
+                    generation_options=gen_options,
+                    file_content="",
+                )
+        else:
+            # Legacy base64 JSON mode (backward compatibility)
+            if import_data is None:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Document appears to be empty or contains insufficient content for assignment extraction",
+                    detail="Either file upload or import_data JSON is required",
                 )
 
-        except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+            actual_file_name = import_data.file_name
+            actual_file_type = import_data.file_type
+            gen_options = import_data.generation_options
 
-        # Parse the document to extract assignment questions
-        try:
-            parsed_assignment = assignment_parser.parse_document_to_assignment(
-                extracted_text, import_data.file_name, import_data.generation_options
+            logger.info(
+                f"Importing document via base64 JSON: {actual_file_name} ({actual_file_type}) for user: {user_id}"
             )
+
+            # Decode document content
+            try:
+                document_content = base64.b64decode(import_data.file_content)
+            except Exception as e:
+                logger.error(f"Error decoding document content: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file content. Please ensure the file is properly encoded.",
+                )
+
+        # Validate supported file types
+        supported_types = [
+            "application/pdf",
+            # "text/plain",
+            # "application/msword",
+            # "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            # "text/markdown",
+            # "text/html",
+            # "text/csv",
+            # "application/json",
+        ]
+
+        # Also check file extension
+        file_extension = (
+            actual_file_name.lower().split(".")[-1] if "." in actual_file_name else ""
+        )
+
+        if actual_file_type not in supported_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported file type: {actual_file_type}. Supported types: PDF",
+                # detail=f"Unsupported file type: {actual_file_type}. Supported types: PDF, DOCX, TXT, MD, HTML, CSV, JSON",
+            )
+
+        # Import document processing services
+        from utils.assignment_document_parser import AssignmentDocumentParser
+
+        # Initialize parser
+        assignment_parser = AssignmentDocumentParser()
+
+        # Parse document based on type
+        try:
+            if actual_file_type == "application/pdf" or file_extension == "pdf":
+                # PDF: Use image-based parsing with diagram bounding boxes
+                parsed_assignment = assignment_parser.parse_pdf_images_to_assignment(
+                    document_content,
+                    actual_file_name,
+                    gen_options,
+                )
+
+                # logger.info(f"Parsed assignment: {parsed_assignment}")
+
+                # Extract diagrams from PDF and upload to S3
+                parsed_assignment = assignment_parser.extract_and_upload_diagrams(
+                    parsed_assignment,
+                    document_content,
+                    "application/pdf",
+                    user_id,
+                    assignment_id=None,  # Temporary storage under user_id
+                )
+
+                # logger.info(f"Parsed assignment after extracting diagrams: {parsed_assignment}")
+
+                text_preview = "PDF content processed via image analysis"
+            else:
+                # Non-PDF: Use text-based parsing
+                parsed_assignment = (
+                    assignment_parser.parse_non_pdf_document_to_assignment(
+                        document_content,
+                        actual_file_name,
+                        actual_file_type,
+                        user_id,
+                        gen_options,
+                    )
+                )
+
+                logger.info(
+                    f"Parsed assignment after parsing non-PDF document: {parsed_assignment}"
+                )
+
+                if (
+                    actual_file_type
+                    == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ):
+                    # For DOCX: extract and upload diagrams
+                    # DOCX images already extracted during parsing, but run extraction pipeline for consistency
+                    parsed_assignment = assignment_parser.extract_and_upload_diagrams(
+                        parsed_assignment,
+                        document_content,
+                        actual_file_type,
+                        user_id,
+                        assignment_id=None,
+                    )
+
+                text_preview = f"{actual_file_type} content processed"
+
+                logger.info(
+                    f"Parsed assignment after extracting diagrams: {parsed_assignment}"
+                )
+
         except Exception as e:
             logger.error(f"Error parsing document with AI: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to extract assignment questions from document. Please ensure the document contains assignment questions, exercises, or problems.",
+                detail=f"Failed to extract assignment questions from document. Please ensure the document contains assignment questions, exercises, or problems. Error: {str(e)}",
             )
 
         # Prepare the response
@@ -1482,13 +1645,11 @@ async def import_document_to_assignment(
             ),
             description=parsed_assignment.get("description"),
             questions=parsed_assignment.get("questions", []),
-            extracted_text=extracted_text[:1000] + "..."
-            if len(extracted_text) > 1000
-            else extracted_text,  # Truncate for response
+            extracted_text=text_preview,  # Preview of extracted text
             file_info={
                 "original_filename": import_data.file_name,
                 "file_type": import_data.file_type,
-                "content_length": len(extracted_text),
+                "content_length": len(text_preview),
                 "questions_generated": len(parsed_assignment.get("questions", [])),
                 "total_points": parsed_assignment.get("total_points", 0),
             },
@@ -1504,7 +1665,9 @@ async def import_document_to_assignment(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error importing document {import_data.file_name}: {str(e)}")
+        logger.error(
+            f"Error importing document {import_data.file_name if import_data else 'unknown file'}: {str(e)}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to import document",
@@ -1746,6 +1909,53 @@ async def submit_assignment(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                         detail=f"Failed to process PDF submission: {str(e)}",
                     )
+
+        # Validate optional parts selection
+        questions = assignment.questions or []
+        for question in questions:
+            q_id = str(question.get("id"))
+            if question.get("type") == "multi-part" and question.get("optionalParts"):
+                required_count = question.get("requiredPartsCount", 0)
+                answer_obj = submission_data.answers.get(q_id)
+
+                answered_subqs = []
+                if answer_obj and isinstance(answer_obj, dict):
+                    subanswers = answer_obj.get("subAnswers", {})
+                    # Count non-empty answers
+                    answered_subqs = [k for k, v in subanswers.items() if v]
+
+                if len(answered_subqs) != required_count:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Question {q_id}: Must answer exactly {required_count} of {len(question.get('subquestions', []))} parts (answered {len(answered_subqs)})",
+                    )
+
+                # Recursively validate nested optional parts
+                if question.get("subquestions"):
+                    for subq in question.get("subquestions", []):
+                        subq_id = str(subq.get("id"))
+                        if subq.get("type") == "multi-part" and subq.get(
+                            "optionalParts"
+                        ):
+                            subq_required_count = subq.get("requiredPartsCount", 0)
+                            subq_answer = (
+                                answer_obj.get("subAnswers", {}).get(subq_id)
+                                if answer_obj
+                                else None
+                            )
+
+                            subq_answered = []
+                            if subq_answer and isinstance(subq_answer, dict):
+                                subq_subanswers = subq_answer.get("subAnswers", {})
+                                subq_answered = [
+                                    k for k, v in subq_subanswers.items() if v
+                                ]
+
+                            if len(subq_answered) != subq_required_count:
+                                raise HTTPException(
+                                    status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail=f"Question {q_id}, Sub-question {subq_id}: Must answer exactly {subq_required_count} of {len(subq.get('subquestions', []))} parts",
+                                )
 
         if existing_submission:
             # Check if already submitted - prevent resubmission
