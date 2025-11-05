@@ -38,21 +38,22 @@ class OpenAIVisionClient:
             messages = [
                 {"role": "system", "content": system_prompt},
             ]
-            
+
             # Add conversation history if provided
             if conversation_history and isinstance(conversation_history, list):
                 for msg in conversation_history:
                     if isinstance(msg, dict) and "role" in msg and "content" in msg:
-                        messages.append({
-                            "role": msg["role"],
-                            "content": msg["content"]
-                        })
-            
+                        messages.append(
+                            {"role": msg["role"], "content": msg["content"]}
+                        )
+
             # Add the current question
-            messages.append({
-                "role": "user",
-                "content": f"Context: {context}\n\nQuestion: {prompt}",
-            })
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"Context: {context}\n\nQuestion: {prompt}",
+                }
+            )
 
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -89,32 +90,33 @@ class OpenAIVisionClient:
             messages = [
                 {"role": "system", "content": system_prompt},
             ]
-            
+
             # Add conversation history if provided
             if conversation_history and isinstance(conversation_history, list):
                 for msg in conversation_history:
                     if isinstance(msg, dict) and "role" in msg and "content" in msg:
-                        messages.append({
-                            "role": msg["role"],
-                            "content": msg["content"]
-                        })
-            
+                        messages.append(
+                            {"role": msg["role"], "content": msg["content"]}
+                        )
+
             # Add the current question with image
-            messages.append({
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": f"Context (Video Transcript): {context}\n\nPlease analyze this video frame along with the provided transcript context and answer the following question: {prompt}",
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{base64_image}"
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Context (Video Transcript): {context}\n\nPlease analyze this video frame along with the provided transcript context and answer the following question: {prompt}",
                         },
-                    },
-                ],
-            })
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            },
+                        },
+                    ],
+                }
+            )
 
             response = self.client.chat.completions.create(
                 model=self.model,
