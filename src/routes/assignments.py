@@ -1544,13 +1544,13 @@ async def import_document_to_assignment(
         # Validate supported file types
         supported_types = [
             "application/pdf",
-            "text/plain",
-            "application/msword",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "text/markdown",
-            "text/html",
-            "text/csv",
-            "application/json",
+            # "text/plain",
+            # "application/msword",
+            # "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            # "text/markdown",
+            # "text/html",
+            # "text/csv",
+            # "application/json",
         ]
 
         # Also check file extension
@@ -1561,7 +1561,8 @@ async def import_document_to_assignment(
         if actual_file_type not in supported_types:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported file type: {actual_file_type}. Supported types: PDF, DOCX, TXT, MD, HTML, CSV, JSON",
+                detail=f"Unsupported file type: {actual_file_type}. Supported types: PDF",
+                # detail=f"Unsupported file type: {actual_file_type}. Supported types: PDF, DOCX, TXT, MD, HTML, CSV, JSON",
             )
 
         # Import document processing services
