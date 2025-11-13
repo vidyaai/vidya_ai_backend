@@ -5,7 +5,7 @@ from textwrap import dedent
 from typing import Dict, Any, Optional
 from openai import OpenAI
 from controllers.config import logger
-import PyPDF2
+import pypdf
 import docx
 from io import BytesIO
 import csv
@@ -88,7 +88,7 @@ class DocumentProcessor:
         """Extract text from PDF files"""
         try:
             pdf_file = BytesIO(content)
-            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            pdf_reader = pypdf.PdfReader(pdf_file)
 
             text = ""
             for page in pdf_reader.pages:

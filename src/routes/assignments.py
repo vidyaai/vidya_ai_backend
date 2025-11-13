@@ -37,6 +37,8 @@ from schemas import (
     BatchGradeRequest,
     BatchGradeResponse,
 )
+from fastapi.responses import Response
+from utils.pdf_generator import AssignmentPDFGenerator
 
 router = APIRouter()
 
@@ -2640,4 +2642,144 @@ async def delete_assignment_diagram(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete diagram",
+        )
+
+@router.get("/api/assignments/{assignment_id}/download-pdf")
+async def download_assignment_pdf(
+    assignment_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Generate and download a professional PDF for a published assignment.
+    Returns a LaTeX-style formatted document with equations and images.
+    """
+    try:
+        user_id = current_user["uid"]
+        logger.info(f"PDF download requested for assignment {assignment_id} by user {user_id}")
+        
+        # Fetch the assignment
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Assignment not found"
+            )
+        
+        # Verify user has access (owner or shared access)
+        has_access = assignment.user_id == user_id
+        
+        if not has_access:
+            # Check if user has shared access
+            shared_access = (
+                db.query(SharedLinkAccess)
+                .join(SharedLink)
+                .filter(
+                    and_(
+                        SharedLink.assignment_id == assignment_id,
+                        SharedLink.share_type == "assignment", 
+                        SharedLinkAccess.user_id == user_id,
+                    )
+                )
+                .first()
+            )
+            has_access = shared_access is not None
+        
+        if not has_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to this assignment"
+            )
+        
+        # Only allow PDF download for published assignments
+        if assignment.status != "published":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="PDF download is only available for published assignments"
+            )
+        
+        # Prepare assignment data for PDF generation
+        assignment_data = {
+            "id": assignment.id,
+            "title": assignment.title,
+            "description": assignment.description,
+            "questions": assignment.questions or [],
+            "total_points": assignment.total_points,
+            "total_questions": assignment.total_questions,
+            "engineering_level": assignment.engineering_level,
+            "engineering_discipline": assignment.engineering_discipline,
+            "created_at": assignment.created_at,
+        }
+        
+        # Process diagram URLs in questions to be accessible
+        for question in assignment_data["questions"]:
+            # Handle main question diagrams
+            if question.get("diagram") and question["diagram"].get("file_id"):
+                try:
+                    # Generate presigned URL for the diagram
+                    file_id = question["diagram"]["file_id"]
+                    s3_key = f"assignments/{assignment_id}/diagrams/{file_id}.png"  # Assume PNG, could be improved
+                    
+                    # Try to generate presigned URL
+                    try:
+                        presigned_url = s3_presign_url(s3_key, expires_in=3600)
+                        question["diagram"]["url"] = presigned_url
+                    except Exception as e:
+                        logger.warning(f"Could not generate presigned URL for diagram {file_id}: {e}")
+                        # Remove diagram if URL generation fails
+                        question["diagram"] = None
+                        
+                except Exception as e:
+                    logger.warning(f"Error processing diagram for question: {e}")
+            
+            # Handle subquestion diagrams
+            if question.get("subquestions"):
+                for subq in question["subquestions"]:
+                    if subq.get("diagram") and subq["diagram"].get("file_id"):
+                        try:
+                            file_id = subq["diagram"]["file_id"]
+                            s3_key = f"assignments/{assignment_id}/diagrams/{file_id}.png"
+                            presigned_url = s3_presign_url(s3_key, expires_in=3600)
+                            subq["diagram"]["url"] = presigned_url
+                        except Exception as e:
+                            logger.warning(f"Could not generate presigned URL for subquestion diagram {file_id}: {e}")
+                            subq["diagram"] = None
+        
+        # Generate PDF
+        pdf_generator = AssignmentPDFGenerator()
+        try:
+            pdf_content = pdf_generator.generate_assignment_pdf(assignment_data)
+            
+            # Clean filename for download
+            safe_title = "".join(c for c in assignment.title if c.isalnum() or c in (' ', '-', '_')).strip()
+            safe_title = safe_title.replace(' ', '_')[:50]  # Limit length
+            filename = f"{safe_title}_Assignment.pdf"
+            
+            logger.info(f"Successfully generated PDF for assignment {assignment_id}, size: {len(pdf_content)} bytes")
+            
+            # Return PDF response
+            return Response(
+                content=pdf_content,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"attachment; filename={filename}",
+                    "Content-Length": str(len(pdf_content)),
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                }
+            )
+            
+        finally:
+            # Always cleanup temporary files
+            pdf_generator.cleanup()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating PDF for assignment {assignment_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate assignment PDF"
         )

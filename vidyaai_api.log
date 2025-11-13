@@ -6156,3 +6156,644 @@ WHERE videos.source_type = %(source_type_1)s AND videos.user_id IS NOT NULL]
 2025-11-01 08:53:22,320 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=0USI-48ovJI - Status: 200 - Time: 0.1926s
 2025-11-01 08:53:22,322 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=0USI-48ovJI
 2025-11-01 08:53:22,335 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=0USI-48ovJI - Status: 200 - Time: 0.0133s
+2025-11-03 12:43:49,929 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-03 12:43:50,043 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-03 12:43:50,044 - controllers.config - INFO - Deepgram client initialized.
+2025-11-03 12:43:52,359 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-03 12:44:08,885 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=0USI-48ovJI
+2025-11-03 12:44:09,227 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=0USI-48ovJI - Status: 200 - Time: 0.3415s
+2025-11-03 12:44:09,228 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=0USI-48ovJI
+2025-11-03 12:44:09,235 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=0USI-48ovJI - Status: 200 - Time: 0.0069s
+2025-11-03 12:44:13,503 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/youtube/info
+2025-11-03 12:44:13,714 - httpx - INFO - HTTP Request: GET https://www.youtube.com/oembed?url=http://www.youtube.com/watch?v=C5-lz0hcqsE&format=json "HTTP/1.1 200 OK"
+2025-11-03 12:44:13,728 - controllers.config - INFO - Starting background download for video ID: C5-lz0hcqsE
+2025-11-03 12:44:13,757 - controllers.config - INFO - Downloading video from URL: https://www.youtube.com/watch?v=C5-lz0hcqsE
+2025-11-03 12:44:16,188 - controllers.config - INFO - Starting transcript formatting for video ID: C5-lz0hcqsE
+2025-11-03 12:44:16,203 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/youtube/info - Status: 200 - Time: 2.6994s
+2025-11-03 12:44:16,203 - controllers.config - INFO - Creating formatted transcript for video ID: C5-lz0hcqsE
+2025-11-03 12:44:16,205 - controllers.config - INFO - Formatting text with OpenAI...
+2025-11-03 12:44:16,205 - controllers.config - INFO - Formatting 71 chunks with OpenAI of video_id: C5-lz0hcqsE...
+2025-11-03 12:44:16,267 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:44:16,268 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:44:16,272 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0049s
+2025-11-03 12:44:16,283 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0145s
+2025-11-03 12:44:19,297 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:21,485 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:22,075 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:23,474 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:24,693 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:25,336 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:27,255 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:28,414 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:29,724 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:30,385 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:31,348 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:44:31,361 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0129s
+2025-11-03 12:44:31,365 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:44:31,387 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0224s
+2025-11-03 12:44:32,255 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:33,275 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:34,313 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:35,187 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:35,330 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/youtube/info
+2025-11-03 12:44:35,524 - httpx - INFO - HTTP Request: GET https://www.youtube.com/oembed?url=http://www.youtube.com/watch?v=C5-lz0hcqsE&format=json "HTTP/1.1 200 OK"
+2025-11-03 12:44:35,554 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/youtube/info - Status: 200 - Time: 0.2240s
+2025-11-03 12:44:35,598 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:44:35,600 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:44:35,608 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0097s
+2025-11-03 12:44:35,621 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0210s
+2025-11-03 12:44:35,636 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:44:35,658 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0219s
+2025-11-03 12:44:35,764 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:36,609 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:37,395 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:37,988 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:39,119 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:39,811 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:40,536 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:41,139 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:42,132 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:42,616 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:43,140 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:43,986 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:44,786 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:46,155 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:46,882 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:47,409 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:44:47,432 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0231s
+2025-11-03 12:44:47,538 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:48,158 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:48,688 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:49,225 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:49,440 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:44:49,457 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0174s
+2025-11-03 12:44:49,906 - controllers.config - INFO - Successfully downloaded: /var/folders/2t/bh3c08n913x8djgj1nr8gxwm0000gn/T/vidyai_backend/videos/C5-lz0hcqsE.mp4 (14.4 MB)
+2025-11-03 12:44:49,908 - controllers.config - INFO - Video downloaded successfully to: /var/folders/2t/bh3c08n913x8djgj1nr8gxwm0000gn/T/vidyai_backend/videos/C5-lz0hcqsE.mp4
+2025-11-03 12:44:49,909 - controllers.config - INFO - Uploading video to S3 for video ID: C5-lz0hcqsE, user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-03 12:44:50,579 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:51,136 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:51,463 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:44:51,474 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0113s
+2025-11-03 12:44:51,751 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:52,321 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:52,864 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:53,490 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:44:53,510 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0200s
+2025-11-03 12:44:54,080 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:54,767 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:55,115 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:55,526 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:44:55,527 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:55,547 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0209s
+2025-11-03 12:44:56,154 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:56,720 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:57,217 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:57,560 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:44:57,569 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0092s
+2025-11-03 12:44:57,799 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:58,529 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:59,179 - controllers.config - INFO - Video uploaded to S3 with key: youtube_videos/QUNGaGMTvdU8xcD0o98TIPnOiHj2/C5-lz0hcqsE.mp4
+2025-11-03 12:44:59,179 - controllers.config - INFO - Generating thumbnail for video ID: C5-lz0hcqsE
+2025-11-03 12:44:59,275 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:44:59,349 - controllers.config - INFO - Thumbnail uploaded to S3 with key: youtube_thumbnails/QUNGaGMTvdU8xcD0o98TIPnOiHj2/C5-lz0hcqsE.jpg
+2025-11-03 12:44:59,361 - controllers.config - INFO - Local video file removed after S3 upload for video ID: C5-lz0hcqsE
+2025-11-03 12:44:59,368 - controllers.config - INFO - Download status updated for video ID: C5-lz0hcqsE
+2025-11-03 12:44:59,595 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:44:59,607 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0123s
+2025-11-03 12:45:00,196 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:00,879 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:01,625 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:45:01,640 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0149s
+2025-11-03 12:45:01,820 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:02,793 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:03,300 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:03,659 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:45:03,681 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0228s
+2025-11-03 12:45:03,941 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:04,487 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:04,929 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:05,544 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:05,689 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:45:05,699 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0095s
+2025-11-03 12:45:06,401 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:07,015 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:07,716 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:45:07,734 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0179s
+2025-11-03 12:45:07,941 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:08,619 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:09,221 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:09,754 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:45:09,770 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0161s
+2025-11-03 12:45:09,807 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:10,289 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:10,843 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:11,786 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:45:11,803 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0163s
+2025-11-03 12:45:11,930 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:12,588 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:13,660 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:13,832 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:45:13,852 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0200s
+2025-11-03 12:45:14,341 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:15,268 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:15,863 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:45:15,873 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0098s
+2025-11-03 12:45:16,566 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:45:16,580 - controllers.config - INFO - Formatted transcript created (not saved to file)
+2025-11-03 12:45:16,585 - controllers.config - INFO - Uploading formatted transcript to S3 for video ID: C5-lz0hcqsE, user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-03 12:45:16,978 - controllers.config - INFO - Formatted transcript uploaded to S3 with key: youtube_transcripts/QUNGaGMTvdU8xcD0o98TIPnOiHj2/C5-lz0hcqsE_formatted.txt
+2025-11-03 12:45:16,995 - controllers.config - INFO - Transcript formatting completed successfully for video ID: C5-lz0hcqsE
+2025-11-03 12:45:17,886 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:45:17,905 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0188s
+2025-11-03 12:45:28,322 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/download-info?videoId=C5-lz0hcqsE
+2025-11-03 12:45:28,326 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/download-info?videoId=C5-lz0hcqsE - Status: 404 - Time: 0.0043s
+2025-11-03 12:45:32,141 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:45:32,141 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:45:32,178 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0365s
+2025-11-03 12:45:32,179 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0388s
+2025-11-03 12:45:32,181 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:45:32,188 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0074s
+2025-11-03 12:45:57,623 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/folders?source_type=uploaded
+2025-11-03 12:45:57,625 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery?source_type=uploaded
+2025-11-03 12:45:57,667 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/folders?source_type=uploaded - Status: 200 - Time: 0.0442s
+2025-11-03 12:45:57,667 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery?source_type=uploaded - Status: 200 - Time: 0.0421s
+2025-11-03 12:45:57,669 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/folders?source_type=uploaded
+2025-11-03 12:45:57,670 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery?source_type=uploaded
+2025-11-03 12:45:57,678 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Ffd83be5d-9b96-46ac-8631-ce3928ae3034.jpg&expires_in=3600
+2025-11-03 12:45:57,678 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2F57735e3e-3e1f-4129-b9fe-9550ac153e55.jpg&expires_in=3600
+2025-11-03 12:45:57,683 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Fdabc7c7b-dd63-49b9-9f81-53c1d4068541.jpg&expires_in=3600
+2025-11-03 12:45:57,685 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Ffd83be5d-9b96-46ac-8631-ce3928ae3034.jpg&expires_in=3600 - Status: 200 - Time: 0.0068s
+2025-11-03 12:45:57,685 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2F57735e3e-3e1f-4129-b9fe-9550ac153e55.jpg&expires_in=3600 - Status: 200 - Time: 0.0067s
+2025-11-03 12:45:57,686 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Fdabc7c7b-dd63-49b9-9f81-53c1d4068541.jpg&expires_in=3600 - Status: 200 - Time: 0.0027s
+2025-11-03 12:45:57,686 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/folders?source_type=uploaded - Status: 200 - Time: 0.0170s
+2025-11-03 12:45:57,689 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery?source_type=uploaded - Status: 200 - Time: 0.0189s
+2025-11-03 12:45:57,704 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Ffd83be5d-9b96-46ac-8631-ce3928ae3034.jpg&expires_in=3600
+2025-11-03 12:45:57,705 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2F57735e3e-3e1f-4129-b9fe-9550ac153e55.jpg&expires_in=3600
+2025-11-03 12:45:57,707 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Fdabc7c7b-dd63-49b9-9f81-53c1d4068541.jpg&expires_in=3600
+2025-11-03 12:45:57,707 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/fd83be5d-9b96-46ac-8631-ce3928ae3034/info
+2025-11-03 12:45:57,709 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/57735e3e-3e1f-4129-b9fe-9550ac153e55/info
+2025-11-03 12:45:57,709 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/dabc7c7b-dd63-49b9-9f81-53c1d4068541/info
+2025-11-03 12:45:57,709 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Ffd83be5d-9b96-46ac-8631-ce3928ae3034.jpg&expires_in=3600 - Status: 200 - Time: 0.0051s
+2025-11-03 12:45:57,709 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2F57735e3e-3e1f-4129-b9fe-9550ac153e55.jpg&expires_in=3600 - Status: 200 - Time: 0.0040s
+2025-11-03 12:45:57,713 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Fdabc7c7b-dd63-49b9-9f81-53c1d4068541.jpg&expires_in=3600 - Status: 200 - Time: 0.0059s
+2025-11-03 12:45:57,726 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/dabc7c7b-dd63-49b9-9f81-53c1d4068541/info - Status: 200 - Time: 0.0176s
+2025-11-03 12:45:57,726 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/fd83be5d-9b96-46ac-8631-ce3928ae3034/info - Status: 200 - Time: 0.0189s
+2025-11-03 12:45:57,728 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/dabc7c7b-dd63-49b9-9f81-53c1d4068541/info
+2025-11-03 12:45:57,729 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/fd83be5d-9b96-46ac-8631-ce3928ae3034/info
+2025-11-03 12:45:57,735 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/fd83be5d-9b96-46ac-8631-ce3928ae3034/info - Status: 200 - Time: 0.0060s
+2025-11-03 12:45:57,735 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/dabc7c7b-dd63-49b9-9f81-53c1d4068541/info - Status: 200 - Time: 0.0067s
+2025-11-03 12:45:57,736 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/fd83be5d-9b96-46ac-8631-ce3928ae3034/info
+2025-11-03 12:45:57,736 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/dabc7c7b-dd63-49b9-9f81-53c1d4068541/info
+2025-11-03 12:45:57,753 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/fd83be5d-9b96-46ac-8631-ce3928ae3034/info - Status: 200 - Time: 0.0169s
+2025-11-03 12:45:57,753 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/dabc7c7b-dd63-49b9-9f81-53c1d4068541/info - Status: 200 - Time: 0.0168s
+2025-11-03 12:45:57,760 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/57735e3e-3e1f-4129-b9fe-9550ac153e55/info - Status: 200 - Time: 0.0513s
+2025-11-03 12:45:57,761 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/57735e3e-3e1f-4129-b9fe-9550ac153e55/info
+2025-11-03 12:45:57,765 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/57735e3e-3e1f-4129-b9fe-9550ac153e55/info - Status: 200 - Time: 0.0045s
+2025-11-03 12:45:57,766 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/57735e3e-3e1f-4129-b9fe-9550ac153e55/info
+2025-11-03 12:45:57,770 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/57735e3e-3e1f-4129-b9fe-9550ac153e55/info - Status: 200 - Time: 0.0034s
+2025-11-03 12:46:00,437 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/folders?source_type=youtube
+2025-11-03 12:46:00,446 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery?source_type=youtube
+2025-11-03 12:46:00,457 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/folders?source_type=youtube - Status: 200 - Time: 0.0203s
+2025-11-03 12:46:00,464 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery?source_type=youtube - Status: 200 - Time: 0.0172s
+2025-11-03 12:46:00,471 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=youtube_thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2FC5-lz0hcqsE.jpg&expires_in=3600
+2025-11-03 12:46:00,478 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=youtube_thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2F0USI-48ovJI.jpg&expires_in=3600
+2025-11-03 12:46:00,482 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=youtube_thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2FC5-lz0hcqsE.jpg&expires_in=3600 - Status: 200 - Time: 0.0109s
+2025-11-03 12:46:00,482 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=youtube_thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2F0USI-48ovJI.jpg&expires_in=3600 - Status: 200 - Time: 0.0044s
+2025-11-03 12:46:00,490 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/C5-lz0hcqsE/info
+2025-11-03 12:46:00,490 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/0USI-48ovJI/info
+2025-11-03 12:46:00,496 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/0USI-48ovJI/info - Status: 200 - Time: 0.0060s
+2025-11-03 12:46:00,497 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/C5-lz0hcqsE/info - Status: 200 - Time: 0.0069s
+2025-11-03 12:46:02,523 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/youtube/info
+2025-11-03 12:46:02,524 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:46:02,528 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:46:02,561 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0367s
+2025-11-03 12:46:02,568 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0401s
+2025-11-03 12:46:02,570 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:46:02,574 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:46:02,575 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0052s
+2025-11-03 12:46:02,581 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:46:02,582 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0073s
+2025-11-03 12:46:02,588 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0063s
+2025-11-03 12:46:02,722 - httpx - INFO - HTTP Request: GET https://www.youtube.com/oembed?url=http://www.youtube.com/watch?v=C5-lz0hcqsE&format=json "HTTP/1.1 200 OK"
+2025-11-03 12:46:02,753 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/youtube/info - Status: 200 - Time: 0.2300s
+2025-11-03 12:46:02,763 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:46:02,772 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0091s
+2025-11-03 12:46:07,959 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE
+2025-11-03 12:46:07,995 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/C5-lz0hcqsE - Status: 200 - Time: 0.0363s
+2025-11-03 12:46:41,162 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:46:41,167 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/query/video
+2025-11-03 12:46:41,231 - controllers.config - INFO - Video downloaded to: https://uservideodownloads980.s3.amazonaws.com/youtube_videos/QUNGaGMTvdU8xcD0o98TIPnOiHj2/C5-lz0hcqsE.mp4?AWSAccessKeyId=AKIA2ONXT6HZMBTJZY7V&Signature=UxIc727DFAToPvRoAHZUrSHlwXU%3D&Expires=1762206401
+2025-11-03 12:46:42,198 - controllers.config - INFO - Video FPS: 10.0
+2025-11-03 12:46:42,199 - controllers.config - INFO - Video duration: 720.00 seconds
+2025-11-03 12:46:42,199 - controllers.config - INFO - FPS: 10.0
+2025-11-03 12:46:42,384 - controllers.config - INFO - Frame saved to: /var/folders/2t/bh3c08n913x8djgj1nr8gxwm0000gn/T/vidyai_backend/frames/frame_C5-lz0hcqsE_149.jpg
+2025-11-03 12:47:07,430 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:47:07,440 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 26.2786s
+2025-11-03 12:47:07,447 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/query/video - Status: 200 - Time: 26.2800s
+2025-11-03 12:47:07,501 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:47:07,788 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.2875s
+2025-11-03 12:48:13,134 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/query/video
+2025-11-03 12:48:13,186 - controllers.config - INFO - Video downloaded to: https://uservideodownloads980.s3.amazonaws.com/youtube_videos/QUNGaGMTvdU8xcD0o98TIPnOiHj2/C5-lz0hcqsE.mp4?AWSAccessKeyId=AKIA2ONXT6HZMBTJZY7V&Signature=olGQ5a5F1lbMAgFTfZG%2FWhXcG34%3D&Expires=1762206493
+2025-11-03 12:48:14,067 - controllers.config - INFO - Video FPS: 10.0
+2025-11-03 12:48:14,067 - controllers.config - INFO - Video duration: 720.00 seconds
+2025-11-03 12:48:14,068 - controllers.config - INFO - FPS: 10.0
+2025-11-03 12:48:14,456 - controllers.config - INFO - Frame saved to: /var/folders/2t/bh3c08n913x8djgj1nr8gxwm0000gn/T/vidyai_backend/frames/frame_C5-lz0hcqsE_333.jpg
+2025-11-03 12:48:37,432 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 12:48:37,448 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:48:37,449 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/query/video - Status: 200 - Time: 24.3154s
+2025-11-03 12:48:37,508 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0609s
+2025-11-03 12:48:37,509 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE
+2025-11-03 12:48:37,519 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=C5-lz0hcqsE - Status: 200 - Time: 0.0099s
+2025-11-05 10:39:37,170 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-05 10:39:37,280 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-05 10:39:37,280 - controllers.config - INFO - Deepgram client initialized.
+2025-11-05 10:39:40,500 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-05 10:41:25,958 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-05 10:41:26,044 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-05 10:41:26,045 - controllers.config - INFO - Deepgram client initialized.
+2025-11-05 10:41:27,150 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-05 10:41:29,963 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/youtube/info
+2025-11-05 10:41:30,551 - httpx - INFO - HTTP Request: GET https://www.youtube.com/oembed?url=http://www.youtube.com/watch?v=KqokoYr_h1A&format=json "HTTP/1.1 200 OK"
+2025-11-05 10:41:30,663 - controllers.config - INFO - Starting background download for video ID: KqokoYr_h1A
+2025-11-05 10:41:30,684 - controllers.config - INFO - Downloading video from URL: https://www.youtube.com/watch?v=KqokoYr_h1A
+2025-11-05 10:41:36,034 - controllers.config - ERROR - Transcript API error: 400 - {"error":"Invalid video id."}
+2025-11-05 10:41:54,983 - controllers.config - INFO - Successfully downloaded: /var/folders/2t/bh3c08n913x8djgj1nr8gxwm0000gn/T/vidyai_backend/videos/KqokoYr_h1A.mp4 (42.1 MB)
+2025-11-05 10:41:54,995 - controllers.config - INFO - Video downloaded successfully to: /var/folders/2t/bh3c08n913x8djgj1nr8gxwm0000gn/T/vidyai_backend/videos/KqokoYr_h1A.mp4
+2025-11-05 10:41:54,996 - controllers.config - INFO - Uploading video to S3 for video ID: KqokoYr_h1A, user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-05 10:42:06,805 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/youtube/info
+2025-11-05 10:42:09,711 - httpx - INFO - HTTP Request: GET https://www.youtube.com/oembed?url=http://www.youtube.com/watch?v=zModDQ-ST30&format=json "HTTP/1.1 200 OK"
+2025-11-05 10:42:09,731 - controllers.config - INFO - Starting background download for video ID: zModDQ-ST30
+2025-11-05 10:42:09,747 - controllers.config - INFO - Downloading video from URL: https://www.youtube.com/watch?v=zModDQ-ST30
+2025-11-05 10:42:23,565 - controllers.config - INFO - Starting transcript formatting for video ID: zModDQ-ST30
+2025-11-05 10:42:23,581 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/youtube/info - Status: 200 - Time: 16.7758s
+2025-11-05 10:42:23,581 - controllers.config - INFO - Creating formatted transcript for video ID: zModDQ-ST30
+2025-11-05 10:42:23,582 - controllers.config - INFO - Formatting text with OpenAI...
+2025-11-05 10:42:23,582 - controllers.config - INFO - Formatting 39 chunks with OpenAI of video_id: zModDQ-ST30...
+2025-11-05 10:42:23,629 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:42:23,629 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:42:23,635 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0060s
+2025-11-05 10:42:23,641 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0120s
+2025-11-05 10:42:25,331 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:26,422 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:28,143 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:30,761 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:31,356 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:32,448 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:33,609 - controllers.config - INFO - Video uploaded to S3 with key: youtube_videos/QUNGaGMTvdU8xcD0o98TIPnOiHj2/KqokoYr_h1A.mp4
+2025-11-05 10:42:33,609 - controllers.config - INFO - Generating thumbnail for video ID: KqokoYr_h1A
+2025-11-05 10:42:33,707 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:33,887 - controllers.config - INFO - Thumbnail uploaded to S3 with key: youtube_thumbnails/QUNGaGMTvdU8xcD0o98TIPnOiHj2/KqokoYr_h1A.jpg
+2025-11-05 10:42:33,898 - controllers.config - INFO - Local video file removed after S3 upload for video ID: KqokoYr_h1A
+2025-11-05 10:42:33,903 - controllers.config - INFO - Download status updated for video ID: KqokoYr_h1A
+2025-11-05 10:42:34,485 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:35,799 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:36,351 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:36,926 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:37,602 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:37,906 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/zModDQ-ST30
+2025-11-05 10:42:37,939 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/zModDQ-ST30 - Status: 200 - Time: 0.0336s
+2025-11-05 10:42:39,949 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/zModDQ-ST30
+2025-11-05 10:42:39,961 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/zModDQ-ST30 - Status: 200 - Time: 0.0122s
+2025-11-05 10:42:40,120 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:40,976 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:41,632 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:41,967 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/zModDQ-ST30
+2025-11-05 10:42:41,982 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/zModDQ-ST30 - Status: 200 - Time: 0.0150s
+2025-11-05 10:42:42,217 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:43,082 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:43,727 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:43,988 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/zModDQ-ST30
+2025-11-05 10:42:44,000 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/zModDQ-ST30 - Status: 200 - Time: 0.0121s
+2025-11-05 10:42:44,339 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:44,958 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:45,585 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:46,472 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:47,108 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:47,138 - controllers.config - INFO - Successfully downloaded: /var/folders/2t/bh3c08n913x8djgj1nr8gxwm0000gn/T/vidyai_backend/videos/zModDQ-ST30.mp4 (82.2 MB)
+2025-11-05 10:42:47,139 - controllers.config - INFO - Video downloaded successfully to: /var/folders/2t/bh3c08n913x8djgj1nr8gxwm0000gn/T/vidyai_backend/videos/zModDQ-ST30.mp4
+2025-11-05 10:42:47,140 - controllers.config - INFO - Uploading video to S3 for video ID: zModDQ-ST30, user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-05 10:42:47,819 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:47,887 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:42:47,888 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:42:47,910 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0226s
+2025-11-05 10:42:47,911 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0243s
+2025-11-05 10:42:47,914 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:42:47,920 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0065s
+2025-11-05 10:42:51,496 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/folders?source_type=uploaded
+2025-11-05 10:42:51,499 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery?source_type=uploaded
+2025-11-05 10:42:51,512 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/folders?source_type=uploaded - Status: 200 - Time: 0.0157s
+2025-11-05 10:42:51,519 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/folders?source_type=uploaded
+2025-11-05 10:42:51,521 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery?source_type=uploaded - Status: 200 - Time: 0.0215s
+2025-11-05 10:42:51,525 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery?source_type=uploaded
+2025-11-05 10:42:51,532 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Ffd83be5d-9b96-46ac-8631-ce3928ae3034.jpg&expires_in=3600
+2025-11-05 10:42:51,534 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2F57735e3e-3e1f-4129-b9fe-9550ac153e55.jpg&expires_in=3600
+2025-11-05 10:42:51,537 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/folders?source_type=uploaded - Status: 200 - Time: 0.0171s
+2025-11-05 10:42:51,537 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Fdabc7c7b-dd63-49b9-9f81-53c1d4068541.jpg&expires_in=3600
+2025-11-05 10:42:51,541 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Ffd83be5d-9b96-46ac-8631-ce3928ae3034.jpg&expires_in=3600 - Status: 200 - Time: 0.0083s
+2025-11-05 10:42:51,541 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2F57735e3e-3e1f-4129-b9fe-9550ac153e55.jpg&expires_in=3600 - Status: 200 - Time: 0.0070s
+2025-11-05 10:42:51,542 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Fdabc7c7b-dd63-49b9-9f81-53c1d4068541.jpg&expires_in=3600 - Status: 200 - Time: 0.0051s
+2025-11-05 10:42:51,543 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery?source_type=uploaded - Status: 200 - Time: 0.0178s
+2025-11-05 10:42:51,549 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Ffd83be5d-9b96-46ac-8631-ce3928ae3034.jpg&expires_in=3600
+2025-11-05 10:42:51,550 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2F57735e3e-3e1f-4129-b9fe-9550ac153e55.jpg&expires_in=3600
+2025-11-05 10:42:51,551 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/fd83be5d-9b96-46ac-8631-ce3928ae3034/info
+2025-11-05 10:42:51,551 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/57735e3e-3e1f-4129-b9fe-9550ac153e55/info
+2025-11-05 10:42:51,552 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/dabc7c7b-dd63-49b9-9f81-53c1d4068541/info
+2025-11-05 10:42:51,552 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Fdabc7c7b-dd63-49b9-9f81-53c1d4068541.jpg&expires_in=3600
+2025-11-05 10:42:51,554 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Ffd83be5d-9b96-46ac-8631-ce3928ae3034.jpg&expires_in=3600 - Status: 200 - Time: 0.0059s
+2025-11-05 10:42:51,557 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2F57735e3e-3e1f-4129-b9fe-9550ac153e55.jpg&expires_in=3600 - Status: 200 - Time: 0.0066s
+2025-11-05 10:42:51,560 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2Fdabc7c7b-dd63-49b9-9f81-53c1d4068541.jpg&expires_in=3600 - Status: 200 - Time: 0.0071s
+2025-11-05 10:42:51,565 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/57735e3e-3e1f-4129-b9fe-9550ac153e55/info - Status: 200 - Time: 0.0136s
+2025-11-05 10:42:51,565 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/fd83be5d-9b96-46ac-8631-ce3928ae3034/info - Status: 200 - Time: 0.0138s
+2025-11-05 10:42:51,566 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/57735e3e-3e1f-4129-b9fe-9550ac153e55/info
+2025-11-05 10:42:51,567 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/fd83be5d-9b96-46ac-8631-ce3928ae3034/info
+2025-11-05 10:42:51,572 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/fd83be5d-9b96-46ac-8631-ce3928ae3034/info - Status: 200 - Time: 0.0053s
+2025-11-05 10:42:51,572 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/57735e3e-3e1f-4129-b9fe-9550ac153e55/info - Status: 200 - Time: 0.0057s
+2025-11-05 10:42:51,591 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/dabc7c7b-dd63-49b9-9f81-53c1d4068541/info - Status: 200 - Time: 0.0389s
+2025-11-05 10:42:51,592 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/dabc7c7b-dd63-49b9-9f81-53c1d4068541/info
+2025-11-05 10:42:51,595 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/dabc7c7b-dd63-49b9-9f81-53c1d4068541/info - Status: 200 - Time: 0.0033s
+2025-11-05 10:42:52,250 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:53,595 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/folders?source_type=youtube
+2025-11-05 10:42:53,597 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery?source_type=youtube
+2025-11-05 10:42:53,609 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/folders?source_type=youtube - Status: 200 - Time: 0.0139s
+2025-11-05 10:42:53,614 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery?source_type=youtube - Status: 200 - Time: 0.0166s
+2025-11-05 10:42:53,618 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=youtube_thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2FC5-lz0hcqsE.jpg&expires_in=3600
+2025-11-05 10:42:53,621 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/storage/presign?key=youtube_thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2F0USI-48ovJI.jpg&expires_in=3600
+2025-11-05 10:42:53,625 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=youtube_thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2FC5-lz0hcqsE.jpg&expires_in=3600 - Status: 200 - Time: 0.0071s
+2025-11-05 10:42:53,626 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/storage/presign?key=youtube_thumbnails%2FQUNGaGMTvdU8xcD0o98TIPnOiHj2%2F0USI-48ovJI.jpg&expires_in=3600 - Status: 200 - Time: 0.0046s
+2025-11-05 10:42:53,634 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/zModDQ-ST30/info
+2025-11-05 10:42:53,635 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/C5-lz0hcqsE/info
+2025-11-05 10:42:53,635 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/gallery/video/0USI-48ovJI/info
+2025-11-05 10:42:53,648 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/zModDQ-ST30/info - Status: 200 - Time: 0.0144s
+2025-11-05 10:42:53,649 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/0USI-48ovJI/info - Status: 200 - Time: 0.0134s
+2025-11-05 10:42:53,649 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/gallery/video/C5-lz0hcqsE/info - Status: 200 - Time: 0.0140s
+2025-11-05 10:42:53,695 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:54,295 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:55,138 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:55,898 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:56,637 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:57,330 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:57,917 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:58,186 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/youtube/info
+2025-11-05 10:42:58,187 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:42:58,187 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:42:58,198 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0113s
+2025-11-05 10:42:58,199 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:42:58,219 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0318s
+2025-11-05 10:42:58,220 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:42:58,225 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:42:58,229 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0301s
+2025-11-05 10:42:58,229 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0092s
+2025-11-05 10:42:58,234 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0087s
+2025-11-05 10:42:58,240 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:42:58,247 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0065s
+2025-11-05 10:42:58,378 - httpx - INFO - HTTP Request: GET https://www.youtube.com/oembed?url=http://www.youtube.com/watch?v=zModDQ-ST30&format=json "HTTP/1.1 200 OK"
+2025-11-05 10:42:58,398 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/youtube/info - Status: 200 - Time: 0.2123s
+2025-11-05 10:42:58,410 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:42:58,420 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0099s
+2025-11-05 10:42:59,030 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:42:59,559 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:43:00,296 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:43:01,133 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:43:01,791 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:43:02,579 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:43:03,204 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:43:03,207 - controllers.config - INFO - Formatted transcript created (not saved to file)
+2025-11-05 10:43:03,212 - controllers.config - INFO - Uploading formatted transcript to S3 for video ID: zModDQ-ST30, user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-05 10:43:03,355 - controllers.config - INFO - Formatted transcript uploaded to S3 with key: youtube_transcripts/QUNGaGMTvdU8xcD0o98TIPnOiHj2/zModDQ-ST30_formatted.txt
+2025-11-05 10:43:03,371 - controllers.config - INFO - Transcript formatting completed successfully for video ID: zModDQ-ST30
+2025-11-05 10:43:06,683 - controllers.config - INFO - Incoming request: GET http://127.0.0.1:8000/api/youtube/formatting-status/zModDQ-ST30
+2025-11-05 10:43:06,696 - controllers.config - INFO - Request completed: GET http://127.0.0.1:8000/api/youtube/formatting-status/zModDQ-ST30 - Status: 200 - Time: 0.0129s
+2025-11-05 10:43:07,855 - controllers.config - INFO - Video uploaded to S3 with key: youtube_videos/QUNGaGMTvdU8xcD0o98TIPnOiHj2/zModDQ-ST30.mp4
+2025-11-05 10:43:07,855 - controllers.config - INFO - Generating thumbnail for video ID: zModDQ-ST30
+2025-11-05 10:43:08,299 - controllers.config - INFO - Thumbnail uploaded to S3 with key: youtube_thumbnails/QUNGaGMTvdU8xcD0o98TIPnOiHj2/zModDQ-ST30.jpg
+2025-11-05 10:43:08,307 - controllers.config - INFO - Local video file removed after S3 upload for video ID: zModDQ-ST30
+2025-11-05 10:43:08,311 - controllers.config - INFO - Download status updated for video ID: zModDQ-ST30
+2025-11-05 10:43:24,664 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/query/video
+2025-11-05 10:43:24,666 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:43:30,637 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:43:30,656 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/query/video - Status: 200 - Time: 5.9919s
+2025-11-05 10:43:30,657 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 5.9912s
+2025-11-05 10:43:30,689 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:43:30,702 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0131s
+2025-11-05 10:44:06,793 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/query/video
+2025-11-05 10:44:06,829 - controllers.config - INFO - Video downloaded to: https://uservideodownloads980.s3.amazonaws.com/youtube_videos/QUNGaGMTvdU8xcD0o98TIPnOiHj2/zModDQ-ST30.mp4?AWSAccessKeyId=AKIA2ONXT6HZMBTJZY7V&Signature=0fPe9gCftu9xwD5ghAv9tmCPFTk%3D&Expires=1762371846
+2025-11-05 10:44:07,843 - controllers.config - INFO - Video FPS: 29.97002997002997
+2025-11-05 10:44:07,844 - controllers.config - INFO - Video duration: 446.31 seconds
+2025-11-05 10:44:07,844 - controllers.config - INFO - FPS: 29.97002997002997
+2025-11-05 10:44:08,612 - controllers.config - INFO - Frame saved to: /var/folders/2t/bh3c08n913x8djgj1nr8gxwm0000gn/T/vidyai_backend/frames/frame_zModDQ-ST30_166.jpg
+2025-11-05 10:44:28,455 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:44:28,461 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:44:28,462 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/query/video - Status: 200 - Time: 21.6688s
+2025-11-05 10:44:28,472 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0109s
+2025-11-05 10:44:28,491 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:44:28,516 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0242s
+2025-11-05 10:48:17,233 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/query/video
+2025-11-05 10:48:17,273 - controllers.config - INFO - Video downloaded to: https://uservideodownloads980.s3.amazonaws.com/youtube_videos/QUNGaGMTvdU8xcD0o98TIPnOiHj2/zModDQ-ST30.mp4?AWSAccessKeyId=AKIA2ONXT6HZMBTJZY7V&Signature=%2BdRvYtb77NorAayyTqg5UlDG97Q%3D&Expires=1762372097
+2025-11-05 10:48:18,287 - controllers.config - INFO - Video FPS: 29.97002997002997
+2025-11-05 10:48:18,287 - controllers.config - INFO - Video duration: 446.31 seconds
+2025-11-05 10:48:18,287 - controllers.config - INFO - FPS: 29.97002997002997
+2025-11-05 10:48:19,451 - controllers.config - INFO - Frame saved to: /var/folders/2t/bh3c08n913x8djgj1nr8gxwm0000gn/T/vidyai_backend/frames/frame_zModDQ-ST30_85.jpg
+2025-11-05 10:48:30,647 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-05 10:48:30,656 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:48:30,671 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/query/video - Status: 200 - Time: 13.4375s
+2025-11-05 10:48:30,692 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0358s
+2025-11-05 10:48:30,718 - controllers.config - INFO - Incoming request: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30
+2025-11-05 10:48:30,726 - controllers.config - INFO - Request completed: POST http://127.0.0.1:8000/api/user-videos/chat-sessions?video_id=zModDQ-ST30 - Status: 200 - Time: 0.0086s
+2025-11-12 22:51:38,680 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 22:51:38,797 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 22:51:38,798 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 22:51:43,021 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-12 22:54:07,678 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 22:54:07,763 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 22:54:07,763 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 22:54:11,227 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-12 23:02:07,378 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc
+2025-11-12 23:02:07,380 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc
+2025-11-12 23:02:07,591 - controllers.config - INFO - Fetching assignments for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:02:07,708 - controllers.config - INFO - Found 0 assignments for user QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:02:07,710 - controllers.config - INFO - Fetching assignments for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:02:07,718 - controllers.config - INFO - Found 0 assignments for user QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:02:07,719 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc - Status: 200 - Time: 0.3416s
+2025-11-12 23:02:07,719 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc - Status: 200 - Time: 0.3396s
+2025-11-12 23:17:19,707 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc
+2025-11-12 23:17:19,728 - controllers.config - INFO - Fetching assignments for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:17:19,735 - controllers.config - INFO - Found 0 assignments for user QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:17:19,737 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc - Status: 200 - Time: 0.0300s
+2025-11-12 23:19:03,364 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-12 23:19:03,403 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:19:03,432 - controllers.config - ERROR - Error generating assignment: No module named 'PyPDF2'
+2025-11-12 23:19:03,433 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 500 - Time: 0.0690s
+2025-11-12 23:19:10,752 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-12 23:19:10,773 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:19:10,777 - controllers.config - ERROR - Error generating assignment: No module named 'PyPDF2'
+2025-11-12 23:19:10,777 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 500 - Time: 0.0253s
+2025-11-12 23:21:07,160 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 23:21:07,244 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 23:21:07,244 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 23:21:08,678 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-12 23:21:16,555 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-12 23:21:16,768 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:21:16,770 - controllers.config - ERROR - Error generating assignment: No module named 'PyPDF2'
+2025-11-12 23:21:16,771 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 500 - Time: 0.2159s
+2025-11-12 23:21:19,683 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-12 23:21:19,700 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:21:19,701 - controllers.config - ERROR - Error generating assignment: No module named 'PyPDF2'
+2025-11-12 23:21:19,702 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 500 - Time: 0.0189s
+2025-11-12 23:25:21,138 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 23:25:21,224 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 23:25:21,224 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 23:25:22,778 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-12 23:25:27,845 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-12 23:25:28,048 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:25:28,338 - controllers.config - ERROR - Error generating assignment: No module named 'docx'
+2025-11-12 23:25:28,338 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 500 - Time: 0.4929s
+2025-11-12 23:26:07,547 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 23:26:07,635 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 23:26:07,635 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 23:26:09,708 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-12 23:26:12,745 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-12 23:26:12,986 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:26:13,014 - controllers.config - ERROR - Error generating assignment: No module named 'exceptions'
+2025-11-12 23:26:13,014 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 500 - Time: 0.2695s
+2025-11-12 23:26:16,236 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-12 23:26:16,254 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:26:16,255 - controllers.config - ERROR - Error generating assignment: No module named 'exceptions'
+2025-11-12 23:26:16,256 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 500 - Time: 0.0203s
+2025-11-12 23:30:48,351 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 23:30:48,408 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 23:30:48,408 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 23:30:50,065 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-12 23:31:05,239 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc
+2025-11-12 23:31:05,241 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc
+2025-11-12 23:31:05,444 - controllers.config - INFO - Fetching assignments for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:31:05,517 - controllers.config - INFO - Found 0 assignments for user QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:31:05,519 - controllers.config - INFO - Fetching assignments for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:31:05,524 - controllers.config - INFO - Found 0 assignments for user QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:31:05,525 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc - Status: 200 - Time: 0.2860s
+2025-11-12 23:31:05,525 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc - Status: 200 - Time: 0.2843s
+2025-11-12 23:36:49,040 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 23:36:49,125 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 23:36:49,125 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 23:36:50,643 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-12 23:37:18,054 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc
+2025-11-12 23:37:18,261 - controllers.config - INFO - Fetching assignments for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:37:18,347 - controllers.config - INFO - Found 0 assignments for user QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:37:18,348 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc - Status: 200 - Time: 0.2939s
+2025-11-12 23:37:18,349 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc
+2025-11-12 23:37:18,351 - controllers.config - INFO - Fetching assignments for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:37:18,353 - controllers.config - INFO - Found 0 assignments for user QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:37:18,353 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc - Status: 200 - Time: 0.0036s
+2025-11-12 23:38:01,192 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-12 23:38:01,215 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:38:01,257 - controllers.config - ERROR - Error generating assignment: No module named 'exceptions'
+2025-11-12 23:38:01,257 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 500 - Time: 0.0650s
+2025-11-12 23:39:19,328 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-12 23:39:19,355 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:39:19,365 - controllers.config - ERROR - Error generating assignment: No module named 'exceptions'
+2025-11-12 23:39:19,366 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 500 - Time: 0.0378s
+2025-11-12 23:40:25,475 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 23:40:25,523 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 23:40:25,524 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 23:40:26,778 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-12 23:40:32,228 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-12 23:40:32,449 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:40:32,485 - controllers.config - ERROR - Error generating assignment: No module named 'exceptions'
+2025-11-12 23:40:32,486 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 500 - Time: 0.2574s
+2025-11-12 23:48:48,348 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 23:48:48,391 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 23:48:48,391 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 23:48:49,435 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-12 23:49:10,907 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-12 23:49:11,110 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:49:11,136 - controllers.config - ERROR - Error generating assignment: No module named 'exceptions'
+2025-11-12 23:49:11,137 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 500 - Time: 0.2293s
+2025-11-12 23:51:24,307 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 23:51:24,359 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 23:51:24,359 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 23:51:48,503 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 23:51:48,553 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 23:51:48,554 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 23:52:08,427 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 23:52:08,481 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 23:52:08,481 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 23:52:40,510 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 23:52:40,561 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 23:52:40,562 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 23:53:19,924 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-12 23:53:20,010 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-12 23:53:20,010 - controllers.config - INFO - Deepgram client initialized.
+2025-11-12 23:53:21,353 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-12 23:53:23,906 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-12 23:53:24,122 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:53:24,158 - controllers.config - ERROR - Error generating assignment: No module named 'exceptions'
+2025-11-12 23:53:24,158 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 500 - Time: 0.2519s
+2025-11-12 23:53:26,422 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-12 23:53:26,444 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-12 23:53:26,446 - controllers.config - ERROR - Error generating assignment: No module named 'exceptions'
+2025-11-12 23:53:26,446 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 500 - Time: 0.0244s
+2025-11-13 00:01:22,092 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-13 00:01:22,152 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-13 00:01:22,152 - controllers.config - INFO - Deepgram client initialized.
+2025-11-13 00:03:08,868 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-13 00:03:08,926 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-13 00:03:08,926 - controllers.config - INFO - Deepgram client initialized.
+2025-11-13 00:03:29,348 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-13 00:03:29,400 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-13 00:03:29,400 - controllers.config - INFO - Deepgram client initialized.
+2025-11-13 00:03:57,159 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-13 00:03:57,213 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-13 00:03:57,213 - controllers.config - INFO - Deepgram client initialized.
+2025-11-13 00:04:35,042 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-13 00:04:35,095 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-13 00:04:35,095 - controllers.config - INFO - Deepgram client initialized.
+2025-11-13 00:04:37,472 - controllers.config - INFO - Starting Vidya AI Backend on port 8000
+2025-11-13 00:04:41,553 - controllers.config - INFO - Incoming request: POST http://localhost:8000/api/assignments/generate
+2025-11-13 00:04:41,779 - controllers.config - INFO - Generating assignment for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 00:04:41,850 - controllers.config - INFO - Starting assignment generation with options: {'numQuestions': 5, 'totalPoints': 25, 'difficultyLevel': 'mixed', 'perQuestionDifficulty': False, 'setCustomPoints': False, 'pointsVariation': 'constant', 'engineeringLevel': 'undergraduate', 'questionTypes': {'multiple-choice': True, 'short-answer': False, 'true-false': False, 'numerical': False, 'code-writing': True, 'diagram-analysis': False, 'multi-part': False}, 'engineeringDiscipline': 'computer', 'includeCode': True, 'includeDiagrams': False, 'includeCalculations': False}
+2025-11-13 00:04:41,850 - controllers.config - INFO - Linked videos: 0
+2025-11-13 00:04:41,850 - controllers.config - INFO - Uploaded files: 1
+2025-11-13 00:04:41,850 - controllers.config - INFO - Generation prompt: None
+2025-11-13 00:04:41,943 - controllers.config - INFO - Content sources extracted: ['video_transcripts', 'document_texts', 'custom_prompt']
+2025-11-13 00:06:27,817 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-13 00:06:27,831 - controllers.config - INFO - Generated 5 questions
+2025-11-13 00:06:27,831 - controllers.config - INFO - Generated assignment with 5 questions
+2025-11-13 00:06:28,043 - controllers.config - INFO - Generated assignment: de3b2268-9ac3-4848-ab45-7bde27e18bb6 - linkedlist assignments
+2025-11-13 00:06:28,062 - controllers.config - INFO - Request completed: POST http://localhost:8000/api/assignments/generate - Status: 200 - Time: 106.5087s
+2025-11-13 00:07:19,226 - controllers.config - INFO - Incoming request: PUT http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6
+2025-11-13 00:07:19,250 - controllers.config - INFO - Updating assignment de3b2268-9ac3-4848-ab45-7bde27e18bb6 for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 00:07:19,323 - controllers.config - INFO - Updated assignment: de3b2268-9ac3-4848-ab45-7bde27e18bb6 - linkedlist assignments
+2025-11-13 00:07:19,341 - controllers.config - INFO - Request completed: PUT http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6 - Status: 200 - Time: 0.1151s
+2025-11-13 00:07:22,525 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc
+2025-11-13 00:07:22,529 - controllers.config - INFO - Fetching assignments for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 00:07:22,548 - controllers.config - INFO - Found 1 assignments for user QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 00:07:22,550 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc - Status: 200 - Time: 0.0247s
+2025-11-13 00:07:25,632 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/download-pdf
+2025-11-13 00:07:25,636 - controllers.config - INFO - PDF download requested for assignment de3b2268-9ac3-4848-ab45-7bde27e18bb6 by user QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 00:07:25,901 - controllers.config - INFO - Successfully generated PDF for assignment de3b2268-9ac3-4848-ab45-7bde27e18bb6, size: 20010 bytes
+2025-11-13 00:07:25,902 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/download-pdf - Status: 200 - Time: 0.2697s
+2025-11-13 08:20:08,117 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share
+2025-11-13 08:20:08,239 - controllers.config - INFO - Getting shared assignment link for assignment de3b2268-9ac3-4848-ab45-7bde27e18bb6 by user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 08:20:08,315 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share - Status: 404 - Time: 0.1982s
+2025-11-13 08:20:08,319 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share
+2025-11-13 08:20:08,324 - controllers.config - INFO - Getting shared assignment link for assignment de3b2268-9ac3-4848-ab45-7bde27e18bb6 by user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 08:20:08,363 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share - Status: 404 - Time: 0.0443s
+2025-11-13 08:20:50,226 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6
+2025-11-13 08:20:50,232 - controllers.config - INFO - Fetching assignment de3b2268-9ac3-4848-ab45-7bde27e18bb6 for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 08:20:50,266 - controllers.config - INFO - Retrieved assignment: linkedlist assignments
+2025-11-13 08:20:50,287 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6 - Status: 200 - Time: 0.0606s
+2025-11-13 08:21:24,120 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc
+2025-11-13 08:21:24,125 - controllers.config - INFO - Fetching assignments for user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 08:21:24,150 - controllers.config - INFO - Found 1 assignments for user QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 08:21:24,152 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments?sort_by=created_at&sort_order=desc - Status: 200 - Time: 0.0318s
+2025-11-13 08:21:28,361 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share
+2025-11-13 08:21:28,365 - controllers.config - INFO - Getting shared assignment link for assignment de3b2268-9ac3-4848-ab45-7bde27e18bb6 by user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 08:21:28,393 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share - Status: 404 - Time: 0.0328s
+2025-11-13 08:21:28,395 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share
+2025-11-13 08:21:28,399 - controllers.config - INFO - Getting shared assignment link for assignment de3b2268-9ac3-4848-ab45-7bde27e18bb6 by user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 08:21:28,428 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share - Status: 404 - Time: 0.0325s
+2025-11-13 08:23:00,708 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share
+2025-11-13 08:23:00,713 - controllers.config - INFO - Getting shared assignment link for assignment de3b2268-9ac3-4848-ab45-7bde27e18bb6 by user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 08:23:00,744 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share - Status: 404 - Time: 0.0361s
+2025-11-13 08:23:00,746 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share
+2025-11-13 08:23:00,750 - controllers.config - INFO - Getting shared assignment link for assignment de3b2268-9ac3-4848-ab45-7bde27e18bb6 by user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
+2025-11-13 08:23:00,777 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share - Status: 404 - Time: 0.0302s
