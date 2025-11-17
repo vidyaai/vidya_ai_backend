@@ -6797,3 +6797,23 @@ WHERE videos.source_type = %(source_type_1)s AND videos.user_id IS NOT NULL]
 2025-11-13 08:23:00,746 - controllers.config - INFO - Incoming request: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share
 2025-11-13 08:23:00,750 - controllers.config - INFO - Getting shared assignment link for assignment de3b2268-9ac3-4848-ab45-7bde27e18bb6 by user: QUNGaGMTvdU8xcD0o98TIPnOiHj2
 2025-11-13 08:23:00,777 - controllers.config - INFO - Request completed: GET http://localhost:8000/api/assignments/de3b2268-9ac3-4848-ab45-7bde27e18bb6/share - Status: 404 - Time: 0.0302s
+2025-11-16 17:39:41,252 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-16 17:39:41,317 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-16 17:39:41,317 - controllers.config - INFO - Deepgram client initialized.
+2025-11-16 17:39:48,816 - controllers.config - ERROR - Failed to get default credentials: Your default credentials were not found. To set up Application Default Credentials, see https://cloud.google.com/docs/authentication/external/set-up-adc for more information.
+2025-11-16 17:39:48,817 - controllers.config - WARNING - Google Forms service not available - no credentials found
+2025-11-16 17:40:04,301 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-16 17:40:04,354 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-16 17:40:04,354 - controllers.config - INFO - Deepgram client initialized.
+2025-11-16 17:40:14,861 - controllers.config - ERROR - Failed to get default credentials: Your default credentials were not found. To set up Application Default Credentials, see https://cloud.google.com/docs/authentication/external/set-up-adc for more information.
+2025-11-16 17:40:14,865 - controllers.config - WARNING - Google Forms service not available - no credentials found
+2025-11-16 17:40:39,344 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-16 17:40:39,396 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-16 17:40:39,397 - controllers.config - INFO - Deepgram client initialized.
+2025-11-16 17:40:49,887 - controllers.config - ERROR - Failed to get default credentials: Your default credentials were not found. To set up Application Default Credentials, see https://cloud.google.com/docs/authentication/external/set-up-adc for more information.
+2025-11-16 17:40:49,888 - controllers.config - WARNING - Google Forms service not available - no credentials found
+2025-11-16 17:44:15,317 - botocore.credentials - INFO - Found credentials in environment variables.
+2025-11-16 17:44:15,367 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2025-11-16 17:44:15,367 - controllers.config - INFO - Deepgram client initialized.
+2025-11-16 17:44:22,735 - controllers.config - ERROR - Failed to get default credentials: Your default credentials were not found. To set up Application Default Credentials, see https://cloud.google.com/docs/authentication/external/set-up-adc for more information.
+2025-11-16 17:44:22,736 - controllers.config - WARNING - Google Forms service not available - no credentials found

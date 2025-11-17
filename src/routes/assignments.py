@@ -39,6 +39,7 @@ from schemas import (
 )
 from fastapi.responses import Response
 from utils.pdf_generator import AssignmentPDFGenerator
+from utils.google_forms_service import get_google_forms_service
 
 router = APIRouter()
 
@@ -2782,4 +2783,77 @@ async def download_assignment_pdf(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate assignment PDF"
+        )
+
+
+@router.post("/api/assignments/{assignment_id}/generate-google-form")
+async def generate_google_form(
+    assignment_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate a Google Form from an existing assignment."""
+    try:
+        # Get the assignment
+        assignment = db.query(Assignment).filter(
+            and_(
+                Assignment.id == assignment_id,
+                Assignment.user_id == current_user["uid"]
+            )
+        ).first()
+        
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Assignment not found"
+            )
+        
+        # Get Google Forms service
+        google_forms_service = get_google_forms_service()
+        
+        if not google_forms_service.is_available():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Google Forms service not available. Please contact administrator to configure Google Cloud credentials."
+            )
+        
+        # Prepare assignment data for form creation
+        assignment_data = {
+            "title": assignment.title,
+            "description": assignment.description,
+            "questions": assignment.questions or []
+        }
+        
+        # Create Google Form
+        result = google_forms_service.create_form_from_assignment(assignment_data)
+        
+        if result["success"]:
+            # Update assignment with Google Form URLs
+            assignment.google_form_url = result["edit_url"]
+            assignment.google_form_response_url = result["response_url"]
+            db.commit()
+            
+            logger.info(f"Created Google Form for assignment {assignment_id}: {result['form_id']}")
+            
+            return {
+                "success": True,
+                "form_id": result["form_id"],
+                "edit_url": result["edit_url"],
+                "response_url": result["response_url"],
+                "message": "Google Form created successfully"
+            }
+        else:
+            logger.error(f"Failed to create Google Form for assignment {assignment_id}: {result['error']}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create Google Form: {result['error']}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating Google Form for assignment {assignment_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate Google Form"
         )

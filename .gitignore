@@ -23,3 +23,13 @@ src/*/__pycache__/
 
 vidyaai-app-firebase-adminsdk-*.json
 .cursor/
+
+# Google Cloud credentials
+credentials/
+google-service-account.json
+*-service-account*.json
+vidyaai-forms-integrations-*.json
+
+# Log files and temporary data
+question_papers_log/
+*.log
