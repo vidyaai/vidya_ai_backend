@@ -2786,6 +2786,45 @@ async def download_assignment_pdf(
         )
 
 
+@router.get("/api/assignments/test-google-forms")
+async def test_google_forms_connection(
+    current_user=Depends(get_current_user)
+):
+    """Test Google Forms service connection and domain-wide delegation."""
+    try:
+        # Get Google Forms service
+        google_forms_service = get_google_forms_service()
+        
+        # Test the connection
+        result = google_forms_service.test_connection()
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "message": "Google Forms service is working correctly with domain-wide delegation",
+                "form_id": result["form_id"],
+                "edit_url": result["edit_url"],
+                "response_url": result["response_url"],
+                "service_available": google_forms_service.is_available()
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Google Forms service test failed",
+                "error": result.get("error", "Unknown error"),
+                "service_available": google_forms_service.is_available()
+            }
+            
+    except Exception as e:
+        logger.error(f"Error testing Google Forms service: {str(e)}")
+        return {
+            "success": False,
+            "message": "Google Forms service test failed with exception",
+            "error": str(e),
+            "service_available": False
+        }
+
+
 @router.post("/api/assignments/{assignment_id}/generate-google-form")
 async def generate_google_form(
     assignment_id: str,
@@ -2840,13 +2879,24 @@ async def generate_google_form(
                 "form_id": result["form_id"],
                 "edit_url": result["edit_url"],
                 "response_url": result["response_url"],
+                "google_resource_url": result["edit_url"],  # Frontend expects this field
                 "message": "Google Form created successfully"
             }
         else:
-            logger.error(f"Failed to create Google Form for assignment {assignment_id}: {result['error']}")
+            error_message = result.get('error', 'Unknown error')
+            logger.error(f"Failed to create Google Form for assignment {assignment_id}: {error_message}")
+            
+            # Provide user-friendly error messages
+            if "Permission denied" in error_message or "403" in str(result.get('api_error', '')):
+                user_message = "Google Forms integration is not properly configured. Please contact your administrator."
+            elif "internal error" in error_message.lower() or "500" in str(result.get('api_error', '')):
+                user_message = "Google Forms service is temporarily unavailable. Please try again later."
+            else:
+                user_message = "Failed to create Google Form. Please try again or contact support."
+            
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to create Google Form: {result['error']}"
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=user_message
             )
             
     except HTTPException:
@@ -2856,4 +2906,196 @@ async def generate_google_form(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate Google Form"
+        )
+
+
+@router.get("/api/assignments/{assignment_id}/google-form-url")
+async def get_google_form_url(
+    assignment_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get the Google Form URL for an existing assignment."""
+    try:
+        # Get the assignment
+        assignment = db.query(Assignment).filter(
+            and_(
+                Assignment.id == assignment_id,
+                Assignment.user_id == current_user["uid"]
+            )
+        ).first()
+        
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Assignment not found"
+            )
+        
+        # Check if Google Form URL exists
+        if not assignment.google_form_url:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No Google Form exists for this assignment"
+            )
+        
+        return {
+            "google_resource_url": assignment.google_form_url,
+            "google_form_response_url": assignment.google_form_response_url,
+            "message": "Google Form URL retrieved successfully"
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting Google Form URL for assignment {assignment_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve Google Form URL"
+        )
+
+
+@router.post("/api/assignments/{assignment_id}/make-google-form-public")
+async def make_google_form_public(
+    assignment_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Make an existing Google Form publicly accessible."""
+    try:
+        # Get the assignment
+        assignment = db.query(Assignment).filter(
+            and_(
+                Assignment.id == assignment_id,
+                Assignment.user_id == current_user["uid"]
+            )
+        ).first()
+        
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Assignment not found"
+            )
+        
+        # Check if Google Form exists
+        if not assignment.google_form_url:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No Google Form exists for this assignment"
+            )
+        
+        # Extract form ID from URL
+        try:
+            # URL format: https://docs.google.com/forms/d/{form_id}/edit
+            form_id = assignment.google_form_url.split('/d/')[1].split('/')[0]
+        except (IndexError, AttributeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Google Form URL format"
+            )
+        
+        # Get Google Forms service and make form public
+        google_forms_service = get_google_forms_service()
+        
+        if not google_forms_service.is_available():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Google Forms service not available"
+            )
+        
+        # Make the form public
+        google_forms_service._make_form_public(form_id)
+        
+        logger.info(f"Made existing Google Form {form_id} public for assignment {assignment_id}")
+        
+        return {
+            "success": True,
+            "form_id": form_id,
+            "message": "Google Form is now publicly accessible",
+            "google_resource_url": assignment.google_form_url,
+            "google_form_response_url": assignment.google_form_response_url
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error making Google Form public for assignment {assignment_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to make Google Form public"
+        )
+
+
+@router.post("/api/assignments/make-all-google-forms-public")
+async def make_all_google_forms_public(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Make all existing Google Forms for the current user publicly accessible."""
+    try:
+        # Get all assignments with Google Forms for this user
+        assignments = db.query(Assignment).filter(
+            and_(
+                Assignment.user_id == current_user["uid"],
+                Assignment.google_form_url.isnot(None),
+                Assignment.google_form_url != ""
+            )
+        ).all()
+        
+        if not assignments:
+            return {
+                "success": True,
+                "message": "No Google Forms found to make public",
+                "processed_count": 0,
+                "successful_count": 0,
+                "failed_count": 0
+            }
+        
+        google_forms_service = get_google_forms_service()
+        
+        if not google_forms_service.is_available():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Google Forms service not available"
+            )
+        
+        successful_count = 0
+        failed_count = 0
+        failed_assignments = []
+        
+        for assignment in assignments:
+            try:
+                # Extract form ID from URL
+                form_id = assignment.google_form_url.split('/d/')[1].split('/')[0]
+                
+                # Make the form public
+                google_forms_service._make_form_public(form_id)
+                successful_count += 1
+                
+                logger.info(f"Made Google Form {form_id} public for assignment {assignment.id}")
+                
+            except Exception as e:
+                failed_count += 1
+                failed_assignments.append({
+                    "assignment_id": assignment.id,
+                    "assignment_title": assignment.title,
+                    "error": str(e)
+                })
+                logger.error(f"Failed to make form public for assignment {assignment.id}: {e}")
+        
+        return {
+            "success": True,
+            "message": f"Processed {len(assignments)} Google Forms",
+            "processed_count": len(assignments),
+            "successful_count": successful_count,
+            "failed_count": failed_count,
+            "failed_assignments": failed_assignments if failed_assignments else None
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error making all Google Forms public for user {current_user['uid']}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to make Google Forms public"
         )
