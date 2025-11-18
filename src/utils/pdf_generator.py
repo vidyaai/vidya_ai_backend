@@ -1,6 +1,6 @@
 """
 PDF generation service for assignments with LaTeX-style formatting.
-Supports equations, images, and professional document layout.
+Supports professional equation rendering, images, and research paper layout.
 """
 
 import io
@@ -14,16 +14,41 @@ import requests
 
 try:
     from weasyprint import HTML, CSS
-    from weasyprint.css.targets import PageBox
-except ImportError:
-    print("WeasyPrint not installed. Install with: pip install weasyprint")
+    WEASYPRINT_AVAILABLE = True
+except ImportError as e:
+    print(f"WeasyPrint import failed: {e}")
+    WEASYPRINT_AVAILABLE = False
 
 try:
     import matplotlib.pyplot as plt
     import matplotlib.mathtext as mathtext
     from matplotlib.backends.backend_agg import FigureCanvasAgg
+    import matplotlib.patches as patches
+    from matplotlib import rcParams
 except ImportError:
     print("Matplotlib not installed. Install with: pip install matplotlib")
+
+try:
+    import sympy as sp
+    from sympy import latex, preview
+    # Note: sympy.parsing.latex is optional and may not be available in all versions
+    try:
+        from sympy.parsing.latex import parse_latex
+        SYMPY_LATEX_PARSER = True
+    except ImportError:
+        SYMPY_LATEX_PARSER = False
+    SYMPY_AVAILABLE = True
+except ImportError as e:
+    print(f"SymPy import failed: {e}")
+    SYMPY_AVAILABLE = False
+    SYMPY_LATEX_PARSER = False
+
+try:
+    from latex2mathml.converter import convert as latex_to_mathml
+    LATEX2MATHML_AVAILABLE = True
+except ImportError as e:
+    print(f"latex2mathml import failed: {e}")
+    LATEX2MATHML_AVAILABLE = False
 
 from controllers.config import logger
 
@@ -34,77 +59,338 @@ class AssignmentPDFGenerator:
     def __init__(self):
         self.temp_dir = tempfile.mkdtemp()
         
-    def render_latex_equation(self, latex_text: str, fontsize: int = 12) -> str:
+        # Configure matplotlib for professional rendering
+        self._configure_matplotlib_for_latex()
+        
+    def _configure_matplotlib_for_latex(self):
+        """Configure matplotlib with professional LaTeX settings."""
+        try:
+            # Set up LaTeX-like font rendering
+            rcParams.update({
+                'font.size': 12,
+                'font.family': 'serif',
+                'font.serif': ['DejaVu Serif', 'Times New Roman'],
+                'text.usetex': False,  # We'll use mathtext which is more reliable
+                'mathtext.fontset': 'cm',  # Computer Modern fonts
+                'mathtext.rm': 'serif',
+                'mathtext.it': 'serif:italic', 
+                'mathtext.bf': 'serif:bold',
+                'mathtext.sf': 'sans\\-serif',  # Fixed syntax
+                'mathtext.tt': 'monospace',
+                'mathtext.cal': 'cursive',
+                'axes.unicode_minus': True,  # Use proper minus signs
+                'figure.dpi': 200,  # High DPI for crisp equations
+                'savefig.dpi': 200,
+                'savefig.format': 'png',
+                'savefig.bbox': 'tight',
+                'savefig.transparent': True
+            })
+        except Exception as e:
+            logger.warning(f"Could not configure LaTeX settings: {e}")
+        
+    def render_latex_equation(self, latex_text: str, fontsize: int = 11, is_display: bool = False) -> str:
         """
-        Render LaTeX equation to base64 image using matplotlib.
+        Convert LaTeX to selectable HTML text with proper mathematical formatting.
         
         Args:
             latex_text: LaTeX equation string
-            fontsize: Font size for the equation
+            fontsize: Font size for the equation (matches text size)
+            is_display: True for display equations (centered), False for inline
             
         Returns:
-            Base64 encoded image data URI
+            HTML formatted mathematical expression as selectable text
         """
         try:
             # Clean up LaTeX text
             latex_text = latex_text.strip()
-            if not latex_text.startswith('$'):
-                latex_text = f'${latex_text}$'
             
-            # Create figure for equation
-            fig, ax = plt.subplots(figsize=(8, 1))
-            ax.text(0.5, 0.5, latex_text, transform=ax.transAxes, 
-                   fontsize=fontsize, ha='center', va='center',
-                   fontfamily='serif')
+            # Remove outer $ signs if present
+            if latex_text.startswith('$$') and latex_text.endswith('$$'):
+                latex_text = latex_text[2:-2]
+                is_display = True
+            elif latex_text.startswith('$') and latex_text.endswith('$'):
+                latex_text = latex_text[1:-1]
             
-            # Remove axes and make transparent
-            ax.set_xlim(0, 1)
-            ax.set_ylim(0, 1)
+            # Convert LaTeX to selectable HTML using Unicode and CSS
+            html_equation = self._latex_to_html(latex_text)
+            
+            # Return formatted HTML
+            if is_display:
+                return f'<span class="math-display">{html_equation}</span>'
+            else:
+                return f'<span class="math-inline">{html_equation}</span>'
+            
+        except Exception as e:
+            logger.warning(f"LaTeX conversion failed for '{latex_text}': {e}")
+            # Fallback to plain text with basic formatting
+            return f'<span class="math-fallback">{latex_text}</span>'
+    
+    def _enhance_latex_formatting(self, latex_text: str) -> str:
+        """
+        Enhance LaTeX text with proper mathematical formatting.
+        
+        Args:
+            latex_text: Raw LaTeX text
+            
+        Returns:
+            Enhanced LaTeX text with better typography
+        """
+        # Clean up common LaTeX issues
+        enhanced = latex_text
+        
+        # Fix common spacing issues around operators (only if not already spaced)
+        enhanced = re.sub(r'(?<!\s)\+(?!\s)', ' + ', enhanced)
+        enhanced = re.sub(r'(?<!\s)-(?!\s)', ' - ', enhanced)  
+        enhanced = re.sub(r'(?<!\s)=(?!\s)', ' = ', enhanced)
+        enhanced = re.sub(r'(?<!\s)<(?!\s)', ' < ', enhanced)
+        enhanced = re.sub(r'(?<!\s)>(?!\s)', ' > ', enhanced)
+        
+        # Ensure proper braces for single character sub/superscripts
+        enhanced = re.sub(r'([a-zA-Z])_([a-zA-Z0-9])(?![a-zA-Z0-9{])', r'\1_{\2}', enhanced)
+        enhanced = re.sub(r'([a-zA-Z])\^([a-zA-Z0-9])(?![a-zA-Z0-9{])', r'\1^{\2}', enhanced)
+        
+        return enhanced
+    
+    def _latex_to_html(self, latex_text: str) -> str:
+        """
+        Convert LaTeX mathematical expressions to HTML with Unicode characters.
+        
+        Args:
+            latex_text: LaTeX mathematical expression
+            
+        Returns:
+            HTML with Unicode mathematical characters
+        """
+        html = latex_text
+        
+        # Common mathematical symbols
+        symbol_map = {
+            # Greek letters
+            r'\\alpha': 'α', r'\\beta': 'β', r'\\gamma': 'γ', r'\\delta': 'δ', r'\\Delta': 'Δ',
+            r'\\epsilon': 'ε', r'\\theta': 'θ', r'\\Theta': 'Θ', r'\\lambda': 'λ', r'\\Lambda': 'Λ',
+            r'\\mu': 'μ', r'\\pi': 'π', r'\\Pi': 'Π', r'\\sigma': 'σ', r'\\Sigma': 'Σ',
+            r'\\tau': 'τ', r'\\phi': 'φ', r'\\Phi': 'Φ', r'\\chi': 'χ', r'\\psi': 'ψ', r'\\omega': 'ω', r'\\Omega': 'Ω',
+            
+            # Mathematical operators
+            r'\\times': '×', r'\\cdot': '·', r'\\div': '÷', r'\\pm': '±', r'\\mp': '∓',
+            r'\\leq': '≤', r'\\geq': '≥', r'\\neq': '≠', r'\\approx': '≈', r'\\equiv': '≡',
+            r'\\infty': '∞', r'\\partial': '∂', r'\\nabla': '∇', r'\\sum': '∑', r'\\prod': '∏',
+            r'\\int': '∫', r'\\oint': '∮', r'\\sqrt': '√', r'\\forall': '∀', r'\\exists': '∃',
+            
+            # Set theory
+            r'\\in': '∈', r'\\notin': '∉', r'\\subset': '⊂', r'\\supset': '⊃', r'\\subseteq': '⊆',
+            r'\\supseteq': '⊇', r'\\cup': '∪', r'\\cap': '∩', r'\\emptyset': '∅', 
+            
+            # Arrows
+            r'\\rightarrow': '→', r'\\leftarrow': '←', r'\\leftrightarrow': '↔',
+            r'\\Rightarrow': '⇒', r'\\Leftarrow': '⇐', r'\\Leftrightarrow': '⇔',
+            
+            # Other symbols
+            r'\\deg': '°', r'\\angle': '∠', r'\\perp': '⊥', r'\\parallel': '∥',
+        }
+        
+        # Replace symbols
+        for latex_symbol, unicode_char in symbol_map.items():
+            html = re.sub(latex_symbol + r'(?![a-zA-Z])', unicode_char, html)
+        
+        # Handle fractions \frac{numerator}{denominator}
+        html = re.sub(r'\\frac\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}',
+                     lambda m: f'<span class="fraction"><span class="numerator">{self._latex_to_html(m.group(1))}</span><span class="fraction-bar">/</span><span class="denominator">{self._latex_to_html(m.group(2))}</span></span>',
+                     html)
+        
+        # Handle superscripts ^{...} or ^char
+        html = re.sub(r'\^{([^}]+)}', r'<sup>\1</sup>', html)
+        html = re.sub(r'\^([a-zA-Z0-9])', r'<sup>\1</sup>', html)
+        
+        # Handle subscripts _{...} or _char
+        html = re.sub(r'_{([^}]+)}', r'<sub>\1</sub>', html)
+        html = re.sub(r'_([a-zA-Z0-9])', r'<sub>\1</sub>', html)
+        
+        # Handle square roots
+        html = re.sub(r'\\sqrt\{([^}]+)\}', r'√<span class="sqrt-content">\1</span>', html)
+        
+        # Handle limits
+        html = re.sub(r'\\lim_{([^}]+)}', r'lim<sub>\1</sub>', html)
+        
+        # Handle integrals with limits
+        html = re.sub(r'\\int_\{([^}]+)\}\^\{([^}]+)\}', r'∫<sub>\1</sub><sup>\2</sup>', html)
+        html = re.sub(r'\\int_([a-zA-Z0-9])\^([a-zA-Z0-9])', r'∫<sub>\1</sub><sup>\2</sup>', html)
+        
+        # Handle summation with limits
+        html = re.sub(r'\\sum_{([^}]+)}\^{([^}]+)}', r'∑<sub>\1</sub><sup>\2</sup>', html)
+        
+        # Handle text in math mode
+        html = re.sub(r'\\text\{([^}]+)\}', r'<span class="math-text">\1</span>', html)
+        
+        # Clean up remaining backslashes for simple commands
+        html = re.sub(r'\\([a-zA-Z]+)', r'\1', html)
+        
+        return html
+    
+    def _simplify_latex_for_mathtext(self, latex_text: str) -> str:
+        """
+        Simplify LaTeX expressions that matplotlib mathtext cannot handle.
+        
+        Args:
+            latex_text: Complex LaTeX text
+            
+        Returns:
+            Simplified LaTeX text compatible with mathtext
+        """
+        simplified = latex_text
+        
+        # Replace unsupported matrix environments with simple notation
+        simplified = re.sub(r'\\begin\{pmatrix\}([^}]+)\\end\{pmatrix\}', 
+                           r'[\1]', simplified)
+        simplified = re.sub(r'\\begin\{bmatrix\}([^}]+)\\end\{bmatrix\}', 
+                           r'[\1]', simplified)
+        simplified = re.sub(r'\\begin\{matrix\}([^}]+)\\end\{matrix\}', 
+                           r'[\1]', simplified)
+        
+        # Replace double backslashes with commas in simplified matrices  
+        simplified = re.sub(r'\\\\', ', ', simplified)
+        
+        # Replace some complex symbols with simpler alternatives
+        replacements = {
+            r'\\vec\{([^}]+)\}': r'\mathbf{\1}',  # Vector notation
+            r'\\text\{([^}]+)\}': r'\mathrm{\1}',  # Text in math mode
+            r'\\mathrm\{([^}]+)\}': r'\1',  # Remove mathrm if problematic
+        }
+        
+        for pattern, replacement in replacements.items():
+            simplified = re.sub(pattern, replacement, simplified)
+        
+        return simplified
+    
+    def _render_fallback_equation(self, latex_text: str, fontsize: int = 14) -> str:
+        """
+        Fallback equation renderer for cases where main renderer fails.
+        
+        Args:
+            latex_text: LaTeX equation text
+            fontsize: Font size
+            
+        Returns:
+            Base64 encoded simple text image
+        """
+        try:
+            fig, ax = plt.subplots(figsize=(6, 1))
+            
+            # Simple text rendering with math font
+            ax.text(0.5, 0.5, latex_text, 
+                   transform=ax.transAxes,
+                   fontsize=fontsize,
+                   ha='center', 
+                   va='center',
+                   fontfamily='monospace',
+                   bbox=dict(boxstyle='round,pad=0.3', 
+                           facecolor='lightgray', 
+                           alpha=0.3))
+            
             ax.axis('off')
             fig.patch.set_alpha(0)
             
-            # Save to bytes
             buf = io.BytesIO()
             plt.savefig(buf, format='png', bbox_inches='tight', 
-                       transparent=True, dpi=150, pad_inches=0.1)
+                       transparent=True, dpi=150)
             buf.seek(0)
             
-            # Convert to base64
             img_base64 = base64.b64encode(buf.read()).decode('utf-8')
             plt.close(fig)
             
             return f"data:image/png;base64,{img_base64}"
             
         except Exception as e:
-            logger.error(f"Error rendering LaTeX equation '{latex_text}': {e}")
+            logger.error(f"Fallback rendering failed: {e}")
             return ""
     
     def process_question_text(self, text: str) -> str:
         """
-        Process question text to render LaTeX equations as images.
+        Process question text to render LaTeX equations as professional images.
         
         Args:
-            text: Question text that may contain LaTeX
+            text: Question text that may contain LaTeX equations
             
         Returns:
-            HTML text with LaTeX equations rendered as images
+            HTML text with LaTeX equations rendered as high-quality images
         """
         if not text:
             return ""
         
-        # Pattern to match LaTeX equations: $equation$ or $$equation$$
-        equation_pattern = r'\$\$([^$]+)\$\$|\$([^$]+)\$'
+        # First handle display equations ($$equation$$)
+        display_pattern = r'\$\$([^$]+?)\$\$'
         
-        def replace_equation(match):
-            latex_text = match.group(1) or match.group(2)
-            img_data = self.render_latex_equation(latex_text)
-            if img_data:
-                return f'<img src="{img_data}" style="vertical-align: middle; margin: 0 4px;" alt="{latex_text}">'
+        def replace_display_equation(match):
+            latex_text = match.group(1)
+            html_equation = self.render_latex_equation(latex_text, fontsize=11, is_display=True)
+            return f'<div class="display-equation">{html_equation}</div>'
+        
+        # Replace display equations first
+        processed_text = re.sub(display_pattern, replace_display_equation, text)
+        
+        # Then handle inline equations ($equation$)
+        inline_pattern = r'\$([^$]+?)\$'
+        
+        def replace_inline_equation(match):
+            latex_text = match.group(1)
+            html_equation = self.render_latex_equation(latex_text, fontsize=11, is_display=False)
+            return html_equation
+        
+        # Replace inline equations
+        processed_text = re.sub(inline_pattern, replace_inline_equation, processed_text)
+        
+        # Handle equation placeholders like <eq id> format (from your existing system)
+        eq_placeholder_pattern = r'<eq\s+([^>]+)>'
+        
+        def replace_eq_placeholder(match):
+            eq_id = match.group(1)
+            # For now, show placeholder - this could be enhanced to look up actual LaTeX
+            return f'<span class="equation-placeholder" style="background: #e3f2fd; padding: 2px 6px; border-radius: 3px; font-family: monospace;">[Equation {eq_id}]</span>'
+        
+        processed_text = re.sub(eq_placeholder_pattern, replace_eq_placeholder, processed_text)
+        
+        return processed_text
+    
+    def process_question_text_with_equations(self, text: str, equations: List[Dict[str, Any]] = None) -> str:
+        """
+        Process question text with equations array (your existing system format).
+        
+        Args:
+            text: Question text with <eq id> placeholders
+            equations: List of equation objects with id, latex, position, type
+            
+        Returns:
+            HTML text with equations rendered as professional images
+        """
+        if not text:
+            return ""
+        
+        # Create equation lookup dictionary
+        eq_lookup = {}
+        if equations:
+            for eq in equations:
+                eq_lookup[eq.get('id', '')] = eq.get('latex', '')
+        
+        # First handle standard LaTeX equations
+        processed_text = self.process_question_text(text)
+        
+        # Then handle <eq id> placeholders with actual LaTeX lookup
+        eq_placeholder_pattern = r'<eq\s+([^>]+)>'
+        
+        def replace_eq_placeholder_with_latex(match):
+            eq_id = match.group(1)
+            latex_text = eq_lookup.get(eq_id, '')
+            
+            if latex_text:
+                # Render the actual LaTeX equation as selectable text
+                html_equation = self.render_latex_equation(latex_text, fontsize=11, is_display=False)
+                return html_equation
             else:
-                return f'<code>{latex_text}</code>'  # Fallback to code styling
+                # Fallback to placeholder display
+                return f'<span class="equation-placeholder">[Equation {eq_id}]</span>'
         
-        # Replace all LaTeX equations
-        processed_text = re.sub(equation_pattern, replace_equation, text)
+        processed_text = re.sub(eq_placeholder_pattern, replace_eq_placeholder_with_latex, processed_text)
+        
         return processed_text
     
     def download_image_as_base64(self, image_url: str) -> str:
@@ -143,7 +429,13 @@ class AssignmentPDFGenerator:
         Returns:
             HTML string for the question
         """
-        question_text = self.process_question_text(question.get('question', ''))
+        # Use enhanced processing that handles both LaTeX and equation placeholders
+        equations = question.get('equations', [])
+        if equations:
+            question_text = self.process_question_text_with_equations(question.get('question', ''), equations)
+        else:
+            question_text = self.process_question_text(question.get('question', ''))
+            
         question_type = question.get('type', 'unknown')
         points = question.get('points', 0)
         difficulty = question.get('difficulty', 'medium')
@@ -188,20 +480,13 @@ class AssignmentPDFGenerator:
         if question_type == 'multiple-choice' and question.get('options'):
             html += '<div class="question-options">'
             for i, option in enumerate(question['options']):
+                # Process options with equations support too
                 option_text = self.process_question_text(option)
                 letter = chr(65 + i)  # A, B, C, D...
                 html += f'<div class="option"><strong>{letter}.</strong> {option_text}</div>'
             html += '</div>'
         
-        # Add answer space for other question types
-        elif question_type in ['short-answer', 'numerical', 'long-answer']:
-            lines = 3 if question_type == 'short-answer' else 8
-            html += f"""
-            <div class="answer-space">
-                <p><strong>Answer:</strong></p>
-                <div class="answer-lines" style="height: {lines * 1.5}em; border-bottom: 1px solid #ccc; margin: 10px 0;"></div>
-            </div>
-            """
+        # No answer spaces for professional question paper format
         
         # Handle subquestions for multi-part questions
         if question.get('subquestions'):
@@ -242,92 +527,74 @@ class AssignmentPDFGenerator:
         }
         
         body {
-            font-family: "Times New Roman", "Liberation Serif", serif;
+            font-family: "Times New Roman", Times, serif;
             font-size: 11pt;
-            line-height: 1.4;
+            line-height: 1.3;
             color: #000;
             margin: 0;
             padding: 0;
+            text-align: justify;
         }
         
         .document-header {
             text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 15px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
         }
         
         .document-title {
-            font-size: 18pt;
+            font-size: 14pt;
             font-weight: bold;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             string-set: doc-title content();
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .document-meta {
             font-size: 10pt;
-            color: #666;
-            margin-bottom: 15px;
+            color: #333;
+            margin-bottom: 10px;
         }
         
         .instructions {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            padding: 15px;
-            margin-bottom: 25px;
-            border-radius: 4px;
+            margin-bottom: 15px;
+            font-style: italic;
         }
         
         .instructions h3 {
-            margin-top: 0;
-            color: #495057;
+            display: none; /* Hide instructions header for cleaner look */
         }
         
         .question {
-            margin-bottom: 25px;
+            margin-bottom: 15px;
             page-break-inside: avoid;
         }
         
         .question-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 8px;
+            margin-bottom: 8px;
         }
         
         .question-header h3 {
             margin: 0;
-            font-size: 14pt;
-            color: #333;
+            font-size: 11pt;
+            color: #000;
+            font-weight: bold;
+            display: inline;
         }
         
         .question-meta {
-            display: flex;
-            gap: 10px;
-            align-items: center;
+            display: none; /* Hide meta information for clean paper look */
         }
         
         .points, .difficulty, .type {
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 9pt;
-            font-weight: bold;
-            color: white;
-        }
-        
-        .points {
-            background-color: #007bff;
-        }
-        
-        .type {
-            background-color: #6c757d;
+            display: none; /* Hide badges for professional appearance */
         }
         
         .question-text {
-            margin-bottom: 15px;
-            line-height: 1.5;
+            margin-bottom: 10px;
+            line-height: 1.3;
+            text-align: justify;
         }
         
         .question-diagram {
@@ -377,18 +644,120 @@ class AssignmentPDFGenerator:
             text-align: center;
         }
         
-        /* Math equation styling */
-        .equation {
+        /* Professional Mathematical Text Styling */
+        .display-equation {
             text-align: center;
-            margin: 10px 0;
+            margin: 8px 0;
+            padding: 0;
         }
         
-        /* Code blocks */
+        .math-display {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            font-style: italic;
+            user-select: text;
+        }
+        
+        .math-inline {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            font-style: italic;
+            user-select: text;
+        }
+        
+        .math-fallback {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            font-style: italic;
+            user-select: text;
+        }
+        
+        .equation-placeholder {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            font-style: italic;
+        }
+        
+        /* Mathematical formatting elements */
+        .fraction {
+            display: inline-block;
+            text-align: center;
+            vertical-align: middle;
+        }
+        
+        .numerator {
+            display: block;
+            border-bottom: 1px solid black;
+            padding-bottom: 1px;
+            margin-bottom: 1px;
+        }
+        
+        .denominator {
+            display: block;
+            padding-top: 1px;
+        }
+        
+        .fraction-bar {
+            display: none; /* Hide the slash, use border instead */
+        }
+        
+        .sqrt-content {
+            border-top: 1px solid black;
+            padding-left: 2px;
+        }
+        
+        .math-text {
+            font-style: normal;
+        }
+        
+        /* Superscripts and subscripts */
+        sup, sub {
+            font-size: 0.8em;
+            line-height: 0;
+        }
+        
+        /* Code blocks for mathematical expressions */
         code {
-            font-family: "Courier New", monospace;
-            background-color: #f4f4f4;
-            padding: 2px 4px;
-            border-radius: 2px;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            font-style: italic;
+        }
+        
+        /* IEEE paper styling */
+        .question-text {
+            text-align: justify;
+            line-height: 1.3;
+            font-size: 11pt;
+        }
+        
+        .question-text p {
+            margin-bottom: 8px;
+        }
+        
+        /* Multiple choice options - IEEE style */
+        .question-options .option {
+            margin: 4px 0;
+            padding-left: 15px;
+            line-height: 1.3;
+        }
+        
+        .question-options .option strong {
+            margin-right: 6px;
+        }
+        
+        /* Professional diagram styling */
+        .question-diagram img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        /* Remove answer spaces completely */
+        .answer-space {
+            display: none;
+        }
+        
+        .answer-lines {
+            display: none;
         }
         """
     
@@ -426,9 +795,7 @@ class AssignmentPDFGenerator:
                 
                 {f'''
                 <div class="instructions">
-                    <h3>Instructions</h3>
                     <p>{self.process_question_text(description)}</p>
-                    <p><strong>Important:</strong> Show all work for full credit. Write legibly and organize your answers clearly.</p>
                 </div>
                 ''' if description else ''}
                 
