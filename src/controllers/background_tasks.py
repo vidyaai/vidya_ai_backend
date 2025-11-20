@@ -32,7 +32,7 @@ def download_video_background(video_id: str, url: str, user_id: str):
         }
         update_download_status(db, video_id, status)
         logger.info(f"Downloading video from URL: {url}")
-        video_local_path = download_video(url)
+        video_local_path = download_video(url, video_id_param=video_id)
         if video_local_path and os.path.exists(video_local_path):
             logger.info(f"Video downloaded successfully to: {video_local_path}")
             s3_key = None

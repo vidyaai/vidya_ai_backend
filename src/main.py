@@ -17,6 +17,7 @@ from routes.query import router as query_router
 from routes.sharing import router as sharing_router
 from routes.assignments import router as assignments_router
 from routes.payments import router as payments_router
+from utils.youtube_utils import start_cache_cleanup_thread
 
 
 app = FastAPI(
@@ -24,6 +25,15 @@ app = FastAPI(
     description="Vidya AI Backend API",
     version="1.0.0",
 )
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize background tasks on startup"""
+    logger.info("🚀 Starting up Vidya AI Backend...")
+    start_cache_cleanup_thread()
+    logger.info("✅ Startup complete")
+
 
 
 @app.middleware("http")
