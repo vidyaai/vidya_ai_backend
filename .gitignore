@@ -4,6 +4,7 @@ videos/
 output/
 frames/
 
+log/
 app.log
 
 vai_venv/

@@ -1569,7 +1569,7 @@ async def import_document_to_assignment(
         from utils.assignment_document_parser import AssignmentDocumentParser
 
         # Initialize parser
-        assignment_parser = AssignmentDocumentParser()
+        assignment_parser = AssignmentDocumentParser(user_id=user_id)
 
         # Parse document based on type
         try:
@@ -1583,14 +1583,14 @@ async def import_document_to_assignment(
 
                 # logger.info(f"Parsed assignment: {parsed_assignment}")
 
-                # Extract diagrams from PDF and upload to S3
-                parsed_assignment = assignment_parser.extract_and_upload_diagrams(
-                    parsed_assignment,
-                    document_content,
-                    "application/pdf",
-                    user_id,
-                    assignment_id=None,  # Temporary storage under user_id
-                )
+                # # Extract diagrams from PDF and upload to S3
+                # parsed_assignment = assignment_parser.extract_and_upload_diagrams(
+                #     parsed_assignment,
+                #     document_content,
+                #     "application/pdf",
+                #     user_id,
+                #     assignment_id=None,  # Temporary storage under user_id
+                # )
 
                 # logger.info(f"Parsed assignment after extracting diagrams: {parsed_assignment}")
 
@@ -1654,6 +1654,15 @@ async def import_document_to_assignment(
                 "total_points": parsed_assignment.get("total_points", 0),
             },
         )
+
+        # Debug: Log first question's answer and rubric
+        if parsed_assignment.get("questions"):
+            first_q = parsed_assignment["questions"][0]
+            logger.info(
+                f"DEBUG - First question before response: ID={first_q.get('id')}, "
+                f"correctAnswer='{first_q.get('correctAnswer', 'MISSING')}', "
+                f"rubric='{first_q.get('rubric', 'MISSING')[:50]}...'"
+            )
 
         logger.info(
             f"Successfully imported document {import_data.file_name}: "

@@ -169,7 +169,7 @@ class AssignmentGenerator:
                 response_format={
                     "type": "json_schema",
                     "json_schema": {
-                        "name": response_schema["name"],
+                        "name": "assignment_generation_questions",
                         "schema": response_schema,
                     },
                 },
