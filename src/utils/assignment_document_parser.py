@@ -9,6 +9,7 @@ from textwrap import dedent
 from typing import Dict, Any, Optional, List
 from openai import OpenAI
 from google import genai
+from anthropic import Anthropic
 from controllers.config import logger, s3_client, AWS_S3_BUCKET
 from controllers.storage import s3_presign_url, s3_upload_file
 import concurrent.futures
@@ -31,8 +32,36 @@ class AssignmentDocumentParser:
     def __init__(self, user_id: Optional[int] = None):
         self.user_id = user_id
         self.GPTclient = OpenAI()
-        self.gpt5_model = "gpt-5"
+        self.claude_client = Anthropic()
+        self.claude_model = "claude-haiku-4-5"
         self.gpt4o_model = "gpt-4o"
+
+    @staticmethod
+    def _add_additional_properties_false(schema: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Recursively add 'additionalProperties': false to all objects in a JSON schema.
+        Claude requires this for structured outputs.
+        """
+        if isinstance(schema, dict):
+            # If this is an object type, add additionalProperties: false
+            if schema.get("type") == "object" and "additionalProperties" not in schema:
+                schema["additionalProperties"] = False
+
+            # Recursively process all nested structures
+            for key, value in schema.items():
+                if isinstance(value, dict):
+                    schema[
+                        key
+                    ] = AssignmentDocumentParser._add_additional_properties_false(value)
+                elif isinstance(value, list):
+                    schema[key] = [
+                        AssignmentDocumentParser._add_additional_properties_false(item)
+                        if isinstance(item, dict)
+                        else item
+                        for item in value
+                    ]
+
+        return schema
 
     def parse_pdf_images_to_assignment(
         self,
@@ -157,7 +186,7 @@ class AssignmentDocumentParser:
         )
 
         try:
-            # Convert images to base64 parts
+            # Convert images to base64 parts in OpenAI format for GPT-4o
             image_parts = []
             for idx, image in enumerate(images):
                 buffered = BytesIO()
@@ -480,7 +509,7 @@ class AssignmentDocumentParser:
             f"Step 1 (Batch {batch_idx}): Page numbers in batch: {page_numbers}"
         )
 
-        # Convert images to base64
+        # Convert images to base64 in Claude format
         image_contents = []
         for idx, image in enumerate(images):
             buffered = BytesIO()
@@ -488,8 +517,12 @@ class AssignmentDocumentParser:
             img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
             image_contents.append(
                 {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{img_base64}"},
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/png",
+                        "data": img_base64,
+                    },
                 }
             )
 
@@ -605,33 +638,28 @@ class AssignmentDocumentParser:
 
         # Get comprehensive schema (includes equations, allows empty answers/rubrics)
         response_schema = get_assignment_parsing_schema("step1_pdf_parsing_no_bbox")
+        # Add additionalProperties: false to all objects for Claude
+        response_schema = self._add_additional_properties_false(response_schema)
 
         # Build message
         user_content = [{"type": "text", "text": dedent(prompt).strip()}]
         user_content.extend(image_contents)
 
         # Call LLM
-        response = self.GPTclient.chat.completions.create(
-            model=self.gpt5_model,
+        # Note: Using regular messages API instead of structured outputs
+        # The schema is too complex for Claude's structured outputs (>24 optional parameters)
+        response = self.claude_client.messages.create(
+            model=self.claude_model,
+            max_tokens=16384,
+            system=dedent(DOCUMENT_PARSER_SYSTEM_PROMPT_STEP1)
+            + "\n\nIMPORTANT: Return ONLY valid JSON matching the expected schema. No other text.",
             messages=[
-                {
-                    "role": "system",
-                    "content": dedent(DOCUMENT_PARSER_SYSTEM_PROMPT_STEP1),
-                },
                 {"role": "user", "content": user_content},
             ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "step1_pdf_parsing_no_bbox",
-                    "schema": response_schema,
-                },
-            },
-            # max_completion_tokens=16384,
-            # temperature=0.2,
+            temperature=0.2,
         )
 
-        extracted_data = json.loads(response.choices[0].message.content)
+        extracted_data = json.loads(response.content[0].text)
 
         # Validate extracted_data is a dict
         if not isinstance(extracted_data, dict):
@@ -781,7 +809,7 @@ class AssignmentDocumentParser:
         Step 3: Generate missing answers and rubrics in four steps:
         1. Use GPT-4o to group questions into dynamic batches.
         2. Create prepared prompts (with image contents) for each batch.
-        3. Process prepared batches in parallel using GPT-5.
+        3. Process prepared batches in parallel using Claude Haiku 4.5.
         4. Consolidate results into a single output.
         """
         questions = data.get("questions", [])
@@ -835,9 +863,9 @@ class AssignmentDocumentParser:
             logger.error(f"Error during GPT-4o batching: {str(e)}")
             raise
 
-        # Step 2: Prepare prompts (with images) for each batch, then process batches in parallel using GPT-5
+        # Step 2: Prepare prompts (with images) for each batch, then process batches in parallel using Claude
         logger.info(
-            "Step 3.2: Preparing prompts for GPT-5 generation and processing batches in parallel..."
+            "Step 3.2: Preparing prompts for Claude generation and processing batches in parallel..."
         )
         batch_results = []
         try:
@@ -865,7 +893,7 @@ class AssignmentDocumentParser:
                         logger.error(f"Error in batch future: {e}")
             logger.info(f"Step 3.2: Processed {len(batch_results)} batches")
         except Exception as e:
-            logger.error(f"Error during GPT-5 batch processing: {str(e)}")
+            logger.error(f"Error during Claude batch processing: {str(e)}")
             raise
 
         # Step 3: Consolidate results
@@ -936,7 +964,7 @@ class AssignmentDocumentParser:
         prompt = dedent(
             f"""
             Group the following {len(questions)} questions into dynamic batches such that each batch
-            can be comfortably processed by GPT-5 without exceeding token limits. Return the batches
+            can be comfortably processed by Claude Haiku 4.5 without exceeding token limits. Return the batches
             as a JSON array of arrays, where each inner array contains question indices.
 
             QUESTIONS:
@@ -1055,7 +1083,7 @@ class AssignmentDocumentParser:
         self, question_batches: List[List[Dict[str, Any]]], images: List[Image.Image]
     ) -> List[Dict[str, Any]]:
         """
-        Prepare per-batch prompt text and image contents for GPT-5 calls.
+        Prepare per-batch prompt text and image contents for Claude calls.
 
         Returns a list of prepared payloads with keys:
         - batch_index: int
@@ -1150,7 +1178,7 @@ class AssignmentDocumentParser:
                     logger.info(f"Step 3: Presigning S3 URL for {s3_key}")
                     s3_url = s3_presign_url(s3_key)
                     image_contents.append(
-                        {"type": "image_url", "image_url": {"url": s3_url}}
+                        {"type": "image", "source": {"type": "url", "url": s3_url}}
                     )
                 except Exception as e:
                     logger.warning(
@@ -1184,9 +1212,11 @@ class AssignmentDocumentParser:
                                     )
                                     image_contents.append(
                                         {
-                                            "type": "image_url",
-                                            "image_url": {
-                                                "url": f"data:image/jpeg;base64,{data}"
+                                            "type": "image",
+                                            "source": {
+                                                "type": "base64",
+                                                "media_type": "image/jpeg",
+                                                "data": data,
                                             },
                                         }
                                     )
@@ -1250,38 +1280,34 @@ class AssignmentDocumentParser:
 
         # Call LLM for batch generation
         logger.info("Step 3: Calling LLM for answer/rubric generation...")
-        response = self.GPTclient.chat.completions.create(
-            model=self.gpt5_model,
+        response = self.claude_client.messages.create(
+            model=self.claude_model,
+            max_tokens=16384,
+            temperature=0.2,
+            system=dedent(
+                """You are an expert educator and mathematical problem solver.
+
+                CRITICAL INSTRUCTIONS FOR ANSWER GENERATION:
+                1. For mathematical, physics, chemistry, or scientific questions: Provide COMPLETE STEP-BY-STEP DERIVATIONS
+                2. Show ALL intermediate steps - never skip steps
+                3. Explain the reasoning/theorem/principle behind each step
+                4. For algebraic problems: Show every equation manipulation
+                5. For calculus: Show differentiation/integration with all rules applied
+                6. For physics/chemistry: List givens, formulas, substitutions, calculations, and final answer with units
+                7. For numerical problems: Show the complete calculation process
+                8. For conceptual questions: Provide thorough explanations with definitions and examples
+
+                Use 0-based indexing for options in multiple-choice questions.
+                Use equation placeholders <eq equation_id> for all mathematical expressions.
+                Generate detailed grading rubrics that award partial credit for intermediate steps.
+                Return ONLY valid JSON with a 'responses' array. No other text."""
+            ),
             messages=[
-                {
-                    "role": "system",
-                    "content": dedent(
-                        """You are an expert educator and mathematical problem solver.
-
-                        CRITICAL INSTRUCTIONS FOR ANSWER GENERATION:
-                        1. For mathematical, physics, chemistry, or scientific questions: Provide COMPLETE STEP-BY-STEP DERIVATIONS
-                        2. Show ALL intermediate steps - never skip steps
-                        3. Explain the reasoning/theorem/principle behind each step
-                        4. For algebraic problems: Show every equation manipulation
-                        5. For calculus: Show differentiation/integration with all rules applied
-                        6. For physics/chemistry: List givens, formulas, substitutions, calculations, and final answer with units
-                        7. For numerical problems: Show the complete calculation process
-                        8. For conceptual questions: Provide thorough explanations with definitions and examples
-
-                        Use 0-based indexing for options in multiple-choice questions.
-                        Use equation placeholders <eq equation_id> for all mathematical expressions.
-                        Generate detailed grading rubrics that award partial credit for intermediate steps.
-                        Return your response as a JSON object with 'responses' array."""
-                    ),
-                },
                 {"role": "user", "content": user_content},
             ],
-            response_format={"type": "json_object"},
-            # max_completion_tokens=16384,
-            # temperature=0.2,
         )
 
-        response_content = response.choices[0].message.content
+        response_content = response.content[0].text
         logger.info(
             f"Step 3: LLM response length: {len(response_content) if response_content else 0} characters"
         )
