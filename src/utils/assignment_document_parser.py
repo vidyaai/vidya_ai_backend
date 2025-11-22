@@ -184,10 +184,11 @@ class AssignmentDocumentParser:
             2) For the `selected_language`, determine for EACH page (1..{len(images)}) whether that page contains
                assignment questions in that language. Look for question numbering, question prompts, options, problem statements, etc.
 
-            3) Group the pages that contain questions into OPTIMIZED batches for parallel LLM extraction. Requirements:
+            3) Group the pages that contain questions in selected_language into OPTIMIZED batches for parallel LLM extraction. Requirements:
                - Batches should be sized dynamically to balance parallelism and token limits; do not use a fixed page size.
                - Ensure NO question is split across a batch boundary (i.e., if a question continues across pages, put all its pages in the same batch).
                - Try to minimize number of batches while keeping batch sizes reasonable (avoid extremely large batches).
+               - Try to selcect pages in selected_language only; if a page has mixed languages, include it only if it has any question or question data in selected_language.
 
             4) Also extract assignment `title` and `description` (if present) from the document in the selected language.
 
@@ -201,7 +202,7 @@ class AssignmentDocumentParser:
                 "description": "..."
             }}
 
-            IMPORTANT: `batches` must cover ONLY pages that have `has_questions=true` and use ORIGINAL page numbers.
+            IMPORTANT: `batches` must cover ONLY pages that have `has_questions=true` and `selected_language=page_language`. Use ORIGINAL page numbers.
             """
             )
 
