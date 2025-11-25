@@ -101,6 +101,7 @@ jobs:
             STRIPE_PRO_ANNUAL_PRICE_ID=${{ secrets.STRIPE_PRO_ANNUAL_PRICE_ID }}
             STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
             POPPLER_PATH=/usr/bin/
             EOF
             alembic upgrade head
