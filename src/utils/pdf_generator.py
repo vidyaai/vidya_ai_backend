@@ -26,6 +26,16 @@ except ImportError as e:
     WEASYPRINT_AVAILABLE = False
 
 try:
+    from markdown_katex.extension import tex2html
+
+    MARKDOWN_KATEX_AVAILABLE = True
+except ImportError as e:
+    print(
+        f"markdown-katex import failed: {e}. Install with: pip install markdown-katex"
+    )
+    MARKDOWN_KATEX_AVAILABLE = False
+
+try:
     import matplotlib.pyplot as plt
     import matplotlib.mathtext as mathtext
     from matplotlib.backends.backend_agg import FigureCanvasAgg
@@ -33,28 +43,6 @@ try:
     from matplotlib import rcParams
 except ImportError:
     print("Matplotlib not installed. Install with: pip install matplotlib")
-
-# try:
-#     import sympy as sp
-#     from sympy import latex, preview
-#     # Note: sympy.parsing.latex is optional and may not be available in all versions
-#     try:
-#         from sympy.parsing.latex import parse_latex
-#         SYMPY_LATEX_PARSER = True
-#     except ImportError:
-#         SYMPY_LATEX_PARSER = False
-#     SYMPY_AVAILABLE = True
-# except ImportError as e:
-#     print(f"SymPy import failed: {e}")
-#     SYMPY_AVAILABLE = False
-#     SYMPY_LATEX_PARSER = False
-
-# try:
-#     from latex2mathml.converter import convert as latex_to_mathml
-#     LATEX2MATHML_AVAILABLE = True
-# except ImportError as e:
-#     print(f"latex2mathml import failed: {e}")
-#     LATEX2MATHML_AVAILABLE = False
 
 from controllers.config import logger
 
@@ -122,12 +110,13 @@ class AssignmentPDFGenerator:
             elif latex_text.startswith("$") and latex_text.endswith("$"):
                 latex_text = latex_text[1:-1]
 
-            # Convert LaTeX to selectable HTML using Unicode and CSS
-            html_equation = self._latex_to_html(latex_text)
+            # Convert LaTeX to HTML using markdown-katex if available
+            html_equation = self._latex_to_html(latex_text, is_display=is_display)
 
             # Return formatted HTML
             if is_display:
-                return f'<span class="math-display">{html_equation}</span>'
+                logger.info(f"Rendered display equation: {html_equation}")
+                return f'<div class="math-display">{html_equation}</div>'
             else:
                 return f'<span class="math-inline">{html_equation}</span>'
 
@@ -166,16 +155,53 @@ class AssignmentPDFGenerator:
 
         return enhanced
 
-    def _latex_to_html(self, latex_text: str) -> str:
+    def _replace_ne_with_symbol(self, latex_text: str) -> str:
         """
-        Convert LaTeX mathematical expressions to HTML with Unicode characters.
+        Replace \ne with the proper not-equal symbol for better rendering.
+
+        Args:
+            latex_text: LaTeX text
+        Returns:
+            LaTeX text with \ne replaced
+        """
+        return (
+            latex_text.replace(r"\\neq", "\\not=")
+            .replace(r"\\ne", "\\not=")
+            .replace(r"\neq", "\\not=")
+            .replace(r"\ne", "\\not=")
+            .strip()
+        )
+
+    def _latex_to_html(self, latex_text: str, is_display: bool = False) -> str:
+        """
+        Convert LaTeX mathematical expressions to HTML.
+        Uses markdown-katex if available, otherwise falls back to Unicode conversion.
 
         Args:
             latex_text: LaTeX mathematical expression
 
         Returns:
-            HTML with Unicode mathematical characters
+            HTML with rendered mathematics
         """
+        # Try markdown-katex first (best quality for WeasyPrint)
+        if MARKDOWN_KATEX_AVAILABLE:
+            try:
+                processed_latex_text = self._replace_ne_with_symbol(latex_text)
+                # processed_latex_text = latex_text
+
+                # Configure for WeasyPrint compatibility
+                options = {
+                    "no_inline_svg": False,
+                    "insert_fonts_css": False,
+                }
+                html = tex2html(processed_latex_text, options)
+                return html
+            except Exception as e:
+                logger.warning(
+                    f"markdown-katex conversion failed for '{latex_text}': {e}. Falling back to Unicode."
+                )
+
+        # Fallback to Unicode conversion
         html = latex_text
 
         # Common mathematical symbols
@@ -452,19 +478,29 @@ class AssignmentPDFGenerator:
         eq_lookup = {}
         if equations:
             for eq in equations:
-                eq_lookup[eq.get("id", "")] = eq.get("latex", "")
+                eq_lookup[eq.get("id", "")] = {
+                    "latex": eq.get("latex", ""),
+                    "display": eq.get("type", "inline") == "display",
+                }
 
         # Then handle <eq id> placeholders with actual LaTeX lookup
         eq_placeholder_pattern = r"<eq\s+([^>]+)>"
 
         def replace_eq_placeholder_with_latex(match):
             eq_id = match.group(1)
-            latex_text = eq_lookup.get(eq_id, "")
+            latex_text = eq_lookup.get(eq_id)["latex"] if eq_lookup.get(eq_id) else ""
+            is_display = (
+                eq_lookup.get(eq_id)["display"] if eq_lookup.get(eq_id) else False
+            )
+
+            logger.info(
+                f"Processing equation placeholder: id={eq_id}, latex='{latex_text}', display={is_display}"
+            )
 
             if latex_text:
                 # Render the actual LaTeX equation as selectable text
                 html_equation = self.render_latex_equation(
-                    latex_text, fontsize=11, is_display=False
+                    latex_text, fontsize=11, is_display=is_display
                 )
                 return html_equation
             else:
@@ -583,12 +619,13 @@ class AssignmentPDFGenerator:
             html += '<div class="subquestions">'
             for i, subq in enumerate(question["subquestions"]):
                 # Process subquestion text with equations
-                if equations:
+                subq_equations = subq.get("equations", equations)
+                if subq_equations:
                     logger.info(
                         f"Processing subquestion {i+1} {subq.get('question', '')} with equations."
                     )
                     subq_text = self.process_question_text_with_equations(
-                        subq.get("question", ""), equations
+                        subq.get("question", ""), subq_equations
                     )
                 else:
                     subq_text = self.process_question_text(subq.get("question", ""))
@@ -607,9 +644,9 @@ class AssignmentPDFGenerator:
                     html += '<div class="question-options">'
                     for j, option in enumerate(subq["options"]):
                         # Process options with equations support
-                        if equations:
+                        if subq_equations:
                             option_text = self.process_question_text_with_equations(
-                                option, equations
+                                option, subq_equations
                             )
                         else:
                             option_text = self.process_question_text(option)
@@ -622,9 +659,10 @@ class AssignmentPDFGenerator:
                     html += '<div class="sub-subquestions" style="padding-left: 20px; margin-top: 10px;">'
                     for k, sub_subq in enumerate(subq["subquestions"]):
                         # Process sub-subquestion text with equations
-                        if equations:
+                        sub_subq_equations = sub_subq.get("equations", subq_equations)
+                        if sub_subq_equations:
                             sub_subq_text = self.process_question_text_with_equations(
-                                sub_subq.get("question", ""), equations
+                                sub_subq.get("question", ""), sub_subq_equations
                             )
                         else:
                             sub_subq_text = self.process_question_text(
@@ -649,10 +687,10 @@ class AssignmentPDFGenerator:
                             html += '<div class="question-options">'
                             for m, option in enumerate(sub_subq["options"]):
                                 # Process options with equations support
-                                if equations:
+                                if sub_subq_equations:
                                     option_text = (
                                         self.process_question_text_with_equations(
-                                            option, equations
+                                            option, sub_subq_equations
                                         )
                                     )
                                 else:
@@ -682,19 +720,19 @@ class AssignmentPDFGenerator:
         @page {
             size: A4;
             margin: 1in;
-            @top-center {
+            @top-center {{
                 content: string(doc-title);
                 font-size: 10pt;
                 color: #666;
-            }
-            @bottom-center {
+            }}
+            @bottom-center {{
                 content: "Page " counter(page) " of " counter(pages);
                 font-size: 9pt;
                 color: #666;
-            }
-        }
+            }}
+        }}
 
-        body {
+        body {{
             font-family: "Times New Roman", Times, serif;
             font-size: 11pt;
             line-height: 1.3;
@@ -702,7 +740,46 @@ class AssignmentPDFGenerator:
             margin: 0;
             padding: 0;
             text-align: justify;
-        }
+        }}
+
+        /* KaTeX base styles for proper math rendering */
+        .katex {{
+            font-size: 1em;
+            text-indent: 0;
+            font-family: KaTeX_Main, "Times New Roman", Times, serif;
+        }}
+
+        .katex-display {{
+            margin: 0.5em 0;
+            text-align: center;
+        }}
+
+        .katex .mrel {{
+            font-family: KaTeX_Main, "Times New Roman", Times, serif;
+        }}
+
+        /* Ensure not-equal and other relation symbols render correctly */
+        .katex .mord.vbox .thinbox .rlap {{
+            display: inline-block;
+        }}
+
+        .katex .strut {{
+            display: inline-block;
+        }}
+
+        .katex-mathml {{
+            position: absolute;
+            clip: rect(1px, 1px, 1px, 1px);
+            padding: 0;
+            border: 0;
+            height: 1px;
+            width: 1px;
+            overflow: hidden;
+        }}
+
+        .katex-html {{
+            display: inline-block;
+        }}
 
         .document-header {
             text-align: center;
@@ -815,15 +892,18 @@ class AssignmentPDFGenerator:
         /* Professional Mathematical Text Styling */
         .display-equation {
             text-align: center;
-            margin: 8px 0;
+            margin: 12px 0;
             padding: 0;
         }
 
         .math-display {
+            display: block;
+            text-align: center;
             font-family: "Times New Roman", Times, serif;
             font-size: 11pt;
             font-style: italic;
             user-select: text;
+            margin: 12px 0;
         }
 
         .math-inline {
@@ -945,6 +1025,21 @@ class AssignmentPDFGenerator:
             questions = assignment.get("questions", [])
             total_points = assignment.get("total_points", 0)
 
+            # Add KaTeX CSS if using markdown-katex
+            katex_css = ""
+            if MARKDOWN_KATEX_AVAILABLE:
+                try:
+                    # KaTeX CSS for proper math rendering
+                    katex_css = """
+                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+                    <style>
+                    .katex { font-size: 1em; }
+                    .katex-display { margin: 0.5em 0; }
+                    </style>
+                    """
+                except:
+                    pass
+
             # Generate HTML content
             html_content = f"""
             <!DOCTYPE html>
@@ -952,6 +1047,7 @@ class AssignmentPDFGenerator:
             <head>
                 <meta charset="UTF-8">
                 <title>{title}</title>
+                {katex_css}
             </head>
             <body>
                 <div class="document-header">
@@ -988,8 +1084,20 @@ class AssignmentPDFGenerator:
             html_doc = HTML(string=html_content)
             css_doc = CSS(string=self.generate_css())
 
+            # Fetch KaTeX CSS from CDN for proper math rendering
+            stylesheets = [css_doc]
+            if MARKDOWN_KATEX_AVAILABLE:
+                try:
+                    katex_cdn_css = CSS(
+                        url="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+                    )
+                    stylesheets.insert(0, katex_cdn_css)  # Add KaTeX CSS first
+                    # stylesheets = [katex_cdn_css]  # Add only KaTeX CSS
+                except Exception as e:
+                    logger.warning(f"Failed to fetch KaTeX CSS from CDN: {e}")
+
             pdf_buffer = io.BytesIO()
-            html_doc.write_pdf(pdf_buffer, stylesheets=[css_doc])
+            html_doc.write_pdf(pdf_buffer, stylesheets=stylesheets)
             pdf_buffer.seek(0)
 
             return pdf_buffer.getvalue()

@@ -34,3 +34,5 @@ vidyaai-forms-integrations-*.json
 # Log files and temporary data
 question_papers_log/
 *.log
+
+debug/
