@@ -8,7 +8,7 @@ import base64
 import re
 import tempfile
 import os
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from datetime import datetime
 import requests
 
@@ -587,6 +587,13 @@ class AssignmentPDFGenerator:
                 {question_text}
             </div>
         """
+
+        # Add code block if present
+        if question.get("hasCode") and question.get("code"):
+            code_text = question["code"]
+            html += f"""
+            <div class="question-code" style="background: #f3f4f6; padding: 10px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; margin-top: 10px;">{code_text}</div>
+            """
 
         # Add diagram if present
         if question.get("diagram") and question["diagram"].get("s3_key"):
