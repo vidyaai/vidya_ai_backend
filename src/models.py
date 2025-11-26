@@ -194,6 +194,10 @@ class Assignment(Base):
     is_template = Column(Boolean, default=False)  # Can be used as template by others
     shared_count = Column(String, default="0")  # Number of times shared
 
+    # External integrations
+    google_form_url = Column(String, nullable=True)  # Google Form edit URL
+    google_form_response_url = Column(String, nullable=True)  # Google Form response URL
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     updated_at = Column(

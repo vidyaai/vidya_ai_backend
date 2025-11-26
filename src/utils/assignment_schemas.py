@@ -29,7 +29,7 @@ def get_assignment_parsing_schema(
         "properties": {
             "id": {"type": "string"},
             "latex": {"type": "string"},
-            "mathml": {"type": ["string", "null"]},
+            "mathml": {"type": "string"},
             "position": {
                 "type": "object",
                 "properties": {
@@ -107,11 +107,10 @@ def get_assignment_parsing_schema(
         "requiredPartsCount": {"type": "integer"},
     }
 
-    # Add answer-related fields only if NOT step1
-    if not step1_mode:
-        base_question_properties["correctAnswer"] = {"type": "string"}
-        base_question_properties["explanation"] = {"type": "string"}
-        base_question_properties["rubric"] = {"type": "string"}
+    # Add answer-related fields
+    base_question_properties["correctAnswer"] = {"type": "string"}
+    base_question_properties["explanation"] = {"type": "string"}
+    base_question_properties["rubric"] = {"type": "string"}
 
     # Build subquestion properties (level 2)
     subquestion_level2_properties = {
@@ -163,10 +162,9 @@ def get_assignment_parsing_schema(
         "requiredPartsCount": {"type": "integer"},
     }
 
-    if not step1_mode:
-        subquestion_level2_properties["correctAnswer"] = {"type": "string"}
-        subquestion_level2_properties["explanation"] = {"type": "string"}
-        subquestion_level2_properties["rubric"] = {"type": "string"}
+    subquestion_level2_properties["correctAnswer"] = {"type": "string"}
+    subquestion_level2_properties["explanation"] = {"type": "string"}
+    subquestion_level2_properties["rubric"] = {"type": "string"}
 
     # Build subquestion properties (level 3 - deepest)
     subquestion_level3_properties = {
@@ -217,10 +215,9 @@ def get_assignment_parsing_schema(
         "requiredPartsCount": {"type": "integer"},
     }
 
-    if not step1_mode:
-        subquestion_level3_properties["correctAnswer"] = {"type": "string"}
-        subquestion_level3_properties["explanation"] = {"type": "string"}
-        subquestion_level3_properties["rubric"] = {"type": "string"}
+    subquestion_level3_properties["correctAnswer"] = {"type": "string"}
+    subquestion_level3_properties["explanation"] = {"type": "string"}
+    subquestion_level3_properties["rubric"] = {"type": "string"}
 
     # Build level 3 schema (deepest subquestions)
     subquestion_level3_required = ["id", "type", "question", "points"]
@@ -267,7 +264,6 @@ def get_assignment_parsing_schema(
 
     # Create the full parsing schema with additional fields
     schema = {
-        "name": schema_name,
         "type": "object",
         "properties": {
             "title": {"type": "string"},
