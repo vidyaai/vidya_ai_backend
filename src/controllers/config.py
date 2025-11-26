@@ -27,7 +27,7 @@ except Exception:
     pass
 
 # Ensure log directory exists
-log_file_path = "/var/log/vidyaai_api.log"
+log_file_path = "E:/VidyAI/Dev/vidya_ai_backend/log/vidyaai_api.log"
 log_dir = os.path.dirname(log_file_path)
 os.makedirs(log_dir, exist_ok=True)
 

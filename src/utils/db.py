@@ -7,7 +7,8 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql+psycopg2://vidyaai_user:Vidya%40123@localhost:5432/vidyaai_db",
+    "postgresql://postgres:localpgpassw0rd@localhost:5432/vidyaai",
+    # "postgresql+psycopg2://vidyaai_user:Vidya%40123@localhost:5432/vidyaai_db",
 )
 
 

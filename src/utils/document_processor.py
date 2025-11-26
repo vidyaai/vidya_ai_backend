@@ -3,7 +3,7 @@ import json
 from typing import Any
 from openai import OpenAI
 from controllers.config import logger
-import PyPDF2
+import pypdf
 import docx
 from io import BytesIO
 import csv
@@ -135,7 +135,7 @@ class DocumentProcessor:
             logger.info("Attempting fallback to PyPDF2 text extraction...")
             try:
                 pdf_file = BytesIO(content)
-                pdf_reader = PyPDF2.PdfReader(pdf_file)
+                pdf_reader = pypdf.PdfReader(pdf_file)
                 text = ""
                 for page in pdf_reader.pages:
                     text += page.extract_text() + "\n"
