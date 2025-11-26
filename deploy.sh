@@ -63,25 +63,25 @@ setup_python_env() {
 # Function to setup credentials securely
 setup_credentials() {
     echo "🔐 Setting up Google Forms credentials"
-    
+
     if [ ! -f "$CREDENTIALS_FILE" ]; then
         echo "❌ Credentials file $CREDENTIALS_FILE not found!"
         echo "Please ensure $CREDENTIALS_FILE is in the current directory"
         exit 1
     fi
-    
+
     # Copy credentials to secure location
     cp "$CREDENTIALS_FILE" "$APP_DIR/credentials/"
     chown $SERVICE_USER:$SERVICE_USER "$APP_DIR/credentials/$CREDENTIALS_FILE"
     chmod 600 "$APP_DIR/credentials/$CREDENTIALS_FILE"
-    
+
     echo "✅ Credentials file secured at $APP_DIR/credentials/$CREDENTIALS_FILE"
 }
 
 # Function to create environment file
 create_env_file() {
     echo "⚙️ Creating environment configuration"
-    
+
     cat > $APP_DIR/.env << EOF
 # Database Configuration
 DATABASE_URL=\${DATABASE_URL}
@@ -110,10 +110,10 @@ STRIPE_WEBHOOK_SECRET=\${STRIPE_WEBHOOK_SECRET}
 ENVIRONMENT=production
 DEBUG=false
 EOF
-    
+
     chown $SERVICE_USER:$SERVICE_USER $APP_DIR/.env
     chmod 600 $APP_DIR/.env
-    
+
     echo "✅ Environment file created at $APP_DIR/.env"
     echo "📝 Please update the environment variables with your actual values"
 }
@@ -121,7 +121,7 @@ EOF
 # Function to create systemd service
 create_systemd_service() {
     echo "🔧 Creating systemd service"
-    
+
     cat > /etc/systemd/system/vidyaai-backend.service << EOF
 [Unit]
 Description=VidyaAI Backend API
@@ -148,34 +148,34 @@ PrivateTmp=yes
 [Install]
 WantedBy=multi-user.target
 EOF
-    
+
     systemctl daemon-reload
     systemctl enable vidyaai-backend
-    
+
     echo "✅ Systemd service created and enabled"
 }
 
 # Function to setup nginx
 setup_nginx() {
     echo "🌐 Setting up Nginx reverse proxy"
-    
+
     cat > /etc/nginx/sites-available/vidyaai-backend << EOF
 server {
     listen 80;
     server_name your-domain.com;  # Replace with your domain
-    
+
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        
+
         # Handle CORS
         add_header Access-Control-Allow-Origin *;
         add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS";
         add_header Access-Control-Allow-Headers "Authorization, Content-Type";
-        
+
         # Handle preflight requests
         if (\$request_method = 'OPTIONS') {
             return 204;
@@ -183,11 +183,11 @@ server {
     }
 }
 EOF
-    
+
     ln -sf /etc/nginx/sites-available/vidyaai-backend /etc/nginx/sites-enabled/
     nginx -t
     systemctl restart nginx
-    
+
     echo "✅ Nginx configured and restarted"
 }
 
@@ -211,10 +211,10 @@ start_services() {
 # Function to test deployment
 test_deployment() {
     echo "🧪 Testing deployment"
-    
+
     # Wait for service to start
     sleep 5
-    
+
     # Test health endpoint
     if curl -f http://localhost:8000/health > /dev/null 2>&1; then
         echo "✅ Health check passed"
@@ -222,7 +222,7 @@ test_deployment() {
         echo "❌ Health check failed"
         systemctl status vidyaai-backend
     fi
-    
+
     # Test Google Forms service
     echo "🔍 Testing Google Forms integration..."
     echo "Manual test required: Make API call to /api/assignments/{id}/generate-google-form"
@@ -231,7 +231,7 @@ test_deployment() {
 # Main deployment function
 main() {
     echo "🎯 Starting VidyaAI Backend Deployment"
-    
+
     check_root
     create_service_user
     setup_directories
@@ -244,7 +244,7 @@ main() {
     run_migrations
     start_services
     test_deployment
-    
+
     echo ""
     echo "🎉 Deployment completed successfully!"
     echo ""

@@ -46,7 +46,7 @@ services:
 ## Security Best Practices
 
 1. **Never commit credentials to Git** - Use environment variables
-2. **Use service accounts** - Not personal Google accounts  
+2. **Use service accounts** - Not personal Google accounts
 3. **Minimal permissions** - Only Forms API access needed
 4. **Rotate keys regularly** - Generate new service account keys periodically
 5. **Monitor usage** - Check Google Cloud Console for API usage
@@ -87,7 +87,7 @@ curl -X POST "https://your-server.com/api/assignments/{id}/generate-google-form"
 ```
 
 The service will automatically detect and use the available credential method in this order:
-1. GOOGLE_CLOUD_CREDENTIALS_JSON environment variable  
+1. GOOGLE_CLOUD_CREDENTIALS_JSON environment variable
 2. GOOGLE_CLOUD_CREDENTIALS_FILE file path
 3. Local development files (for development only)
 4. Application Default Credentials (for GCP deployment)
