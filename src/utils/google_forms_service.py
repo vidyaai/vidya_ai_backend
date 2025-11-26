@@ -262,7 +262,7 @@ class GoogleFormsService:
             # Construct permanent public URL
             # Note: This assumes bucket has public read policy configured
             public_url = f"https://{self.aws_s3_bucket}.s3.{self.aws_s3_region}.amazonaws.com/{s3_key}"
-            logger.info(f"Generated public S3 URL: {s3_key}")
+            logger.info(f"Generated public S3 URL: {public_url}")
             return public_url
 
         except Exception as e:
@@ -584,7 +584,8 @@ class GoogleFormsService:
                 "createItem": {
                     "item": {
                         "title": sanitize_text_for_forms(
-                            f"Question {number_prefix}: {main_text} (Total: {points} points)"
+                            f"Question {number_prefix}: {main_text} (Total: {points} points)",
+                            question.get("equations", []),
                         ),
                         "description": sanitize_text_for_forms(
                             "Answer the following parts:"
@@ -596,6 +597,37 @@ class GoogleFormsService:
             }
 
             requests.append(description_item)
+            current_index += 1
+
+            # Add diagram as a separate image item if present
+            if question.get("hasDiagram") and question.get("diagram"):
+                logger.info(f"Adding diagram to question: {number_prefix}")
+                diagram = question["diagram"]
+                caption = diagram.get("caption", "")
+                public_url = self._get_public_diagram_url(diagram)
+                if public_url:
+                    diagram_item = {
+                        "createItem": {
+                            "item": {
+                                "title": sanitize_text_for_forms(caption)
+                                if caption
+                                else "",
+                                "imageItem": {
+                                    "image": {
+                                        "sourceUri": public_url,
+                                        "properties": {"alignment": "CENTER"},
+                                    }
+                                },
+                            },
+                            "location": {"index": current_index},
+                        }
+                    }
+                    requests.append(diagram_item)
+                    current_index += 1
+                else:
+                    logger.warning(
+                        f"Could not get public URL for diagram in question {number_prefix}"
+                    )
 
             # Process subquestions
             subquestions = question.get("subquestions", [])
@@ -618,22 +650,24 @@ class GoogleFormsService:
                     subq_requests = self._flatten_question(
                         subq,
                         full_number,
-                        current_index + len(requests),
+                        current_index,
                         parent_question=question,
                         depth=depth + 1,
                     )
                     requests.extend(subq_requests)
+                    current_index += len(subq_requests)
                 else:
                     # Create regular question for this subquestion
                     subq_request = self._create_question_by_type(
                         subq,
-                        current_index + len(requests),
+                        current_index,
                         title_prefix=full_number,
                         parent_question=question,
                         subq_index=idx,
                     )
                     if subq_request:
                         requests.append(subq_request)
+                        current_index += 1
         else:
             # Not a multi-part question - create single question
             request = self._create_question_by_type(
@@ -751,6 +785,7 @@ class GoogleFormsService:
 
         # Add image if diagram present
         if question.get("hasDiagram") and question.get("diagram"):
+            logger.info(f"Adding diagram to question: {title_prefix}")
             item = self._add_image_to_question_item(item, question["diagram"])
 
         return {"createItem": {"item": item, "location": {"index": index}}}
@@ -800,6 +835,7 @@ class GoogleFormsService:
 
         # Add image if diagram present
         if question.get("hasDiagram") and question.get("diagram"):
+            logger.info(f"Adding diagram to question: {title_prefix}")
             item = self._add_image_to_question_item(item, question["diagram"])
 
         return {"createItem": {"item": item, "location": {"index": index}}}
@@ -843,6 +879,7 @@ class GoogleFormsService:
 
         # Add image if diagram present
         if question.get("hasDiagram") and question.get("diagram"):
+            logger.info(f"Adding diagram to question: {title_prefix}")
             item = self._add_image_to_question_item(item, question["diagram"])
 
         return {"createItem": {"item": item, "location": {"index": index}}}
@@ -886,6 +923,7 @@ class GoogleFormsService:
 
         # Add image if diagram present
         if question.get("hasDiagram") and question.get("diagram"):
+            logger.info(f"Adding diagram to question: {title_prefix}")
             item = self._add_image_to_question_item(item, question["diagram"])
 
         return {"createItem": {"item": item, "location": {"index": index}}}
