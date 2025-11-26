@@ -83,6 +83,9 @@ jobs:
             cat <<EOF >src/${{ secrets.FIREBASE_CONFIG }}
             ${{ secrets.FIREBASE_CONFIG_CONTENT }}
             EOF
+            cat <<EOF >src/${{ secrets.GOOGLE_CLOUD_CREDENTIALS_FILE }}
+            ${{ secrets.GOOGLE_CLOUD_CREDENTIALS_FILE_CONTENT }}
+            EOF
             touch .env
             cat <<EOF >.env
             DATABASE_URL=${{ secrets.DATABASE_URL }}
@@ -92,6 +95,7 @@ jobs:
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             FIREBASE_CONFIG=${{ secrets.FIREBASE_CONFIG }}
+            GOOGLE_CLOUD_CREDENTIALS_FILE=${{ secrets.GOOGLE_CLOUD_CREDENTIALS_FILE }}
             DEEPGRAM_API_KEY=${{ secrets.DEEPGRAM_API_KEY }}
             STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
             STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
@@ -102,6 +106,8 @@ jobs:
             STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+
+            DIAGRAM_YOLO_MODEL_PATH=${{ secrets.DIAGRAM_YOLO_MODEL_PATH }}
             POPPLER_PATH=/usr/bin/
             EOF
             alembic upgrade head
