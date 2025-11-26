@@ -83,7 +83,7 @@ jobs:
             cat <<EOF >src/${{ secrets.FIREBASE_CONFIG }}
             ${{ secrets.FIREBASE_CONFIG_CONTENT }}
             EOF
-            cat <<EOF >src/${{ secrets.GOOGLE_CLOUD_CREDENTIALS_FILE }}
+            cat <<EOF >${{ secrets.GOOGLE_CLOUD_CREDENTIALS_FILE }}
             ${{ secrets.GOOGLE_CLOUD_CREDENTIALS_FILE_CONTENT }}
             EOF
             touch .env
