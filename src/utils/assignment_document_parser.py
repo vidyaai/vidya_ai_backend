@@ -8,7 +8,6 @@ import traceback
 from textwrap import dedent
 from typing import Dict, Any, Optional, List
 from openai import OpenAI
-from google import genai
 from controllers.config import logger, s3_client, AWS_S3_BUCKET
 from controllers.storage import s3_presign_url, s3_upload_file
 import concurrent.futures
