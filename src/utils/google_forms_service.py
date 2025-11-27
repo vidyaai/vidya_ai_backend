@@ -783,6 +783,13 @@ class GoogleFormsService:
             },
         }
 
+        # # Add codeBlock if present
+        # if question.get("hasCode") and question.get("code"):
+        #     code_text = question["code"]
+        #     item["codeBlock"] = {
+        #         "text": code_text
+        #     }
+
         # Add image if diagram present
         if question.get("hasDiagram") and question.get("diagram"):
             logger.info(f"Adding diagram to question: {title_prefix}")
