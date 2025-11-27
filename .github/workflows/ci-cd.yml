@@ -35,6 +35,8 @@ jobs:
             cd vidya_ai_backend
             pip install --upgrade pip
             pip install -r requirements.txt
+            pip uninstall -y opencv-python-headless==4.12.0.88
+            pip install opencv-python-headless==4.12.0.88
             pip install gunicorn
             touch src/${{ secrets.FIREBASE_CONFIG }}
             cat <<EOF >src/${{ secrets.FIREBASE_CONFIG }}
