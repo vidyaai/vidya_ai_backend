@@ -646,6 +646,24 @@ class AssignmentPDFGenerator:
                     <div class="subquestion-text">{subq_text}</div>
                 """
 
+                # handle subquestion code block if present
+                if subq.get("hasCode") and subq.get("code"):
+                    code_text = subq["code"]
+                    html += f"""
+                    <div class="subquestion-code" style="background: #f3f4f6; padding: 10px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; margin-top: 10px;">{code_text}</div>
+                    """
+
+                # handle subquestion diagram if present
+                if subq.get("diagram") and subq["diagram"].get("s3_key"):
+                    diagram_url = s3_presign_url(subq["diagram"]["s3_key"])
+                    diagram_base64 = self.download_image_as_base64(diagram_url)
+                    if diagram_base64:
+                        html += f"""
+                        <div class="subquestion-diagram">
+                            <img src="{diagram_base64}" alt="Subquestion diagram" style="max-width: 100%; height: auto;">
+                        </div>
+                        """
+
                 # Add options for multiple choice subquestions
                 if subq_type == "multiple-choice" and subq.get("options"):
                     html += '<div class="question-options">'

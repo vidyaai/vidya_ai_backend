@@ -673,12 +673,21 @@ class AssignmentDocumentParser:
 
         # Map: page_number -> [questions needing diagram]
         page_to_questions = {}
-        for q in questions:
-            diagram = q.get("diagram")
-            if q.get("hasDiagram") and isinstance(diagram, dict):
-                page_number = diagram.get("page_number")
-                if page_number:
-                    page_to_questions.setdefault(page_number, []).append(q)
+
+        def collect_questions_with_diagrams(q_list):
+            """Recursively collect all questions (including subquestions) that have diagrams"""
+            for q in q_list:
+                diagram = q.get("diagram")
+                if q.get("hasDiagram") and isinstance(diagram, dict):
+                    page_number = diagram.get("page_number")
+                    if page_number:
+                        page_to_questions.setdefault(page_number, []).append(q)
+
+                # Recurse into subquestions
+                if q.get("subquestions"):
+                    collect_questions_with_diagrams(q["subquestions"])
+
+        collect_questions_with_diagrams(questions)
 
         # For each relevant page, run YOLO and assign diagrams
         for page_number, qs in page_to_questions.items():
