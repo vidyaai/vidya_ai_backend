@@ -29,7 +29,6 @@ def get_assignment_parsing_schema(
         "properties": {
             "id": {"type": "string"},
             "latex": {"type": "string"},
-            "mathml": {"type": "string"},
             "position": {
                 "type": "object",
                 "properties": {
@@ -44,6 +43,7 @@ def get_assignment_parsing_schema(
                     },
                 },
                 "required": ["char_index", "context"],
+                "additionalProperties": False,
             },
             "type": {
                 "type": "string",
@@ -52,214 +52,235 @@ def get_assignment_parsing_schema(
             },
         },
         "required": ["id", "latex", "position", "type"],
+        "additionalProperties": False,
     }
 
-    # Build base question properties
-    base_question_properties = {
-        "id": {"type": "integer"},
-        "type": {
-            "type": "string",
-            "enum": [
-                "multiple-choice",
-                "fill-blank",
-                "short-answer",
-                "numerical",
-                "long-answer",
-                "true-false",
-                "code-writing",
-                "diagram-analysis",
-                "multi-part",
-            ],
-        },
-        "question": {"type": "string"},
-        "points": {"type": "number"},
-        "difficulty": {"type": "string", "enum": ["easy", "medium", "hard"]},
-        "options": {"type": "array", "items": {"type": "string"}},
-        "allowMultipleCorrect": {"type": "boolean"},
-        "multipleCorrectAnswers": {"type": "array", "items": {"type": "string"}},
-        "order": {"type": "integer"},
-        "hasCode": {"type": "boolean"},
-        "hasDiagram": {"type": "boolean"},
-        "codeLanguage": {"type": "string"},
-        "outputType": {"type": "string"},
-        "rubricType": {
-            "type": "string",
-            "enum": ["per-subquestion", "overall"],
-        },
-        "code": {"type": "string"},
-        "equations": {
-            "type": "array",
-            "items": equation_schema,
-            "description": "Mathematical equations with their character positions in question text",
-        },
-        "diagram": {
+    # Define diagram schema based on no_bbox flag
+    if no_bbox:
+        diagram_schema = {
             "type": "object",
-            "properties": (
-                {"page_number": {"type": "integer"}, "caption": {"type": "string"}}
-                if no_bbox
-                else {
-                    "s3_url": {"type": ["string", "null"]},
-                    "s3_key": {"type": ["string", "null"]},
-                }
-            ),
-        },
-        "optionalParts": {"type": "boolean"},
-        "requiredPartsCount": {"type": "integer"},
-    }
-
-    # Add answer-related fields
-    base_question_properties["correctAnswer"] = {"type": "string"}
-    base_question_properties["explanation"] = {"type": "string"}
-    base_question_properties["rubric"] = {"type": "string"}
-
-    # Build subquestion properties (level 2)
-    subquestion_level2_properties = {
-        "id": {"type": "integer"},
-        "type": {
-            "type": "string",
-            "enum": [
-                "multiple-choice",
-                "fill-blank",
-                "short-answer",
-                "numerical",
-                "true-false",
-                "code-writing",
-                "diagram-analysis",
-                "multi-part",
-            ],
-        },
-        "question": {"type": "string"},
-        "points": {"type": "number"},
-        "options": {"type": "array", "items": {"type": "string"}},
-        "allowMultipleCorrect": {"type": "boolean"},
-        "multipleCorrectAnswers": {"type": "array", "items": {"type": "string"}},
-        "hasCode": {"type": "boolean"},
-        "hasDiagram": {"type": "boolean"},
-        "codeLanguage": {"type": "string"},
-        "outputType": {"type": "string"},
-        "rubricType": {
-            "type": "string",
-            "enum": ["per-subquestion", "overall"],
-        },
-        "code": {"type": "string"},
-        "equations": {
-            "type": "array",
-            "items": equation_schema,
-            "description": "Mathematical equations with their character positions",
-        },
-        "diagram": {
+            "properties": {
+                "page_number": {"type": "integer"},
+                "caption": {"type": "string"},
+            },
+            "required": ["page_number", "caption"],
+            "additionalProperties": False,
+        }
+    else:
+        diagram_schema = {
             "type": "object",
-            "properties": (
-                {"page_number": {"type": "integer"}, "caption": {"type": "string"}}
-                if no_bbox
-                else {
-                    "s3_url": {"type": ["string", "null"]},
-                    "s3_key": {"type": ["string", "null"]},
-                }
-            ),
-        },
-        "optionalParts": {"type": "boolean"},
-        "requiredPartsCount": {"type": "integer"},
-    }
+            "properties": {
+                "s3_url": {"type": ["string", "null"]},
+                "s3_key": {"type": ["string", "null"]},
+            },
+            "required": ["s3_url", "s3_key"],
+            "additionalProperties": False,
+        }
 
-    subquestion_level2_properties["correctAnswer"] = {"type": "string"}
-    subquestion_level2_properties["explanation"] = {"type": "string"}
-    subquestion_level2_properties["rubric"] = {"type": "string"}
-
-    # Build subquestion properties (level 3 - deepest)
-    subquestion_level3_properties = {
-        "id": {"type": "integer"},
-        "type": {
-            "type": "string",
-            "enum": [
-                "multiple-choice",
-                "fill-blank",
-                "short-answer",
-                "numerical",
-                "true-false",
-                "code-writing",
-                "diagram-analysis",
-            ],
-        },
-        "question": {"type": "string"},
-        "points": {"type": "number"},
-        "options": {"type": "array", "items": {"type": "string"}},
-        "allowMultipleCorrect": {"type": "boolean"},
-        "multipleCorrectAnswers": {"type": "array", "items": {"type": "string"}},
-        "hasCode": {"type": "boolean"},
-        "hasDiagram": {"type": "boolean"},
-        "codeLanguage": {"type": "string"},
-        "outputType": {"type": "string"},
-        "rubricType": {
-            "type": "string",
-            "enum": ["overall"],
-        },
-        "code": {"type": "string"},
-        "equations": {
-            "type": "array",
-            "items": equation_schema,
-            "description": "Mathematical equations with their character positions",
-        },
-        "diagram": {
-            "type": "object",
-            "properties": (
-                {"page_number": {"type": "integer"}, "caption": {"type": "string"}}
-                if no_bbox
-                else {
-                    "s3_url": {"type": ["string", "null"]},
-                    "s3_key": {"type": ["string", "null"]},
-                }
-            ),
-        },
-        "optionalParts": {"type": "boolean"},
-        "requiredPartsCount": {"type": "integer"},
-    }
-
-    subquestion_level3_properties["correctAnswer"] = {"type": "string"}
-    subquestion_level3_properties["explanation"] = {"type": "string"}
-    subquestion_level3_properties["rubric"] = {"type": "string"}
-
-    # Build level 3 schema (deepest subquestions)
-    subquestion_level3_required = ["id", "type", "question", "points"]
-    if not step1_mode:
-        subquestion_level3_required.extend(["correctAnswer", "explanation", "rubric"])
-
+    # Build subquestion properties (level 3 - deepest, no further nesting)
     subquestion_level3_schema = {
         "type": "object",
-        "properties": subquestion_level3_properties,
-        "required": subquestion_level3_required,
+        "properties": {
+            "id": {"type": "integer"},
+            "type": {
+                "type": "string",
+                "enum": [
+                    "multiple-choice",
+                    "fill-blank",
+                    "short-answer",
+                    "numerical",
+                    "true-false",
+                    "code-writing",
+                    "diagram-analysis",
+                ],
+            },
+            "question": {"type": "string"},
+            "points": {"type": "number"},
+            "options": {"type": "array", "items": {"type": "string"}},
+            "allowMultipleCorrect": {"type": "boolean"},
+            "multipleCorrectAnswers": {"type": "array", "items": {"type": "string"}},
+            "hasCode": {"type": "boolean"},
+            "hasDiagram": {"type": "boolean"},
+            "codeLanguage": {"type": "string"},
+            "outputType": {"type": "string"},
+            "rubricType": {"type": "string", "enum": ["overall"]},
+            "code": {"type": "string"},
+            "equations": {
+                "type": "array",
+                "items": equation_schema,
+                "description": "Mathematical equations with their character positions",
+            },
+            "diagram": diagram_schema,
+            "optionalParts": {"type": "boolean"},
+            "requiredPartsCount": {"type": "integer"},
+            "correctAnswer": {"type": "string"},
+            "explanation": {"type": "string"},
+            "rubric": {"type": "string"},
+        },
+        "required": [
+            "id",
+            "type",
+            "question",
+            "points",
+            "options",
+            "allowMultipleCorrect",
+            "multipleCorrectAnswers",
+            "hasCode",
+            "hasDiagram",
+            "codeLanguage",
+            "outputType",
+            "rubricType",
+            "code",
+            "equations",
+            "diagram",
+            "optionalParts",
+            "requiredPartsCount",
+            "correctAnswer",
+            "explanation",
+            "rubric",
+        ],
+        "additionalProperties": False,
     }
 
-    # Build level 2 schema (with level 3 subquestions)
-    subquestion_level2_properties["subquestions"] = {
-        "type": "array",
-        "items": subquestion_level3_schema,
-    }
-
-    subquestion_level2_required = ["id", "type", "question", "points"]
-    if not step1_mode:
-        subquestion_level2_required.extend(["correctAnswer", "explanation"])
-
+    # Build subquestion properties (level 2)
     subquestion_level2_schema = {
         "type": "object",
-        "properties": subquestion_level2_properties,
-        "required": subquestion_level2_required,
+        "properties": {
+            "id": {"type": "integer"},
+            "type": {
+                "type": "string",
+                "enum": [
+                    "multiple-choice",
+                    "fill-blank",
+                    "short-answer",
+                    "numerical",
+                    "true-false",
+                    "code-writing",
+                    "diagram-analysis",
+                    "multi-part",
+                ],
+            },
+            "question": {"type": "string"},
+            "points": {"type": "number"},
+            "options": {"type": "array", "items": {"type": "string"}},
+            "allowMultipleCorrect": {"type": "boolean"},
+            "multipleCorrectAnswers": {"type": "array", "items": {"type": "string"}},
+            "hasCode": {"type": "boolean"},
+            "hasDiagram": {"type": "boolean"},
+            "codeLanguage": {"type": "string"},
+            "outputType": {"type": "string"},
+            "rubricType": {"type": "string", "enum": ["per-subquestion", "overall"]},
+            "code": {"type": "string"},
+            "equations": {
+                "type": "array",
+                "items": equation_schema,
+                "description": "Mathematical equations with their character positions",
+            },
+            "diagram": diagram_schema,
+            "optionalParts": {"type": "boolean"},
+            "requiredPartsCount": {"type": "integer"},
+            "correctAnswer": {"type": "string"},
+            "explanation": {"type": "string"},
+            "rubric": {"type": "string"},
+            "subquestions": {"type": "array", "items": subquestion_level3_schema},
+        },
+        "required": [
+            "id",
+            "type",
+            "question",
+            "points",
+            "options",
+            "allowMultipleCorrect",
+            "multipleCorrectAnswers",
+            "hasCode",
+            "hasDiagram",
+            "codeLanguage",
+            "outputType",
+            "rubricType",
+            "code",
+            "equations",
+            "diagram",
+            "optionalParts",
+            "requiredPartsCount",
+            "correctAnswer",
+            "explanation",
+            "rubric",
+            "subquestions",
+        ],
+        "additionalProperties": False,
     }
 
-    # Build base question schema (with level 2 subquestions)
-    base_question_properties["subquestions"] = {
-        "type": "array",
-        "items": subquestion_level2_schema,
-    }
-
-    base_question_required = ["id", "type", "question", "points", "difficulty"]
-    if not step1_mode:
-        base_question_required.extend(["correctAnswer", "rubric"])
-
+    # Build base question schema
     base_question_schema = {
         "type": "object",
-        "properties": base_question_properties,
-        "required": base_question_required,
+        "properties": {
+            "id": {"type": "integer"},
+            "type": {
+                "type": "string",
+                "enum": [
+                    "multiple-choice",
+                    "fill-blank",
+                    "short-answer",
+                    "numerical",
+                    "long-answer",
+                    "true-false",
+                    "code-writing",
+                    "diagram-analysis",
+                    "multi-part",
+                ],
+            },
+            "question": {"type": "string"},
+            "points": {"type": "number"},
+            "difficulty": {"type": "string", "enum": ["easy", "medium", "hard"]},
+            "options": {"type": "array", "items": {"type": "string"}},
+            "allowMultipleCorrect": {"type": "boolean"},
+            "multipleCorrectAnswers": {"type": "array", "items": {"type": "string"}},
+            "order": {"type": "integer"},
+            "hasCode": {"type": "boolean"},
+            "hasDiagram": {"type": "boolean"},
+            "codeLanguage": {"type": "string"},
+            "outputType": {"type": "string"},
+            "rubricType": {"type": "string", "enum": ["per-subquestion", "overall"]},
+            "code": {"type": "string"},
+            "equations": {
+                "type": "array",
+                "items": equation_schema,
+                "description": "Mathematical equations with their character positions in question text",
+            },
+            "diagram": diagram_schema,
+            "optionalParts": {"type": "boolean"},
+            "requiredPartsCount": {"type": "integer"},
+            "correctAnswer": {"type": "string"},
+            "explanation": {"type": "string"},
+            "rubric": {"type": "string"},
+            "subquestions": {"type": "array", "items": subquestion_level2_schema},
+        },
+        "required": [
+            "id",
+            "type",
+            "question",
+            "points",
+            "difficulty",
+            "options",
+            "allowMultipleCorrect",
+            "multipleCorrectAnswers",
+            "order",
+            "hasCode",
+            "hasDiagram",
+            "codeLanguage",
+            "outputType",
+            "rubricType",
+            "code",
+            "equations",
+            "diagram",
+            "optionalParts",
+            "requiredPartsCount",
+            "correctAnswer",
+            "explanation",
+            "rubric",
+            "subquestions",
+        ],
+        "additionalProperties": False,
     }
 
     # Create the full parsing schema with additional fields
@@ -271,7 +292,8 @@ def get_assignment_parsing_schema(
             "questions": {"type": "array", "items": base_question_schema},
             "total_points": {"type": "number"},
         },
-        "required": ["title", "questions", "total_points"],
+        "required": ["title", "description", "questions", "total_points"],
+        "additionalProperties": False,
     }
 
     return schema
