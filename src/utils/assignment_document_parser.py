@@ -849,8 +849,14 @@ class AssignmentDocumentParser:
             items: List[Dict[str, Any]] = []
             q_id = q.get("id")
             path = str(q_id) if q_id is not None else None
-            needs_answer = not bool(q.get("correctAnswer"))
-            needs_rubric = not bool(q.get("rubric"))
+            needs_answer = (
+                not bool(q.get("correctAnswer"))
+                if q.get("type") != "multi-part"
+                else False
+            )
+            needs_rubric = (
+                not bool(q.get("rubric")) if q.get("type") != "multi-part" else False
+            )
 
             # Add this question if it needs generation
             if path and (needs_answer or needs_rubric):
