@@ -1,0 +1,575 @@
+{
+    "title": "Quiz 2",
+    "description": "Communication Systems (EE 308), Autumn\u201919. Oct. 24, 2019; Total: 10 marks; Time: 55 minutes.",
+    "questions": [
+        {
+            "id": 1,
+            "type": "multi-part",
+            "question": "Let <eq q1_eq1> be a periodic square wave with period <eq q1_eq2> as shown in Fig. 1. The width and height of each pulse are <eq q1_eq3> and <eq q1_eq4> respectively. The starting time of the first complete pulse to the right of <eq q1_eq5> is a random variable <eq q1_eq6> that is uniform in <eq q1_eq7>.",
+            "points": 3,
+            "order": 1,
+            "hasDiagram": true,
+            "diagram": {
+                "page_number": 1,
+                "caption": "Fig. 1. The process X(t) in Question 1."
+            },
+            "optionalParts": false,
+            "requiredPartsCount": 2,
+            "correctAnswer": "",
+            "explanation": "",
+            "rubric": "",
+            "equations": [
+                {
+                    "id": "q1_eq1",
+                    "latex": "X(t)",
+                    "mathml": null,
+                    "position": {
+                        "char_index": 4,
+                        "context": "question_text"
+                    },
+                    "type": "inline"
+                },
+                {
+                    "id": "q1_eq2",
+                    "latex": "T",
+                    "mathml": null,
+                    "position": {
+                        "char_index": 54,
+                        "context": "question_text"
+                    },
+                    "type": "inline"
+                },
+                {
+                    "id": "q1_eq3",
+                    "latex": "\\frac{T}{2}",
+                    "mathml": null,
+                    "position": {
+                        "char_index": 125,
+                        "context": "question_text"
+                    },
+                    "type": "inline"
+                },
+                {
+                    "id": "q1_eq4",
+                    "latex": "A",
+                    "mathml": null,
+                    "position": {
+                        "char_index": 141,
+                        "context": "question_text"
+                    },
+                    "type": "inline"
+                },
+                {
+                    "id": "q1_eq5",
+                    "latex": "t = 0",
+                    "mathml": null,
+                    "position": {
+                        "char_index": 229,
+                        "context": "question_text"
+                    },
+                    "type": "inline"
+                },
+                {
+                    "id": "q1_eq6",
+                    "latex": "\\Theta",
+                    "mathml": null,
+                    "position": {
+                        "char_index": 262,
+                        "context": "question_text"
+                    },
+                    "type": "inline"
+                },
+                {
+                    "id": "q1_eq7",
+                    "latex": "[0, T]",
+                    "mathml": null,
+                    "position": {
+                        "char_index": 293,
+                        "context": "question_text"
+                    },
+                    "type": "inline"
+                }
+            ],
+            "subquestions": [
+                {
+                    "id": 101,
+                    "type": "long-answer",
+                    "question": "Find the mean function <eq q1_1_eq1> and autocorrelation function <eq q1_1_eq2> of the process <eq q1_1_eq3>. (You can assume that <eq q1_1_eq4> is a WSS process.)",
+                    "points": 2.5,
+                    "options": [],
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": [],
+                    "hasCode": false,
+                    "hasDiagram": false,
+                    "equations": [
+                        {
+                            "id": "q1_1_eq1",
+                            "latex": "\\eta_X(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 23,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q1_1_eq2",
+                            "latex": "R_X(\\tau)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 65,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q1_1_eq3",
+                            "latex": "X(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 94,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q1_1_eq4",
+                            "latex": "X(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 130,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        }
+                    ],
+                    "correctAnswer": "",
+                    "explanation": "",
+                    "rubric": ""
+                },
+                {
+                    "id": 102,
+                    "type": "long-answer",
+                    "question": "Suppose <eq q1_2_eq1> is input to a cascade (series) connection of two linear time-invariant systems with impulse responses <eq q1_2_eq2> and <eq q1_2_eq3> respectively. Find the mean function <eq q1_2_eq4> and autocorrelation function <eq q1_2_eq5> of the final output, <eq q1_2_eq6>, of the cascade system.",
+                    "points": 0.5,
+                    "options": [],
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": [],
+                    "hasCode": false,
+                    "hasDiagram": false,
+                    "equations": [
+                        {
+                            "id": "q1_2_eq1",
+                            "latex": "X(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 8,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q1_2_eq2",
+                            "latex": "h_1(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 124,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q1_2_eq3",
+                            "latex": "h_2(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 142,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q1_2_eq4",
+                            "latex": "\\eta_Y(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 193,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q1_2_eq5",
+                            "latex": "R_Y(\\tau)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 235,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q1_2_eq6",
+                            "latex": "Y(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 270,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        }
+                    ],
+                    "correctAnswer": "",
+                    "explanation": "",
+                    "rubric": ""
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "type": "multi-part",
+            "question": "Consider a pulse <eq q2_eq1>, where <eq q2_eq2>.",
+            "points": 3,
+            "order": 2,
+            "hasDiagram": false,
+            "optionalParts": false,
+            "requiredPartsCount": 4,
+            "correctAnswer": "",
+            "explanation": "",
+            "rubric": "",
+            "equations": [
+                {
+                    "id": "q2_eq1",
+                    "latex": "s(t) = \\operatorname{sinc}(a t)\\operatorname{sinc}(b t)",
+                    "mathml": null,
+                    "position": {
+                        "char_index": 17,
+                        "context": "question_text"
+                    },
+                    "type": "inline"
+                },
+                {
+                    "id": "q2_eq2",
+                    "latex": "a \\ge b",
+                    "mathml": null,
+                    "position": {
+                        "char_index": 36,
+                        "context": "question_text"
+                    },
+                    "type": "inline"
+                }
+            ],
+            "subquestions": [
+                {
+                    "id": 201,
+                    "type": "long-answer",
+                    "question": "Sketch the frequency-domain response <eq q2_1_eq1> of the pulse.",
+                    "points": 0.5,
+                    "equations": [
+                        {
+                            "id": "q2_1_eq1",
+                            "latex": "S(f)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 37,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        }
+                    ],
+                    "correctAnswer": "",
+                    "explanation": "",
+                    "rubric": ""
+                },
+                {
+                    "id": 202,
+                    "type": "short-answer",
+                    "question": "Suppose that the pulse is to be used over an ideal real-baseband channel with one-sided bandwidth 400 Hz. Choose a and b so that the pulse is Nyquist for 4PAM signaling at 1200 bits/s and exactly fills the channel bandwidth.",
+                    "points": 1,
+                    "equations": [],
+                    "correctAnswer": "",
+                    "explanation": "",
+                    "rubric": ""
+                },
+                {
+                    "id": 203,
+                    "type": "short-answer",
+                    "question": "Now, suppose that the pulse is to be used over a passband channel spanning the frequency range 2.4\u20132.42 GHz. Assuming that we use 64QAM signaling at 60 Mbits/s, choose a and b so that the pulse is Nyquist and exactly fills the channel bandwidth.",
+                    "points": 1,
+                    "equations": [],
+                    "correctAnswer": "",
+                    "explanation": "",
+                    "rubric": ""
+                },
+                {
+                    "id": 204,
+                    "type": "long-answer",
+                    "question": "Sketch an argument showing that the magnitude of the transmitted waveform in the preceding settings is always finite.",
+                    "points": 0.5,
+                    "equations": [],
+                    "correctAnswer": "",
+                    "explanation": "",
+                    "rubric": ""
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "type": "multi-part",
+            "question": "A zero-mean white Gaussian noise process, <eq q3_eq1>, with power-spectral density <eq q3_eq2>, is passed through an ideal filter whose passband is from 3\u201311 kHz. The output process is denoted by <eq q3_eq3>.",
+            "points": 2,
+            "order": 3,
+            "hasDiagram": false,
+            "optionalParts": false,
+            "requiredPartsCount": 2,
+            "correctAnswer": "",
+            "explanation": "",
+            "rubric": "",
+            "equations": [
+                {
+                    "id": "q3_eq1",
+                    "latex": "n_{w}(t)",
+                    "mathml": null,
+                    "position": {
+                        "char_index": 42,
+                        "context": "question_text"
+                    },
+                    "type": "inline"
+                },
+                {
+                    "id": "q3_eq2",
+                    "latex": "\\frac{N_0}{2}",
+                    "mathml": null,
+                    "position": {
+                        "char_index": 83,
+                        "context": "question_text"
+                    },
+                    "type": "inline"
+                },
+                {
+                    "id": "q3_eq3",
+                    "latex": "n(t)",
+                    "mathml": null,
+                    "position": {
+                        "char_index": 196,
+                        "context": "question_text"
+                    },
+                    "type": "inline"
+                }
+            ],
+            "subquestions": [
+                {
+                    "id": 301,
+                    "type": "short-answer",
+                    "question": "If <eq q3_1_eq1>, find <eq q3_1_eq2>, <eq q3_1_eq3> and <eq q3_1_eq4>, where <eq q3_1_eq5> and <eq q3_1_eq6> are the in-phase and quadrature components of <eq q3_1_eq7>.",
+                    "points": 1,
+                    "equations": [
+                        {
+                            "id": "q3_1_eq1",
+                            "latex": "f_c = 7\\,\\text{kHz}",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 3,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q3_1_eq2",
+                            "latex": "S_{n_I}(f)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 23,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q3_1_eq3",
+                            "latex": "S_{n_Q}(f)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 38,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q3_1_eq4",
+                            "latex": "S_{n_I,n_Q}(f)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 56,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q3_1_eq5",
+                            "latex": "n_I(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 76,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q3_1_eq6",
+                            "latex": "n_Q(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 94,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q3_1_eq7",
+                            "latex": "n(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 154,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        }
+                    ],
+                    "correctAnswer": "",
+                    "explanation": "",
+                    "rubric": ""
+                },
+                {
+                    "id": 302,
+                    "type": "short-answer",
+                    "question": "Do part (a) with the change that <eq q3_2_eq1>.",
+                    "points": 1,
+                    "equations": [
+                        {
+                            "id": "q3_2_eq1",
+                            "latex": "f_c = 6\\,\\text{kHz}",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 33,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        }
+                    ],
+                    "correctAnswer": "",
+                    "explanation": "",
+                    "rubric": ""
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "type": "multi-part",
+            "question": "",
+            "points": 2,
+            "order": 4,
+            "hasDiagram": false,
+            "optionalParts": false,
+            "requiredPartsCount": 2,
+            "correctAnswer": "",
+            "explanation": "",
+            "rubric": "",
+            "equations": [],
+            "subquestions": [
+                {
+                    "id": 401,
+                    "type": "long-answer",
+                    "question": "Suppose <eq q4_1_eq1> is a SSS process and <eq q4_1_eq2> is a random variable independent of <eq q4_1_eq3>. Let <eq q4_1_eq4>. Consider the following statement: \u201cThe process <eq q4_1_eq5> is SSS\u201d. State whether this statement is true or false and provide a proof (if true) or counterexample (if false).",
+                    "points": 1,
+                    "equations": [
+                        {
+                            "id": "q4_1_eq1",
+                            "latex": "X(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 8,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q4_1_eq2",
+                            "latex": "Z",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 43,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q4_1_eq3",
+                            "latex": "X(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 93,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q4_1_eq4",
+                            "latex": "Y(t) = X(t - Z)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 112,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q4_1_eq5",
+                            "latex": "Y(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 174,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        }
+                    ],
+                    "correctAnswer": "",
+                    "explanation": "",
+                    "rubric": ""
+                },
+                {
+                    "id": 402,
+                    "type": "long-answer",
+                    "question": "Do part (a) with the change that <eq q4_2_eq1> is not independent of <eq q4_2_eq2>.",
+                    "points": 1,
+                    "equations": [
+                        {
+                            "id": "q4_2_eq1",
+                            "latex": "Z",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 33,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        },
+                        {
+                            "id": "q4_2_eq2",
+                            "latex": "X(t)",
+                            "mathml": null,
+                            "position": {
+                                "char_index": 69,
+                                "context": "question_text"
+                            },
+                            "type": "inline"
+                        }
+                    ],
+                    "correctAnswer": "",
+                    "explanation": "",
+                    "rubric": ""
+                }
+            ]
+        }
+    ],
+    "total_points": 10
+}

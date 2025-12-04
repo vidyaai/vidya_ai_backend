@@ -21,6 +21,7 @@ from .prompts import (
     get_question_extraction_prompt,
 )
 from .assignment_schemas import get_assignment_parsing_schema
+from .assignment_pydantic_models import AssignmentParsingResponse
 from .document_processor import DocumentProcessor
 
 
@@ -32,6 +33,26 @@ class AssignmentDocumentParser:
         self.GPTclient = OpenAI()
         self.gpt5_model = "gpt-5"
         self.gpt4o_model = "gpt-4o"
+
+    def _save_debug_images_and_result(
+        result, images: List[Image.Image], file_name, debug_dir="debug_outputs"
+    ):
+        """
+        Save debug images and result JSON to local debug directory.
+        """
+        try:
+            os.makedirs(debug_dir, exist_ok=True)
+            # Save images
+            for idx, img in enumerate(images):
+                img_path = os.path.join(debug_dir, f"{file_name}_page_{idx + 1}.png")
+                img.save(img_path)
+            # Save result JSON
+            result_path = os.path.join(debug_dir, f"{file_name}_result.json")
+            with open(result_path, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=4)
+            logger.info(f"Saved debug images and result to {debug_dir}")
+        except Exception as e:
+            logger.warning(f"Failed to save debug images/result: {e}")
 
     def parse_pdf_images_to_assignment(
         self,
@@ -103,6 +124,9 @@ class AssignmentDocumentParser:
                 )
             except Exception as e:
                 logger.warning(f"Skipping YOLO bbox enrichment due to error: {e}")
+
+            # save images and result for debugging
+            self._save_debug_images_and_result(result, images, file_name)
 
             # STEP 3: Single LLM call to generate missing answers/rubrics
             logger.info("Step 3: Generating missing answers and rubrics...")
@@ -603,41 +627,44 @@ class AssignmentDocumentParser:
             Return structured JSON matching schema.
         """
 
-        # Get comprehensive schema (includes equations, allows empty answers/rubrics)
-        response_schema = get_assignment_parsing_schema("step1_pdf_parsing_no_bbox")
+        # Build user content for Responses API
+        # For Responses API: use 'input_text' for text and 'input_image' for images
+        user_content = [{"type": "input_text", "text": dedent(prompt).strip()}]
+        for img in image_contents:
+            if img.get("type") == "image_url":
+                user_content.append(
+                    {
+                        "type": "input_image",
+                        "image_url": img["image_url"]["url"],
+                    }
+                )
 
-        # Build message
-        user_content = [{"type": "text", "text": dedent(prompt).strip()}]
-        user_content.extend(image_contents)
+        input_items = [
+            {
+                "type": "message",
+                "role": "user",
+                "content": user_content,
+            }
+        ]
 
-        # Call LLM
-        response = self.GPTclient.chat.completions.create(
+        # Call LLM using Responses API with Pydantic model for structured output
+        response = self.GPTclient.responses.parse(
             model=self.gpt5_model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": dedent(DOCUMENT_PARSER_SYSTEM_PROMPT_STEP1),
-                },
-                {"role": "user", "content": user_content},
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "step1_pdf_parsing_no_bbox",
-                    "schema": response_schema,
-                },
-            },
-            # max_completion_tokens=16384,
-            # temperature=0.2,
+            instructions=dedent(DOCUMENT_PARSER_SYSTEM_PROMPT_STEP1),
+            input=input_items,
+            text_format=AssignmentParsingResponse,
+            reasoning={"effort": "low"},
         )
 
-        extracted_data = json.loads(response.choices[0].message.content)
+        # Extract parsed Pydantic model and convert to dict
+        parsed_response = response.output_parsed
+        extracted_data = parsed_response.model_dump() if parsed_response else {}
 
         # Validate extracted_data is a dict
         if not isinstance(extracted_data, dict):
             logger.error(
                 f"Step 1 (Batch {batch_idx}): Extracted data is not a dict, it's {type(extracted_data)}. "
-                f"Content: {response.choices[0].message.content[:500]}"
+                f"Response: {response}"
             )
             raise ValueError(f"LLM returned invalid data type: {type(extracted_data)}")
 
@@ -788,57 +815,116 @@ class AssignmentDocumentParser:
     ) -> Dict[str, Any]:
         """
         Step 3: Generate missing answers and rubrics in four steps:
-        1. Use GPT-4o to group questions into dynamic batches.
+        1. Use GPT-4o to group question groups into dynamic batches.
         2. Create prepared prompts (with image contents) for each batch.
         3. Process prepared batches in parallel using GPT-5.
         4. Consolidate results into a single output.
+
+        Note: Multi-part questions with subquestions are kept together as atomic groups
+        to ensure GPT-5 receives full context when generating answers.
         """
         questions = data.get("questions", [])
         logger.info(f"Step 3: Starting with {len(questions)} total questions")
 
-        # Step 1: Collect questions that need generation and group into dynamic batches using GPT-4o
-        logger.info(
-            "Step 3.1: Collecting incomplete questions and grouping into dynamic batches using GPT-4o..."
-        )
-        # Flatten questions and create a list of items expected by _generate_batch_answers
-        def _collect_questions_to_generate(
-            q_list: List[Dict[str, Any]]
-        ) -> List[Dict[str, Any]]:
-            out: List[Dict[str, Any]] = []
-            for q in q_list:
-                q_id = q.get("id")
-                path = str(q_id) if q_id is not None else None
-                needs_answer = not bool(q.get("correctAnswer"))
-                needs_rubric = not bool(q.get("rubric"))
-                if path and (needs_answer or needs_rubric):
-                    out.append(
-                        {
-                            "path": path,
-                            "question": q,
-                            "needs_answer": needs_answer,
-                            "needs_rubric": needs_rubric,
-                        }
-                    )
-                # Recurse into subquestions
-                for sub in q.get("subquestions", []):
-                    out.extend(_collect_questions_to_generate([sub]))
-            return out
+        # Step 1: Collect question GROUPS (not flattened) that need generation
+        # Each group keeps a multi-part question together with all its subquestions
+        logger.info("Step 3.1: Collecting question groups and batching using GPT-4o...")
 
-        questions_needing_generation = _collect_questions_to_generate(questions)
+        def _collect_items_needing_generation(
+            q: Dict[str, Any]
+        ) -> List[Dict[str, Any]]:
+            """Recursively collect all items (question + subquestions) that need generation."""
+            items: List[Dict[str, Any]] = []
+            q_id = q.get("id")
+            path = str(q_id) if q_id is not None else None
+            needs_answer = not bool(q.get("correctAnswer"))
+            needs_rubric = not bool(q.get("rubric"))
+
+            # Add this question if it needs generation
+            if path and (needs_answer or needs_rubric):
+                items.append(
+                    {
+                        "path": path,
+                        "question": q,
+                        "needs_answer": needs_answer,
+                        "needs_rubric": needs_rubric,
+                    }
+                )
+
+            # Recurse into subquestions
+            for sub in q.get("subquestions", []) or []:
+                items.extend(_collect_items_needing_generation(sub))
+
+            return items
+
+        def _detect_optional_parts(q: Dict[str, Any]) -> bool:
+            """Detect if question has optional parts (OR, answer any X, etc.)."""
+            # Check optionalParts flag
+            if q.get("optionalParts"):
+                return True
+
+            # Check question text for patterns
+            question_text = (q.get("question") or "").lower()
+            optional_patterns = [
+                "answer any",
+                "attempt any",
+                "choose any",
+                "select any",
+                "either...or",
+                "either or",
+                " or ",
+                "attempt only",
+                "answer only",
+                "choose only",
+                "select only",
+            ]
+            for pattern in optional_patterns:
+                if pattern in question_text:
+                    return True
+
+            # Recursively check subquestions
+            for sub in q.get("subquestions", []) or []:
+                if _detect_optional_parts(sub):
+                    return True
+
+            return False
+
+        def _count_subquestions(q: Dict[str, Any]) -> int:
+            """Count total subquestions recursively."""
+            count = len(q.get("subquestions", []) or [])
+            for sub in q.get("subquestions", []) or []:
+                count += _count_subquestions(sub)
+            return count
+
+        # Build question groups from top-level questions only
+        question_groups: List[Dict[str, Any]] = []
+        total_items = 0
+
+        for q in questions:
+            items = _collect_items_needing_generation(q)
+            if items:  # Only include groups where at least one item needs generation
+                group = {
+                    "parent_id": str(q.get("id")) if q.get("id") is not None else None,
+                    "parent_question": q,  # Full question object for context
+                    "subquestion_count": _count_subquestions(q),
+                    "has_optional_parts": _detect_optional_parts(q),
+                    "items": items,  # Flat list of items needing generation
+                }
+                question_groups.append(group)
+                total_items += len(items)
+
         logger.info(
-            f"Step 3.1: Found {len(questions_needing_generation)} questions needing generation"
+            f"Step 3.1: Found {len(question_groups)} top-level groups containing {total_items} total items needing generation"
         )
 
         try:
-            if not questions_needing_generation:
+            if not question_groups:
                 logger.info("Step 3: No questions need generation; skipping Step 3")
                 return data
 
-            question_batches = self._group_questions_into_batches_gpt4o(
-                questions_needing_generation
-            )
+            question_batches = self._group_questions_into_batches_gpt4o(question_groups)
             logger.info(
-                f"Step 3.1: Grouped questions into {len(question_batches)} batches"
+                f"Step 3.1: Grouped {len(question_groups)} question groups into {len(question_batches)} batches"
             )
         except Exception as e:
             logger.error(f"Error during GPT-4o batching: {str(e)}")
@@ -928,37 +1014,102 @@ class AssignmentDocumentParser:
             raise
 
     def _group_questions_into_batches_gpt4o(
-        self, questions: List[Dict[str, Any]]
+        self, question_groups: List[Dict[str, Any]]
     ) -> List[List[Dict[str, Any]]]:
         """
-        Use GPT-4o to group questions into dynamic batches based on complexity and token limits.
+        Use GPT-4o to group question groups into dynamic batches based on complexity and token limits.
+
+        Each question group represents a top-level question with all its subquestions kept together
+        as an atomic unit that cannot be split across batches.
 
         Args:
-            questions: List of questions needing generation.
+            question_groups: List of question groups, each containing:
+                - parent_id: ID of the top-level question
+                - parent_question: Full question object for context
+                - subquestion_count: Total number of nested subquestions
+                - has_optional_parts: Whether the question has optional/OR parts
+                - items: Flat list of items needing generation
 
         Returns:
-            List of question batches.
+            List of question group batches.
         """
-        logger.info(f"Grouping {len(questions)} questions into batches using GPT-4o...")
+        logger.info(
+            f"Grouping {len(question_groups)} question groups into batches using GPT-4o..."
+        )
+
+        # Build a summary for GPT-4o
+        group_summaries = []
+        for idx, group in enumerate(question_groups):
+            parent_q = group.get("parent_question", {})
+            parent_q_equations = parent_q.get("equations", []) or []
+            subquestions = parent_q.get("subquestions", []) or []
+            subquestions_summary = []
+            for sub in subquestions:
+                sub_subquestions_summary = []
+                for subsub in sub.get("subquestions", []) or []:
+                    subsub_summary = {
+                        "id": subsub.get("id"),
+                        "type": subsub.get("type", "unknown"),
+                        "points": subsub.get("points", None),
+                        "question": (subsub.get("question") or ""),
+                        "equations": subsub.get("equations", []) or [],
+                        "needs_answer": not bool(subsub.get("correctAnswer")),
+                        "needs_rubric": not bool(subsub.get("rubric")),
+                    }
+                    sub_subquestions_summary.append(subsub_summary)
+                sub_summary = {
+                    "id": sub.get("id"),
+                    "type": sub.get("type", "unknown"),
+                    "points": sub.get("points", None),
+                    "question": (sub.get("question") or ""),
+                    "equations": sub.get("equations", []) or [],
+                    "needs_answer": not bool(sub.get("correctAnswer")),
+                    "needs_rubric": not bool(sub.get("rubric")),
+                    "has_subquestions": len(sub.get("subquestions", []) or []) > 0,
+                    "subquestions": sub_subquestions_summary,
+                }
+                subquestions_summary.append(sub_summary)
+            summary = {
+                "index": idx,
+                "parent_id": group.get("parent_id"),
+                "type": parent_q.get("type", "unknown"),
+                "subquestion_count": group.get("subquestion_count", 0),
+                "items_needing_generation": len(group.get("items", [])),
+                "has_optional_parts": group.get("has_optional_parts", False),
+                "question": (parent_q.get("question") or ""),
+                "equations": parent_q_equations,
+                "points": parent_q.get("points", None),
+                "subquestions": subquestions_summary,
+            }
+            group_summaries.append(summary)
 
         # Build the prompt for GPT-4o
         prompt = dedent(
             f"""
-            Group the following {len(questions)} questions into dynamic batches such that each batch
-            can be comfortably processed by GPT-5 without exceeding token limits. Return the batches
-            as a JSON array of arrays, where each inner array contains question indices.
+            Group the following {len(question_groups)} QUESTION GROUPS into dynamic batches such that each batch
+            can be comfortably processed by GPT-5-mini without exceeding token limits. Return the batches
+            as a JSON array of arrays, where each inner array contains group indices.
 
-            QUESTIONS:
-            {json.dumps(questions, indent=2)}
+            Remember that
+            - gpt-5-mini will have to generate answers and/or rubrics for ALL items in each group.
+            - it will have to generate placeholders for any equations in answers/rubrics and generate the LaTeX for those equations along with id, position(answer/rubric) and location in text which it will also have to include in its response.
+            - we are using approximately 500 tokens as a soft limit per batch to ensure safety.
+
+            QUESTION GROUPS:
+            {json.dumps(group_summaries, indent=2)}
 
             RULES:
+            - CRITICAL: Each group is ATOMIC and must NOT be split across batches.
+            - Use 'subquestion_count', 'items_needing_generation' and 'subquestions_summary' to estimate token cost per group.
             - Minimize the number of batches while ensuring token safety.
-            - Group questions of similar complexity together when possible.
-            - Each batch should not exceed approximately 1500 tokens.
+            - Groups with more subquestions require more tokens - plan accordingly.
+            - Each batch should not exceed approximately 500 tokens total.
 
-            Return JSON in the format: [[0, 1, 2], [3, 4], ...]
+            Return JSON in the format: [[0, 1], [2], [3, 4, 5], ...]
             """
         )
+
+        logger.info(f"GPT-4o Batching Prompt: {prompt}")
 
         # Call GPT-4o
         try:
@@ -1022,7 +1173,7 @@ class AssignmentDocumentParser:
                     except Exception:
                         logger.warning(f"Ignoring non-integer batch index: {idx}")
                         continue
-                    if i < 0 or i >= len(questions):
+                    if i < 0 or i >= len(question_groups):
                         logger.warning(f"Ignoring out-of-range batch index: {i}")
                         continue
                     int_indices.append(i)
@@ -1033,9 +1184,11 @@ class AssignmentDocumentParser:
                 raise ValueError("No valid batches returned by GPT-4o")
 
             question_batches = [
-                [questions[i] for i in batch] for batch in sanitized_batches
+                [question_groups[i] for i in batch] for batch in sanitized_batches
             ]
-            logger.info(f"GPT-4o created {len(question_batches)} batches")
+            logger.info(
+                f"GPT-4o created {len(question_batches)} batches from {len(question_groups)} groups"
+            )
             return question_batches
 
         except json.JSONDecodeError as e:
@@ -1043,32 +1196,20 @@ class AssignmentDocumentParser:
             logger.debug(f"Raw GPT-4o response: {response.choices[0].message.content}")
             raise
 
-        except Exception as e:
-            logger.error(f"Unexpected error during GPT-4o batching: {str(e)}")
-            logger.debug(
-                f"Raw GPT-4o response: {response.choices[0].message.content if 'response' in locals() else 'No response'}"
-            )
-
-            # Fallback: Create default batches
-            fallback_batch_size = max(1, len(questions) // 5)  # Default to 5 batches
-            question_batches = [
-                questions[i : i + fallback_batch_size]
-                for i in range(0, len(questions), fallback_batch_size)
-            ]
-            logger.warning(
-                f"Using fallback batching: {len(question_batches)} batches created"
-            )
-            return question_batches
-
     def _create_batch_prompts_with_images(
         self, question_batches: List[List[Dict[str, Any]]], images: List[Image.Image]
     ) -> List[Dict[str, Any]]:
         """
         Prepare per-batch prompt text and image contents for GPT-5 calls.
 
+        Each batch contains question groups (not individual items). Each group has:
+        - parent_question: Full question object for context
+        - has_optional_parts: Whether optional/OR instructions exist
+        - items: Flat list of items needing generation
+
         Returns a list of prepared payloads with keys:
         - batch_index: int
-        - batch_questions: List[Dict]
+        - batch_groups: List[Dict] (the question groups in this batch)
         - prompt_text: str
         - image_contents: List[Dict] (image_url entries, either presigned URLs or data URLs)
         - diagram_s3_keys: List[str]
@@ -1076,76 +1217,211 @@ class AssignmentDocumentParser:
         """
         prepared: List[Dict[str, Any]] = []
 
-        for batch_idx, batch in enumerate(question_batches):
+        for batch_idx, batch_groups in enumerate(question_batches):
+            # Count total items across all groups in this batch
+            total_items = sum(len(g.get("items", [])) for g in batch_groups)
+
+            # Check if any group has optional parts
+            has_any_optional = any(
+                g.get("has_optional_parts", False) for g in batch_groups
+            )
+
             prompt_parts = [
-                f"Generate correct answers and/or grading rubrics for {len(batch)} STEM questions.",
+                f"Generate correct answers and/or grading rubrics for {total_items} STEM questions across {len(batch_groups)} question groups.",
                 "",
-                "ANSWER GENERATION RULES:",
-                "Mathematical/Scientific/Engineering: FULL STEP-BY-STEP DERIVATIONS with ALL intermediate steps",
-                "- Algebra: Show every equation manipulation",
-                "- Calculus: Show differentiation/integration with all rules (chain, product, u-sub, etc.)",
-                "- Physics/Chemistry/Engineering: List givens → formulas → substitutions → calculations → final answer with units",
-                "- Numerical: Complete calculation process",
-                "- Conceptual: Thorough explanations with key definitions/concepts",
-                "",
-                "MCQ ANSWERS:",
-                "- Provide 0-based index only (e.g., '0' for option A, '1' for B)",
-                "- DO NOT include option text or explanations",
-                "- Multiple correct: comma-separated (e.g., '0,2' for A and C)",
-                "",
-                "EQUATION PLACEHOLDERS:",
-                "- Format: <eq equation_id> where math appears",
-                "- Naming: q{path}_ans_eq{n} (answers), q{path}_rub_eq{n} (rubrics)",
-                "- REQUIRED: Include ALL equation objects in 'equations' array",
-                '- Each equation: {"id":"...", "latex":"...", "type":"inline|display", "position":{"context":"correctAnswer|rubric", "char_index":...}}',
-                "",
-                "JSON RESPONSE:",
-                '{"responses":[{"question_path":"1","correct_answer":"...<eq q1_ans_eq1>...","rubric":"...<eq q1_rub_eq1>...","equations":[...]}]}',
-                "",
-                "QUESTIONS:",
             ]
 
-            diagram_s3_keys: List[str] = []
-            for item in batch:
-                q = item["question"]
-                prompt_parts.append(f"Question Path: {item['path']}")
-                prompt_parts.append(f"Type: {q.get('type', 'unknown')}")
-                prompt_parts.append(f"Points: {q.get('points', 0)}")
-                prompt_parts.append(f"Question: {q.get('question', '')}")
-
-                if q.get("options"):
-                    try:
-                        prompt_parts.append(f"Options: {', '.join(q['options'])}")
-                    except Exception:
-                        prompt_parts.append("Options: ")
-
-                if q.get("equations"):
-                    eq_list = []
-                    for eq in q["equations"]:
-                        try:
-                            eq_list.append(
-                                f"  - {eq.get('latex','')} (type: {eq.get('type','')}, context: {eq.get('position',{}).get('context','')})"
-                            )
-                        except Exception:
-                            continue
-                    if eq_list:
-                        prompt_parts.append("Equations:")
-                        prompt_parts.extend(eq_list)
-
-                if q.get("hasDiagram") and q.get("diagram"):
-                    s3_key = q["diagram"].get("s3_key", "")
-                    logger.info(
-                        f"Step 3: Preparing diagram for Q{item['path']} with S3 key {s3_key}"
-                    )
-                    diagram_s3_keys.append(s3_key)
-                    prompt_parts.append(
-                        f"Diagram: {q['diagram'].get('caption', 'See diagram')}"
-                    )
-
-                prompt_parts.append(
-                    f"Needs: {'answer' if item['needs_answer'] else ''}{' and ' if item['needs_answer'] and item['needs_rubric'] else ''}{'rubric' if item['needs_rubric'] else ''}"
+            # Add special instruction if optional parts detected
+            if has_any_optional:
+                prompt_parts.extend(
+                    [
+                        "═══════════════════════════════════════════════════════════",
+                        "IMPORTANT: GENERATE ANSWERS FOR ALL SUBQUESTIONS",
+                        "═══════════════════════════════════════════════════════════",
+                        "Some questions have 'answer any X of Y', 'OR', or 'attempt only one' instructions.",
+                        "IGNORE these instructions - we need COMPLETE answer keys for ALL subquestions.",
+                        "Generate answers for EVERY subquestion regardless of optional/OR instructions.",
+                        "",
+                    ]
                 )
+
+            prompt_parts.extend(
+                [
+                    "═══════════════════════════════════════════════════════════",
+                    "CRITICAL RESPONSE FORMAT - READ CAREFULLY",
+                    "═══════════════════════════════════════════════════════════",
+                    "You MUST return ONE response entry for EACH 'Question Path' listed below.",
+                    "Each subquestion has a UNIQUE path (like '101', '102', '201', '202').",
+                    "Return SEPARATE answers for EACH path - do NOT combine into one answer.",
+                    "The 'question_path' in your response MUST EXACTLY match the paths shown.",
+                    "",
+                    "ANSWER GENERATION RULES:",
+                    "Mathematical/Scientific/Engineering: FULL STEP-BY-STEP DERIVATIONS with ALL intermediate steps",
+                    "- Algebra: Show every equation manipulation",
+                    "- Calculus: Show differentiation/integration with all rules (chain, product, u-sub, etc.)",
+                    "- Physics/Chemistry/Engineering: List givens → formulas → substitutions → calculations → final answer with units",
+                    "- Numerical: Complete calculation process",
+                    "- Conceptual: Thorough explanations with key definitions/concepts",
+                    "",
+                    "MCQ ANSWERS:",
+                    "- Provide 0-based index only (e.g., '0' for option A, '1' for B)",
+                    "- DO NOT include option text or explanations",
+                    "- Multiple correct: comma-separated (e.g., '0,2' for A and C)",
+                    "",
+                    "EQUATION PLACEHOLDERS:",
+                    "- Format: <eq equation_id> where math appears",
+                    "- Naming: q{path}_ans_eq{n} (answers), q{path}_rub_eq{n} (rubrics)",
+                    "- CRITICALLY REQUIRED: Include ALL equation objects in 'equations' array",
+                    '- Each equation: {"id":"...", "latex":"...", "type":"inline|display", "position":{"context":"correctAnswer|rubric", "char_index":...}}',
+                    "",
+                    "JSON RESPONSE:",
+                    "Return exactly ONE entry per Question Path. Example with paths 101, 102:",
+                    '{"responses":[',
+                    '  {"question_path":"101","correct_answer":"...<eq q101_ans_eq1>...","rubric":"...<eq q101_rub_eq1>...","equations":[...]},',
+                    '  {"question_path":"102","correct_answer":"...<eq q102_ans_eq1>...","rubric":"...<eq q102_rub_eq1>...","equations":[...]}',
+                    "]}",
+                    "",
+                    "QUESTIONS:",
+                ]
+            )
+
+            diagram_s3_keys: List[str] = []
+            all_items: List[
+                Dict[str, Any]
+            ] = []  # Collect all items for batch_questions
+
+            # Build a list of all paths for summary
+            all_paths = []
+            for group in batch_groups:
+                for item in group.get("items", []):
+                    all_paths.append(item["path"])
+
+            prompt_parts.append(
+                f"PATHS TO GENERATE (return one response for EACH): {', '.join(all_paths)}"
+            )
+            prompt_parts.append("")
+
+            # Process each group in the batch
+            for group in batch_groups:
+                parent_q = group.get("parent_question", {})
+                items = group.get("items", [])
+                has_optional = group.get("has_optional_parts", False)
+
+                # Determine if this is a multi-part question (has subquestions) or standalone
+                has_subquestions = bool(parent_q.get("subquestions"))
+
+                # Add parent context header
+                prompt_parts.append("═" * 60)
+                if has_subquestions:
+                    prompt_parts.append(
+                        f"QUESTION GROUP: Q{group.get('parent_id', '?')} (multi-part - parent context provided below)"
+                    )
+                else:
+                    prompt_parts.append(
+                        f"QUESTION: Q{group.get('parent_id', '?')} (standalone question)"
+                    )
+
+                if has_optional:
+                    prompt_parts.append(
+                        "⚠️ HAS OPTIONAL PARTS - Generate answers for ALL subquestions anyway"
+                    )
+
+                # Show parent question text
+                if has_subquestions:
+                    prompt_parts.append(
+                        f"Parent Question Text (context for subquestions): {parent_q.get('question', '')}"
+                    )
+                    prompt_parts.append(
+                        f"Parent Type: {parent_q.get('type', 'unknown')}"
+                    )
+                    prompt_parts.append(f"Total Points: {parent_q.get('points', 0)}")
+
+                    # Add parent equations - CRITICAL for subquestions that reference them
+                    if parent_q.get("equations"):
+                        prompt_parts.append(
+                            "Parent Equations (may be referenced by subquestions):"
+                        )
+                        for eq in parent_q["equations"]:
+                            try:
+                                prompt_parts.append(
+                                    f"  - <eq {eq.get('id', '')}> = {eq.get('latex','')} (type: {eq.get('type','')})"
+                                )
+                            except Exception:
+                                continue
+
+                    prompt_parts.append("")
+                    prompt_parts.append(
+                        ">>> SUBQUESTIONS TO ANSWER (generate response for each path below):"
+                    )
+                else:
+                    # For standalone questions, don't show redundant parent info
+                    prompt_parts.append("")
+
+                # Collect diagrams from parent if present
+                if parent_q.get("hasDiagram") and parent_q.get("diagram"):
+                    s3_key = parent_q["diagram"].get("s3_key", "")
+                    if s3_key:
+                        diagram_s3_keys.append(s3_key)
+                        prompt_parts.append(
+                            f"Parent Diagram: {parent_q['diagram'].get('caption', 'See diagram')}"
+                        )
+
+                # Add each item needing generation
+                for item in items:
+                    all_items.append(item)  # Collect for later
+                    q = item["question"]
+                    prompt_parts.append(f"")
+                    prompt_parts.append(f"  ──────────────────────────────────────────")
+                    prompt_parts.append(
+                        f"  ★ QUESTION PATH: {item['path']} ← Use this exact path in response"
+                    )
+                    prompt_parts.append(f"  Type: {q.get('type', 'unknown')}")
+                    prompt_parts.append(f"  Points: {q.get('points', 0)}")
+                    prompt_parts.append(f"  Question: {q.get('question', '')}")
+
+                    if q.get("options"):
+                        try:
+                            prompt_parts.append(f"  Options: {', '.join(q['options'])}")
+                        except Exception:
+                            prompt_parts.append("  Options: ")
+
+                    if q.get("equations"):
+                        eq_list = []
+                        for eq in q["equations"]:
+                            try:
+                                eq_list.append(
+                                    f"    - {eq.get('latex','')} (type: {eq.get('type','')}, context: {eq.get('position',{}).get('context','')})"
+                                )
+                            except Exception:
+                                continue
+                        if eq_list:
+                            prompt_parts.append("  Equations:")
+                            prompt_parts.extend(eq_list)
+
+                    if q.get("hasDiagram") and q.get("diagram"):
+                        s3_key = q["diagram"].get("s3_key", "")
+                        if s3_key:
+                            logger.info(
+                                f"Step 3: Preparing diagram for Q{item['path']} with S3 key {s3_key}"
+                            )
+                            diagram_s3_keys.append(s3_key)
+                            prompt_parts.append(
+                                f"  Diagram: {q['diagram'].get('caption', 'See diagram')}"
+                            )
+
+                    prompt_parts.append(
+                        f"  Needs: {'answer' if item['needs_answer'] else ''}{' and ' if item['needs_answer'] and item['needs_rubric'] else ''}{'rubric' if item['needs_rubric'] else ''}"
+                    )
+
                 prompt_parts.append("")
+
+            # Add final reminder with exact paths
+            prompt_parts.append("═" * 60)
+            prompt_parts.append(
+                f"REMINDER: Return EXACTLY {len(all_paths)} responses, one for each path:"
+            )
+            prompt_parts.append(f"Required paths: {', '.join(all_paths)}")
+            prompt_parts.append("═" * 60)
 
             prompt_text = "\n".join(prompt_parts)
 
@@ -1167,7 +1443,7 @@ class AssignmentDocumentParser:
                     )
                     # Try to find matching question and inline the image from page crop if available
                     inlined = False
-                    for batch_item in batch:
+                    for batch_item in all_items:
                         dq = batch_item.get("question", {}).get("diagram") or {}
                         if dq.get("s3_key") == s3_key:
                             page_number = dq.get("page_number")
@@ -1218,7 +1494,8 @@ class AssignmentDocumentParser:
             prepared.append(
                 {
                     "batch_index": batch_idx,
-                    "batch_questions": batch,
+                    "batch_groups": batch_groups,
+                    "batch_questions": all_items,  # Flat list of items for compatibility
                     "prompt_text": dedent(prompt_text).strip(),
                     "image_contents": image_contents,
                     "diagram_s3_keys": diagram_s3_keys,
@@ -1253,44 +1530,65 @@ class AssignmentDocumentParser:
             f"Step 3: Including {len(image_contents)} images in batch {prepared_batch.get('batch_index')}"
         )
 
-        # Build message contents from prepared data
-        user_content = [{"type": "text", "text": dedent(prompt).strip()}]
-        user_content.extend(image_contents)
+        # Build message contents from prepared data for Responses API
+        # Use message item format with role and content
+        # For Responses API: use 'input_text' for text and 'input_image' for images
+        user_content = [{"type": "input_text", "text": dedent(prompt).strip()}]
 
-        # Call LLM for batch generation
+        # Convert image_url types to input_image for Responses API
+        for img in image_contents:
+            if img.get("type") == "image_url":
+                user_content.append(
+                    {
+                        "type": "input_image",
+                        "image_url": img.get("image_url", {}).get("url", ""),
+                    }
+                )
+            else:
+                user_content.append(img)
+
+        input_items = [
+            {
+                "type": "message",
+                "role": "user",
+                "content": user_content,
+            }
+        ]
+
+        # Call LLM for batch generation using Responses API
         logger.info("Step 3: Calling LLM for answer/rubric generation...")
-        response = self.GPTclient.chat.completions.create(
-            model=self.gpt5_model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": dedent(
-                        """You are an expert educator and mathematical problem solver.
+        response = self.GPTclient.responses.create(
+            model="gpt-5",
+            instructions=dedent(
+                """You are an expert educator and mathematical problem solver.
 
-                        CRITICAL INSTRUCTIONS FOR ANSWER GENERATION:
-                        1. For mathematical, physics, chemistry, or scientific questions: Provide COMPLETE STEP-BY-STEP DERIVATIONS
-                        2. Show ALL intermediate steps - never skip steps
-                        3. Explain the reasoning/theorem/principle behind each step
-                        4. For algebraic problems: Show every equation manipulation
-                        5. For calculus: Show differentiation/integration with all rules applied
-                        6. For physics/chemistry: List givens, formulas, substitutions, calculations, and final answer with units
-                        7. For numerical problems: Show the complete calculation process
-                        8. For conceptual questions: Provide thorough explanations with definitions and examples
+                CRITICAL INSTRUCTIONS FOR ANSWER GENERATION:
+                1. For mathematical, physics, chemistry, or scientific questions: Provide COMPLETE STEP-BY-STEP DERIVATIONS
+                2. Show ALL intermediate steps - never skip steps
+                3. Explain the reasoning/theorem/principle behind each step
+                4. For algebraic problems: Show every equation manipulation
+                5. For calculus: Show differentiation/integration with all rules applied
+                6. For physics/chemistry: List givens, formulas, substitutions, calculations, and final answer with units
+                7. For numerical problems: Show the complete calculation process
+                8. For conceptual questions: Provide thorough explanations with definitions and examples
 
-                        Use 0-based indexing for options in multiple-choice questions.
-                        Use equation placeholders <eq equation_id> for all mathematical expressions.
-                        Generate detailed grading rubrics that award partial credit for intermediate steps.
-                        Return your response as a JSON object with 'responses' array."""
-                    ),
-                },
-                {"role": "user", "content": user_content},
-            ],
-            response_format={"type": "json_object"},
-            # max_completion_tokens=16384,
+                Use 0-based indexing for options in multiple-choice questions.
+                Use equation placeholders <eq equation_id> for all mathematical expressions.
+                Generate detailed grading rubrics that award partial credit for intermediate steps.
+                Return your response as a JSON object with 'responses' array."""
+            ),
+            input=input_items,
+            text={"format": {"type": "json_object"}},
+            # max_output_tokens=16384,
+            # max_output_tokens=128000,
             # temperature=0.2,
+            reasoning={"effort": "minimal"},
         )
 
-        response_content = response.choices[0].message.content
+        # log full response for debugging
+        logger.debug(f"Step 3: Full LLM response: {response}")
+
+        response_content = response.output_text
         logger.info(
             f"Step 3: LLM response length: {len(response_content) if response_content else 0} characters"
         )
@@ -1313,16 +1611,7 @@ class AssignmentDocumentParser:
 
         logger.info(f"Step 3: Parsed JSON keys: {list(result.keys())}")
 
-        # Try multiple possible keys where the LLM might return the data
-        generated_answers = (
-            result.get("responses", [])
-            or result.get("answers", [])
-            or result.get("questions", [])
-            or result.get("result", [])
-            or result.get("results", [])
-            or result.get("data", [])
-            or []
-        )
+        generated_answers = result.get("responses", [])
         logger.info(
             f"Step 3: Found {len(generated_answers)} generated answers in response"
         )
