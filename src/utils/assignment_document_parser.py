@@ -664,7 +664,7 @@ class AssignmentDocumentParser:
         if not isinstance(extracted_data, dict):
             logger.error(
                 f"Step 1 (Batch {batch_idx}): Extracted data is not a dict, it's {type(extracted_data)}. "
-                f"Response: {response}"
+                f"Content: {response.output_text[:500] if response.output_text else 'EMPTY'}"
             )
             raise ValueError(f"LLM returned invalid data type: {type(extracted_data)}")
 
@@ -837,8 +837,14 @@ class AssignmentDocumentParser:
             items: List[Dict[str, Any]] = []
             q_id = q.get("id")
             path = str(q_id) if q_id is not None else None
-            needs_answer = not bool(q.get("correctAnswer"))
-            needs_rubric = not bool(q.get("rubric"))
+            needs_answer = (
+                not bool(q.get("correctAnswer"))
+                if q.get("type") != "multi-part"
+                else False
+            )
+            needs_rubric = (
+                not bool(q.get("rubric")) if q.get("type") != "multi-part" else False
+            )
 
             # Add this question if it needs generation
             if path and (needs_answer or needs_rubric):
@@ -1109,7 +1115,7 @@ class AssignmentDocumentParser:
             """
         )
 
-        logger.info(f"GPT-4o Batching Prompt: {prompt}")
+        # logger.info(f"GPT-4o Batching Prompt: {prompt}")
 
         # Call GPT-4o
         try:
@@ -1558,7 +1564,7 @@ class AssignmentDocumentParser:
         # Call LLM for batch generation using Responses API
         logger.info("Step 3: Calling LLM for answer/rubric generation...")
         response = self.GPTclient.responses.create(
-            model="gpt-5",
+            model=self.gpt5_model,
             instructions=dedent(
                 """You are an expert educator and mathematical problem solver.
 
@@ -1582,7 +1588,7 @@ class AssignmentDocumentParser:
             # max_output_tokens=16384,
             # max_output_tokens=128000,
             # temperature=0.2,
-            reasoning={"effort": "minimal"},
+            reasoning={"effort": "low"},
         )
 
         # log full response for debugging
