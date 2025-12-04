@@ -34,26 +34,6 @@ class AssignmentDocumentParser:
         self.gpt5_model = "gpt-5"
         self.gpt4o_model = "gpt-4o"
 
-    def _save_debug_images_and_result(
-        result, images: List[Image.Image], file_name, debug_dir="debug_outputs"
-    ):
-        """
-        Save debug images and result JSON to local debug directory.
-        """
-        try:
-            os.makedirs(debug_dir, exist_ok=True)
-            # Save images
-            for idx, img in enumerate(images):
-                img_path = os.path.join(debug_dir, f"{file_name}_page_{idx + 1}.png")
-                img.save(img_path)
-            # Save result JSON
-            result_path = os.path.join(debug_dir, f"{file_name}_result.json")
-            with open(result_path, "w", encoding="utf-8") as f:
-                json.dump(result, f, ensure_ascii=False, indent=4)
-            logger.info(f"Saved debug images and result to {debug_dir}")
-        except Exception as e:
-            logger.warning(f"Failed to save debug images/result: {e}")
-
     def parse_pdf_images_to_assignment(
         self,
         pdf_content: bytes,
@@ -124,9 +104,6 @@ class AssignmentDocumentParser:
                 )
             except Exception as e:
                 logger.warning(f"Skipping YOLO bbox enrichment due to error: {e}")
-
-            # save images and result for debugging
-            self._save_debug_images_and_result(result, images, file_name)
 
             # STEP 3: Single LLM call to generate missing answers/rubrics
             logger.info("Step 3: Generating missing answers and rubrics...")
