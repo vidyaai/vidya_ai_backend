@@ -235,6 +235,7 @@ class AssignmentGenerator:
         )
         question_types = generation_options.get("questionTypes", {})
         difficulty_level = generation_options.get("difficultyLevel", "mixed")
+        total_points = generation_options.get("totalPoints", 50)
 
         # Handle per-question difficulty distribution
         difficulty_distribution = None
@@ -270,6 +271,7 @@ class AssignmentGenerator:
             - Clear, well-structured question text
             - Appropriate answer options (for multiple choice) with correctAnswer as index (like "0", "1", "2", "3") of the correct answer in the options array
             - Correct answer with brief explanation (except for multi-part questions which get answers from sub-questions)
+            - Rubric or grading guidelines
             - Point value based on difficulty
             - Any necessary code templates or diagrams
 
@@ -286,7 +288,10 @@ class AssignmentGenerator:
                     else:
                         for varying_point in config.get("varyingPoints", []):
                             prompt += f"- {varying_point['count']} {difficulty} questions ({varying_point['points']} points each)\n"
-
+            prompt += f"\n\nTotal Assignment Points: {total_points}\n"
+        else:
+            prompt += f"\n\nOverall Difficulty Level: {difficulty_level}\n"
+            prompt += f"\n\nTotal Assignment Points: {total_points}\n"
         # logger.info(f"Prompt: {prompt}")
         return prompt
 
