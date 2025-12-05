@@ -1992,17 +1992,32 @@ async def submit_assignment(
             db.commit()
             db.refresh(existing_submission)
 
-            # Queue background task to extract diagrams if PDF submission
+            # Extract diagrams from PDF submission (foreground task)
             if (
                 submission_data.submission_method == "pdf"
                 and submission_data.submitted_files
+                and existing_submission.answers
             ):
-                from controllers.background_tasks import queue_pdf_diagram_extraction
+                from utils.pdf_answer_processor import PDFAnswerProcessor
+                from sqlalchemy.orm.attributes import flag_modified
 
-                queue_pdf_diagram_extraction(
-                    existing_submission.id,
-                    submission_data.submitted_files[0].get("s3_key"),
+                processor = PDFAnswerProcessor()
+                updated_answers = processor.extract_and_upload_diagrams(
+                    submission_id=existing_submission.id,
+                    pdf_s3_key=submission_data.submitted_files[0].get("s3_key"),
+                    answers=existing_submission.answers,
+                    s3_client=s3_client,
+                    s3_bucket=AWS_S3_BUCKET,
+                    s3_upload_func=s3_upload_file,
+                    logger=logger,
                 )
+                # Update submission with extracted diagram s3_keys
+                # Use flag_modified to ensure SQLAlchemy detects the JSON change
+                existing_submission.answers = updated_answers
+                flag_modified(existing_submission, "answers")
+                existing_submission.updated_at = datetime.now(timezone.utc)
+                db.commit()
+                db.refresh(existing_submission)
 
             logger.info(
                 f"Updated submission for assignment {assignment_id} by user {user_id}"
@@ -2025,16 +2040,32 @@ async def submit_assignment(
             db.commit()
             db.refresh(submission)
 
-            # Queue background task to extract diagrams if PDF submission
+            # Extract diagrams from PDF submission (foreground task)
             if (
                 submission_data.submission_method == "pdf"
                 and submission_data.submitted_files
+                and submission.answers
             ):
-                from controllers.background_tasks import queue_pdf_diagram_extraction
+                from utils.pdf_answer_processor import PDFAnswerProcessor
+                from sqlalchemy.orm.attributes import flag_modified
 
-                queue_pdf_diagram_extraction(
-                    submission.id, submission_data.submitted_files[0].get("s3_key")
+                processor = PDFAnswerProcessor()
+                updated_answers = processor.extract_and_upload_diagrams(
+                    submission_id=submission.id,
+                    pdf_s3_key=submission_data.submitted_files[0].get("s3_key"),
+                    answers=submission.answers,
+                    s3_client=s3_client,
+                    s3_bucket=AWS_S3_BUCKET,
+                    s3_upload_func=s3_upload_file,
+                    logger=logger,
                 )
+                # Update submission with extracted diagram s3_keys
+                # Use flag_modified to ensure SQLAlchemy detects the JSON change
+                submission.answers = updated_answers
+                flag_modified(submission, "answers")
+                submission.updated_at = datetime.now(timezone.utc)
+                db.commit()
+                db.refresh(submission)
 
             logger.info(
                 f"Created submission for assignment {assignment_id} by user {user_id}"

@@ -6,6 +6,8 @@ Adapted from vidyaai_grading_experiments/PDFAnswerSheetToJSON.py
 import os
 import base64
 import json
+import uuid
+import tempfile
 from io import BytesIO
 from typing import List, Dict, Any, Optional
 from textwrap import dedent
@@ -34,8 +36,8 @@ class PDFAnswerProcessor:
             "2": {
                 "text": "answer with diagram",
                 "diagram": {
-                    "bounding_box": {"x": 120, "y": 240, "width": 460, "height": 320, "page_number": 1},
-                    "label": "Circuit diagram"
+                    "label": "Circuit diagram",
+                    "page_number": 1
                 }
             }
         }
@@ -87,7 +89,7 @@ class PDFAnswerProcessor:
               "answer": "Applying coating of zinc",
               "diagram": {{
                 "label": "Circuit diagram",
-                "bounding_box": {{"ymin": 240, "xmin": 120, "ymax": 560, "xmax": 580, "page_number": 1}}
+                "page_number": 2
               }}
             }},
             {{
@@ -122,12 +124,8 @@ class PDFAnswerProcessor:
         - Each item must include:
           - question_number: string (exact as written in the answer sheet)
           - answer: extracted answer (just the letter for MCQ, full text for descriptive)
-          - diagram: null if no diagram; otherwise include label and a tight bounding_box around the drawn diagram for that question only.
-        - Bounding boxes must be integers in image pixel coordinates of the provided JPEGs (top-left origin).
-        - CRITICAL: Each bounding_box must include a "page_number" field indicating which page (1, 2, 3, etc.) the diagram appears on.
-        - Bounding box format: [ymin, xmin, ymax, xmax] where:
-          * ymin, xmin: Top-left corner of the diagram
-          * ymax, xmax: Bottom-right corner of the diagram
+          - diagram: null if no diagram; otherwise include label and the page number where the diagram appears for that question only.
+        - Each diagram must include a "page_number" field indicating which page (1, 2, 3, etc.) the diagram appears on.
         - If a diagram is present but unlabeled, just put "unlabeled" in the label field.
         - Preserve question order and ignore non-answer metadata.
         - Return only valid JSON that conforms to the schema.
@@ -151,17 +149,10 @@ class PDFAnswerProcessor:
                                         "type": "object",
                                         "properties": {
                                             "label": {"type": "string"},
-                                            "bounding_box": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "integer",
-                                                },
-                                            },
                                             "page_number": {"type": "integer"},
                                         },
                                         "required": [
                                             "label",
-                                            "bounding_box",
                                             "page_number",
                                         ],
                                     },
@@ -199,9 +190,7 @@ class PDFAnswerProcessor:
         result = json.loads(completion.choices[0].message.content)
 
         # Debug: Log the raw result
-        print(
-            f"[PDF Processor] Raw LLM result: {json.dumps(result, indent=2)[:500]}..."
-        )
+        print(f"[PDF Processor] Raw LLM result: {json.dumps(result, indent=2)[:50]}...")
 
         # Check if answer_sheet exists
         answer_sheet = result.get("answer_sheet", [])
@@ -223,13 +212,14 @@ class PDFAnswerProcessor:
             # Normalize MCQ answer: "C" -> "C" (keep letters as-is for grading service)
             answer_normalized = self._normalize_mcq_answer(answer_text)
 
-            if diagram_data and diagram_data.get("bounding_box"):
+            if diagram_data and diagram_data.get("page_number") is not None:
                 # Answer with diagram (bounding box only, s3_key to be filled by background task)
                 answers_dict[q_num] = {
                     "text": answer_normalized,
                     "diagram": {
-                        "bounding_box": diagram_data["bounding_box"],
+                        "bounding_box": None,  # To be filled later
                         "label": diagram_data.get("label", "unlabeled"),
+                        "page_number": diagram_data.get("page_number", None),
                         "s3_key": None,  # Will be filled by background task
                         "file_id": None,
                         "filename": None,
@@ -240,15 +230,17 @@ class PDFAnswerProcessor:
                 answers_dict[q_num] = answer_normalized
 
         print(f"[PDF Processor] Extracted {len(answers_dict)} answers")
+
+        # Enrich answers with YOLO-detected bounding boxes for diagrams
+        answers_dict = self._enrich_answers_with_yolo_bounding_box(answers_dict, pages)
+
         return answers_dict
 
     def extract_diagram_from_pdf(
-        self, pdf_path: str, bounding_box: List[int], output_path: str
+        self, pdf_path: str, bounding_box: List[int], page_num: int, output_path: str
     ) -> bool:
         """Extract a single diagram from PDF using bounding box coordinates."""
         try:
-            page_num = bounding_box.get("page_number", 1)
-
             # Handle both old format [x, y, width, height] and new format [ymin, xmin, ymax, xmax]
             if isinstance(bounding_box, list) and len(bounding_box) == 4:
                 pass
@@ -273,10 +265,10 @@ class PDFAnswerProcessor:
             # Crop diagram using bounding box
             cropped = page_img.crop(
                 (
-                    bounding_box[1] / 1000 * page_img.width,
-                    bounding_box[0] / 1000 * page_img.height,
-                    bounding_box[3] / 1000 * page_img.width,
-                    bounding_box[2] / 1000 * page_img.height,
+                    bounding_box[0],
+                    bounding_box[1],
+                    bounding_box[2],
+                    bounding_box[3],
                 )
             )
 
@@ -287,6 +279,160 @@ class PDFAnswerProcessor:
         except Exception as e:
             print(f"Error extracting diagram: {e}")
             return False
+
+    def _enrich_answers_with_yolo_bounding_box(
+        self, answers: Dict[str, Any], pages: List[Image.Image]
+    ) -> Dict[str, Any]:
+        """
+        Enrich answer dict with YOLO-detected bounding boxes for diagrams.
+
+        For each answer that has a diagram with page_number, run YOLO on that page
+        to detect diagram regions and assign bounding boxes.
+        """
+        import tempfile
+
+        try:
+            from ultralytics import YOLO
+        except ImportError:
+            print(
+                "[PDF Processor] WARNING: ultralytics not installed, skipping YOLO enrichment"
+            )
+            return answers
+
+        # Model path should be configurable
+        model_path = os.getenv(
+            "DIAGRAM_YOLO_MODEL_PATH", "runs/detect/diagram_detector5/weights/best.pt"
+        )
+        confidence = float(os.getenv("DIAGRAM_YOLO_CONFIDENCE", "0.25"))
+
+        try:
+            yolo_model = YOLO(model_path)
+        except Exception as e:
+            print(f"[PDF Processor] WARNING: Failed to load YOLO model: {e}")
+            return answers
+
+        # Map: page_number -> [(question_id, answer_dict)]
+        page_to_answers: Dict[int, List[tuple]] = {}
+
+        for q_id, answer_data in answers.items():
+            if isinstance(answer_data, dict) and answer_data.get("diagram"):
+                diagram = answer_data["diagram"]
+                page_number = diagram.get("page_number")
+                if page_number and isinstance(page_number, int):
+                    page_to_answers.setdefault(page_number, []).append(
+                        (q_id, answer_data)
+                    )
+
+        if not page_to_answers:
+            print(
+                "[PDF Processor] No diagrams with page numbers found, skipping YOLO enrichment"
+            )
+            return answers
+
+        print(
+            f"[PDF Processor] Running YOLO on {len(page_to_answers)} pages with diagrams"
+        )
+
+        # For each relevant page, run YOLO and assign bounding boxes
+        for page_number, answer_items in page_to_answers.items():
+            if not (1 <= page_number <= len(pages)):
+                print(
+                    f"[PDF Processor] WARNING: Page {page_number} out of range (1-{len(pages)})"
+                )
+                continue
+
+            page_img = pages[page_number - 1]
+
+            # Save image to temp file for YOLO
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_img:
+                page_img.save(tmp_img, "JPEG", quality=95)
+                img_path = tmp_img.name
+
+            try:
+                results = yolo_model(img_path, conf=confidence, verbose=False)
+                detections = []
+
+                if len(results) > 0 and results[0].boxes is not None:
+                    boxes = results[0].boxes
+                    for box in boxes:
+                        coords = box.xyxy[0].cpu().numpy()
+                        x1, y1, x2, y2 = map(int, coords)
+                        conf_score = float(box.conf[0])
+                        cls = int(box.cls[0])
+                        detection = {
+                            "bbox": (x1, y1, x2, y2),
+                            "confidence": conf_score,
+                            "class_id": cls,
+                            "ymin": y1,
+                        }
+                        detections.append(detection)
+
+                # Sort detections by confidence (desc), then ymin (asc)
+                detections.sort(key=lambda d: (-d["confidence"], d["ymin"]))
+
+                n_answers = len(answer_items)
+                n_diagrams = len(detections)
+
+                print(
+                    f"[PDF Processor] Page {page_number}: {n_diagrams} diagrams detected for {n_answers} answers"
+                )
+
+                # Assignment logic (matching assignment_document_parser.py)
+                if n_answers == 1 and n_diagrams > 0:
+                    # Assign highest confidence diagram
+                    det = detections[0]
+                    self._update_answer_with_bounding_box(
+                        answer_items[0][1], det, page_number
+                    )
+                elif n_diagrams >= n_answers:
+                    # Assign first n_answers diagrams sorted by ymin
+                    top_diagrams = sorted(
+                        detections[:n_answers], key=lambda d: d["ymin"]
+                    )
+                    for (q_id, answer_data), det in zip(answer_items, top_diagrams):
+                        self._update_answer_with_bounding_box(
+                            answer_data, det, page_number
+                        )
+                elif n_diagrams < n_answers and n_diagrams > 0:
+                    # Assign all detected diagrams sorted by ymin
+                    top_diagrams = sorted(detections, key=lambda d: d["ymin"])
+                    for (q_id, answer_data), det in zip(answer_items, top_diagrams):
+                        self._update_answer_with_bounding_box(
+                            answer_data, det, page_number
+                        )
+                    # Remaining answers without diagrams keep bounding_box as None
+
+            except Exception as e:
+                print(f"[PDF Processor] ERROR running YOLO on page {page_number}: {e}")
+            finally:
+                # Clean up temp image
+                try:
+                    os.unlink(img_path)
+                except Exception:
+                    pass
+
+        return answers
+
+    def _update_answer_with_bounding_box(
+        self, answer_data: Dict[str, Any], det: Dict[str, Any], page_number: int
+    ) -> None:
+        """Update answer's diagram with YOLO-detected bounding box."""
+        x1, y1, x2, y2 = det["bbox"]
+
+        if not isinstance(answer_data.get("diagram"), dict):
+            answer_data["diagram"] = {}
+
+        answer_data["diagram"].update(
+            {
+                "bounding_box": [x1, y1, x2, y2],
+                "page_number": page_number,
+                "confidence": det["confidence"],
+            }
+        )
+
+        print(
+            f"[PDF Processor] Diagram bbox assigned: {[x1, y1, x2, y2]} (conf: {det['confidence']:.2f})"
+        )
 
     @staticmethod
     def _normalize_question_number(q_num: str) -> str:
@@ -387,3 +533,145 @@ class PDFAnswerProcessor:
         img.save(buffered, format="JPEG")
         encoded = base64.b64encode(buffered.getvalue()).decode("utf-8")
         return f"data:image/jpeg;base64,{encoded}"
+
+    def extract_and_upload_diagrams(
+        self,
+        submission_id: str,
+        pdf_s3_key: str,
+        answers: Dict[str, Any],
+        s3_client,
+        s3_bucket: str,
+        s3_upload_func,
+        logger=None,
+    ) -> Dict[str, Any]:
+        """
+        Extract diagram images from PDF submission using bounding boxes and upload to S3.
+
+        This is a synchronous/foreground operation that:
+        1. Downloads the PDF from S3
+        2. For each answer with a diagram bounding_box but no s3_key, extracts the image
+        3. Uploads to S3 and updates the answer dict with s3_key, file_id, filename
+
+        Args:
+            submission_id: The submission ID
+            pdf_s3_key: S3 key of the PDF file
+            answers: Dict of question_id -> answer data (may include diagrams)
+            s3_client: boto3 S3 client
+            s3_bucket: S3 bucket name
+            s3_upload_func: Function to upload file to S3 (path, key, content_type)
+            logger: Optional logger
+
+        Returns:
+            Updated answers dict with diagram s3_keys populated
+        """
+        if logger:
+            logger.info(
+                f"Starting PDF diagram extraction for submission {submission_id}"
+            )
+        else:
+            print(
+                f"[PDF Processor] Starting diagram extraction for submission {submission_id}"
+            )
+
+        if not answers:
+            if logger:
+                logger.warning(f"Submission {submission_id} has no answers")
+            return answers
+
+        # Download PDF from S3 to temp file
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                s3_client.download_fileobj(s3_bucket, pdf_s3_key, tmp)
+                tmp_pdf_path = tmp.name
+        except Exception as e:
+            if logger:
+                logger.error(f"Failed to download PDF from S3: {str(e)}")
+            else:
+                print(
+                    f"[PDF Processor] ERROR: Failed to download PDF from S3: {str(e)}"
+                )
+            return answers
+
+        updated = False
+
+        try:
+            for question_id, answer in answers.items():
+                # Check if answer has diagram with bounding_box but no s3_key
+                if isinstance(answer, dict) and answer.get("diagram"):
+                    diagram = answer["diagram"]
+                    bounding_box = diagram.get("bounding_box")
+                    page_number = diagram.get("page_number", None)
+
+                    if bounding_box and not diagram.get("s3_key"):
+                        try:
+                            # Extract diagram image from PDF
+                            with tempfile.NamedTemporaryFile(
+                                delete=False, suffix=".jpg"
+                            ) as img_tmp:
+                                img_output_path = img_tmp.name
+
+                            success = self.extract_diagram_from_pdf(
+                                tmp_pdf_path, bounding_box, page_number, img_output_path
+                            )
+
+                            if success and os.path.exists(img_output_path):
+                                # Upload to S3
+                                file_id = str(uuid.uuid4())
+                                s3_key = f"submissions/{submission_id}/diagrams/q{question_id}_{file_id}.jpg"
+
+                                s3_upload_func(
+                                    img_output_path, s3_key, content_type="image/jpeg"
+                                )
+
+                                # Update answer with s3_key
+                                answers[question_id]["diagram"]["s3_key"] = s3_key
+                                answers[question_id]["diagram"]["file_id"] = file_id
+                                answers[question_id]["diagram"][
+                                    "filename"
+                                ] = f"diagram_q{question_id}.jpg"
+                                updated = True
+
+                                if logger:
+                                    logger.info(
+                                        f"Extracted and uploaded diagram for Q{question_id} to {s3_key}"
+                                    )
+                                else:
+                                    print(
+                                        f"[PDF Processor] Extracted and uploaded diagram for Q{question_id} to {s3_key}"
+                                    )
+
+                                # Clean up temp image
+                                os.unlink(img_output_path)
+
+                        except Exception as e:
+                            if logger:
+                                logger.error(
+                                    f"Error extracting diagram for Q{question_id}: {str(e)}"
+                                )
+                            else:
+                                print(
+                                    f"[PDF Processor] ERROR extracting diagram for Q{question_id}: {str(e)}"
+                                )
+                            continue
+
+        finally:
+            # Clean up temp PDF
+            try:
+                os.unlink(tmp_pdf_path)
+            except Exception:
+                pass
+
+        if updated:
+            if logger:
+                logger.info(
+                    f"Completed diagram extraction for submission {submission_id}"
+                )
+            else:
+                print(
+                    f"[PDF Processor] Completed diagram extraction for submission {submission_id}"
+                )
+
+        print(f"[PDF Processor] Diagram extraction process finished")
+        print(f"[PDF Processor] Final answers: {json.dumps(answers, indent=2)}...")
+
+        return answers
