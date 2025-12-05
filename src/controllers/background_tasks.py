@@ -375,6 +375,7 @@ def queue_batch_grading(
     logger.info(f"Started {len(submission_ids)} grading threads")
 
 
+# not used
 def extract_pdf_diagrams_background(submission_id: str, pdf_s3_key: str):
     """Extract diagram images from PDF submission using bounding boxes and upload to S3."""
     logger.info(f"Starting PDF diagram extraction for submission {submission_id}")
@@ -409,6 +410,7 @@ def extract_pdf_diagrams_background(submission_id: str, pdf_s3_key: str):
             if isinstance(answer, dict) and answer.get("diagram"):
                 diagram = answer["diagram"]
                 bounding_box = diagram.get("bounding_box")
+                page_number = diagram.get("page_number", None)
 
                 if bounding_box and not diagram.get("s3_key"):
                     try:
@@ -419,7 +421,7 @@ def extract_pdf_diagrams_background(submission_id: str, pdf_s3_key: str):
                             img_output_path = img_tmp.name
 
                         success = processor.extract_diagram_from_pdf(
-                            tmp_pdf_path, bounding_box, img_output_path
+                            tmp_pdf_path, bounding_box, page_number, img_output_path
                         )
 
                         if success and os.path.exists(img_output_path):
@@ -474,6 +476,7 @@ def extract_pdf_diagrams_background(submission_id: str, pdf_s3_key: str):
         db.close()
 
 
+# not used
 def queue_pdf_diagram_extraction(submission_id: str, pdf_s3_key: str):
     """Queue PDF diagram extraction as a background task."""
     logger.info(f"Queueing PDF diagram extraction for submission {submission_id}")

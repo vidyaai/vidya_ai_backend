@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone
@@ -42,7 +43,10 @@ class LLMGrader:
         flattened_questions = self._flatten_questions(
             assignment.get("questions", []), "", answered_subquestion_ids
         )
+        print("flattened_questions", json.dumps(flattened_questions, indent=2))
+
         flattened_answers = self._flatten_answers(submission_answers)
+        print("flattened_answers", json.dumps(flattened_answers, indent=2))
 
         # Partition questions: deterministic (MCQ/TF) vs LLM-required
         deterministic_questions: List[Dict[str, Any]] = []
@@ -113,6 +117,7 @@ class LLMGrader:
                     )
                 except Exception:
                     # If presign fails, proceed without image
+                    print(f"Failed to presign S3 key: {s3_key}")
                     pass
 
             # Make single LLM call
@@ -545,6 +550,7 @@ class LLMGrader:
         """
         prompt_parts = []
         diagram_s3_keys = []
+        diagram_index = 0
 
         prompt_parts.append(
             "You are an expert academic grader. Grade this student's submission for all questions. "
@@ -560,6 +566,8 @@ class LLMGrader:
             '  "overall_feedback": "<overall assessment>"\n'
             "}\n\n"
             "GRADING CRITERIA:\n"
+            "- Grade strictly according to the provided rubric and max points.\n\n"
+            "Questions, reference answers, rubrics, max points, and student answers follow:\n"
         )
 
         for question in flattened_questions:
@@ -599,9 +607,19 @@ class LLMGrader:
                     if diagram and isinstance(diagram, dict):
                         s3_key = diagram.get("s3_key")
                         if s3_key:
+                            diagram_index = diagram_index + 1
+                            ordinal_suffix = (
+                                "st"
+                                if diagram_index == 1
+                                else "nd"
+                                if diagram_index == 2
+                                else "rd"
+                                if diagram_index == 3
+                                else "th"
+                            )
                             diagram_s3_keys.append(s3_key)
                             prompt_parts.append(
-                                f"STUDENT ANSWER (diagram): [Image attached - see diagram for question {q_id}]"
+                                f"STUDENT ANSWER (diagram): [Image attached - see {diagram_index}{ordinal_suffix} image]"
                             )
             else:
                 prompt_parts.append("STUDENT ANSWER: <no answer provided>")
