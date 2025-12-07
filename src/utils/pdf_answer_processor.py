@@ -26,7 +26,9 @@ class PDFAnswerProcessor:
         else:
             self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    def process_pdf_to_json(self, pdf_path: str) -> Dict[str, Any]:
+    def process_pdf_to_json(
+        self, pdf_path: str, questions: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
         """
         Convert PDF answer sheet to JSON format with diagram bounding boxes.
 
@@ -57,6 +59,9 @@ class PDFAnswerProcessor:
             raise RuntimeError(
                 f"Failed to convert PDF to images. Ensure Poppler is installed. Error: {e}"
             )
+
+        # Get question numbers list if questions provided
+        question_numbers = self._get_question_numbers(questions) if questions else None
 
         # Build multimodal prompt with all pages
         image_contents: List[dict] = []
@@ -108,12 +113,13 @@ class PDFAnswerProcessor:
         Rules:
         - DO NOT MAKE ANYTHING UP. DO NOT INCLUDE ANYTHING OTHER THAN THE ANSWER SHEET.
         - TRY TO INCLUDE THE FULL ANSWER FROM THE ANSWER SHEET.
-        - CRITICAL: Preserve the EXACT question numbering from the answer sheet:
-          * If numbered as "17(a)", use "17(a)"
-          * If numbered as "17(b)", use "17(b)"
-          * If numbered as "33(a)(i)", use "33(a)(i)"
+        - CRITICAL: DO NOT preserve the EXACT question numbering from the answer sheet:
+          * If numbered as "17(a)", use "17.1"
+          * If numbered as "17(b)", use "17.2"
+          * If numbered as "33(a)(i)", use "33.1.1"
           * If numbered as "29.1", use "29.1"
           * Simple numbers like "1", "2", "3" should stay as is
+          * Here is the list of question numbers to extract answers for: {', '.join(map(str, question_numbers)) if question_numbers else 'All questions found in the answer sheet'}
         - For multiple choice questions (MCQ):
           * Extract ONLY the option letter (A, B, C, or D)
           * DO NOT include the option text or any additional explanation
@@ -279,6 +285,44 @@ class PDFAnswerProcessor:
         except Exception as e:
             print(f"Error extracting diagram: {e}")
             return False
+
+    def _get_question_numbers(
+        self, questions: List[Dict[str, Any]], parent_id: Optional[str] = None
+    ) -> List[str]:
+        """Recursively flatten questions to handle nested multi-part questions at any depth and return list of question numbers.
+
+        Generates composite IDs that match the PDF extraction format:
+        - Top-level questions: keep original ID (e.g., "1", "17", "33")
+        - Subquestions: create composite IDs like "17.1", "17.2", "33.1.1" using sequential numbering
+        - For multipart questions, do not include the main question ID. Only include leaf subquestion IDs.
+
+        """
+        question_numbers = []
+
+        for i, question in enumerate(questions, 1):
+            question_type = question.get("type", "")
+            question_id = i
+            subquestions = question.get("subquestions", [])
+
+            # Build the current question's composite ID
+            if parent_id:
+                # This is a subquestion
+                current_id = f"{parent_id}.{question_id}"
+            else:
+                # Top-level question - use the question id directly
+                current_id = question_id
+
+            # Check if this question has subquestions (multi-part question)
+            if question_type == "multi-part" and subquestions:
+                # Recursively process subquestions
+                # Pass current_id as parent for generating composite IDs
+                sub_numbers = self._get_question_numbers(subquestions, current_id)
+                question_numbers.extend(sub_numbers)
+            else:
+                # Leaf question - add to the list
+                question_numbers.append(current_id)
+
+        return question_numbers
 
     def _enrich_answers_with_yolo_bounding_box(
         self, answers: Dict[str, Any], pages: List[Image.Image]
