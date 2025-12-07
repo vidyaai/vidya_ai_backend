@@ -1903,7 +1903,9 @@ async def submit_assignment(
                     from utils.pdf_answer_processor import PDFAnswerProcessor
 
                     processor = PDFAnswerProcessor()
-                    answers_from_pdf = processor.process_pdf_to_json(tmp_pdf_path)
+                    answers_from_pdf = processor.process_pdf_to_json(
+                        tmp_pdf_path, assignment.questions or []
+                    )
 
                     # Clean up temp file
                     os.unlink(tmp_pdf_path)
