@@ -111,14 +111,14 @@ def get_video_path(db: Session, video_id: str) -> Optional[str]:
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         return None
-    
+
     # DEBUG: Log what's in the database
     logger.info(f"📊 VIDEO PATH DEBUG for {video_id}:")
     logger.info(f"   - s3_key: {video.s3_key}")
     logger.info(f"   - download_path: {video.download_path}")
     if video.download_path:
         logger.info(f"   - download_path exists: {os.path.exists(video.download_path)}")
-    
+
     if video.s3_key and s3_client and AWS_S3_BUCKET:
         try:
             s3_url = s3_presign_url(video.s3_key, expires_in=3600)
@@ -129,6 +129,6 @@ def get_video_path(db: Session, video_id: str) -> Optional[str]:
     if video.download_path and os.path.exists(video.download_path):
         logger.info(f"   → Returning LOCAL PATH: {video.download_path}")
         return video.download_path
-    
+
     logger.info(f"   → Returning None (no path found)")
     return None

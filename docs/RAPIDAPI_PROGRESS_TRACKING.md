@@ -67,18 +67,18 @@ try:
     if progress_response.status_code == 200:
         progress_data = progress_response.json()
         log(f"Progress check {attempt + 1}: {progress_data}")
-        
+
         # Extract progress information from RapidAPI response
         api_progress = progress_data.get("progress", 0)
         api_status = progress_data.get("status", "processing")
         api_message = progress_data.get("message", "")
-        
+
         # Update buffering status with actual API progress
         if video_id_param:
             db = SessionLocal()
             try:
                 elapsed_seconds = (attempt + 1) * 10
-                
+
                 # Build message based on what RapidAPI returns
                 if api_progress > 0:
                     message = f"⏳ Processing video... {api_progress}% complete"
@@ -86,7 +86,7 @@ try:
                     message = f"⏳ {api_message} ({elapsed_seconds}s elapsed)"
                 else:
                     message = f"⏳ Video buffering... ({elapsed_seconds}s elapsed)"
-                
+
                 status = {
                     "status": "buffering",
                     "message": message,
@@ -146,11 +146,11 @@ try:
 
 1. **Preparing** (no progress):
    - Indeterminate yellow sliding animation
-   
+
 2. **Buffering with progress** (`progress > 0`):
    - Determinate yellow progress bar showing actual percentage
    - Percentage markers displayed: 25%, 50%, 75%, 100%
-   
+
 3. **Buffering without progress** (`progress = 0`):
    - Indeterminate yellow sliding animation
 
@@ -242,7 +242,7 @@ RapidAPI might return various formats:
 // Format 1
 {"progress": 50, "status": "converting"}
 
-// Format 2  
+// Format 2
 {"status": "processing", "message": "Extracting audio", "percent": 30}
 
 // Format 3
