@@ -2,7 +2,7 @@ import os
 from typing import Optional
 from sqlalchemy.orm import Session
 from models import Video
-from .config import s3_client, AWS_S3_BUCKET
+from .config import s3_client, AWS_S3_BUCKET, logger
 from .storage import s3_presign_url, s3_client
 
 
@@ -111,11 +111,24 @@ def get_video_path(db: Session, video_id: str) -> Optional[str]:
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         return None
+    
+    # DEBUG: Log what's in the database
+    logger.info(f"📊 VIDEO PATH DEBUG for {video_id}:")
+    logger.info(f"   - s3_key: {video.s3_key}")
+    logger.info(f"   - download_path: {video.download_path}")
+    if video.download_path:
+        logger.info(f"   - download_path exists: {os.path.exists(video.download_path)}")
+    
     if video.s3_key and s3_client and AWS_S3_BUCKET:
         try:
-            return s3_presign_url(video.s3_key, expires_in=3600)
+            s3_url = s3_presign_url(video.s3_key, expires_in=3600)
+            logger.info(f"   → Returning S3 URL: {s3_url[:100]}...")
+            return s3_url
         except Exception:
             return None
     if video.download_path and os.path.exists(video.download_path):
+        logger.info(f"   → Returning LOCAL PATH: {video.download_path}")
         return video.download_path
+    
+    logger.info(f"   → Returning None (no path found)")
     return None
