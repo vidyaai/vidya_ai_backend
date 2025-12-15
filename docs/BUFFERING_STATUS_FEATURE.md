@@ -92,7 +92,7 @@ Added handling for new statuses:
 ```javascript
 const pollDownloadProgress = async (videoId) => {
   const status = response.data;
-  
+
   if (status.status === 'preparing') {
     setDownloadProgress({
       status: 'preparing',

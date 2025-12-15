@@ -23,23 +23,25 @@ def cleanup_expired_cache():
     with CACHE_LOCK:
         now = datetime.now()
         expired_videos = []
-        
+
         for video_id, cache_data in VIDEO_CACHE.items():
-            last_access = cache_data['last_access']
+            last_access = cache_data["last_access"]
             age_minutes = (now - last_access).total_seconds() / 60
-            
+
             if age_minutes >= CACHE_TTL_MINUTES:
                 expired_videos.append(video_id)
-        
+
         # Remove expired entries and delete files
         for video_id in expired_videos:
             cache_data = VIDEO_CACHE.pop(video_id)
-            temp_path = cache_data['path']
-            
+            temp_path = cache_data["path"]
+
             if os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
-                    logger.info(f"🗑️ Cache cleanup: Removed expired video cache for {video_id} (age: {age_minutes:.1f} min)")
+                    logger.info(
+                        f"🗑️ Cache cleanup: Removed expired video cache for {video_id} (age: {age_minutes:.1f} min)"
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to remove cached file {temp_path}: {e}")
             else:
@@ -48,6 +50,7 @@ def cleanup_expired_cache():
 
 def start_cache_cleanup_thread():
     """Start a background thread that cleans up expired cache every 5 minutes"""
+
     def cleanup_loop():
         while True:
             time.sleep(300)  # Check every 5 minutes
@@ -55,7 +58,7 @@ def start_cache_cleanup_thread():
                 cleanup_expired_cache()
             except Exception as e:
                 logger.error(f"Error in cache cleanup thread: {e}")
-    
+
     cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
     cleanup_thread.start()
     logger.info("🧹 Started cache cleanup background thread (checks every 5 minutes)")
@@ -188,9 +191,11 @@ def extract_youtube_id(url: str) -> str:
     return None
 
 
-def download_video(youtube_url, output_path=video_path, debug=False, video_id_param=None):
+def download_video(
+    youtube_url, output_path=video_path, debug=False, video_id_param=None
+):
     """Simple YouTube video downloader using RapidAPI with progress checking"""
-    
+
     # Import here to avoid circular dependency
     from utils.db import SessionLocal
     from controllers.db_helpers import update_download_status
@@ -239,13 +244,13 @@ def download_video(youtube_url, output_path=video_path, debug=False, video_id_pa
                     "message": "🔄 Preparing video from YouTube...",
                     "percentage": 0,
                     "mb_downloaded": 0,
-                    "chunks": 0
+                    "chunks": 0,
                 }
                 update_download_status(db, video_id_param, status)
                 logger.info(f"Status updated to 'preparing' for video {video_id_param}")
             finally:
                 db.close()
-        
+
         # Get initial response
         log(f"Requesting video info for: {youtube_url}")
         response = requests.get(url, headers=headers)
@@ -260,7 +265,9 @@ def download_video(youtube_url, output_path=video_path, debug=False, video_id_pa
             )
 
             if download_url:
-                return download_file_to_path(download_url, file_path, debug, video_id_param or video_id)
+                return download_file_to_path(
+                    download_url, file_path, debug, video_id_param or video_id
+                )
 
             # Check if we have progress URL (processing in background)
             elif "progress_url" in data:
@@ -270,18 +277,18 @@ def download_video(youtube_url, output_path=video_path, debug=False, video_id_pa
                 # Wait for processing to complete
                 for attempt in range(30):  # Try for 5 minutes
                     time.sleep(10)  # Wait 10 seconds between checks
-                    
+
                     try:
                         progress_response = requests.get(progress_url)
                         if progress_response.status_code == 200:
                             progress_data = progress_response.json()
                             log(f"Progress check {attempt + 1}: {progress_data}")
-                            
+
                             # Extract progress information from RapidAPI response
                             raw_progress = progress_data.get("progress", 0)
                             api_status = progress_data.get("status", "processing")
                             api_message = progress_data.get("message", "")
-                            
+
                             # Validate and normalize progress value
                             # RapidAPI returns 0-1000 scale (1000 = 100%)
                             # Convert to 0-100 scale for display
@@ -290,37 +297,44 @@ def download_video(youtube_url, output_path=video_path, debug=False, video_id_pa
                                 api_progress = int(raw_progress / 10)
                                 # Clamp to 0-100 just in case
                                 api_progress = max(0, min(100, api_progress))
-                                logger.info(f"Converted progress: {raw_progress}/1000 → {api_progress}%")
+                                logger.info(
+                                    f"Converted progress: {raw_progress}/1000 → {api_progress}%"
+                                )
                             else:
                                 api_progress = 0
-                            
+
                             # Update buffering status with actual API progress
                             if video_id_param:
                                 db = SessionLocal()
                                 try:
                                     elapsed_seconds = (attempt + 1) * 10
-                                    
+
                                     # Build message based on what RapidAPI returns
                                     if api_progress > 0 and api_progress < 100:
                                         message = f"⏳ Processing video... {api_progress}% complete"
                                     elif api_progress >= 100:
                                         message = f"✅ Processing complete, starting download..."
-                                    elif api_message and "contact us" not in api_message.lower():
+                                    elif (
+                                        api_message
+                                        and "contact us" not in api_message.lower()
+                                    ):
                                         # Skip the promotional message from RapidAPI
                                         message = f"⏳ {api_message} ({elapsed_seconds}s elapsed)"
                                     else:
                                         message = f"⏳ Video buffering... ({elapsed_seconds}s elapsed)"
-                                    
+
                                     status = {
                                         "status": "buffering",
                                         "message": message,
                                         "percentage": api_progress,  # Normalized to 0-100
                                         "mb_downloaded": 0,
                                         "chunks": 0,
-                                        "api_status": api_status  # Pass through API status
+                                        "api_status": api_status,  # Pass through API status
                                     }
                                     update_download_status(db, video_id_param, status)
-                                    logger.info(f"Buffering progress: {api_progress}% (raw: {raw_progress}/1000) - Status: {api_status}")
+                                    logger.info(
+                                        f"Buffering progress: {api_progress}% (raw: {raw_progress}/1000) - Status: {api_status}"
+                                    )
                                 finally:
                                     db.close()
 
@@ -333,7 +347,7 @@ def download_video(youtube_url, output_path=video_path, debug=False, video_id_pa
 
                             if download_url:
                                 log("✅ Processing complete! Starting download...")
-                                
+
                                 # Update to "downloading" status before actual download
                                 if video_id_param:
                                     db = SessionLocal()
@@ -343,14 +357,19 @@ def download_video(youtube_url, output_path=video_path, debug=False, video_id_pa
                                             "message": "📥 Starting download from server...",
                                             "percentage": 0,
                                             "mb_downloaded": 0,
-                                            "chunks": 0
+                                            "chunks": 0,
                                         }
-                                        update_download_status(db, video_id_param, status)
+                                        update_download_status(
+                                            db, video_id_param, status
+                                        )
                                     finally:
                                         db.close()
-                                
+
                                 return download_file_to_path(
-                                    download_url, file_path, debug, video_id_param or video_id
+                                    download_url,
+                                    file_path,
+                                    debug,
+                                    video_id_param or video_id,
                                 )
 
                             # Check if processing is complete
@@ -381,9 +400,11 @@ def download_video(youtube_url, output_path=video_path, debug=False, video_id_pa
         return None
 
 
-def download_file_to_path(download_url, file_path, debug=False, video_id_for_progress=None):
+def download_file_to_path(
+    download_url, file_path, debug=False, video_id_for_progress=None
+):
     """Download file from URL to specific path"""
-    
+
     # Import here to avoid circular dependency
     from utils.db import SessionLocal
     from controllers.db_helpers import update_download_status
@@ -405,31 +426,31 @@ def download_file_to_path(download_url, file_path, debug=False, video_id_for_pro
 
         if video_response.status_code == 200:
             # Get total size from Content-Length header if available
-            total_size = int(video_response.headers.get('content-length', 0))
-            
+            total_size = int(video_response.headers.get("content-length", 0))
+
             with open(file_path, "wb") as f:
                 downloaded = 0
                 last_update = 0
                 chunk_count = 0
-                
+
                 for chunk in video_response.iter_content(chunk_size=1024 * 1024):
                     if chunk:
                         f.write(chunk)
                         downloaded += len(chunk)
                         chunk_count += 1
-                        
+
                         # Update progress in database if video_id is provided
                         if video_id_for_progress and total_size > 0:
                             percentage = int((downloaded / total_size) * 100)
-                            
+
                             # Update every 1MB OR every 5% change OR at the end
                             percentage_change = percentage - last_update
                             should_update = (
-                                downloaded % (1024 * 1024) == 0 or  # Every 1MB
-                                percentage_change >= 5 or  # Every 5% change
-                                percentage >= 99  # At the end
+                                downloaded % (1024 * 1024) == 0
+                                or percentage_change >= 5  # Every 1MB
+                                or percentage >= 99  # Every 5% change  # At the end
                             )
-                            
+
                             if should_update:
                                 db = SessionLocal()
                                 try:
@@ -444,7 +465,7 @@ def download_file_to_path(download_url, file_path, debug=False, video_id_for_pro
                                         detail_msg = "Almost there..."
                                     else:
                                         detail_msg = "Finalizing download..."
-                                    
+
                                     status = {
                                         "status": "downloading",
                                         "message": f"{detail_msg} {percentage}%",
@@ -454,12 +475,16 @@ def download_file_to_path(download_url, file_path, debug=False, video_id_for_pro
                                         "chunks_received": chunk_count,
                                         "path": None,
                                     }
-                                    update_download_status(db, video_id_for_progress, status)
+                                    update_download_status(
+                                        db, video_id_for_progress, status
+                                    )
                                     last_update = percentage
-                                    log(f"Progress updated: {percentage}% ({downloaded / (1024*1024):.1f} MB / {total_size / (1024*1024):.1f} MB)")
+                                    log(
+                                        f"Progress updated: {percentage}% ({downloaded / (1024*1024):.1f} MB / {total_size / (1024*1024):.1f} MB)"
+                                    )
                                 finally:
                                     db.close()
-                        
+
                         if downloaded % (5 * 1024 * 1024) == 0:
                             log(f"Downloaded: {downloaded / (1024*1024):.1f} MB")
 
@@ -746,82 +771,99 @@ def grab_youtube_frame(video_path_func, timestamp, output_file="extracted_frame.
     try:
         video_path = video_path_func
         video_id = None
-        
+
         # DEBUG: Log what type of path we received
-        if video_path.startswith('http://') or video_path.startswith('https://'):
+        if video_path.startswith("http://") or video_path.startswith("https://"):
             logger.info(f"🔴 RECEIVED S3 URL: {video_path[:100]}...")
-            
+
             # Try to extract video_id from the S3 URL (format: .../video_id.mp4)
             try:
                 # Extract filename from URL
-                filename = video_path.split('/')[-1].split('?')[0]  # Remove query params
-                video_id = filename.replace('.mp4', '').replace('.webm', '')
+                filename = video_path.split("/")[-1].split("?")[
+                    0
+                ]  # Remove query params
+                video_id = filename.replace(".mp4", "").replace(".webm", "")
                 logger.info(f"� Extracted video_id: {video_id}")
             except:
                 logger.warning("Could not extract video_id from S3 URL")
-            
+
             # Check if we have this video cached
             with CACHE_LOCK:
                 if video_id and video_id in VIDEO_CACHE:
                     cache_data = VIDEO_CACHE[video_id]
-                    cached_path = cache_data['path']
-                    
+                    cached_path = cache_data["path"]
+
                     # Verify the cached file still exists
                     if os.path.exists(cached_path):
-                        age_minutes = (datetime.now() - cache_data['last_access']).total_seconds() / 60
-                        logger.info(f"✨ Using CACHED video! (age: {age_minutes:.1f} min, path: {cached_path})")
-                        
+                        age_minutes = (
+                            datetime.now() - cache_data["last_access"]
+                        ).total_seconds() / 60
+                        logger.info(
+                            f"✨ Using CACHED video! (age: {age_minutes:.1f} min, path: {cached_path})"
+                        )
+
                         # Update last access time
-                        VIDEO_CACHE[video_id]['last_access'] = datetime.now()
+                        VIDEO_CACHE[video_id]["last_access"] = datetime.now()
                         video_path = cached_path
                     else:
-                        logger.warning(f"⚠️ Cached file no longer exists, removing from cache")
+                        logger.warning(
+                            f"⚠️ Cached file no longer exists, removing from cache"
+                        )
                         VIDEO_CACHE.pop(video_id, None)
                         video_id = None  # Force re-download
-            
+
             # If not in cache or cache invalid, download it
             if not video_id or video_id not in VIDEO_CACHE:
-                logger.info(f"📥 Video not in cache, downloading temporarily for frame extraction...")
-                
+                logger.info(
+                    f"📥 Video not in cache, downloading temporarily for frame extraction..."
+                )
+
                 # Download the video temporarily
                 import tempfile
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
                 temp_path = temp_file.name
                 temp_file.close()
                 temp_file_created = True
-                
+
                 # Download from S3 URL
                 download_start = time.time()
                 response = requests.get(video_path, stream=True, timeout=60)
                 if response.status_code == 200:
-                    total_size = int(response.headers.get('content-length', 0))
+                    total_size = int(response.headers.get("content-length", 0))
                     downloaded = 0
-                    
-                    with open(temp_path, 'wb') as f:
+
+                    with open(temp_path, "wb") as f:
                         for chunk in response.iter_content(chunk_size=1024 * 1024):
                             if chunk:
                                 f.write(chunk)
                                 downloaded += len(chunk)
-                    
+
                     download_time = time.time() - download_start
                     size_mb = total_size / (1024 * 1024)
-                    logger.info(f"✅ Video downloaded in {download_time:.1f}s ({size_mb:.1f} MB) to: {temp_path}")
-                    
+                    logger.info(
+                        f"✅ Video downloaded in {download_time:.1f}s ({size_mb:.1f} MB) to: {temp_path}"
+                    )
+
                     # Add to cache
                     if video_id:
                         with CACHE_LOCK:
                             VIDEO_CACHE[video_id] = {
-                                'path': temp_path,
-                                'last_access': datetime.now()
+                                "path": temp_path,
+                                "last_access": datetime.now(),
                             }
-                        logger.info(f"💾 Video cached for video_id: {video_id} (will auto-delete after {CACHE_TTL_MINUTES} min of inactivity)")
+                        logger.info(
+                            f"💾 Video cached for video_id: {video_id} (will auto-delete after {CACHE_TTL_MINUTES} min of inactivity)"
+                        )
                         temp_file_created = False  # Don't delete in finally block
-                    
+
                     video_path = temp_path
                 else:
-                    raise Exception(f"Failed to download video from S3: {response.status_code}")
-                    
-        elif video_path.startswith('/'):
+                    raise Exception(
+                        f"Failed to download video from S3: {response.status_code}"
+                    )
+
+        elif video_path.startswith("/"):
             logger.info(f"🟢 RECEIVED LOCAL PATH: {video_path}")
             logger.info(f"🟢 File exists: {os.path.exists(video_path)}")
         else:
@@ -829,17 +871,19 @@ def grab_youtube_frame(video_path_func, timestamp, output_file="extracted_frame.
 
         # Open the video with OpenCV
         video = cv2.VideoCapture(video_path)
-        
+
         if not video.isOpened():
             raise Exception(f"Failed to open video file: {video_path}")
 
         # Get video properties
         fps = video.get(cv2.CAP_PROP_FPS)
         logger.info(f"Video FPS: {fps}")
-        
+
         if fps == 0 or fps is None:
-            raise Exception("Invalid FPS value, video file may be corrupted or inaccessible")
-        
+            raise Exception(
+                "Invalid FPS value, video file may be corrupted or inaccessible"
+            )
+
         total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = total_frames / fps
 
@@ -876,10 +920,11 @@ def grab_youtube_frame(video_path_func, timestamp, output_file="extracted_frame.
         if video is not None:
             video.release()
         # Only clean up temporary file if it was NOT added to cache
-        if temp_file_created and 'temp_path' in locals() and os.path.exists(temp_path):
+        if temp_file_created and "temp_path" in locals() and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-                logger.info(f"🗑️ Temporary (non-cached) video file removed: {temp_path}")
+                logger.info(
+                    f"🗑️ Temporary (non-cached) video file removed: {temp_path}"
+                )
             except Exception as e:
                 logger.warning(f"Failed to remove temporary file: {e}")
-
