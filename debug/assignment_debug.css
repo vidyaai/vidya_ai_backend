@@ -1,0 +1,291 @@
+
+        @page {
+            size: A4;
+            margin: 1in;
+            @top-center {{
+                content: string(doc-title);
+                font-size: 10pt;
+                color: #666;
+            }}
+            @bottom-center {{
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 9pt;
+                color: #666;
+            }}
+        }}
+
+        body {{
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            line-height: 1.3;
+            color: #000;
+            margin: 0;
+            padding: 0;
+            text-align: justify;
+        }}
+
+        /* KaTeX base styles for proper math rendering */
+        .katex {{
+            font-size: 1em;
+            text-indent: 0;
+            font-family: KaTeX_Main, "Times New Roman", Times, serif;
+        }}
+
+        .katex-display {{
+            margin: 0.5em 0;
+            text-align: center;
+        }}
+
+        .katex .mrel {{
+            font-family: KaTeX_Main, "Times New Roman", Times, serif;
+        }}
+
+        /* Ensure not-equal and other relation symbols render correctly */
+        .katex .mord.vbox .thinbox .rlap {{
+            display: inline-block;
+        }}
+
+        .katex .strut {{
+            display: inline-block;
+        }}
+
+        .katex-mathml {{
+            position: absolute;
+            clip: rect(1px, 1px, 1px, 1px);
+            padding: 0;
+            border: 0;
+            height: 1px;
+            width: 1px;
+            overflow: hidden;
+        }}
+
+        .katex-html {{
+            display: inline-block;
+        }}
+
+        .document-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+
+        .document-title {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 6px;
+            string-set: doc-title content();
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .document-meta {
+            font-size: 10pt;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .instructions {
+            margin-bottom: 15px;
+            font-style: italic;
+        }
+
+        .instructions h3 {
+            display: none; /* Hide instructions header for cleaner look */
+        }
+
+        .question {
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+
+        .question-header {
+            margin-bottom: 8px;
+        }
+
+        .question-header h3 {
+            margin: 0;
+            font-size: 11pt;
+            color: #000;
+            font-weight: bold;
+            display: inline;
+        }
+
+        .question-meta {
+            display: none; /* Hide meta information for clean paper look */
+        }
+
+        .points, .difficulty, .type {
+            display: none; /* Hide badges for professional appearance */
+        }
+
+        .question-text {
+            margin-bottom: 10px;
+            line-height: 1.3;
+            text-align: justify;
+        }
+
+        .question-diagram {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .question-options {
+            margin: 15px 0;
+        }
+
+        .option {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .answer-space {
+            margin-top: 15px;
+        }
+
+        .answer-lines {
+            border-bottom: 1px solid #ccc;
+            margin: 8px 0;
+        }
+
+        .subquestions {
+            margin-top: 15px;
+            padding-left: 20px;
+        }
+
+        .subquestion {
+            margin-bottom: 15px;
+        }
+
+        .subquestion h4 {
+            margin: 0 0 8px 0;
+            font-size: 11pt;
+            color: #555;
+        }
+
+        .footer-info {
+            margin-top: 40px;
+            border-top: 1px solid #ddd;
+            padding-top: 15px;
+            font-size: 9pt;
+            color: #666;
+            text-align: center;
+        }
+
+        /* Professional Mathematical Text Styling */
+        .display-equation {
+            text-align: center;
+            margin: 12px 0;
+            padding: 0;
+        }
+
+        .math-display {
+            display: block;
+            text-align: center;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            font-style: italic;
+            user-select: text;
+            margin: 12px 0;
+        }
+
+        .math-inline {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            font-style: italic;
+            user-select: text;
+        }
+
+        .math-fallback {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            font-style: italic;
+            user-select: text;
+        }
+
+        .equation-placeholder {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            font-style: italic;
+        }
+
+        /* Mathematical formatting elements */
+        .fraction {
+            display: inline-block;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .numerator {
+            display: block;
+            border-bottom: 1px solid black;
+            padding-bottom: 1px;
+            margin-bottom: 1px;
+        }
+
+        .denominator {
+            display: block;
+            padding-top: 1px;
+        }
+
+        .fraction-bar {
+            display: none; /* Hide the slash, use border instead */
+        }
+
+        .sqrt-content {
+            border-top: 1px solid black;
+            padding-left: 2px;
+        }
+
+        .math-text {
+            font-style: normal;
+        }
+
+        /* Superscripts and subscripts */
+        sup, sub {
+            font-size: 0.8em;
+            line-height: 0;
+        }
+
+        /* Code blocks for mathematical expressions */
+        code {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            font-style: italic;
+        }
+
+        /* IEEE paper styling */
+        .question-text {
+            text-align: justify;
+            line-height: 1.3;
+            font-size: 11pt;
+        }
+
+        .question-text p {
+            margin-bottom: 8px;
+        }
+
+        /* Multiple choice options - IEEE style */
+        .question-options .option {
+            margin: 4px 0;
+            padding-left: 15px;
+            line-height: 1.3;
+        }
+
+        .question-options .option strong {
+            margin-right: 6px;
+        }
+
+        /* Professional diagram styling */
+        .question-diagram img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Remove answer spaces completely */
+        .answer-space {
+            display: none;
+        }
+
+        .answer-lines {
+            display: none;
+        }
