@@ -1,4 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
+import base64
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+    Request,
+    UploadFile,
+    File,
+    Form,
+)
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, asc
@@ -52,13 +62,39 @@ def generate_share_token() -> str:
 
 
 def calculate_assignment_stats(assignment: Assignment) -> Assignment:
-    """Calculate total points and questions for an assignment"""
+    """Calculate total points and questions for an assignment, handling optional parts correctly"""
     questions = assignment.questions or []
     total_questions = len(questions)
-    total_points = sum(q.get("points", 0) for q in questions)
+
+    def calculate_question_points(question: dict) -> float:
+        """Recursively calculate points for a question, accounting for optional parts"""
+        q_type = question.get("type", "")
+
+        if q_type == "multi-part":
+            subquestions = question.get("subquestions", [])
+            if not subquestions:
+                return float(question.get("points", 0))
+
+            # For optional parts, only count required number of parts
+            if question.get("optionalParts"):
+                required_count = question.get("requiredPartsCount", len(subquestions))
+                # Sort subquestions by points (descending) to get realistic total
+                # This assumes students will choose higher-point questions
+                subq_points = [calculate_question_points(sq) for sq in subquestions]
+                subq_points.sort(reverse=True)
+                # Sum only the required number of highest-point subquestions
+                return sum(subq_points[:required_count])
+            else:
+                # Non-optional multi-part: sum all subquestion points
+                return sum(calculate_question_points(sq) for sq in subquestions)
+        else:
+            # Regular question: return its points
+            return float(question.get("points", 0))
+
+    total_points = sum(calculate_question_points(q) for q in questions)
 
     assignment.total_questions = str(total_questions)
-    assignment.total_points = str(total_points)
+    assignment.total_points = str(int(total_points))
     return assignment
 
 
@@ -1435,47 +1471,174 @@ async def generate_assignment(
 
 @router.post("/api/assignments/import-document", response_model=DocumentImportResponse)
 async def import_document_to_assignment(
-    import_data: DocumentImportRequest,
     request: Request,
     current_user: dict = Depends(get_current_user),
+    file: UploadFile = File(None),
+    file_name: str = Form(None),
+    file_type: str = Form(None),
+    generation_options: str = Form(None),
+    # Legacy support for base64 JSON
+    import_data: DocumentImportRequest = None,
 ):
-    """Import assignment questions from a document using AI parsing"""
+    """Import assignment questions from documents (PDF, DOCX, MD, HTML, CSV, JSON, TXT) using AI parsing with diagram support
+
+    Supports two modes:
+    1. File upload (multipart/form-data) - Preferred for better performance
+    2. Legacy base64 JSON - For backward compatibility
+    """
     try:
         user_id = current_user["uid"]
-        logger.info(f"Importing document {import_data.file_name} for user: {user_id}")
 
-        # Import document processing services
-        from utils.document_processor import DocumentProcessor, AssignmentDocumentParser
+        # Determine if this is a file upload or JSON request
+        is_file_upload = file is not None
 
-        # Initialize processors
-        doc_processor = DocumentProcessor()
-        assignment_parser = AssignmentDocumentParser()
-
-        # Extract text from the document
-        try:
-            extracted_text = doc_processor.extract_text_from_file(
-                import_data.file_content, import_data.file_name, import_data.file_type
+        if is_file_upload:
+            # File upload mode (preferred)
+            actual_file_name = file_name or file.filename
+            actual_file_type = file_type or file.content_type
+            logger.info(
+                f"Importing document via file upload: {actual_file_name} ({actual_file_type}) for user: {user_id}"
             )
 
-            if not extracted_text or len(extracted_text.strip()) < 50:
+            # Read file content
+            document_content = await file.read()
+
+            # Parse generation options
+            gen_options = None
+            if generation_options:
+                try:
+                    gen_options = json.loads(generation_options)
+                except:
+                    gen_options = None
+
+            if import_data is None:
+                import_data = DocumentImportRequest(
+                    file_name=actual_file_name,
+                    file_type=actual_file_type,
+                    generation_options=gen_options,
+                    file_content="",
+                )
+        else:
+            # Legacy base64 JSON mode (backward compatibility)
+            if import_data is None:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Document appears to be empty or contains insufficient content for assignment extraction",
+                    detail="Either file upload or import_data JSON is required",
                 )
 
-        except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+            actual_file_name = import_data.file_name
+            actual_file_type = import_data.file_type
+            gen_options = import_data.generation_options
 
-        # Parse the document to extract assignment questions
-        try:
-            parsed_assignment = assignment_parser.parse_document_to_assignment(
-                extracted_text, import_data.file_name, import_data.generation_options
+            logger.info(
+                f"Importing document via base64 JSON: {actual_file_name} ({actual_file_type}) for user: {user_id}"
             )
+
+            # Decode document content
+            try:
+                document_content = base64.b64decode(import_data.file_content)
+            except Exception as e:
+                logger.error(f"Error decoding document content: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file content. Please ensure the file is properly encoded.",
+                )
+
+        # Validate supported file types
+        supported_types = [
+            "application/pdf",
+            # "text/plain",
+            # "application/msword",
+            # "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            # "text/markdown",
+            # "text/html",
+            # "text/csv",
+            # "application/json",
+        ]
+
+        # Also check file extension
+        file_extension = (
+            actual_file_name.lower().split(".")[-1] if "." in actual_file_name else ""
+        )
+
+        if actual_file_type not in supported_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported file type: {actual_file_type}. Supported types: PDF",
+                # detail=f"Unsupported file type: {actual_file_type}. Supported types: PDF, DOCX, TXT, MD, HTML, CSV, JSON",
+            )
+
+        # Import document processing services
+        from utils.assignment_document_parser import AssignmentDocumentParser
+
+        # Initialize parser
+        assignment_parser = AssignmentDocumentParser(user_id=user_id)
+
+        # Parse document based on type
+        try:
+            if actual_file_type == "application/pdf" or file_extension == "pdf":
+                # PDF: Use image-based parsing with diagram bounding boxes
+                parsed_assignment = assignment_parser.parse_pdf_images_to_assignment(
+                    document_content,
+                    actual_file_name,
+                    gen_options,
+                )
+
+                # logger.info(f"Parsed assignment: {parsed_assignment}")
+
+                # # Extract diagrams from PDF and upload to S3
+                # parsed_assignment = assignment_parser.extract_and_upload_diagrams(
+                #     parsed_assignment,
+                #     document_content,
+                #     "application/pdf",
+                #     user_id,
+                #     assignment_id=None,  # Temporary storage under user_id
+                # )
+
+                # logger.info(f"Parsed assignment after extracting diagrams: {parsed_assignment}")
+
+                text_preview = "PDF content processed via image analysis"
+            else:
+                # Non-PDF: Use text-based parsing
+                parsed_assignment = (
+                    assignment_parser.parse_non_pdf_document_to_assignment(
+                        document_content,
+                        actual_file_name,
+                        actual_file_type,
+                        user_id,
+                        gen_options,
+                    )
+                )
+
+                logger.info(
+                    f"Parsed assignment after parsing non-PDF document: {parsed_assignment}"
+                )
+
+                if (
+                    actual_file_type
+                    == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ):
+                    # For DOCX: extract and upload diagrams
+                    # DOCX images already extracted during parsing, but run extraction pipeline for consistency
+                    parsed_assignment = assignment_parser.extract_and_upload_diagrams(
+                        parsed_assignment,
+                        document_content,
+                        actual_file_type,
+                        user_id,
+                        assignment_id=None,
+                    )
+
+                text_preview = f"{actual_file_type} content processed"
+
+                logger.info(
+                    f"Parsed assignment after extracting diagrams: {parsed_assignment}"
+                )
+
         except Exception as e:
             logger.error(f"Error parsing document with AI: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to extract assignment questions from document. Please ensure the document contains assignment questions, exercises, or problems.",
+                detail=f"Failed to extract assignment questions from document. Please ensure the document contains assignment questions, exercises, or problems. Error: {str(e)}",
             )
 
         # Prepare the response
@@ -1485,17 +1648,24 @@ async def import_document_to_assignment(
             ),
             description=parsed_assignment.get("description"),
             questions=parsed_assignment.get("questions", []),
-            extracted_text=extracted_text[:1000] + "..."
-            if len(extracted_text) > 1000
-            else extracted_text,  # Truncate for response
+            extracted_text=text_preview,  # Preview of extracted text
             file_info={
                 "original_filename": import_data.file_name,
                 "file_type": import_data.file_type,
-                "content_length": len(extracted_text),
+                "content_length": len(text_preview),
                 "questions_generated": len(parsed_assignment.get("questions", [])),
                 "total_points": parsed_assignment.get("total_points", 0),
             },
         )
+
+        # Debug: Log first question's answer and rubric
+        if parsed_assignment.get("questions"):
+            first_q = parsed_assignment["questions"][0]
+            logger.info(
+                f"DEBUG - First question before response: ID={first_q.get('id')}, "
+                f"correctAnswer='{first_q.get('correctAnswer', 'MISSING')}', "
+                f"rubric='{first_q.get('rubric', 'MISSING')[:50]}...'"
+            )
 
         logger.info(
             f"Successfully imported document {import_data.file_name}: "
@@ -1507,7 +1677,9 @@ async def import_document_to_assignment(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error importing document {import_data.file_name}: {str(e)}")
+        logger.error(
+            f"Error importing document {import_data.file_name if import_data else 'unknown file'}: {str(e)}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to import document",
@@ -1731,7 +1903,9 @@ async def submit_assignment(
                     from utils.pdf_answer_processor import PDFAnswerProcessor
 
                     processor = PDFAnswerProcessor()
-                    answers_from_pdf = processor.process_pdf_to_json(tmp_pdf_path)
+                    answers_from_pdf = processor.process_pdf_to_json(
+                        tmp_pdf_path, assignment.questions or []
+                    )
 
                     # Clean up temp file
                     os.unlink(tmp_pdf_path)
@@ -1749,6 +1923,53 @@ async def submit_assignment(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                         detail=f"Failed to process PDF submission: {str(e)}",
                     )
+
+        # Validate optional parts selection
+        questions = assignment.questions or []
+        for question in questions:
+            q_id = str(question.get("id"))
+            if question.get("type") == "multi-part" and question.get("optionalParts"):
+                required_count = question.get("requiredPartsCount", 0)
+                answer_obj = submission_data.answers.get(q_id)
+
+                answered_subqs = []
+                if answer_obj and isinstance(answer_obj, dict):
+                    subanswers = answer_obj.get("subAnswers", {})
+                    # Count non-empty answers
+                    answered_subqs = [k for k, v in subanswers.items() if v]
+
+                if len(answered_subqs) != required_count:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Question {q_id}: Must answer exactly {required_count} of {len(question.get('subquestions', []))} parts (answered {len(answered_subqs)})",
+                    )
+
+                # Recursively validate nested optional parts
+                if question.get("subquestions"):
+                    for subq in question.get("subquestions", []):
+                        subq_id = str(subq.get("id"))
+                        if subq.get("type") == "multi-part" and subq.get(
+                            "optionalParts"
+                        ):
+                            subq_required_count = subq.get("requiredPartsCount", 0)
+                            subq_answer = (
+                                answer_obj.get("subAnswers", {}).get(subq_id)
+                                if answer_obj
+                                else None
+                            )
+
+                            subq_answered = []
+                            if subq_answer and isinstance(subq_answer, dict):
+                                subq_subanswers = subq_answer.get("subAnswers", {})
+                                subq_answered = [
+                                    k for k, v in subq_subanswers.items() if v
+                                ]
+
+                            if len(subq_answered) != subq_required_count:
+                                raise HTTPException(
+                                    status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail=f"Question {q_id}, Sub-question {subq_id}: Must answer exactly {subq_required_count} of {len(subq.get('subquestions', []))} parts",
+                                )
 
         if existing_submission:
             # Check if already submitted - prevent resubmission
@@ -1773,17 +1994,32 @@ async def submit_assignment(
             db.commit()
             db.refresh(existing_submission)
 
-            # Queue background task to extract diagrams if PDF submission
+            # Extract diagrams from PDF submission (foreground task)
             if (
                 submission_data.submission_method == "pdf"
                 and submission_data.submitted_files
+                and existing_submission.answers
             ):
-                from controllers.background_tasks import queue_pdf_diagram_extraction
+                from utils.pdf_answer_processor import PDFAnswerProcessor
+                from sqlalchemy.orm.attributes import flag_modified
 
-                queue_pdf_diagram_extraction(
-                    existing_submission.id,
-                    submission_data.submitted_files[0].get("s3_key"),
+                processor = PDFAnswerProcessor()
+                updated_answers = processor.extract_and_upload_diagrams(
+                    submission_id=existing_submission.id,
+                    pdf_s3_key=submission_data.submitted_files[0].get("s3_key"),
+                    answers=existing_submission.answers,
+                    s3_client=s3_client,
+                    s3_bucket=AWS_S3_BUCKET,
+                    s3_upload_func=s3_upload_file,
+                    logger=logger,
                 )
+                # Update submission with extracted diagram s3_keys
+                # Use flag_modified to ensure SQLAlchemy detects the JSON change
+                existing_submission.answers = updated_answers
+                flag_modified(existing_submission, "answers")
+                existing_submission.updated_at = datetime.now(timezone.utc)
+                db.commit()
+                db.refresh(existing_submission)
 
             logger.info(
                 f"Updated submission for assignment {assignment_id} by user {user_id}"
@@ -1806,16 +2042,32 @@ async def submit_assignment(
             db.commit()
             db.refresh(submission)
 
-            # Queue background task to extract diagrams if PDF submission
+            # Extract diagrams from PDF submission (foreground task)
             if (
                 submission_data.submission_method == "pdf"
                 and submission_data.submitted_files
+                and submission.answers
             ):
-                from controllers.background_tasks import queue_pdf_diagram_extraction
+                from utils.pdf_answer_processor import PDFAnswerProcessor
+                from sqlalchemy.orm.attributes import flag_modified
 
-                queue_pdf_diagram_extraction(
-                    submission.id, submission_data.submitted_files[0].get("s3_key")
+                processor = PDFAnswerProcessor()
+                updated_answers = processor.extract_and_upload_diagrams(
+                    submission_id=submission.id,
+                    pdf_s3_key=submission_data.submitted_files[0].get("s3_key"),
+                    answers=submission.answers,
+                    s3_client=s3_client,
+                    s3_bucket=AWS_S3_BUCKET,
+                    s3_upload_func=s3_upload_file,
+                    logger=logger,
                 )
+                # Update submission with extracted diagram s3_keys
+                # Use flag_modified to ensure SQLAlchemy detects the JSON change
+                submission.answers = updated_answers
+                flag_modified(submission, "answers")
+                submission.updated_at = datetime.now(timezone.utc)
+                db.commit()
+                db.refresh(submission)
 
             logger.info(
                 f"Created submission for assignment {assignment_id} by user {user_id}"
@@ -2645,6 +2897,7 @@ async def delete_assignment_diagram(
             detail="Failed to delete diagram",
         )
 
+
 @router.get("/api/assignments/{assignment_id}/download-pdf")
 async def download_assignment_pdf(
     assignment_id: str,
@@ -2658,19 +2911,20 @@ async def download_assignment_pdf(
     """
     try:
         user_id = current_user["uid"]
-        logger.info(f"PDF download requested for assignment {assignment_id} by user {user_id}")
-        
+        logger.info(
+            f"PDF download requested for assignment {assignment_id} by user {user_id}"
+        )
+
         # Fetch the assignment
         assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
         if not assignment:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
-                detail="Assignment not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
-        
+
         # Verify user has access (owner or shared access)
         has_access = assignment.user_id == user_id
-        
+
         if not has_access:
             # Check if user has shared access
             shared_access = (
@@ -2679,27 +2933,27 @@ async def download_assignment_pdf(
                 .filter(
                     and_(
                         SharedLink.assignment_id == assignment_id,
-                        SharedLink.share_type == "assignment", 
+                        SharedLink.share_type == "assignment",
                         SharedLinkAccess.user_id == user_id,
                     )
                 )
                 .first()
             )
             has_access = shared_access is not None
-        
+
         if not has_access:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied to this assignment"
+                detail="Access denied to this assignment",
             )
-        
+
         # Only allow PDF download for published assignments
         if assignment.status != "published":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="PDF download is only available for published assignments"
+                detail="PDF download is only available for published assignments",
             )
-        
+
         # Prepare assignment data for PDF generation
         assignment_data = {
             "id": assignment.id,
@@ -2712,7 +2966,7 @@ async def download_assignment_pdf(
             "engineering_discipline": assignment.engineering_discipline,
             "created_at": assignment.created_at,
         }
-        
+
         # Process diagram URLs in questions to be accessible
         for question in assignment_data["questions"]:
             # Handle main question diagrams
@@ -2721,44 +2975,54 @@ async def download_assignment_pdf(
                     # Generate presigned URL for the diagram
                     file_id = question["diagram"]["file_id"]
                     s3_key = f"assignments/{assignment_id}/diagrams/{file_id}.png"  # Assume PNG, could be improved
-                    
+
                     # Try to generate presigned URL
                     try:
                         presigned_url = s3_presign_url(s3_key, expires_in=3600)
                         question["diagram"]["url"] = presigned_url
                     except Exception as e:
-                        logger.warning(f"Could not generate presigned URL for diagram {file_id}: {e}")
+                        logger.warning(
+                            f"Could not generate presigned URL for diagram {file_id}: {e}"
+                        )
                         # Remove diagram if URL generation fails
                         question["diagram"] = None
-                        
+
                 except Exception as e:
                     logger.warning(f"Error processing diagram for question: {e}")
-            
+
             # Handle subquestion diagrams
             if question.get("subquestions"):
                 for subq in question["subquestions"]:
                     if subq.get("diagram") and subq["diagram"].get("file_id"):
                         try:
                             file_id = subq["diagram"]["file_id"]
-                            s3_key = f"assignments/{assignment_id}/diagrams/{file_id}.png"
+                            s3_key = (
+                                f"assignments/{assignment_id}/diagrams/{file_id}.png"
+                            )
                             presigned_url = s3_presign_url(s3_key, expires_in=3600)
                             subq["diagram"]["url"] = presigned_url
                         except Exception as e:
-                            logger.warning(f"Could not generate presigned URL for subquestion diagram {file_id}: {e}")
+                            logger.warning(
+                                f"Could not generate presigned URL for subquestion diagram {file_id}: {e}"
+                            )
                             subq["diagram"] = None
-        
+
         # Generate PDF
         pdf_generator = AssignmentPDFGenerator()
         try:
             pdf_content = pdf_generator.generate_assignment_pdf(assignment_data)
-            
+
             # Clean filename for download
-            safe_title = "".join(c for c in assignment.title if c.isalnum() or c in (' ', '-', '_')).strip()
-            safe_title = safe_title.replace(' ', '_')[:50]  # Limit length
+            safe_title = "".join(
+                c for c in assignment.title if c.isalnum() or c in (" ", "-", "_")
+            ).strip()
+            safe_title = safe_title.replace(" ", "_")[:50]  # Limit length
             filename = f"{safe_title}_Assignment.pdf"
-            
-            logger.info(f"Successfully generated PDF for assignment {assignment_id}, size: {len(pdf_content)} bytes")
-            
+
+            logger.info(
+                f"Successfully generated PDF for assignment {assignment_id}, size: {len(pdf_content)} bytes"
+            )
+
             # Return PDF response
             return Response(
                 content=pdf_content,
@@ -2769,35 +3033,33 @@ async def download_assignment_pdf(
                     "Cache-Control": "no-cache, no-store, must-revalidate",
                     "Pragma": "no-cache",
                     "Expires": "0",
-                }
+                },
             )
-            
+
         finally:
             # Always cleanup temporary files
             pdf_generator.cleanup()
-            
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error generating PDF for assignment {assignment_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate assignment PDF"
+            detail="Failed to generate assignment PDF",
         )
 
 
 @router.get("/api/assignments/test-google-forms")
-async def test_google_forms_connection(
-    current_user=Depends(get_current_user)
-):
+async def test_google_forms_connection(current_user=Depends(get_current_user)):
     """Test Google Forms service connection and domain-wide delegation."""
     try:
         # Get Google Forms service
         google_forms_service = get_google_forms_service()
-        
+
         # Test the connection
         result = google_forms_service.test_connection()
-        
+
         if result["success"]:
             return {
                 "success": True,
@@ -2805,23 +3067,23 @@ async def test_google_forms_connection(
                 "form_id": result["form_id"],
                 "edit_url": result["edit_url"],
                 "response_url": result["response_url"],
-                "service_available": google_forms_service.is_available()
+                "service_available": google_forms_service.is_available(),
             }
         else:
             return {
                 "success": False,
                 "message": "Google Forms service test failed",
                 "error": result.get("error", "Unknown error"),
-                "service_available": google_forms_service.is_available()
+                "service_available": google_forms_service.is_available(),
             }
-            
+
     except Exception as e:
         logger.error(f"Error testing Google Forms service: {str(e)}")
         return {
             "success": False,
             "message": "Google Forms service test failed with exception",
             "error": str(e),
-            "service_available": False
+            "service_available": False,
         }
 
 
@@ -2829,83 +3091,99 @@ async def test_google_forms_connection(
 async def generate_google_form(
     assignment_id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """Generate a Google Form from an existing assignment."""
     try:
         # Get the assignment
-        assignment = db.query(Assignment).filter(
-            and_(
-                Assignment.id == assignment_id,
-                Assignment.user_id == current_user["uid"]
+        assignment = (
+            db.query(Assignment)
+            .filter(
+                and_(
+                    Assignment.id == assignment_id,
+                    Assignment.user_id == current_user["uid"],
+                )
             )
-        ).first()
-        
+            .first()
+        )
+
         if not assignment:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Assignment not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
-        
+
         # Get Google Forms service
         google_forms_service = get_google_forms_service()
-        
+
         if not google_forms_service.is_available():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Google Forms service not available. Please contact administrator to configure Google Cloud credentials."
+                detail="Google Forms service not available. Please contact administrator to configure Google Cloud credentials.",
             )
-        
+
         # Prepare assignment data for form creation
         assignment_data = {
             "title": assignment.title,
             "description": assignment.description,
-            "questions": assignment.questions or []
+            "questions": assignment.questions or [],
         }
-        
+
         # Create Google Form
         result = google_forms_service.create_form_from_assignment(assignment_data)
-        
+
         if result["success"]:
             # Update assignment with Google Form URLs
             assignment.google_form_url = result["edit_url"]
             assignment.google_form_response_url = result["response_url"]
             db.commit()
-            
-            logger.info(f"Created Google Form for assignment {assignment_id}: {result['form_id']}")
-            
+
+            logger.info(
+                f"Created Google Form for assignment {assignment_id}: {result['form_id']}"
+            )
+
             return {
                 "success": True,
                 "form_id": result["form_id"],
                 "edit_url": result["edit_url"],
                 "response_url": result["response_url"],
-                "google_resource_url": result["edit_url"],  # Frontend expects this field
-                "message": "Google Form created successfully"
+                "google_resource_url": result[
+                    "edit_url"
+                ],  # Frontend expects this field
+                "message": "Google Form created successfully",
             }
         else:
-            error_message = result.get('error', 'Unknown error')
-            logger.error(f"Failed to create Google Form for assignment {assignment_id}: {error_message}")
-            
+            error_message = result.get("error", "Unknown error")
+            logger.error(
+                f"Failed to create Google Form for assignment {assignment_id}: {error_message}"
+            )
+
             # Provide user-friendly error messages
-            if "Permission denied" in error_message or "403" in str(result.get('api_error', '')):
+            if "Permission denied" in error_message or "403" in str(
+                result.get("api_error", "")
+            ):
                 user_message = "Google Forms integration is not properly configured. Please contact your administrator."
-            elif "internal error" in error_message.lower() or "500" in str(result.get('api_error', '')):
+            elif "internal error" in error_message.lower() or "500" in str(
+                result.get("api_error", "")
+            ):
                 user_message = "Google Forms service is temporarily unavailable. Please try again later."
             else:
-                user_message = "Failed to create Google Form. Please try again or contact support."
-            
+                user_message = (
+                    "Failed to create Google Form. Please try again or contact support."
+                )
+
             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=user_message
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=user_message
             )
-            
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error generating Google Form for assignment {assignment_id}: {str(e)}")
+        logger.error(
+            f"Error generating Google Form for assignment {assignment_id}: {str(e)}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate Google Form"
+            detail="Failed to generate Google Form",
         )
 
 
@@ -2913,44 +3191,49 @@ async def generate_google_form(
 async def get_google_form_url(
     assignment_id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """Get the Google Form URL for an existing assignment."""
     try:
         # Get the assignment
-        assignment = db.query(Assignment).filter(
-            and_(
-                Assignment.id == assignment_id,
-                Assignment.user_id == current_user["uid"]
+        assignment = (
+            db.query(Assignment)
+            .filter(
+                and_(
+                    Assignment.id == assignment_id,
+                    Assignment.user_id == current_user["uid"],
+                )
             )
-        ).first()
-        
+            .first()
+        )
+
         if not assignment:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Assignment not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
-        
+
         # Check if Google Form URL exists
         if not assignment.google_form_url:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No Google Form exists for this assignment"
+                detail="No Google Form exists for this assignment",
             )
-        
+
         return {
             "google_resource_url": assignment.google_form_url,
             "google_form_response_url": assignment.google_form_response_url,
-            "message": "Google Form URL retrieved successfully"
+            "message": "Google Form URL retrieved successfully",
         }
-            
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting Google Form URL for assignment {assignment_id}: {str(e)}")
+        logger.error(
+            f"Error getting Google Form URL for assignment {assignment_id}: {str(e)}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve Google Form URL"
+            detail="Failed to retrieve Google Form URL",
         )
 
 
@@ -2958,144 +3241,162 @@ async def get_google_form_url(
 async def make_google_form_public(
     assignment_id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """Make an existing Google Form publicly accessible."""
     try:
         # Get the assignment
-        assignment = db.query(Assignment).filter(
-            and_(
-                Assignment.id == assignment_id,
-                Assignment.user_id == current_user["uid"]
+        assignment = (
+            db.query(Assignment)
+            .filter(
+                and_(
+                    Assignment.id == assignment_id,
+                    Assignment.user_id == current_user["uid"],
+                )
             )
-        ).first()
-        
+            .first()
+        )
+
         if not assignment:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Assignment not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
-        
+
         # Check if Google Form exists
         if not assignment.google_form_url:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No Google Form exists for this assignment"
+                detail="No Google Form exists for this assignment",
             )
-        
+
         # Extract form ID from URL
         try:
             # URL format: https://docs.google.com/forms/d/{form_id}/edit
-            form_id = assignment.google_form_url.split('/d/')[1].split('/')[0]
+            form_id = assignment.google_form_url.split("/d/")[1].split("/")[0]
         except (IndexError, AttributeError):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid Google Form URL format"
+                detail="Invalid Google Form URL format",
             )
-        
+
         # Get Google Forms service and make form public
         google_forms_service = get_google_forms_service()
-        
+
         if not google_forms_service.is_available():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Google Forms service not available"
+                detail="Google Forms service not available",
             )
-        
+
         # Make the form public
         google_forms_service._make_form_public(form_id)
-        
-        logger.info(f"Made existing Google Form {form_id} public for assignment {assignment_id}")
-        
+
+        logger.info(
+            f"Made existing Google Form {form_id} public for assignment {assignment_id}"
+        )
+
         return {
             "success": True,
             "form_id": form_id,
             "message": "Google Form is now publicly accessible",
             "google_resource_url": assignment.google_form_url,
-            "google_form_response_url": assignment.google_form_response_url
+            "google_form_response_url": assignment.google_form_response_url,
         }
-            
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error making Google Form public for assignment {assignment_id}: {str(e)}")
+        logger.error(
+            f"Error making Google Form public for assignment {assignment_id}: {str(e)}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to make Google Form public"
+            detail="Failed to make Google Form public",
         )
 
 
 @router.post("/api/assignments/make-all-google-forms-public")
 async def make_all_google_forms_public(
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
 ):
     """Make all existing Google Forms for the current user publicly accessible."""
     try:
         # Get all assignments with Google Forms for this user
-        assignments = db.query(Assignment).filter(
-            and_(
-                Assignment.user_id == current_user["uid"],
-                Assignment.google_form_url.isnot(None),
-                Assignment.google_form_url != ""
+        assignments = (
+            db.query(Assignment)
+            .filter(
+                and_(
+                    Assignment.user_id == current_user["uid"],
+                    Assignment.google_form_url.isnot(None),
+                    Assignment.google_form_url != "",
+                )
             )
-        ).all()
-        
+            .all()
+        )
+
         if not assignments:
             return {
                 "success": True,
                 "message": "No Google Forms found to make public",
                 "processed_count": 0,
                 "successful_count": 0,
-                "failed_count": 0
+                "failed_count": 0,
             }
-        
+
         google_forms_service = get_google_forms_service()
-        
+
         if not google_forms_service.is_available():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Google Forms service not available"
+                detail="Google Forms service not available",
             )
-        
+
         successful_count = 0
         failed_count = 0
         failed_assignments = []
-        
+
         for assignment in assignments:
             try:
                 # Extract form ID from URL
-                form_id = assignment.google_form_url.split('/d/')[1].split('/')[0]
-                
+                form_id = assignment.google_form_url.split("/d/")[1].split("/")[0]
+
                 # Make the form public
                 google_forms_service._make_form_public(form_id)
                 successful_count += 1
-                
-                logger.info(f"Made Google Form {form_id} public for assignment {assignment.id}")
-                
+
+                logger.info(
+                    f"Made Google Form {form_id} public for assignment {assignment.id}"
+                )
+
             except Exception as e:
                 failed_count += 1
-                failed_assignments.append({
-                    "assignment_id": assignment.id,
-                    "assignment_title": assignment.title,
-                    "error": str(e)
-                })
-                logger.error(f"Failed to make form public for assignment {assignment.id}: {e}")
-        
+                failed_assignments.append(
+                    {
+                        "assignment_id": assignment.id,
+                        "assignment_title": assignment.title,
+                        "error": str(e),
+                    }
+                )
+                logger.error(
+                    f"Failed to make form public for assignment {assignment.id}: {e}"
+                )
+
         return {
             "success": True,
             "message": f"Processed {len(assignments)} Google Forms",
             "processed_count": len(assignments),
             "successful_count": successful_count,
             "failed_count": failed_count,
-            "failed_assignments": failed_assignments if failed_assignments else None
+            "failed_assignments": failed_assignments if failed_assignments else None,
         }
-            
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error making all Google Forms public for user {current_user['uid']}: {str(e)}")
+        logger.error(
+            f"Error making all Google Forms public for user {current_user['uid']}: {str(e)}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to make Google Forms public"
+            detail="Failed to make Google Forms public",
         )

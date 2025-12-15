@@ -7,25 +7,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     # Service containers to run with `runner-job`
-    services:
-      # Label used to access the service container
-      postgres:
-        # Docker Hub image
-        image: postgres
-        # Provide the password for postgres
-        env:
-          POSTGRES_DB: ${{ secrets.DB_NAME }}
-          POSTGRES_USER: ${{ secrets.DB_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.DB_PASS }}
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          # Maps tcp port 5432 on service container to the host
-          - 5432:5432
     steps:
       - uses: actions/checkout@v5
       - name: Set up Python 3.13
@@ -35,32 +16,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Create Firebase Config file
-        run: |
-          touch src/${{ secrets.FIREBASE_CONFIG }}
-          cat <<EOF >src/${{ secrets.FIREBASE_CONFIG }}
-          ${{ secrets.FIREBASE_CONFIG_CONTENT }}
-          EOF
-      - name: Create .env file
-        run: |
-          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> ./.env
-          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> ./.env
-          echo "AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}" >> ./.env
-          echo "AWS_S3_REGION=${{ secrets.AWS_S3_REGION }}" >> ./.env
-          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ./.env
-          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ./.env
-          echo "FIREBASE_CONFIG=${{ secrets.FIREBASE_CONFIG }}" >> ./.env
-          echo "DEEPGRAM_API_KEY=${{ secrets.DEEPGRAM_API_KEY }}" >> ./.env
-          echo "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" >> ./.env
-          echo "STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}" >> ./.env
-          echo "STRIPE_PLUS_MONTHLY_PRICE_ID=${{ secrets.STRIPE_PLUS_MONTHLY_PRICE_ID }}" >> ./.env
-          echo "STRIPE_PLUS_ANNUAL_PRICE_ID=${{ secrets.STRIPE_PLUS_ANNUAL_PRICE_ID }}" >> ./.env
-          echo "STRIPE_PRO_MONTHLY_PRICE_ID=${{ secrets.STRIPE_PRO_MONTHLY_PRICE_ID }}" >> ./.env
-          echo "STRIPE_PRO_ANNUAL_PRICE_ID=${{ secrets.STRIPE_PRO_ANNUAL_PRICE_ID }}" >> ./.env
-          echo "STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}" >> ./.env
-          echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" >> ./.env
-          echo "POPPLER_PATH=/usr/bin/" >> ./.env
+          pip install pre-commit==4.3.0
       - name: Run Static Checks
         uses: pre-commit/action@v3.0.0
       - name: SSH into ec2 and execute commands
@@ -77,11 +33,17 @@ jobs:
             python3.13 -m venv venv
             source venv/bin/activate
             cd vidya_ai_backend
+            pip install --upgrade pip
             pip install -r requirements.txt
+            pip uninstall -y opencv-python-headless==4.12.0.88
+            pip install opencv-python-headless==4.12.0.88
             pip install gunicorn
             touch src/${{ secrets.FIREBASE_CONFIG }}
             cat <<EOF >src/${{ secrets.FIREBASE_CONFIG }}
             ${{ secrets.FIREBASE_CONFIG_CONTENT }}
+            EOF
+            cat <<EOF >${{ secrets.GOOGLE_CLOUD_CREDENTIALS_FILE }}
+            ${{ secrets.GOOGLE_CLOUD_CREDENTIALS_FILE_CONTENT }}
             EOF
             touch .env
             cat <<EOF >.env
@@ -92,6 +54,7 @@ jobs:
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             FIREBASE_CONFIG=${{ secrets.FIREBASE_CONFIG }}
+            GOOGLE_CLOUD_CREDENTIALS_FILE=${{ secrets.GOOGLE_CLOUD_CREDENTIALS_FILE }}
             DEEPGRAM_API_KEY=${{ secrets.DEEPGRAM_API_KEY }}
             STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
             STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
@@ -101,6 +64,9 @@ jobs:
             STRIPE_PRO_ANNUAL_PRICE_ID=${{ secrets.STRIPE_PRO_ANNUAL_PRICE_ID }}
             STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+
+            DIAGRAM_YOLO_MODEL_PATH=${{ secrets.DIAGRAM_YOLO_MODEL_PATH }}
             POPPLER_PATH=/usr/bin/
             EOF
             alembic upgrade head

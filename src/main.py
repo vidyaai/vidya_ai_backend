@@ -35,7 +35,6 @@ async def startup_event():
     logger.info("✅ Startup complete")
 
 
-
 @app.middleware("http")
 async def logging_middleware(request, call_next):
     import time
@@ -61,7 +60,7 @@ async def add_security_headers(request, call_next):
     response = await call_next(request)
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Methods"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
     response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
@@ -72,18 +71,16 @@ async def add_security_headers(request, call_next):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://d1xrorvpgizypa.cloudfront.net",
         "https://vidyaai.co",
         "http://localhost:3000",
         "http://localhost:5173",
         "https://www.vidyaai.co",
-        "https://upload-video.d2krgf8gkzw2h8.amplifyapp.com",
-        "https://upload-video.d2krgf8gkzw2h8.amplifyapp.com/*",
-        "https://7de5d1a559ab.ngrok-free.app",
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
 
 

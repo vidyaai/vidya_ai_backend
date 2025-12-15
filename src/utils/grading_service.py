@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone
@@ -17,7 +18,7 @@ class LLMGrader:
     `diagram` (with `s3_key`), and nested `subAnswers` for multi-part questions.
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o") -> None:
+    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-5") -> None:
         if api_key:
             self.client = OpenAI(api_key=api_key)
         else:
@@ -34,8 +35,18 @@ class LLMGrader:
 
         Returns: total_score, total_points, feedback_by_question, overall_feedback
         """
-        flattened_questions = self._flatten_questions(assignment.get("questions", []))
+        # Extract answered subquestion IDs for optional parts filtering
+        answered_subquestion_ids = self._extract_answered_subquestion_ids(
+            assignment.get("questions", []), submission_answers
+        )
+
+        flattened_questions = self._flatten_questions(
+            assignment.get("questions", []), "", answered_subquestion_ids
+        )
+        print("flattened_questions", json.dumps(flattened_questions, indent=2))
+
         flattened_answers = self._flatten_answers(submission_answers)
+        print("flattened_answers", json.dumps(flattened_answers, indent=2))
 
         # Partition questions: deterministic (MCQ/TF) vs LLM-required
         deterministic_questions: List[Dict[str, Any]] = []
@@ -106,6 +117,7 @@ class LLMGrader:
                     )
                 except Exception:
                     # If presign fails, proceed without image
+                    print(f"Failed to presign S3 key: {s3_key}")
                     pass
 
             # Make single LLM call
@@ -146,6 +158,7 @@ class LLMGrader:
     ) -> Optional[str]:
         """Parse MCQ answer to index string. Handles:
         - Index strings: "0", "1", "2"
+        - Single letters: "A", "B", "C", "D" (most common format)
         - Letter prefixes: "A)", "B.", "a)", "b."
         - Roman numerals: "i)", "ii)", "I)", "II."
         - Numbered: "1.", "2.", "3)"
@@ -162,7 +175,15 @@ class LLMGrader:
             if 0 <= idx < len(options):
                 return str(idx)
 
-        # Letter prefix match (A, B, C, D, etc.)
+        # Single letter match (A, B, C, D, etc.) - Handle before letter prefix
+        # This is the most common format in student answers
+        if len(answer) == 1 and answer.isalpha():
+            letter = answer.upper()
+            letter_idx = ord(letter) - ord("A")
+            if 0 <= letter_idx < len(options):
+                return str(letter_idx)
+
+        # Letter prefix match (A), B., a), b.)
         if len(answer) >= 2 and answer[0].isalpha() and answer[1] in ".)":
             letter = answer[0].upper()
             letter_idx = ord(letter) - ord("A")
@@ -198,7 +219,7 @@ class LLMGrader:
                 return str(idx)
 
         # Numbered prefix match (1., 2., 3), etc.)
-        if answer[0].isdigit() and len(answer) > 1 and answer[1] in ".)":
+        if len(answer) > 1 and answer[0].isdigit() and answer[1] in ".)":
             idx = int(answer[0]) - 1  # Convert 1-based to 0-based
             if 0 <= idx < len(options):
                 return str(idx)
@@ -372,48 +393,67 @@ class LLMGrader:
         }
 
     def _flatten_questions(
-        self, questions: List[Dict[str, Any]], parent_id: str = ""
+        self,
+        questions: List[Dict[str, Any]],
+        parent_id: str = "",
+        answered_subquestion_ids: Dict[str, List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Recursively flatten questions to handle nested multi-part questions at any depth.
 
-        Generates composite IDs that match the flattened answer structure:
-        - Top-level questions: keep original ID
-        - Subquestions: create composite IDs like "1.1", "1.2", "2.1", etc. (sequential numbering)
+        Generates composite IDs that match the PDF extraction format:
+        - Top-level questions: keep original ID (e.g., "1", "17", "33")
+        - Subquestions: create composite IDs like "17.1", "17.2", "33.1.1" using sequential numbering
+        This matches the format from _normalize_question_number() in pdf_answer_processor.py
+
+        For optional parts (optionalParts: true), only includes subquestions that were answered.
         """
+        if answered_subquestion_ids is None:
+            answered_subquestion_ids = {}
+
         flattened: List[Dict[str, Any]] = []
+        subquestion_counter = 0  # Counter for subquestions at current level
+
         for q in questions:
             original_id = str(q.get("id"))
 
             if q.get("type") == "multi-part" and q.get("subquestions"):
-                # For multi-part questions, flatten subquestions with sequential numbering
+                # For multi-part questions, flatten subquestions
                 if parent_id:
-                    # Nested multi-part: use parent_id as prefix
-                    sub_parent_id = f"{parent_id}.{original_id}"
+                    # Nested multi-part: increment counter and use as part of parent ID
+                    subquestion_counter += 1
+                    sub_parent_id = f"{parent_id}.{subquestion_counter}"
                 else:
                     # Top-level multi-part: use original ID as prefix
                     sub_parent_id = original_id
 
+                # For optional parts, filter to only include answered subquestions
+                subquestions_to_process = q.get("subquestions", [])
+                if q.get("optionalParts"):
+                    # Get list of answered subquestion IDs for this question
+                    answered_subq_ids = answered_subquestion_ids.get(original_id, [])
+                    # Filter to only include answered subquestions
+                    subquestions_to_process = [
+                        subq
+                        for subq in subquestions_to_process
+                        if str(subq.get("id")) in answered_subq_ids
+                    ]
+
                 # Recursively flatten subquestions with composite parent ID
                 sub_flattened = self._flatten_questions(
-                    q.get("subquestions", []), sub_parent_id
+                    subquestions_to_process, sub_parent_id, answered_subquestion_ids
                 )
                 flattened.extend(sub_flattened)
             else:
                 # Regular question - create composite ID if we have a parent
                 if parent_id:
-                    # Use sequential numbering within the parent (1, 2, 3, etc.)
-                    # Count existing questions with this parent to get next sequence number
-                    existing_count = sum(
-                        1
-                        for fq in flattened
-                        if fq.get("id", "").startswith(f"{parent_id}.")
-                    )
-                    next_seq = existing_count + 1
-
-                    composite_id = f"{parent_id}.{next_seq}"
+                    # Use SEQUENTIAL numbering (1, 2, 3...) to match PDF extraction format
+                    # This matches how 17(a) -> 17.1, 17(b) -> 17.2 in pdf_answer_processor
+                    subquestion_counter += 1
+                    composite_id = f"{parent_id}.{subquestion_counter}"
                     # Create a copy of the question with the composite ID
                     q_copy = q.copy()
                     q_copy["id"] = composite_id
+                    q_copy["original_id"] = original_id  # Keep original for reference
                     flattened.append(q_copy)
                 else:
                     # Top-level question - keep original ID
@@ -427,6 +467,7 @@ class LLMGrader:
         - String answers: keep as-is
         - Object answers with text/diagram: keep object structure
         - Answers with subAnswers: recursively flatten at any depth
+        - Direct answers to multi-part questions: stored at parent level for fallback
         """
         flattened: Dict[str, Any] = {}
 
@@ -440,17 +481,62 @@ class LLMGrader:
                     sub_answers = answer.get("subAnswers", {})
                     sub_flattened = self._flatten_answers(sub_answers)
                     for sub_id, sub_answer in sub_flattened.items():
-                        # Create composite question ID (e.g., "1.1", "1.2")
+                        # Create composite question ID (e.g., "17.171", "29.294.1761205736950")
                         composite_id = f"{question_id}.{sub_id}"
                         flattened[composite_id] = sub_answer
+
+                    # Also store the parent-level answer if it has text/diagram
+                    # This handles cases where student provides answer at parent level
+                    if answer.get("text") or answer.get("diagram"):
+                        flattened[question_id] = {
+                            k: v for k, v in answer.items() if k != "subAnswers"
+                        }
                 else:
-                    # Object answer with text/diagram - keep structure
+                    # Object answer with text/diagram but no subAnswers
+                    # This might be a direct answer to a multi-part question
+                    # Store it at the parent level - the grading logic will handle it
                     flattened[question_id] = answer
             else:
                 # Fallback - convert to string
                 flattened[question_id] = str(answer)
 
         return flattened
+
+    def _extract_answered_subquestion_ids(
+        self, questions: List[Dict[str, Any]], answers: Dict[str, Any]
+    ) -> Dict[str, List[str]]:
+        """Extract which subquestions were answered for optional parts questions.
+
+        Returns a dictionary mapping question IDs to lists of answered subquestion IDs.
+        """
+        answered_map = {}
+
+        for q in questions:
+            q_id = str(q.get("id"))
+            if q.get("type") == "multi-part" and q.get("optionalParts"):
+                answer_obj = answers.get(q_id)
+                if answer_obj and isinstance(answer_obj, dict):
+                    subanswers = answer_obj.get("subAnswers", {})
+                    # Track which subquestions have non-empty answers
+                    answered_subq_ids = [k for k, v in subanswers.items() if v]
+                    answered_map[q_id] = answered_subq_ids
+
+                    # Recursively handle nested optional parts
+                    if q.get("subquestions"):
+                        for subq in q.get("subquestions"):
+                            subq_id = str(subq.get("id"))
+                            if subq.get("type") == "multi-part" and subq.get(
+                                "optionalParts"
+                            ):
+                                subq_answer = subanswers.get(subq_id)
+                                if subq_answer and isinstance(subq_answer, dict):
+                                    subq_subanswers = subq_answer.get("subAnswers", {})
+                                    answered_subsubq_ids = [
+                                        k for k, v in subq_subanswers.items() if v
+                                    ]
+                                    answered_map[subq_id] = answered_subsubq_ids
+
+        return answered_map
 
     def _build_bulk_prompt(
         self,
@@ -464,6 +550,7 @@ class LLMGrader:
         """
         prompt_parts = []
         diagram_s3_keys = []
+        diagram_index = 0
 
         prompt_parts.append(
             "You are an expert academic grader. Grade this student's submission for all questions. "
@@ -479,6 +566,8 @@ class LLMGrader:
             '  "overall_feedback": "<overall assessment>"\n'
             "}\n\n"
             "GRADING CRITERIA:\n"
+            "- Grade strictly according to the provided rubric and max points.\n\n"
+            "Questions, reference answers, rubrics, max points, and student answers follow:\n"
         )
 
         for question in flattened_questions:
@@ -518,9 +607,19 @@ class LLMGrader:
                     if diagram and isinstance(diagram, dict):
                         s3_key = diagram.get("s3_key")
                         if s3_key:
+                            diagram_index = diagram_index + 1
+                            ordinal_suffix = (
+                                "st"
+                                if diagram_index == 1
+                                else "nd"
+                                if diagram_index == 2
+                                else "rd"
+                                if diagram_index == 3
+                                else "th"
+                            )
                             diagram_s3_keys.append(s3_key)
                             prompt_parts.append(
-                                f"STUDENT ANSWER (diagram): [Image attached - see diagram for question {q_id}]"
+                                f"STUDENT ANSWER (diagram): [Image attached - see {diagram_index}{ordinal_suffix} image]"
                             )
             else:
                 prompt_parts.append("STUDENT ANSWER: <no answer provided>")
