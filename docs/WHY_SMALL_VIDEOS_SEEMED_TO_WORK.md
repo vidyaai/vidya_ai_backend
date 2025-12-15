@@ -112,15 +112,15 @@ This happens for **ALL videos**, regardless of size!
 ```python
 def get_video_path(db: Session, video_id: str) -> Optional[str]:
     video = db.query(Video).filter(Video.id == video_id).first()
-    
+
     # Priority 1: S3 URL (if s3_key exists)
     if video.s3_key and s3_client and AWS_S3_BUCKET:
         return s3_presign_url(video.s3_key, expires_in=3600)  # ← Returns HTTPS URL
-    
+
     # Priority 2: Local path (if file exists)
     if video.download_path and os.path.exists(video.download_path):
         return video.download_path  # ← Returns local path
-    
+
     return None
 ```
 
@@ -158,11 +158,11 @@ def grab_youtube_frame(video_path, timestamp, output_file):
             for chunk in response.iter_content(chunk_size=1024*1024):
                 f.write(chunk)
         video_path = temp_file.name  # Use temp file instead
-    
+
     # Now OpenCV can read it!
     video = cv2.VideoCapture(video_path)
     # ... extract frame ...
-    
+
     # Cleanup
     if temp_file:
         os.remove(temp_file.name)

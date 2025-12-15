@@ -9,7 +9,7 @@ I've successfully implemented a real-time video download progress bar for your "
 ### Backend Changes (Python/FastAPI)
 
 **1. Modified `src/utils/youtube_utils.py`**
-- Updated `download_video()` to accept optional `video_id_param` 
+- Updated `download_video()` to accept optional `video_id_param`
 - Enhanced `download_file_to_path()` to track download progress:
   - Extracts total file size from `Content-Length` header
   - Updates database every 5MB with current progress

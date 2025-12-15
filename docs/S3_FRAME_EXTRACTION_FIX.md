@@ -36,11 +36,11 @@ def grab_youtube_frame(video_path_func, timestamp, output_file):
             for chunk in response.iter_content(chunk_size=1MB):
                 f.write(chunk)
         video_path = temp_path
-    
+
     # Now use local file with OpenCV
     video = cv2.VideoCapture(video_path)
     # ... extract frame ...
-    
+
     # Cleanup temp file
     if temp_file:
         os.remove(temp_file.name)
@@ -88,7 +88,7 @@ OpenCV's video capture is designed for:
 
 **Before:** ❌ Instant failure - OpenCV can't read URL
 
-**After:** 
+**After:**
 - Download time: ~10-30 seconds (depending on video size & connection)
 - Frame extraction: <1 second
 - Total: ~10-30 seconds for first frame query
@@ -175,7 +175,7 @@ No additional dependencies needed - uses existing libraries.
 
 Users can now ask frame-specific questions about **any video**, whether:
 - ✅ Stored on S3
-- ✅ Stored locally  
+- ✅ Stored locally
 - ✅ Small or large (1 hour+)
 - ✅ Just uploaded or old
 

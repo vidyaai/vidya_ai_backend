@@ -43,7 +43,7 @@ The following packages were installed (all pure Python, no system dependencies):
 # Display equation (centered)
 question = "Solve: $$x^2 + 5x + 6 = 0$$"
 
-# Inline equation (in-text)  
+# Inline equation (in-text)
 question = "Find the derivative of $f(x) = x^2$"
 ```
 
@@ -67,7 +67,7 @@ Two comprehensive test PDFs were generated successfully:
 
 Both PDFs demonstrate:
 - ✅ Professional equation quality
-- ✅ Proper mathematical typography  
+- ✅ Proper mathematical typography
 - ✅ Research paper formatting
 - ✅ Multiple equation formats
 - ✅ No rendering errors

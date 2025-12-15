@@ -69,7 +69,7 @@ I have completely transformed the mathematical equation rendering from **images 
 Generated three test PDFs demonstrating the progression:
 
 1. **`test_equations_output.pdf`** (81KB) - Original image-based equations
-2. **`ieee_style_question_paper.pdf`** (46KB) - Improved formatting with images  
+2. **`ieee_style_question_paper.pdf`** (46KB) - Improved formatting with images
 3. **`selectable_math_test.pdf`** (19KB) - **Final solution with selectable text**
 
 ## 🎯 Why Professors Will Love This
@@ -79,7 +79,7 @@ Generated three test PDFs demonstrating the progression:
 - Times New Roman font throughout
 - Clean, minimal design without distracting elements
 
-### ✅ **Practical Usability**  
+### ✅ **Practical Usability**
 - Can select and copy mathematical expressions
 - Easy to modify equations for different versions
 - Accessible to students with disabilities
@@ -100,7 +100,7 @@ The PDF generation system now produces **professional, professor-friendly docume
 
 - ✅ **Selectable mathematical text** (no images)
 - ✅ **IEEE paper formatting** standards
-- ✅ **80% smaller file sizes** 
+- ✅ **80% smaller file sizes**
 - ✅ **Complete accessibility** support
 - ✅ **Professional typography** throughout
 - ✅ **Copy/paste friendly** equations

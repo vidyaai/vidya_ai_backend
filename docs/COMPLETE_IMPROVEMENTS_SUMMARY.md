@@ -111,11 +111,11 @@ def grab_youtube_frame(video_path, timestamp, output_file):
             for chunk in response.iter_content(chunk_size=1MB):
                 f.write(chunk)
         video_path = temp_path
-    
+
     # 3. Extract frame with OpenCV
     video = cv2.VideoCapture(video_path)
     # ... extract frame ...
-    
+
     # 4. Cleanup
     if temp_file:
         os.remove(temp_file.name)

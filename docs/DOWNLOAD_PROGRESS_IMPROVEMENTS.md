@@ -182,7 +182,7 @@ UI: Finalizing download... 100%
    cd vidya_ai_backend/src
    source ../venv/bin/activate
    python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-   
+
    # Frontend
    cd vidya_ai_frontend
    npm run dev
