@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -20,19 +21,24 @@ from routes.payments import router as payments_router
 from utils.youtube_utils import start_cache_cleanup_thread
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    # Startup
+    logger.info("🚀 Starting up Vidya AI Backend...")
+    start_cache_cleanup_thread()
+    logger.info("✅ Startup complete")
+    yield
+    # Shutdown (if needed in the future)
+    logger.info("👋 Shutting down Vidya AI Backend...")
+
+
 app = FastAPI(
     title="Vidya AI Backend API",
     description="Vidya AI Backend API",
     version="1.0.0",
+    lifespan=lifespan,
 )
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize background tasks on startup"""
-    logger.info("🚀 Starting up Vidya AI Backend...")
-    start_cache_cleanup_thread()
-    logger.info("✅ Startup complete")
 
 
 @app.middleware("http")
