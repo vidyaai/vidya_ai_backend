@@ -115,6 +115,12 @@ class SharedLink(Base):
     )  # True for public links, False for invite-only
     title = Column(String, nullable=True)  # Custom title for the shared link
     description = Column(String, nullable=True)  # Optional description
+    share_format = Column(
+        String, default="html_form"
+    )  # Format for assignment sharing: "html_form", "pdf", or "google_forms"
+    google_resource_url = Column(
+        String, nullable=True
+    )  # Google Form URL when share_format is "google_forms"
 
     # Access control
     expires_at = Column(DateTime, nullable=True)  # Optional expiration date

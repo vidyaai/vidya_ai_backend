@@ -297,6 +297,7 @@ class ShareAssignmentRequest(BaseModel):
     assignment_id: str
     shared_with_user_ids: List[str]  # Firebase UIDs
     permission: str = "view"  # "view", "edit", "complete"
+    share_format: str = "html_form"  # "html_form", "pdf", or "google_forms"
     title: Optional[str] = None  # Custom title for the shared assignment
     description: Optional[str] = None  # Optional description
     is_public: bool = False  # Whether this creates a public link
@@ -312,6 +313,8 @@ class SharedAssignmentOut(BaseModel):
     owner_email: Optional[str] = None  # Email of the owner
     title: Optional[str] = None
     description: Optional[str] = None
+    share_format: str = "html_form"  # "html_form", "pdf", or "google_forms"
+    google_resource_url: Optional[str] = None  # Google Form URL when share_format is "google_forms"
     is_public: bool
     expires_at: Optional[datetime] = None
     created_at: datetime

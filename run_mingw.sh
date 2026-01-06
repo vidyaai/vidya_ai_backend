@@ -1,6 +1,6 @@
-.\vai_venv\Scripts\activate
+. ./vai_venv/Scripts/activate
 
 # Suppress GLib-GIO warnings about UWP apps (harmless Windows-specific noise)
-$env:G_MESSAGES_DEBUG = ""
+export G_MESSAGES_DEBUG=""
 
-python src\main.py
+python src/main.py
