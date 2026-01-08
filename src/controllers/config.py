@@ -26,13 +26,14 @@ except Exception:
     # Best-effort; if reconfigure isn't supported, continue with defaults
     pass
 
-# Ensure log directory exists
-if os.name == "nt":
-    log_file_path = "E:/VidyAI/Dev/vidya_ai_backend/log/vidyaai_api.log"
-else:
-    log_file_path = "/var/log/vidyaai_api/vidyaai_api.log"  # for Linux
-log_dir = os.path.dirname(log_file_path)
-os.makedirs(log_dir, exist_ok=True)
+# Ensure log directory exists - use project-relative path for better portability
+# Get the project root directory (vidya_ai_backend)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+logs_dir = os.path.join(project_root, "logs")
+log_file_path = os.path.join(logs_dir, "vidyaai_api.log")
+
+# Create logs directory in project root (no permission issues)
+os.makedirs(logs_dir, exist_ok=True)
 
 # Configure logging with both file and console handlers
 logging.basicConfig(
