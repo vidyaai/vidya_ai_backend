@@ -36,3 +36,8 @@ question_papers_log/
 *.log
 
 debug/
+
+# LTI Security Keys - NEVER COMMIT
+private.key
+public.key
+lti_config.production.json

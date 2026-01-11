@@ -355,3 +355,22 @@ class UserUsage(Base):
 
     # Relationship
     user = relationship("User", backref="usage_records")
+
+
+class CanvasLTISession(Base):
+    """Store Canvas LTI session data for assignment generation"""
+    __tablename__ = "canvas_lti_sessions"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    session_id = Column(String, unique=True, nullable=False, index=True)
+    canvas_course_id = Column(String, nullable=False, index=True)
+    canvas_course_name = Column(String, nullable=True)
+    canvas_user_id = Column(String, nullable=False)
+    canvas_user_name = Column(String, nullable=True)
+    canvas_user_email = Column(String, nullable=True)
+    canvas_api_domain = Column(String, nullable=True)
+    launch_data = Column(JSONB, nullable=True)
+    is_deep_link = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    expires_at = Column(DateTime, nullable=True)  # Session expiration
+
