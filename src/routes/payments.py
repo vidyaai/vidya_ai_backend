@@ -79,48 +79,6 @@ async def get_pricing_plans():
         raise HTTPException(status_code=500, detail="Failed to get pricing plans")
 
 
-@router.post("/verify-session")
-async def verify_session(
-    request: dict,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    """Verify Stripe checkout session and update subscription (for local testing without webhooks)"""
-    try:
-        session_id = request.get("session_id")
-        if not session_id:
-            raise HTTPException(status_code=400, detail="Session ID required")
-
-        logger.info(f"Verifying session {session_id} for user {current_user['uid']}")
-
-        # Retrieve the session from Stripe
-        session = stripe.checkout.Session.retrieve(session_id)
-
-        # Check if payment was successful
-        if session.payment_status != "paid":
-            raise HTTPException(
-                status_code=400, detail="Payment not completed"
-            )
-
-        # Process the checkout completion
-        await handle_checkout_completed(session, db)
-
-        logger.info(f"✅ Session {session_id} verified and subscription updated")
-
-        return {
-            "success": True,
-            "message": "Subscription activated successfully",
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to verify session: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to verify session: {str(e)}"
-        )
-
-
 @router.post("/create-checkout-session")
 async def create_checkout_session(
     request: PaymentRequest,
@@ -238,25 +196,12 @@ async def get_subscription_status(
             raise HTTPException(status_code=404, detail="User not found")
 
         subscription = (
-            db.query(Subscription)
-            .filter(Subscription.user_id == user.id, Subscription.status == "active")
-            .first()
+            db.query(Subscription).filter(Subscription.user_id == user.id).first()
         )
 
         if not subscription:
-            # No active subscription found - return Free plan
-            return {
-                "subscription": {
-                    "plan_name": "Free",
-                    "plan_key": "free",
-                    "status": "free",
-                    "billing_period": None,
-                    "cancel_at_period_end": False,
-                    "current_period_start": None,
-                    "current_period_end": None,
-                    "stripe_subscription_id": None,
-                }
-            }
+            # No subscription found
+            return {"subscription": None}
 
         # Get plan details
         plan = (
@@ -266,14 +211,11 @@ async def get_subscription_status(
         return {
             "subscription": {
                 "id": subscription.id,
-                "plan_name": plan.name if plan else "Free",
-                "plan_key": plan.plan_key if plan else "free",
+                "plan_name": plan.name if plan else "Unknown Plan",
+                "plan_key": plan.plan_key if plan else "unknown",
                 "status": subscription.status,
                 "billing_period": subscription.billing_period,
                 "cancel_at_period_end": subscription.cancel_at_period_end,
-                "current_period_start": subscription.current_period_start.isoformat()
-                if subscription.current_period_start
-                else None,
                 "current_period_end": subscription.current_period_end.isoformat()
                 if subscription.current_period_end
                 else None,

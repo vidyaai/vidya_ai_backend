@@ -11,12 +11,10 @@ from controllers.db_helpers import (
 )
 from controllers.background_tasks import download_video_background
 from controllers.config import frames_path, download_executor
-from controllers.subscription_service import check_usage_limits, increment_usage, get_user_subscription
 from utils.youtube_utils import download_transcript_api, grab_youtube_frame
 from utils.ml_models import OpenAIVisionClient
 from schemas import VideoQuery
 from utils.firebase_auth import get_current_user
-from models import User
 
 
 router = APIRouter(prefix="/api/query", tags=["Query"])
@@ -33,39 +31,6 @@ async def process_query(
         query = query_request.query
         timestamp = query_request.timestamp
         is_image_query = query_request.is_image_query
-        
-        # Get user from database to get internal user_id
-        user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
-        if not user:
-            # Create user if doesn't exist
-            user = User(
-                firebase_uid=current_user["uid"],
-                email=current_user.get("email"),
-                name=current_user.get("name"),
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-        
-        # Check daily question limit for this specific video
-        usage_check = check_usage_limits(db, user.id, "question_per_video", video_id=video_id)
-        if not usage_check["allowed"]:
-            # Get subscription info for upgrade message
-            subscription = get_user_subscription(db, user.id)
-            plan_name = subscription.plan.name if subscription and subscription.plan else "Free"
-            
-            raise HTTPException(
-                status_code=429,
-                detail={
-                    "error": "limit_reached",
-                    "message": usage_check["reason"],
-                    "limit": usage_check.get("limit"),
-                    "current": usage_check.get("current"),
-                    "current_plan": plan_name,
-                    "upgrade_url": "/pricing"
-                }
-            )
-        
         vision_client = OpenAIVisionClient()
         transcript_to_use = None
         formatting_status_info = get_formatting_status(db, video_id)
@@ -128,10 +93,6 @@ async def process_query(
             response = vision_client.ask_text_only(
                 query, transcript_to_use, query_request.conversation_history
             )
-        
-        # Increment question count for this video
-        increment_usage(db, user.id, "question_per_video", 1, video_id=video_id)
-        
         return {
             "response": response,
             "video_id": video_id,

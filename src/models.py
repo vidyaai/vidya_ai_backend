@@ -334,18 +334,10 @@ class UserUsage(Base):
 
     id = Column(String, primary_key=True, default=generate_uuid)
     user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
-    date = Column(String, nullable=False, index=True)  # Format: "2026-01-05" for daily tracking
-    month_year = Column(String, nullable=False, index=True)  # Format: "2024-09" for legacy
-    
-    # Daily limits tracking
-    videos_analyzed_today = Column(Integer, default=0, nullable=False)  # Videos analyzed per day
-    questions_per_video = Column(JSON, default={}, nullable=False)  # {video_id: question_count}
-    
-    # Legacy monthly tracking (kept for backwards compatibility)
+    month_year = Column(String, nullable=False, index=True)  # Format: "2024-09"
     video_uploads_count = Column(Integer, default=0, nullable=False)
     youtube_chats_count = Column(Integer, default=0, nullable=False)
     translation_minutes_used = Column(Float, default=0.0, nullable=False)
-    
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
         DateTime,
