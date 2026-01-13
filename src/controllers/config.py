@@ -27,10 +27,18 @@ except Exception:
     pass
 
 # Ensure log directory exists
-if os.name == "nt":
+if os.name == "nt":  # Windows
     log_file_path = "E:/VidyAI/Dev/vidya_ai_backend/log/vidyaai_api.log"
+elif sys.platform == "linux":  # Linux
+    log_file_path = "/var/log/vidyaai_api/vidyaai_api.log"
+elif sys.platform == "darwin":  # macOS
+    project_root = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
+    logs_dir = os.path.join(project_root, "logs")
+    log_file_path = os.path.join(logs_dir, "vidyaai_api.log")
 else:
-    log_file_path = "/var/log/vidyaai_api/vidyaai_api.log"  # for Linux
+    log_file_path = "/var/log/vidyaai_api/vidyaai_api.log"  # fallback
 log_dir = os.path.dirname(log_file_path)
 os.makedirs(log_dir, exist_ok=True)
 
