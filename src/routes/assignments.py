@@ -531,6 +531,9 @@ async def get_shared_assignments(
                     assignment_dict, user_id, db
                 )
 
+                # Log share_format for debugging
+                logger.info(f"Shared link {shared_link.id} has share_format: {shared_link.share_format}")
+                
                 shared_assignment_data = {
                     "id": shared_link.id,
                     "share_token": shared_link.share_token,
@@ -540,6 +543,8 @@ async def get_shared_assignments(
                     "owner_email": owner_info.get("email", ""),
                     "title": shared_link.title,
                     "description": shared_link.description,
+                    "share_format": shared_link.share_format or "html_form",
+                    "google_resource_url": shared_link.google_resource_url,
                     "is_public": shared_link.is_public,
                     "expires_at": shared_link.expires_at,
                     "created_at": shared_link.created_at,
@@ -906,7 +911,42 @@ async def share_assignment(
             shared_link.description = share_data.description or shared_link.description
             shared_link.is_public = share_data.is_public
             shared_link.expires_at = share_data.expires_at
+            shared_link.share_format = share_data.share_format
+            # Generate Google Form if needed
+            if share_data.share_format == "google_forms" and not shared_link.google_resource_url:
+                try:
+                    from utils.google_forms_service import get_google_forms_service
+                    google_forms_service = get_google_forms_service()
+                    if google_forms_service.is_available():
+                        assignment_data = {
+                            "title": assignment.title,
+                            "description": assignment.description,
+                            "questions": assignment.questions or [],
+                        }
+                        result = google_forms_service.create_form_from_assignment(assignment_data)
+                        if result["success"]:
+                            shared_link.google_resource_url = result["response_url"]
+                except Exception as e:
+                    logger.error(f"Failed to generate Google Form: {str(e)}")
         else:
+            # Generate Google Form if needed
+            google_form_url = None
+            if share_data.share_format == "google_forms":
+                try:
+                    from utils.google_forms_service import get_google_forms_service
+                    google_forms_service = get_google_forms_service()
+                    if google_forms_service.is_available():
+                        assignment_data = {
+                            "title": assignment.title,
+                            "description": assignment.description,
+                            "questions": assignment.questions or [],
+                        }
+                        result = google_forms_service.create_form_from_assignment(assignment_data)
+                        if result["success"]:
+                            google_form_url = result["response_url"]
+                except Exception as e:
+                    logger.error(f"Failed to generate Google Form: {str(e)}")
+            
             # Create new shared link
             shared_link = SharedLink(
                 share_token=generate_share_token(),
@@ -917,6 +957,8 @@ async def share_assignment(
                 description=share_data.description,
                 is_public=share_data.is_public,
                 expires_at=share_data.expires_at,
+                share_format=share_data.share_format,
+                google_resource_url=google_form_url,
             )
             db.add(shared_link)
             db.flush()  # Get the ID
@@ -953,6 +995,9 @@ async def share_assignment(
         db.commit()
         db.refresh(shared_link)
 
+        # Log what was actually saved
+        logger.info(f"SharedLink {shared_link.id} committed with share_format: {shared_link.share_format}")
+
         total_users = (
             db.query(SharedLinkAccess)
             .filter(SharedLinkAccess.shared_link_id == shared_link.id)
@@ -973,6 +1018,8 @@ async def share_assignment(
             "owner_id": shared_link.owner_id,
             "title": shared_link.title,
             "description": shared_link.description,
+            "share_format": shared_link.share_format,
+            "google_resource_url": shared_link.google_resource_url,
             "is_public": shared_link.is_public,
             "expires_at": shared_link.expires_at,
             "created_at": shared_link.created_at,
@@ -1050,6 +1097,25 @@ async def update_shared_assignment(
         shared_link.description = share_data.description
         shared_link.is_public = share_data.is_public
         shared_link.expires_at = share_data.expires_at
+        shared_link.share_format = share_data.share_format
+        
+        # Generate Google Form if needed and not already generated
+        if share_data.share_format == "google_forms" and not shared_link.google_resource_url:
+            try:
+                from utils.google_forms_service import get_google_forms_service
+                assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+                google_forms_service = get_google_forms_service()
+                if google_forms_service.is_available() and assignment:
+                    assignment_data = {
+                        "title": assignment.title,
+                        "description": assignment.description,
+                        "questions": assignment.questions or [],
+                    }
+                    result = google_forms_service.create_form_from_assignment(assignment_data)
+                    if result["success"]:
+                        shared_link.google_resource_url = result["response_url"]
+            except Exception as e:
+                logger.error(f"Failed to generate Google Form: {str(e)}")
 
         # Update or create shared access records for each user
         shared_accesses = []
@@ -1109,6 +1175,8 @@ async def update_shared_assignment(
             "owner_id": shared_link.owner_id,
             "title": shared_link.title,
             "description": shared_link.description,
+            "share_format": shared_link.share_format,
+            "google_resource_url": shared_link.google_resource_url,
             "is_public": shared_link.is_public,
             "expires_at": shared_link.expires_at,
             "created_at": shared_link.created_at,
@@ -1265,6 +1333,8 @@ async def get_shared_assignment_link(
             "owner_id": shared_link.owner_id,
             "title": shared_link.title,
             "description": shared_link.description,
+            "share_format": shared_link.share_format or "html_form",
+            "google_resource_url": shared_link.google_resource_url,
             "is_public": shared_link.is_public,
             "expires_at": shared_link.expires_at,
             "created_at": shared_link.created_at,
