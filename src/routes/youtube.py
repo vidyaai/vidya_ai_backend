@@ -23,9 +23,14 @@ from controllers.background_tasks import (
 )
 from controllers.storage import s3_presign_url
 from controllers.video_service import get_video_title
+from controllers.subscription_service import (
+    check_usage_limits,
+    increment_usage,
+    get_user_subscription,
+)
 from schemas import YouTubeRequest
 from utils.firebase_auth import get_current_user
-from models import Video
+from models import Video, User
 
 
 router = APIRouter(prefix="/api/youtube", tags=["YouTube"])
@@ -113,6 +118,69 @@ async def get_youtube_info(
     video_id = extract_youtube_id(url)
     if not video_id:
         raise HTTPException(status_code=400, detail="Invalid YouTube URL")
+
+    # Get user from database to get internal user_id
+    user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
+    if not user:
+        # Create user if doesn't exist
+        user = User(
+            firebase_uid=current_user["uid"],
+            email=current_user.get("email"),
+            name=current_user.get("name"),
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    # Check if this is a new video for the user (first time analyzing today)
+    existing_video = (
+        db.query(Video)
+        .filter(Video.id == video_id, Video.user_id == current_user["uid"])
+        .first()
+    )
+
+    # If it's a new video for the user, check daily video limit
+    if not existing_video:
+        usage_check = check_usage_limits(db, user.id, "video_per_day")
+        if not usage_check["allowed"]:
+            # Get subscription info for upgrade message
+            subscription = get_user_subscription(db, user.id)
+            plan_name = (
+                subscription.plan.name if subscription and subscription.plan else "Free"
+            )
+
+            # Calculate time until midnight UTC
+            from datetime import datetime, timezone, timedelta
+
+            now_utc = datetime.now(timezone.utc)
+            next_midnight = (now_utc + timedelta(days=1)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            time_remaining = next_midnight - now_utc
+            hours = int(time_remaining.total_seconds() // 3600)
+            minutes = int((time_remaining.total_seconds() % 3600) // 60)
+
+            # Create user-friendly message
+            time_msg = f"{hours}h {minutes}m" if hours > 0 else f"{minutes} minutes"
+            upgrade_msg = f"Daily limit reached ({usage_check.get('current')}/{usage_check.get('limit')}). Upgrade to Plus or Pro to continue, or try again in {time_msg} (resets at 12:00 AM UTC)."
+
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "limit_reached",
+                    "message": upgrade_msg,
+                    "limit": usage_check.get("limit"),
+                    "current": usage_check.get("current"),
+                    "current_plan": plan_name,
+                    "time_until_reset": time_msg,
+                    "reset_time_utc": "12:00 AM UTC",
+                    "upgrade_url": "/pricing",
+                },
+            )
+
+        # Increment video count for new video
+        increment_usage(db, user.id, "video_per_day", 1)
+
     title = await get_video_title(video_id)
     video_path = get_video_path(db, video_id)
     if video_path:
