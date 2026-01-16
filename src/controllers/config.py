@@ -38,7 +38,11 @@ elif sys.platform == "darwin":  # macOS
     logs_dir = os.path.join(project_root, "logs")
     log_file_path = os.path.join(logs_dir, "vidyaai_api.log")
 else:
-    log_file_path = "/var/log/vidyaai_api/vidyaai_api.log"  # fallback
+    # Use local log directory for macOS/Linux to avoid permission issues
+    base_dir = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
+    log_file_path = os.path.join(base_dir, "logs", "vidyaai_api.log")
 log_dir = os.path.dirname(log_file_path)
 os.makedirs(log_dir, exist_ok=True)
 

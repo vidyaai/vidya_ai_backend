@@ -268,6 +268,8 @@ class AssignmentOut(BaseModel):
     shared_count: str
     created_at: datetime
     updated_at: datetime
+    google_form_url: Optional[str] = None
+    google_form_response_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -295,7 +297,8 @@ class AssignmentSummary(BaseModel):
 
 class ShareAssignmentRequest(BaseModel):
     assignment_id: str
-    shared_with_user_ids: List[str]  # Firebase UIDs
+    shared_with_user_ids: List[str] = []  # Firebase UIDs
+    pending_emails: List[str] = []  # Emails for users not yet registered
     permission: str = "view"  # "view", "edit", "complete"
     title: Optional[str] = None  # Custom title for the shared assignment
     description: Optional[str] = None  # Optional description

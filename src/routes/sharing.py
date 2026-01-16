@@ -17,7 +17,7 @@ from utils.firebase_users import (
     get_user_by_uid,
     validate_user_exists,
 )
-from models import SharedLink, SharedLinkAccess, Folder, Video
+from models import SharedLink, SharedLinkAccess, Folder, Video, Assignment
 from schemas import (
     CreateSharedLinkRequest,
     UpdateSharedLinkRequest,
@@ -478,6 +478,85 @@ async def remove_user_from_shared_link(
     return {"success": True}
 
 
+@router.post("/claim/{share_token}")
+async def claim_shared_assignment(
+    share_token: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Claim access to a public shared assignment.
+    This creates a SharedLinkAccess record so the assignment appears in "Assigned to Me".
+    Only works for public assignment links.
+    """
+    user_id = current_user["uid"]
+
+    # Find the shared link
+    link = db.query(SharedLink).filter(SharedLink.share_token == share_token).first()
+
+    if not link:
+        raise HTTPException(status_code=404, detail="Shared link not found")
+
+    # Only allow claiming for assignments
+    if link.share_type != "assignment":
+        raise HTTPException(
+            status_code=400, detail="Only assignment links can be claimed"
+        )
+
+    # Only allow claiming for public links (private links already have explicit access)
+    if not link.is_public:
+        raise HTTPException(
+            status_code=400,
+            detail="Private links cannot be claimed - you need an invitation",
+        )
+
+    # Don't allow the owner to claim their own assignment
+    if link.owner_id == user_id:
+        raise HTTPException(
+            status_code=400, detail="You cannot claim your own assignment"
+        )
+
+    # Check expiration
+    if link.expires_at and datetime.now(timezone.utc) > link.expires_at:
+        raise HTTPException(status_code=410, detail="This link has expired")
+
+    # Check if user already has access
+    existing_access = (
+        db.query(SharedLinkAccess)
+        .filter(
+            SharedLinkAccess.shared_link_id == link.id,
+            SharedLinkAccess.user_id == user_id,
+        )
+        .first()
+    )
+
+    if existing_access:
+        # User already has access, just return success
+        return {
+            "success": True,
+            "message": "You already have access to this assignment",
+            "assignment_id": link.assignment_id,
+        }
+
+    # Create the access record
+    new_access = SharedLinkAccess(
+        shared_link_id=link.id,
+        user_id=user_id,
+        permission="complete",  # Standard permission for assignment access
+        invited_at=datetime.now(timezone.utc),
+    )
+    db.add(new_access)
+    db.commit()
+
+    logger.info(f"User {user_id} claimed access to public assignment link {link.id}")
+
+    return {
+        "success": True,
+        "message": "Assignment added to your 'Assigned to Me' list",
+        "assignment_id": link.assignment_id,
+    }
+
+
 # Public access routes (no authentication required)
 @router.get("/public/{share_token}")
 async def get_public_shared_resource(share_token: str, db: Session = Depends(get_db)):
@@ -539,6 +618,22 @@ async def get_public_shared_resource(share_token: str, db: Session = Depends(get
 
             response["video"] = VideoOut.model_validate(video)
             response["chat_session"] = chat_session
+
+    elif link.share_type == "assignment":
+        assignment = (
+            db.query(Assignment).filter(Assignment.id == link.assignment_id).first()
+        )
+        if assignment:
+            response["assignment"] = {
+                "id": assignment.id,
+                "title": assignment.title,
+                "description": assignment.description,
+                "due_date": assignment.due_date.isoformat()
+                if assignment.due_date
+                else None,
+                "total_questions": assignment.total_questions,
+                "total_points": assignment.total_points,
+            }
 
     return response
 
@@ -633,6 +728,22 @@ async def get_private_shared_resource(
 
             response["video"] = VideoOut.model_validate(video)
             response["chat_session"] = chat_session
+
+    elif link.share_type == "assignment":
+        assignment = (
+            db.query(Assignment).filter(Assignment.id == link.assignment_id).first()
+        )
+        if assignment:
+            response["assignment"] = {
+                "id": assignment.id,
+                "title": assignment.title,
+                "description": assignment.description,
+                "due_date": assignment.due_date.isoformat()
+                if assignment.due_date
+                else None,
+                "total_questions": assignment.total_questions,
+                "total_points": assignment.total_points,
+            }
 
     return response
 
