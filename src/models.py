@@ -143,7 +143,10 @@ class SharedLinkAccess(Base):
 
     id = Column(String, primary_key=True, default=generate_uuid)
     shared_link_id = Column(String, ForeignKey("shared_links.id"), nullable=False)
-    user_id = Column(String, nullable=False, index=True)  # Firebase UID of invited user
+    user_id = Column(
+        String, nullable=False, index=True
+    )  # Firebase UID of invited user (or 'pending_<email>' for pending invites)
+    email = Column(String, nullable=True, index=True)  # Email for pending invitations
     permission = Column(
         String, default="view"
     )  # "view", "edit", or "complete" (for assignments)

@@ -25,6 +25,7 @@ from utils.db import get_db
 from controllers.config import logger, s3_client, AWS_S3_BUCKET
 from controllers.storage import s3_upload_file, s3_presign_url
 from utils.firebase_auth import get_current_user
+from utils.firebase_users import get_users_by_emails
 from models import Assignment, SharedLink, SharedLinkAccess, AssignmentSubmission, Video
 from schemas import (
     AssignmentCreate,
@@ -952,6 +953,75 @@ async def share_assignment(
                 db.add(shared_access)
                 shared_accesses.append(shared_access)
 
+        # Handle pending emails - check if they're registered users or truly pending
+        if share_data.pending_emails:
+            # Look up all emails in Firebase to see which are registered
+            email_to_user = await get_users_by_emails(share_data.pending_emails)
+
+            for email in share_data.pending_emails:
+                email_lower = email.lower().strip()
+                firebase_user = email_to_user.get(email_lower)
+
+                if firebase_user:
+                    # User is registered - use their Firebase UID
+                    user_id = firebase_user["uid"]
+
+                    # Check if user already has access
+                    existing_access = (
+                        db.query(SharedLinkAccess)
+                        .filter(
+                            and_(
+                                SharedLinkAccess.shared_link_id == shared_link.id,
+                                SharedLinkAccess.user_id == user_id,
+                            )
+                        )
+                        .first()
+                    )
+
+                    if existing_access:
+                        existing_access.permission = share_data.permission
+                        # Update email field if not set
+                        if not existing_access.email:
+                            existing_access.email = email_lower
+                        shared_accesses.append(existing_access)
+                    else:
+                        shared_access = SharedLinkAccess(
+                            shared_link_id=shared_link.id,
+                            user_id=user_id,
+                            email=email_lower,
+                            permission=share_data.permission,
+                        )
+                        db.add(shared_access)
+                        shared_accesses.append(shared_access)
+                else:
+                    # User not registered - create pending invite
+                    pending_user_id = f"pending_{email_lower}"
+
+                    # Check if this pending email already has access
+                    existing_access = (
+                        db.query(SharedLinkAccess)
+                        .filter(
+                            and_(
+                                SharedLinkAccess.shared_link_id == shared_link.id,
+                                SharedLinkAccess.email == email_lower,
+                            )
+                        )
+                        .first()
+                    )
+
+                    if existing_access:
+                        existing_access.permission = share_data.permission
+                        shared_accesses.append(existing_access)
+                    else:
+                        shared_access = SharedLinkAccess(
+                            shared_link_id=shared_link.id,
+                            user_id=pending_user_id,
+                            email=email_lower,
+                            permission=share_data.permission,
+                        )
+                        db.add(shared_access)
+                        shared_accesses.append(shared_access)
+
         db.commit()
         db.refresh(shared_link)
 
@@ -983,6 +1053,7 @@ async def share_assignment(
                 {
                     "id": access.id,
                     "user_id": access.user_id,
+                    "email": access.email,
                     "permission": access.permission,
                     "invited_at": access.invited_at,
                     "accessed_at": access.accessed_at,
@@ -993,7 +1064,7 @@ async def share_assignment(
         }
 
         logger.info(
-            f"Shared assignment {assignment_id} with {len(share_data.shared_with_user_ids)} users"
+            f"Shared assignment {assignment_id} with {len(share_data.shared_with_user_ids)} registered users and {len(share_data.pending_emails)} pending emails"
         )
         return response_data
 
