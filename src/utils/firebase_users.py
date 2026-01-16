@@ -118,3 +118,42 @@ async def validate_user_exists(uid: str) -> bool:
     """Check if a Firebase user exists."""
     user = await get_user_by_uid(uid)
     return user is not None
+
+
+async def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    """Get user details by email address. Returns None if user not found."""
+    ensure_firebase_initialized()
+
+    try:
+        user = fb_auth.get_user_by_email(email)
+        return {
+            "uid": user.uid,
+            "email": user.email,
+            "displayName": user.display_name
+            or (user.email.split("@")[0] if user.email else "Unknown"),
+            "photoURL": user.photo_url,
+        }
+    except fb_auth.UserNotFoundError:
+        return None
+    except Exception as e:
+        logger.error(f"Error getting user by email {email}: {e}")
+        return None
+
+
+async def get_users_by_emails(emails: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
+    """
+    Get multiple users by their email addresses.
+    Returns a dict mapping email -> user data (or None if not found).
+    """
+    ensure_firebase_initialized()
+
+    if not emails:
+        return {}
+
+    result = {}
+    for email in emails:
+        email_lower = email.lower().strip()
+        user = await get_user_by_email(email_lower)
+        result[email_lower] = user
+
+    return result

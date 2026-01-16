@@ -115,12 +115,6 @@ class SharedLink(Base):
     )  # True for public links, False for invite-only
     title = Column(String, nullable=True)  # Custom title for the shared link
     description = Column(String, nullable=True)  # Optional description
-    share_format = Column(
-        String, default="html_form"
-    )  # Format for assignment sharing: "html_form", "pdf", or "google_forms"
-    google_resource_url = Column(
-        String, nullable=True
-    )  # Google Form URL when share_format is "google_forms"
 
     # Access control
     expires_at = Column(DateTime, nullable=True)  # Optional expiration date
@@ -149,7 +143,10 @@ class SharedLinkAccess(Base):
 
     id = Column(String, primary_key=True, default=generate_uuid)
     shared_link_id = Column(String, ForeignKey("shared_links.id"), nullable=False)
-    user_id = Column(String, nullable=False, index=True)  # Firebase UID of invited user
+    user_id = Column(
+        String, nullable=False, index=True
+    )  # Firebase UID of invited user (or 'pending_<email>' for pending invites)
+    email = Column(String, nullable=True, index=True)  # Email for pending invitations
     permission = Column(
         String, default="view"
     )  # "view", "edit", or "complete" (for assignments)
