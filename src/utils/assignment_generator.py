@@ -229,10 +229,8 @@ class AssignmentGenerator:
 
         # Extract key options
         num_questions = generation_options.get("numQuestions", 5)
-        engineering_level = generation_options.get("engineeringLevel", "undergraduate")
-        engineering_discipline = generation_options.get(
-            "engineeringDiscipline", "general"
-        )
+        engineering_level = generation_options.get("engineeringLevel", "")
+        engineering_discipline = generation_options.get("engineeringDiscipline", "")
         question_types = generation_options.get("questionTypes", {})
         difficulty_level = generation_options.get("difficultyLevel", "mixed")
         total_points = generation_options.get("totalPoints", 50)
@@ -247,7 +245,10 @@ class AssignmentGenerator:
         # Create question type requirements
         enabled_types = [k for k, v in question_types.items() if v]
 
-        prompt = f"""
+        # Use different prompts based on whether discipline is specified (engineering vs general)
+        if engineering_discipline:
+            # Engineering-specific prompt
+            prompt = f"""
             Generate {num_questions} engineering assignment questions based on the provided content.
 
             Assignment Requirements:
@@ -277,6 +278,37 @@ class AssignmentGenerator:
 
             The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
         """
+        else:
+            # General (non-engineering) prompt
+            level_text = f"{engineering_level}-level " if engineering_level else ""
+            prompt = f"""
+            Generate {num_questions} assignment questions based on the provided content.
+
+            Assignment Requirements:
+            {f"- Academic Level: {engineering_level}" if engineering_level else ""}
+            - Question Types: {', '.join(enabled_types)}
+            - Difficulty Level: {difficulty_level}
+
+            Content Context:
+            {content_context}
+
+            Please generate questions that:
+            1. Are appropriate for {level_text}students
+            2. Test understanding of key concepts from the provided content
+            3. Include a mix of question types: {', '.join(enabled_types)}
+            4. Have appropriate difficulty levels for the target audience
+            5. Include clear, unambiguous questions with proper answer keys
+            6. Follow education best practices
+
+            For each question, provide:
+            - Clear, well-structured question text
+            - Appropriate answer options (for multiple choice) with correctAnswer as index (like "0", "1", "2", "3") of the correct answer in the options array
+            - Correct answer with brief explanation (except for multi-part questions which get answers from sub-questions)
+            - Rubric or grading guidelines
+            - Point value based on difficulty
+
+            The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
+        """
 
         # Add difficulty distribution if specified
         if difficulty_distribution:
@@ -297,12 +329,13 @@ class AssignmentGenerator:
 
     def _get_system_prompt(self, generation_options: Dict[str, Any]) -> str:
         """Get the system prompt for AI generation"""
-        engineering_level = generation_options.get("engineeringLevel", "undergraduate")
-        engineering_discipline = generation_options.get(
-            "engineeringDiscipline", "general"
-        )
+        engineering_level = generation_options.get("engineeringLevel", "")
+        engineering_discipline = generation_options.get("engineeringDiscipline", "")
 
-        return f"""You are an expert engineering educator specializing in {engineering_discipline} engineering education at the {engineering_level} level.
+        # Use different system prompts based on whether discipline is specified (engineering vs general)
+        if engineering_discipline:
+            # Engineering-specific system prompt
+            return f"""You are an expert engineering educator specializing in {engineering_discipline} engineering education at the {engineering_level} level.
 
             Your task is to create high-quality assignment questions that:
             1. Test deep understanding of engineering concepts
@@ -319,6 +352,31 @@ class AssignmentGenerator:
             - Ensure questions are self-contained and don't require external resources
             - Use proper engineering terminology and notation
             - Include code examples and diagrams when appropriate
+            - Follow academic integrity standards
+
+            The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
+        """
+        else:
+            # General (non-engineering) system prompt
+            level_text = (
+                f" at the {engineering_level} level" if engineering_level else ""
+            )
+            return f"""You are an expert educator{level_text}.
+
+            Your task is to create high-quality assignment questions that:
+            1. Test deep understanding of the subject matter
+            2. Require critical thinking and problem-solving skills
+            3. Are appropriate for the specified academic level
+            4. Follow education best practices
+            5. Include clear, unambiguous questions with proper answer keys
+            6. Provide educational value beyond simple recall
+
+            Guidelines:
+            - Questions should be challenging but fair
+            - Include a variety of question types to assess different skills
+            - Provide clear, detailed explanations for answers
+            - Ensure questions are self-contained and don't require external resources
+            - Use proper terminology and notation appropriate to the subject
             - Follow academic integrity standards
 
             The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
@@ -358,27 +416,50 @@ class AssignmentGenerator:
 
     def _generate_title(self, generation_options: Dict[str, Any]) -> str:
         """Generate assignment title based on options"""
-        engineering_level = generation_options.get("engineeringLevel", "undergraduate")
-        engineering_discipline = generation_options.get(
-            "engineeringDiscipline", "general"
-        )
+        engineering_level = generation_options.get("engineeringLevel", "")
+        engineering_discipline = generation_options.get("engineeringDiscipline", "")
 
-        if engineering_discipline == "general":
-            return f"{engineering_level.title()} Engineering Assignment"
+        # Handle empty strings - not an engineering assignment
+        if not engineering_discipline:
+            if not engineering_level:
+                return "AI-Generated Assignment"
+            else:
+                return f"{engineering_level.title()} Level Assignment"
         else:
-            return f"{engineering_level.title()} {engineering_discipline.title()} Engineering Assignment"
+            if not engineering_level:
+                return f"{engineering_discipline.title()} Assignment"
+            else:
+                return f"{engineering_level.title()} {engineering_discipline.title()} Assignment"
 
     def _generate_description(
         self, generation_options: Dict[str, Any], content_sources: Dict[str, Any]
     ) -> str:
         """Generate assignment description"""
-        engineering_level = generation_options.get("engineeringLevel", "undergraduate")
+        engineering_level = generation_options.get("engineeringLevel", "")
+        engineering_discipline = generation_options.get("engineeringDiscipline", "")
         num_questions = generation_options.get("numQuestions", 5)
 
-        description_parts = [
-            f"AI-generated {engineering_level}-level engineering assignment",
-            f"Contains {num_questions} questions covering key engineering concepts",
-        ]
+        # Build description based on available options
+        if engineering_level and engineering_discipline:
+            description_parts = [
+                f"AI-generated {engineering_level}-level {engineering_discipline} assignment",
+            ]
+        elif engineering_level:
+            description_parts = [
+                f"AI-generated {engineering_level}-level assignment",
+            ]
+        elif engineering_discipline:
+            description_parts = [
+                f"AI-generated {engineering_discipline} assignment",
+            ]
+        else:
+            description_parts = [
+                "AI-generated assignment",
+            ]
+
+        description_parts.append(
+            f"Contains {num_questions} questions covering key concepts"
+        )
 
         if content_sources.get("video_transcripts"):
             description_parts.append(
