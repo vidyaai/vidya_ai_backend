@@ -363,3 +363,20 @@ class UserUsage(Base):
 
     # Relationship
     user = relationship("User", backref="usage_records")
+
+
+class LectureSummary(Base):
+    __tablename__ = "lecture_summaries"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    video_id = Column(String, nullable=False, index=True)
+    user_id = Column(String, nullable=False, index=True)
+    summary_markdown = Column(Text, nullable=False)
+    summary_pdf_s3_key = Column(String, nullable=True)
+    summary_metadata = Column(JSON, nullable=True)  # topics, video_title, generation_time, etc.
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=datetime.now(timezone.utc),
+        onupdate=datetime.now(timezone.utc),
+    )

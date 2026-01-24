@@ -16,11 +16,15 @@ from controllers.subscription_service import (
     increment_usage,
     get_user_subscription,
 )
+from controllers.conversation_manager import (
+    store_conversation_turn,
+    get_merged_conversation_history,
+)
 from utils.youtube_utils import download_transcript_api, grab_youtube_frame
 from utils.ml_models import OpenAIVisionClient
 from schemas import VideoQuery
 from utils.firebase_auth import get_current_user
-from models import User
+from models import User, Video
 
 
 router = APIRouter(prefix="/api/query", tags=["Query"])
@@ -75,6 +79,16 @@ async def process_query(
             )
 
         vision_client = OpenAIVisionClient()
+
+        # Get merged conversation history from database (source of truth)
+        conversation_context = get_merged_conversation_history(
+            db=db,
+            video_id=video_id,
+            firebase_uid=current_user["uid"],
+            session_id=query_request.session_id,
+            client_history=query_request.conversation_history or [],
+        )
+
         transcript_to_use = None
         formatting_status_info = get_formatting_status(db, video_id)
         if formatting_status_info["status"] == "completed":
@@ -87,6 +101,34 @@ async def process_query(
                 transcript_data, json_data = download_transcript_api(video_id)
                 transcript_to_use = transcript_data
                 update_transcript_cache(db, video_id, transcript_data, json_data)
+
+        # Check if question is relevant to video content
+        video_record = db.query(Video).filter(Video.id == video_id).first()
+        video_title = video_record.title if video_record else ""
+
+        relevance_check = vision_client.check_question_relevance(
+            question=query,
+            transcript_excerpt=transcript_to_use[:1000] if transcript_to_use else "",
+            video_title=video_title,
+        )
+
+        # If question is clearly off-topic, provide gentle redirect
+        if (
+            not relevance_check.get("is_relevant", True)
+            and relevance_check.get("confidence", 0) > 0.7
+        ):
+            # Don't increment usage for off-topic questions
+            return {
+                "response": relevance_check.get(
+                    "suggested_redirect",
+                    "I'm here to help you understand this specific video. Could you ask about something from the video content?",
+                ),
+                "video_id": video_id,
+                "timestamp": timestamp,
+                "query_type": "redirect",
+                "is_off_topic": True,
+            }
+
         if is_image_query:
             if timestamp is None:
                 raise HTTPException(
@@ -130,12 +172,35 @@ async def process_query(
             if not output_file:
                 raise HTTPException(status_code=500, detail="Frame extraction failed")
             response = vision_client.ask_with_image(
-                query, frame_path, transcript_to_use, query_request.conversation_history
+                query, frame_path, transcript_to_use, conversation_context
             )
+            # Image queries don't use web search currently
+            web_sources = []
+            used_web_search = False
         else:
-            response = vision_client.ask_text_only(
-                query, transcript_to_use, query_request.conversation_history
+            # Use web-augmented answering for text queries
+            web_result = vision_client.ask_with_web_augmentation(
+                prompt=query,
+                context=transcript_to_use,
+                conversation_history=conversation_context,
+                video_title=video_title,
+                enable_search=True,  # Can be controlled via user settings
             )
+            response = web_result["response"]
+            web_sources = web_result.get("sources", [])
+            used_web_search = web_result.get("used_web_search", False)
+
+        # Store conversation turn in database
+        session_id_used = store_conversation_turn(
+            db=db,
+            video_id=video_id,
+            user_id=user.id,
+            firebase_uid=current_user["uid"],
+            user_message=query,
+            ai_response=response,
+            timestamp=timestamp,
+            session_id=query_request.session_id,
+        )
 
         # Increment question count for this video
         increment_usage(db, user.id, "question_per_video", 1, video_id=video_id)
@@ -145,6 +210,8 @@ async def process_query(
             "video_id": video_id,
             "timestamp": timestamp,
             "query_type": "image" if is_image_query else "text",
+            "web_sources": web_sources,
+            "used_web_search": used_web_search,
         }
     except Exception as e:
         raise HTTPException(
