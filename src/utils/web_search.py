@@ -238,9 +238,26 @@ class SearchDecisionAgent:
             }
         """
         try:
-            # CRITICAL: First check if the question's key terms appear ANYWHERE in the transcript
-            # This prevents web search for topics that ARE covered in the video
             question_lower = user_question.lower()
+
+            # PRIORITY CHECK: If user explicitly asks for external sources/links, ALWAYS search
+            external_source_keywords = [
+                'source', 'link', 'resource', 'further reading', 'learn more',
+                'external', 'website', 'article', 'tutorial', 'guide online',
+                'where can i learn', 'where to learn', 'recommend'
+            ]
+
+            if any(keyword in question_lower for keyword in external_source_keywords):
+                logger.info(f"User explicitly requested external sources, triggering web search")
+                return {
+                    "should_search": True,
+                    "search_query": user_question,
+                    "reason": "User explicitly requested external sources or learning resources",
+                    "confidence": 1.0,
+                }
+
+            # CRITICAL: Check if the question's key terms appear ANYWHERE in the transcript
+            # This prevents web search for topics that ARE covered in the video
             transcript_lower = transcript_excerpt.lower() if transcript_excerpt else ""
 
             # Extract key terms from the question (simple extraction)
@@ -288,6 +305,7 @@ Determine if the video content alone is sufficient to answer the question, or if
 3. Up-to-date information
 4. Broader context
 5. Alternative perspectives
+6. **External sources when explicitly requested** (keywords: "sources", "links", "resources", "further reading", "learn more")
 
 Respond with a JSON object:
 {{
@@ -298,11 +316,13 @@ Respond with a JSON object:
 }}
 
 CRITICAL Guidelines:
+- **If student EXPLICITLY asks for external sources/links/resources: ALWAYS set should_search = true**
+- Keywords that trigger search: "sources", "links", "resources", "further reading", "learn more", "external", "websites"
 - **If the question terms are found in the transcript, the video likely covers it - set should_search = false**
 - If the video FULLY covers the topic: should_search = false
 - If question asks about related concepts CLEARLY not in video: should_search = true
 - If question needs VERY current/external info: should_search = true
-- Be CONSERVATIVE about web search - prefer video content first
+- Be CONSERVATIVE about web search - prefer video content first (UNLESS external sources are requested)
 - Keep search_query concise and specific"""
 
             response = self.client.chat.completions.create(
@@ -445,18 +465,33 @@ def synthesize_with_web_results(
    - Format timestamps as $MM:SS$ in your answer
    - Example: If you see "10:57 - 11:12" before the explanation, cite $10:57$
    - NEVER just cite $00:00$ - find the ACTUAL timestamp where the concept appears
-4. **Web Sources** - Only supplement with web sources if video doesn't cover it adequately
+4. **Web Sources & External Links (CRITICAL):**
+   - **ALWAYS include external source links** when web sources are provided above
+   - **NEVER say** "I cannot provide external links" or "While I can't provide links"
+   - **YOU MUST** format all web sources as clickable markdown links: [Title](URL)
+   - Only supplement with web sources if video doesn't cover it adequately
    - If web results seem unrelated (e.g., different topic with same name), IGNORE them
-5. **Citations at End:**
+5. **Citations at End (REQUIRED FORMAT):**
 
 **Sources:**
 - Video: $MM:SS$, $MM:SS$ (list ALL relevant timestamps)
-- [Web Source Title](URL) (only if actually used)
+- [Web Source 1 Title](URL) - Brief description
+- [Web Source 2 Title](URL) - Brief description
+- [Web Source 3 Title](URL) - Brief description
+
+**Example of Good Sources Section:**
+```
+**Sources:**
+- Video: $05:30$, $08:45$, $12:15$
+- [Khan Academy: Karnaugh Maps](https://khanacademy.org/karnaugh) - Interactive tutorial
+- [Wikipedia: K-Map Simplification](https://en.wikipedia.org/wiki/Karnaugh_map) - Comprehensive guide
+```
 
 **Common Mistakes to Avoid:**
 - ❌ Citing $00:00$ when concept is actually at $10:57$
 - ❌ Saying "video doesn't explain" when it does (just later in transcript)
 - ❌ Using unrelated web results that happen to share the same term name
+- ❌ Saying "I cannot provide links" when links are available above
 """
 
         messages = [{"role": "system", "content": SYSTEM_PROMPT_CONVERSATIONAL_FORMATTED}]
