@@ -237,8 +237,15 @@ class AssignmentSubmission(Base):
     # Grading and feedback
     score = Column(String, nullable=True)  # Points earned
     percentage = Column(String, nullable=True)  # Percentage score
-    feedback = Column(JSONB, nullable=True)  # Question-by-question feedback
+    feedback = Column(
+        JSONB, nullable=True
+    )  # Question-by-question feedback (includes per-question AI flags)
     overall_feedback = Column(Text, nullable=True)  # General feedback
+
+    # AI Plagiarism Detection (submission-level telemetry, per-question flags in feedback JSONB)
+    telemetry_data = Column(
+        JSONB, nullable=True
+    )  # Frontend behavioral data (paste events, typing speed, tab switches)
 
     # Status tracking
     status = Column(

@@ -337,6 +337,42 @@ class SharedAssignmentAccessOut(BaseModel):
         from_attributes = True
 
 
+# AI Plagiarism Detection Schemas
+class TelemetryData(BaseModel):
+    """Behavioral telemetry captured from frontend during submission."""
+
+    pasted: bool = False
+    pasteCount: int = 0
+    tabSwitches: int = 0
+    timeToComplete: Optional[int] = None  # milliseconds
+    time_taken_seconds: Optional[int] = None  # seconds
+    typingSpeed: Optional[float] = None  # words per minute
+
+
+class AIFlagInfo(BaseModel):
+    """AI plagiarism detection result for a single question."""
+
+    flag_level: str  # "none", "soft", "hard"
+    confidence: float  # 0.0 to 1.0
+    reasons: List[str]  # List of detection reasons
+    model_score: float  # Stylometric model score
+    telemetry_score: float  # Behavioral telemetry score
+    original_score: Optional[float] = None  # Score before penalty
+    penalized_score: Optional[float] = None  # Score after penalty (for hard flags)
+    override_status: Optional[
+        Dict[str, Any]
+    ] = None  # {"overridden": bool, "by": user_id, "at": timestamp, "reason": str, "action": str}
+    timestamp: Optional[datetime] = None
+
+
+class AIFlagOverrideRequest(BaseModel):
+    """Request to override an AI flag on a specific question."""
+
+    question_id: str
+    action: str  # "dismiss", "apply_penalty", "remove_penalty"
+    reason: Optional[str] = None
+
+
 class SubmissionAnswerCreate(BaseModel):
     question_id: int
     answer: str  # JSON string or text answer
@@ -368,6 +404,9 @@ class AssignmentSubmissionCreate(BaseModel):
     submission_method: str = "in-app"
     submitted_files: Optional[List[dict]] = None
     time_spent: Optional[str] = None
+    telemetry_data: Optional[
+        Dict[str, Any]
+    ] = None  # Behavioral telemetry for AI detection
 
 
 class AssignmentSubmissionDraft(BaseModel):
@@ -399,6 +438,7 @@ class AssignmentSubmissionOut(BaseModel):
     percentage: Optional[str] = None
     feedback: Optional[dict] = None
     overall_feedback: Optional[str] = None
+    telemetry_data: Optional[Dict[str, Any]] = None  # Behavioral telemetry
     status: str
     is_late: bool
     attempt_number: str
@@ -470,6 +510,9 @@ class QuestionGradeFeedback(BaseModel):
     strengths: Optional[str] = None
     areas_for_improvement: Optional[str] = None
     rubric_alignment: Optional[Dict[str, Any]] = None
+    ai_flag: Optional[
+        Dict[str, Any]
+    ] = None  # AI plagiarism detection info (AIFlagInfo)
 
 
 class GradeSubmissionResponse(BaseModel):

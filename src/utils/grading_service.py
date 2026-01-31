@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
@@ -8,6 +9,7 @@ from datetime import datetime, timezone
 from openai import OpenAI
 
 from controllers.storage import s3_presign_url
+from utils.ai_detection_service import get_ai_detection_service
 
 
 class LLMGrader:
@@ -30,11 +32,21 @@ class LLMGrader:
         assignment: Dict[str, Any],
         submission_answers: Dict[str, Any],
         options: Optional[Dict[str, Any]] = None,
+        telemetry_data: Optional[Dict[str, Any]] = None,
     ) -> Tuple[float, float, Dict[str, Any], str]:
-        """Grade a single submission using bulk LLM call.
+        """Grade a single submission using bulk LLM call with AI plagiarism detection.
+
+        Args:
+            assignment: Assignment data with questions
+            submission_answers: Student's answers
+            options: Grading options
+            telemetry_data: Submission-level behavioral data for AI detection
 
         Returns: total_score, total_points, feedback_by_question, overall_feedback
         """
+        # Initialize AI detection service
+        ai_detector = get_ai_detection_service()
+
         # Extract answered subquestion IDs for optional parts filtering
         answered_subquestion_ids = self._extract_answered_subquestion_ids(
             assignment.get("questions", []), submission_answers
@@ -66,6 +78,8 @@ class LLMGrader:
             max_points = float(question.get("points", 0) or 0)
             answer_obj = flattened_answers.get(q_id)
             q_type = (question.get("type") or "").lower()
+
+            # Grade the question
             if q_type == "multiple-choice":
                 score, fb = self._grade_multiple_choice(
                     question, answer_obj, max_points
@@ -74,12 +88,27 @@ class LLMGrader:
                 score, fb = self._grade_true_false(question, answer_obj, max_points)
             else:
                 score, fb = 0.0, {"breakdown": "Unsupported deterministic type"}
+
+            # Run AI detection on the answer text
+            answer_text = self._extract_answer_text(answer_obj)
+            ai_flag = self._run_ai_detection(
+                q_id, answer_text, telemetry_data, ai_detector
+            )
+
+            # Apply penalty if hard flag
+            original_score = score
+            if ai_flag and ai_flag.get("flag_level") == "hard":
+                score = score * 0.5  # 50% penalty
+                ai_flag["original_score"] = original_score
+                ai_flag["penalized_score"] = score
+
             feedback_by_question[q_id] = {
                 "score": score,
                 "max_points": max_points,
                 "strengths": fb.get("strengths", ""),
                 "areas_for_improvement": fb.get("areas_for_improvement", ""),
                 "breakdown": fb.get("breakdown", ""),
+                "ai_flag": ai_flag,  # Include AI detection result
             }
 
         print("feedback_by_question before LLM", feedback_by_question)
@@ -135,6 +164,25 @@ class LLMGrader:
                 llm_feedback_by_question,
                 overall_feedback_llm,
             ) = self._parse_bulk_grading_response(result_text, llm_questions)
+
+            # Run AI detection and apply penalties for LLM-graded questions
+            for q_id, feedback in llm_feedback_by_question.items():
+                answer_obj = flattened_answers.get(q_id)
+                answer_text = self._extract_answer_text(answer_obj)
+                ai_flag = self._run_ai_detection(
+                    q_id, answer_text, telemetry_data, ai_detector
+                )
+
+                # Apply penalty if hard flag
+                if ai_flag and ai_flag.get("flag_level") == "hard":
+                    original_score = feedback.get("score", 0.0)
+                    penalized_score = original_score * 0.5  # 50% penalty
+                    ai_flag["original_score"] = original_score
+                    ai_flag["penalized_score"] = penalized_score
+                    feedback["score"] = penalized_score
+
+                # Add AI flag to feedback
+                feedback["ai_flag"] = ai_flag
 
             # Merge results
             feedback_by_question.update(llm_feedback_by_question)
@@ -273,6 +321,7 @@ class LLMGrader:
         """Return list of selected indices (strings). Accepts:
         - single string index (e.g., "1")
         - list/array of strings/ints (e.g., ["0", "2"]) for multi-select
+        - Python literal list string (e.g., "['0', '1']" or "[0, 1]")
         - comma-separated string (e.g., "0,2,3")
         - text-based answers (e.g., "A)", "B.", "i)", "1.", "b)", full option text)
         """
@@ -298,6 +347,24 @@ class LLMGrader:
         # Handle string inputs
         if isinstance(answer_obj, str):
             s = answer_obj.strip()
+
+            # Try to parse as Python literal first (handles "['0', '1']" or "[0, 1]" format)
+            if s.startswith("[") and s.endswith("]"):
+                try:
+                    parsed_list = ast.literal_eval(s)
+                    if isinstance(parsed_list, list):
+                        indices = []
+                        for item in parsed_list:
+                            parsed_idx = self._parse_mcq_answer_to_index(
+                                str(item), options
+                            )
+                            if parsed_idx is not None:
+                                indices.append(parsed_idx)
+                        return indices
+                except (ValueError, SyntaxError):
+                    # Not valid Python literal, fall through to other parsing methods
+                    pass
+
             if "," in s:
                 # Comma-separated values
                 indices = []
@@ -791,3 +858,50 @@ class LLMGrader:
             "strengths": strengths,
             "areas_for_improvement": areas,
         }
+
+    def _extract_answer_text(self, answer_obj: Any) -> str:
+        """Extract plain text from answer object (handles string or dict with 'text' field)."""
+        if answer_obj is None:
+            return ""
+        if isinstance(answer_obj, str):
+            return answer_obj
+        if isinstance(answer_obj, dict):
+            # Handle structured answer with 'text' field
+            if "text" in answer_obj:
+                return str(answer_obj["text"])
+            # Handle subAnswers (multi-part questions)
+            if "subAnswers" in answer_obj:
+                sub_texts = []
+                for sub_key, sub_val in answer_obj["subAnswers"].items():
+                    sub_texts.append(self._extract_answer_text(sub_val))
+                return " ".join(sub_texts)
+        return str(answer_obj)
+
+    def _run_ai_detection(
+        self,
+        question_id: str,
+        answer_text: str,
+        telemetry_data: Optional[Dict[str, Any]],
+        ai_detector,
+    ) -> Optional[Dict[str, Any]]:
+        """Run AI detection on an answer and return the flag info."""
+        if not answer_text or len(answer_text.strip()) < 10:
+            # Skip detection for very short answers
+            return None
+
+        try:
+            detection_result = ai_detector.detect_ai_content(
+                text=answer_text, telemetry=telemetry_data
+            )
+
+            # Add timestamp
+            detection_result["timestamp"] = datetime.now(timezone.utc).isoformat()
+
+            # Only return if there's a flag (soft or hard)
+            if detection_result.get("flag_level") in ["soft", "hard"]:
+                return detection_result
+
+            return None
+        except Exception as e:
+            print(f"AI detection failed for question {question_id}: {str(e)}")
+            return None
