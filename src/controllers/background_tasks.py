@@ -317,6 +317,8 @@ def grade_submission_background(
             assignment=assignment_dict,
             submission_answers=submission.answers or {},
             options=options,
+            telemetry_data=submission.telemetry_data,  # Pass telemetry for AI detection
+            submission_method=submission.submission_method or "in-app",
         )
 
         # Update submission with results

@@ -339,14 +339,27 @@ class SharedAssignmentAccessOut(BaseModel):
 
 # AI Plagiarism Detection Schemas
 class TelemetryData(BaseModel):
-    """Behavioral telemetry captured from frontend during submission."""
+    """Behavioral telemetry captured from frontend during submission.
 
-    pasted: bool = False
-    pasteCount: int = 0
-    tabSwitches: int = 0
+    Supports two formats:
+    1. Legacy (submission-level): {"pasted": bool, "pasteCount": int, ...}
+    2. New (per-question): {"per_question": {"1": {...}, "2": {...}}, "submission_level": {...}}
+    """
+
+    # Legacy format fields (submission-level)
+    pasted: Optional[bool] = None
+    pasteCount: Optional[int] = None
+    tabSwitches: Optional[int] = None
     timeToComplete: Optional[int] = None  # milliseconds
     time_taken_seconds: Optional[int] = None  # seconds
     typingSpeed: Optional[float] = None  # words per minute
+
+    # New format fields
+    per_question: Optional[Dict[str, Any]] = None  # Question ID -> telemetry mapping
+    submission_level: Optional[Dict[str, Any]] = None  # Overall submission metrics
+
+    class Config:
+        extra = "allow"  # Allow additional fields for flexibility
 
 
 class AIFlagInfo(BaseModel):
@@ -406,7 +419,7 @@ class AssignmentSubmissionCreate(BaseModel):
     time_spent: Optional[str] = None
     telemetry_data: Optional[
         Dict[str, Any]
-    ] = None  # Behavioral telemetry for AI detection
+    ] = None  # Behavioral telemetry for AI detection - supports legacy and per-question formats
 
 
 class AssignmentSubmissionDraft(BaseModel):

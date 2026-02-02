@@ -28,12 +28,12 @@ class AIDetectionService:
     _model_loaded = False
 
     # Detection thresholds
-    SOFT_FLAG_THRESHOLD = 0.5
-    HARD_FLAG_THRESHOLD = 0.8
+    SOFT_FLAG_THRESHOLD = 0.4  # Lowered to catch more suspicious cases
+    HARD_FLAG_THRESHOLD = 0.7  # Lowered for stronger telemetry signals
 
     # Telemetry thresholds
-    FAST_TYPING_WPM = 150  # Words per minute threshold
-    LARGE_PASTE_LENGTH = 50  # Characters
+    FAST_TYPING_WPM = 120  # Lowered - average human types 40-60 WPM
+    LARGE_PASTE_LENGTH = 30  # Lowered to catch smaller paste events
 
     def __new__(cls):
         if cls._instance is None:
@@ -77,6 +77,7 @@ class AIDetectionService:
         self,
         text: str,
         telemetry: Optional[Dict[str, Any]] = None,
+        submission_method: Optional[str] = None,
         question_context: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
@@ -112,10 +113,26 @@ class AIDetectionService:
         # 2. Stylometric Analysis (Model Layer)
         model_score = self._analyze_with_model(text, reasons)
 
+        print(f"Model score: {model_score}, Telemetry score: {telemetry_score}")
+
         # 3. Calculate weighted final score
-        # Model is weighted higher (70%) than telemetry (30%)
-        final_confidence = (model_score * 0.7) + (telemetry_score * 0.3)
+        if submission_method == "in-app":
+            # For in-app submissions, telemetry is more reliable than model
+            model_weight = 0.2
+            telemetry_weight = 0.8
+        else:
+            # For PDF submissions, rely only on model (no telemetry available)
+            model_weight = 1.0
+            telemetry_weight = 0.0
+
+        final_confidence = (model_score * model_weight) + (
+            telemetry_score * telemetry_weight
+        )
         final_confidence = min(final_confidence, 1.0)
+
+        print(
+            f"Final calculation: ({model_score} * {model_weight}) + ({telemetry_score} * {telemetry_weight}) = {final_confidence}"
+        )
 
         # 4. Determine flag level
         if final_confidence >= self.HARD_FLAG_THRESHOLD:
@@ -146,11 +163,11 @@ class AIDetectionService:
         pasted = telemetry.get("pasted", False)
 
         if pasted and len(text) > self.LARGE_PASTE_LENGTH:
-            # Calculate paste ratio (how much was pasted vs typed)
-            # If more than 80% was pasted, it's suspicious
+            # Any paste of substantial content is highly suspicious
             if paste_count > 0:
                 reasons.append(f"Large content pasted ({paste_count} paste event(s))")
-                score += 0.25
+                # Score based on paste count: 1 paste = 0.4, 2+ pastes = 0.6
+                score += min(0.4 + (paste_count - 1) * 0.2, 0.6)
 
         # Check typing speed
         time_seconds = telemetry.get("timeToComplete", 0) or telemetry.get(
@@ -162,7 +179,13 @@ class AIDetectionService:
 
             if wpm > self.FAST_TYPING_WPM:
                 reasons.append(f"Typing speed exceeds human average ({wpm:.0f} WPM)")
-                score += 0.3
+                # Scale score based on how extreme the speed is
+                if wpm > 300:  # Impossible without paste
+                    score += 0.4
+                elif wpm > 200:  # Very suspicious
+                    score += 0.3
+                else:  # Just fast
+                    score += 0.2
 
         # Check tab switching behavior (possible external tool usage)
         tab_switches = telemetry.get("tabSwitches", 0)
@@ -171,9 +194,15 @@ class AIDetectionService:
             score += 0.15
 
         # Suspiciously fast completion with substantial text
-        if time_seconds > 0 and time_seconds < 5 and len(text) > 100:
+        if time_seconds > 0 and time_seconds < 10 and len(text) > 100:
             reasons.append("Suspiciously fast completion for answer length")
-            score += 0.3
+            # Very fast completion is almost certainly paste
+            if time_seconds < 3:
+                score += 0.4
+            elif time_seconds < 7:
+                score += 0.3
+            else:
+                score += 0.2
 
         return min(score, 1.0)
 

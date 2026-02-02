@@ -33,6 +33,7 @@ class LLMGrader:
         submission_answers: Dict[str, Any],
         options: Optional[Dict[str, Any]] = None,
         telemetry_data: Optional[Dict[str, Any]] = None,
+        submission_method: Optional[str] = None,
     ) -> Tuple[float, float, Dict[str, Any], str]:
         """Grade a single submission using bulk LLM call with AI plagiarism detection.
 
@@ -40,7 +41,9 @@ class LLMGrader:
             assignment: Assignment data with questions
             submission_answers: Student's answers
             options: Grading options
-            telemetry_data: Submission-level behavioral data for AI detection
+            telemetry_data: Telemetry data - supports both formats:
+                - Legacy: {"pasted": bool, "pasteCount": int, ...} (submission-level)
+                - New: {"per_question": {"1": {...}, "2": {...}}, "submission_level": {...}}
 
         Returns: total_score, total_points, feedback_by_question, overall_feedback
         """
@@ -92,7 +95,7 @@ class LLMGrader:
             # Run AI detection on the answer text
             answer_text = self._extract_answer_text(answer_obj)
             ai_flag = self._run_ai_detection(
-                q_id, answer_text, telemetry_data, ai_detector
+                q_id, answer_text, telemetry_data, submission_method, ai_detector
             )
 
             # Apply penalty if hard flag
@@ -170,7 +173,7 @@ class LLMGrader:
                 answer_obj = flattened_answers.get(q_id)
                 answer_text = self._extract_answer_text(answer_obj)
                 ai_flag = self._run_ai_detection(
-                    q_id, answer_text, telemetry_data, ai_detector
+                    q_id, answer_text, telemetry_data, submission_method, ai_detector
                 )
 
                 # Apply penalty if hard flag
@@ -882,20 +885,46 @@ class LLMGrader:
         question_id: str,
         answer_text: str,
         telemetry_data: Optional[Dict[str, Any]],
+        submission_method: Optional[str],
         ai_detector,
     ) -> Optional[Dict[str, Any]]:
-        """Run AI detection on an answer and return the flag info."""
+        """Run AI detection on an answer and return the flag info.
+
+        Args:
+            question_id: Flattened question ID (e.g., "1", "17.2", "17.2.1")
+            answer_text: Student's answer text
+            telemetry_data: Telemetry data - supports both formats:
+                - Legacy: {"pasted": bool, ...} (applied to all questions)
+                - New: {"per_question": {"1": {...}, "17.2": {...}}, ...}
+            submission_method: "in-app" or "pdf"
+            ai_detector: AIDetectionService instance
+        """
         if not answer_text or len(answer_text.strip()) < 10:
+            print(
+                f"Skipping AI detection for question {question_id} due to short answer."
+            )
             # Skip detection for very short answers
             return None
 
         try:
+            print(f"Running AI detection for question {question_id}...")
+            # Extract per-question telemetry if available, otherwise use submission-level
+            question_telemetry = self._extract_question_telemetry(
+                question_id, telemetry_data
+            )
+
+            print(f"Telemetry for question {question_id}: {question_telemetry}")
+
             detection_result = ai_detector.detect_ai_content(
-                text=answer_text, telemetry=telemetry_data
+                text=answer_text,
+                telemetry=question_telemetry,
+                submission_method=submission_method,
             )
 
             # Add timestamp
             detection_result["timestamp"] = datetime.now(timezone.utc).isoformat()
+
+            print(f"AI detection result for question {question_id}: {detection_result}")
 
             # Only return if there's a flag (soft or hard)
             if detection_result.get("flag_level") in ["soft", "hard"]:
@@ -905,3 +934,37 @@ class LLMGrader:
         except Exception as e:
             print(f"AI detection failed for question {question_id}: {str(e)}")
             return None
+
+    def _extract_question_telemetry(
+        self, question_id: str, telemetry_data: Optional[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        """Extract telemetry for a specific question, with fallback to submission-level.
+
+        Args:
+            question_id: Flattened question ID (e.g., "1", "17.2", "17.2.1")
+            telemetry_data: Telemetry structure
+
+        Returns:
+            Question-specific telemetry dict, or submission-level telemetry, or None
+        """
+        if not telemetry_data:
+            return None
+
+        # Check if new format with per_question key
+        if "per_question" in telemetry_data:
+            per_question = telemetry_data.get("per_question", {})
+            # Return telemetry for this specific question if available
+            if question_id in per_question:
+                return per_question[question_id]
+            # No telemetry for this question (possibly unanswered optional part)
+            return None
+
+        # Legacy format: use submission-level telemetry for all questions
+        # Check if this looks like submission-level telemetry (has expected keys)
+        if any(
+            key in telemetry_data
+            for key in ["pasted", "pasteCount", "tabSwitches", "timeToComplete"]
+        ):
+            return telemetry_data
+
+        return None
