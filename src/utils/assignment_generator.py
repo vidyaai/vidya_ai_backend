@@ -147,8 +147,8 @@ class AssignmentGenerator:
         # Prepare the content context
         content_context = self._prepare_content_context(content_sources)
 
-        # Create the generation prompt
-        prompt = self._create_generation_prompt(content_context, generation_options)
+        # Create the generation prompt (pass content_sources for checking)
+        prompt = self._create_generation_prompt(content_context, generation_options, content_sources)
 
         # Generate questions using OpenAI with structured output
         try:
@@ -178,9 +178,15 @@ class AssignmentGenerator:
             # Parse the response
             generated_data = json.loads(response.choices[0].message.content)
             questions = generated_data.get("questions", [])
+            
+            # Debug: Log the raw questions before post-processing
+            logger.info(f"Raw questions from AI: {json.dumps(questions, indent=2)}")
 
             # Post-process questions to ensure they meet requirements
             questions = self._post_process_questions(questions, generation_options)
+            
+            # Debug: Log post-processed questions
+            logger.info(f"Post-processed questions: {json.dumps(questions, indent=2)}")
 
             return questions
 
@@ -193,9 +199,16 @@ class AssignmentGenerator:
         """Prepare content context for AI generation"""
         context_parts = []
 
-        # Add video transcripts
+        # Add custom prompt FIRST - this is the primary instruction
+        if content_sources.get("custom_prompt"):
+            context_parts.append("## PRIMARY TOPIC INSTRUCTIONS (MUST FOLLOW):")
+            context_parts.append(content_sources["custom_prompt"])
+            context_parts.append("")
+            context_parts.append("IMPORTANT: Generate questions ONLY on the topic specified above. Do not deviate to other subjects.")
+
+        # Add video transcripts as supporting material
         if content_sources.get("video_transcripts"):
-            context_parts.append("## Video Content:")
+            context_parts.append("## Supporting Video Content:")
             for video in content_sources["video_transcripts"]:
                 context_parts.append(f"### {video['title']}")
                 context_parts.append(
@@ -204,9 +217,9 @@ class AssignmentGenerator:
                     else video["transcript"]
                 )
 
-        # Add document content
+        # Add document content as supporting material
         if content_sources.get("document_texts"):
-            context_parts.append("## Document Content:")
+            context_parts.append("## Supporting Document Content:")
             for doc in content_sources["document_texts"]:
                 context_parts.append(f"### {doc['name']}")
                 context_parts.append(
@@ -215,15 +228,10 @@ class AssignmentGenerator:
                     else doc["content"]
                 )
 
-        # Add custom prompt
-        if content_sources.get("custom_prompt"):
-            context_parts.append("## Custom Instructions:")
-            context_parts.append(content_sources["custom_prompt"])
-
         return "\n\n".join(context_parts)
 
     def _create_generation_prompt(
-        self, content_context: str, generation_options: Dict[str, Any]
+        self, content_context: str, generation_options: Dict[str, Any], content_sources: Dict[str, Any]
     ) -> str:
         """Create the generation prompt for AI"""
 
@@ -245,10 +253,38 @@ class AssignmentGenerator:
         # Create question type requirements
         enabled_types = [k for k, v in question_types.items() if v]
 
+        # Check if custom prompt exists to determine priority
+        has_custom_prompt = content_sources.get("custom_prompt")
+        has_video_or_docs = content_sources.get("video_transcripts") or content_sources.get("document_texts")
+        
         # Use different prompts based on whether discipline is specified (engineering vs general)
         if engineering_discipline:
             # Engineering-specific prompt
-            prompt = f"""
+            if has_custom_prompt and not has_video_or_docs:
+                # Custom prompt only - make it the PRIMARY focus
+                prompt = f"""
+            Generate {num_questions} engineering assignment questions STRICTLY based on the topic specified in the PRIMARY TOPIC INSTRUCTIONS below.
+
+            Assignment Requirements:
+            - Engineering Level: {engineering_level}
+            - Engineering Discipline: {engineering_discipline}
+            - Question Types: {', '.join(enabled_types)}
+            - Difficulty Level: {difficulty_level}
+
+            Content Context:
+            {content_context}
+
+            CRITICAL INSTRUCTIONS:
+            1. You MUST generate questions ONLY on the specific topic mentioned in the PRIMARY TOPIC INSTRUCTIONS above
+            2. DO NOT generate questions on random topics within {engineering_discipline} engineering
+            3. The questions must be appropriate for {engineering_level}-level students
+            4. Test deep understanding of the SPECIFIC concept/topic requested
+            5. Include a mix of question types: {', '.join(enabled_types)}
+            6. Include clear, unambiguous questions with proper answer keys
+            7. Follow the user's specific instructions precisely"""
+            else:
+                # Has video/docs or no custom prompt - original behavior
+                prompt = f"""
             Generate {num_questions} engineering assignment questions based on the provided content.
 
             Assignment Requirements:
@@ -266,7 +302,7 @@ class AssignmentGenerator:
             3. Include a mix of question types: {', '.join(enabled_types)}
             4. Have appropriate difficulty levels for the target audience
             5. Include clear, unambiguous questions with proper answer keys
-            6. Follow engineering education best practices
+            6. Follow engineering education best practices"
 
             For each question, provide:
             - Clear, well-structured question text
@@ -281,7 +317,30 @@ class AssignmentGenerator:
         else:
             # General (non-engineering) prompt
             level_text = f"{engineering_level}-level " if engineering_level else ""
-            prompt = f"""
+            if has_custom_prompt and not has_video_or_docs:
+                # Custom prompt only - make it the PRIMARY focus
+                prompt = f"""
+            Generate {num_questions} assignment questions STRICTLY based on the topic specified in the PRIMARY TOPIC INSTRUCTIONS below.
+
+            Assignment Requirements:
+            {f"- Academic Level: {engineering_level}" if engineering_level else ""}
+            - Question Types: {', '.join(enabled_types)}
+            - Difficulty Level: {difficulty_level}
+
+            Content Context:
+            {content_context}
+
+            CRITICAL INSTRUCTIONS:
+            1. You MUST generate questions ONLY on the specific topic mentioned in the PRIMARY TOPIC INSTRUCTIONS above
+            2. DO NOT generate questions on random or unrelated topics
+            3. The questions must be appropriate for {level_text}students
+            4. Test deep understanding of the SPECIFIC concept/topic requested
+            5. Include a mix of question types: {', '.join(enabled_types)}
+            6. Include clear, unambiguous questions with proper answer keys
+            7. Follow the user's specific instructions precisely"""
+            else:
+                # Has video/docs or no custom prompt - original behavior
+                prompt = f"""
             Generate {num_questions} assignment questions based on the provided content.
 
             Assignment Requirements:
@@ -298,7 +357,7 @@ class AssignmentGenerator:
             3. Include a mix of question types: {', '.join(enabled_types)}
             4. Have appropriate difficulty levels for the target audience
             5. Include clear, unambiguous questions with proper answer keys
-            6. Follow education best practices
+            6. Follow education best practices"
 
             For each question, provide:
             - Clear, well-structured question text
@@ -338,12 +397,15 @@ class AssignmentGenerator:
             return f"""You are an expert engineering educator specializing in {engineering_discipline} engineering education at the {engineering_level} level.
 
             Your task is to create high-quality assignment questions that:
-            1. Test deep understanding of engineering concepts
-            2. Require critical thinking and problem-solving skills
-            3. Are appropriate for the specified academic level
-            4. Follow engineering education best practices
-            5. Include clear, unambiguous questions with proper answer keys
-            6. Provide educational value beyond simple recall
+            1. STRICTLY follow any PRIMARY TOPIC INSTRUCTIONS provided by the user - this is your TOP priority
+            2. Test deep understanding of the SPECIFIC concepts requested
+            3. Require critical thinking and problem-solving skills
+            4. Are appropriate for the specified academic level
+            5. Follow engineering education best practices
+            6. Include clear, unambiguous questions with proper answer keys
+            7. Provide educational value beyond simple recall
+
+            CRITICAL: If the user provides PRIMARY TOPIC INSTRUCTIONS, you MUST generate questions ONLY on that specific topic. DO NOT deviate to other subjects or generate random questions within the discipline.
 
             Guidelines:
             - Questions should be challenging but fair
@@ -364,12 +426,15 @@ class AssignmentGenerator:
             return f"""You are an expert educator{level_text}.
 
             Your task is to create high-quality assignment questions that:
-            1. Test deep understanding of the subject matter
-            2. Require critical thinking and problem-solving skills
-            3. Are appropriate for the specified academic level
-            4. Follow education best practices
-            5. Include clear, unambiguous questions with proper answer keys
-            6. Provide educational value beyond simple recall
+            1. STRICTLY follow any PRIMARY TOPIC INSTRUCTIONS provided by the user - this is your TOP priority
+            2. Test deep understanding of the SPECIFIC concepts requested
+            3. Require critical thinking and problem-solving skills
+            4. Are appropriate for the specified academic level
+            5. Follow education best practices
+            6. Include clear, unambiguous questions with proper answer keys
+            7. Provide educational value beyond simple recall
+
+            CRITICAL: If the user provides PRIMARY TOPIC INSTRUCTIONS, you MUST generate questions ONLY on that specific topic. DO NOT deviate to other subjects or generate random unrelated questions.
 
             Guidelines:
             - Questions should be challenging but fair
@@ -394,6 +459,13 @@ class AssignmentGenerator:
             question.setdefault("points", 5)
             question.setdefault("difficulty", "medium")
             question.setdefault("explanation", "No explanation provided")
+            
+            # Ensure backward compatibility: normalize "question" field to "text"
+            # The AI returns "question", but frontend/DB may expect "text"
+            if "question" in question and "text" not in question:
+                question["text"] = question["question"]
+            elif "text" in question and "question" not in question:
+                question["question"] = question["text"]
 
             # Ensure correct answer format
             if question.get("correctAnswer") is None:
