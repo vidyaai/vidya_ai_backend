@@ -11,7 +11,7 @@ from textwrap import dedent
 from typing import Dict, List, Any, Optional
 from openai import OpenAI
 from controllers.config import logger
-from utils.assignment_schemas import get_assignment_parsing_schema
+from utils.assignment_schemas import get_assignment_parsing_schema, get_assignment_generation_schema
 from utils.document_processor import DocumentProcessor
 
 
@@ -21,7 +21,7 @@ class AssignmentGenerator:
     def __init__(self):
         """Initialize the assignment generator with OpenAI client"""
         self.client = OpenAI()
-        self.model = "gpt-5"
+        self.model = "gpt-4o"
 
     def generate_assignment(
         self,
@@ -152,10 +152,10 @@ class AssignmentGenerator:
 
         # Generate questions using OpenAI with structured output
         try:
-            # Get the structured output schema with dynamic naming (using document parsing schema)
-            response_schema = get_assignment_parsing_schema(
-                "assignment_generation_questions"
-            )
+            # Use lightweight generation schema based on requested question types
+            question_types = generation_options.get("questionTypes", {})
+            enabled_types = [k for k, v in question_types.items() if v]
+            response_schema = get_assignment_generation_schema(enabled_types or None)
 
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -450,39 +450,79 @@ class AssignmentGenerator:
     def _post_process_questions(
         self, questions: List[Dict[str, Any]], generation_options: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Post-process generated questions to ensure they meet requirements"""
+        """Post-process generated questions to ensure they meet requirements.
 
-        # Ensure all questions have required fields
+        Fills in default values for fields the frontend expects but that were
+        omitted from the lightweight generation schema to keep token usage low.
+        """
+
         for i, question in enumerate(questions):
             question["id"] = i + 1
             question.setdefault("type", "multiple-choice")
             question.setdefault("points", 5)
             question.setdefault("difficulty", "medium")
             question.setdefault("explanation", "No explanation provided")
-            
-            # Ensure backward compatibility: normalize "question" field to "text"
-            # The AI returns "question", but frontend/DB may expect "text"
+            question.setdefault("order", i + 1)
+
+            # Normalize "question" <-> "text" for frontend compatibility
             if "question" in question and "text" not in question:
                 question["text"] = question["question"]
             elif "text" in question and "question" not in question:
                 question["question"] = question["text"]
 
-            # Ensure correct answer format
+            # Correct answer defaults
             if question.get("correctAnswer") is None:
-                if question.get("type") == "multiple-choice" and question.get(
-                    "options"
-                ):
+                if question.get("type") == "multiple-choice" and question.get("options"):
                     question["correctAnswer"] = "0"
                 elif question.get("type") == "multi-part":
-                    question[
-                        "correctAnswer"
-                    ] = ""  # Multi-part questions don't have their own answers
+                    question["correctAnswer"] = ""
                 else:
                     question["correctAnswer"] = "0"
 
-            # Set default multiple correct values
+            # Fields omitted from the lightweight generation schema — set defaults
             question.setdefault("allowMultipleCorrect", False)
             question.setdefault("multipleCorrectAnswers", [])
+            question.setdefault("options", [])
+            question.setdefault("equations", [])
+            question.setdefault("rubric", "")
+            question.setdefault("hasCode", False)
+            question.setdefault("hasDiagram", False)
+            question.setdefault("codeLanguage", "")
+            question.setdefault("outputType", "")
+            question.setdefault("rubricType", "overall")
+            question.setdefault("code", "")
+            question.setdefault("diagram", {"s3_url": None, "s3_key": None})
+            question.setdefault("optionalParts", False)
+            question.setdefault("requiredPartsCount", 0)
+            question.setdefault("subquestions", [])
+
+            # Fill defaults for subquestions too
+            for j, sub in enumerate(question.get("subquestions", [])):
+                sub.setdefault("id", j + 1)
+                sub.setdefault("type", "short-answer")
+                sub.setdefault("points", 1)
+                sub.setdefault("options", [])
+                sub.setdefault("correctAnswer", "")
+                sub.setdefault("explanation", "")
+                sub.setdefault("allowMultipleCorrect", False)
+                sub.setdefault("multipleCorrectAnswers", [])
+                sub.setdefault("equations", [])
+                sub.setdefault("hasCode", False)
+                sub.setdefault("hasDiagram", False)
+                sub.setdefault("codeLanguage", "")
+                sub.setdefault("outputType", "")
+                sub.setdefault("rubricType", "overall")
+                sub.setdefault("code", "")
+                sub.setdefault("diagram", {"s3_url": None, "s3_key": None})
+                sub.setdefault("rubric", "")
+                sub.setdefault("optionalParts", False)
+                sub.setdefault("requiredPartsCount", 0)
+                sub.setdefault("subquestions", [])
+                # Normalize question/text
+                if "question" in sub and "text" not in sub:
+                    sub["text"] = sub["question"]
+                elif "text" in sub and "question" not in sub:
+                    sub["question"] = sub["text"]
 
         return questions
 
