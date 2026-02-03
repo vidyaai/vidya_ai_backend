@@ -224,6 +224,7 @@ class AssignmentCreate(BaseModel):
     title: str
     description: Optional[str] = None
     due_date: Optional[datetime] = None
+    status: str = "draft"
     engineering_level: str = "undergraduate"
     engineering_discipline: str = "general"
     question_types: Optional[List[str]] = None
@@ -233,6 +234,7 @@ class AssignmentCreate(BaseModel):
     generation_options: Optional[dict] = None
     questions: List[dict] = []
     is_template: bool = False
+    ai_penalty_percentage: float = 50.0
 
 
 class AssignmentUpdate(BaseModel):
@@ -245,6 +247,7 @@ class AssignmentUpdate(BaseModel):
     question_types: Optional[List[str]] = None
     questions: Optional[List[dict]] = None
     is_template: Optional[bool] = None
+    ai_penalty_percentage: Optional[float] = None
 
 
 class AssignmentOut(BaseModel):
@@ -270,6 +273,7 @@ class AssignmentOut(BaseModel):
     updated_at: datetime
     google_form_url: Optional[str] = None
     google_form_response_url: Optional[str] = None
+    ai_penalty_percentage: Optional[float] = 50.0
 
     class Config:
         from_attributes = True

@@ -183,6 +183,9 @@ class Assignment(Base):
         String, default="general"
     )  # "general", "electrical", etc.
     question_types = Column(JSONB, nullable=True)  # Array of question types used
+    ai_penalty_percentage = Column(
+        Float, default=50.0
+    )  # Percentage penalty for AI-flagged answers (0-100)
 
     # Content sources (for AI-generated assignments)
     linked_videos = Column(JSONB, nullable=True)  # Array of video IDs/data

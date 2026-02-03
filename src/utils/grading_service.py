@@ -50,6 +50,12 @@ class LLMGrader:
         # Initialize AI detection service
         ai_detector = get_ai_detection_service()
 
+        # Extract AI penalty percentage from assignment (default to 50% for backward compatibility)
+        ai_penalty_percentage = assignment.get("ai_penalty_percentage")
+        if ai_penalty_percentage is None:
+            ai_penalty_percentage = 50.0
+        penalty_multiplier = 1.0 - (ai_penalty_percentage / 100.0)
+
         # Extract answered subquestion IDs for optional parts filtering
         answered_subquestion_ids = self._extract_answered_subquestion_ids(
             assignment.get("questions", []), submission_answers
@@ -101,7 +107,7 @@ class LLMGrader:
             # Apply penalty if hard flag
             original_score = score
             if ai_flag and ai_flag.get("flag_level") == "hard":
-                score = score * 0.5  # 50% penalty
+                score = score * penalty_multiplier  # Apply configurable penalty
                 ai_flag["original_score"] = original_score
                 ai_flag["penalized_score"] = score
 
@@ -179,7 +185,9 @@ class LLMGrader:
                 # Apply penalty if hard flag
                 if ai_flag and ai_flag.get("flag_level") == "hard":
                     original_score = feedback.get("score", 0.0)
-                    penalized_score = original_score * 0.5  # 50% penalty
+                    penalized_score = (
+                        original_score * penalty_multiplier
+                    )  # Apply configurable penalty
                     ai_flag["original_score"] = original_score
                     ai_flag["penalized_score"] = penalized_score
                     feedback["score"] = penalized_score

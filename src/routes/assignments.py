@@ -193,6 +193,12 @@ async def override_ai_flag(
         current_score = question_feedback.get("score", 0)
         original_score = ai_flag.get("original_score", current_score)
 
+        # Get assignment penalty percentage (default to 50% for backward compatibility)
+        ai_penalty_percentage = assignment.ai_penalty_percentage
+        if ai_penalty_percentage is None:
+            ai_penalty_percentage = 50.0
+        penalty_multiplier = 1.0 - (ai_penalty_percentage / 100.0)
+
         if action == "dismiss":
             # Remove AI flag entirely
             question_feedback["ai_flag"] = None
@@ -203,7 +209,9 @@ async def override_ai_flag(
         elif action == "apply_penalty":
             # Upgrade soft flag to hard flag and apply penalty
             if ai_flag.get("flag_level") == "soft":
-                penalized_score = original_score * 0.5
+                penalized_score = (
+                    original_score * penalty_multiplier
+                )  # Use assignment's penalty percentage
                 ai_flag["flag_level"] = "hard"
                 ai_flag["original_score"] = original_score
                 ai_flag["penalized_score"] = penalized_score
@@ -744,6 +752,7 @@ async def get_assignment(
             "generation_options": assignment.generation_options,
             "questions": assignment.questions,
             "is_template": assignment.is_template,
+            "ai_penalty_percentage": assignment.ai_penalty_percentage,
             "shared_count": assignment.shared_count,
             "created_at": assignment.created_at,
             "updated_at": assignment.updated_at,
@@ -785,6 +794,7 @@ async def create_assignment(
             title=assignment_data.title,
             description=assignment_data.description,
             due_date=assignment_data.due_date,
+            status=assignment_data.status,
             engineering_level=assignment_data.engineering_level,
             engineering_discipline=assignment_data.engineering_discipline,
             question_types=assignment_data.question_types,
@@ -794,6 +804,7 @@ async def create_assignment(
             generation_options=assignment_data.generation_options,
             questions=assignment_data.questions,
             is_template=assignment_data.is_template,
+            ai_penalty_percentage=assignment_data.ai_penalty_percentage,
         )
 
         # Calculate stats
