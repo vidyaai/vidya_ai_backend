@@ -541,7 +541,7 @@ class AssignmentDocumentParser:
             - optionalParts=TRUE ONLY for explicit OR alternatives ("answer any X of Y", "either...or")
             - optionalParts=FALSE if ALL parts (a,b,c) must be answered
             - requiredPartsCount: number of parts student must answer
-            - ID scheme: parent 30 → subquestions 301,302,303; nested 3001,3002 → 300101,300102
+            - ID scheme: parent 30 → subquestions 1,2,3; nested 1,2 → 1,2
             - Avoid deep nesting; keep hierarchy flat
 
             EXAMPLES:
@@ -562,14 +562,14 @@ class AssignmentDocumentParser:
             (ii) If width doubled, peaks: (A)1 (B)2 (C)3 (D)4
             (iii) EITHER (a) OR (b):
             (a) If λ=680nm, peaks: (A)2 (B)4 (C)6 (D)9
-            (b) First min at <eq q30_3032_eq1>: (A)<eq q30_3032_optA_eq1> (B)<eq q30_3032_optB_eq1>"
+            (b) First min at <eq q30_3_2_eq1>: (A)<eq q30_3_2_optA_eq1> (B)<eq q30_3_2_optB_eq1>"
 
             JSON: {{"id":30,"type":"multi-part","optionalParts":false,"requiredPartsCount":0,"subquestions":[
-            {{"id":301,"type":"multiple-choice","question":"Peaks:","options":["2","3","4","6"]}},
-            {{"id":302,"type":"multiple-choice","question":"If width doubled:","options":["1","2","3","4"]}},
-            {{"id":303,"type":"multi-part","optionalParts":true,"requiredPartsCount":1,"subquestions":[
-                {{"id":3031,"type":"multiple-choice","question":"If λ=680nm:","options":["2","4","6","9"]}},
-                {{"id":3032,"type":"multiple-choice","question":"First min at <eq q30_3032_eq1>:","options":["<eq q30_3032_optA_eq1>","<eq q30_3032_optB_eq1>"],"equations":[...]}}
+            {{"id":1,"type":"multiple-choice","question":"Peaks:","options":["2","3","4","6"]}},
+            {{"id":2,"type":"multiple-choice","question":"If width doubled:","options":["1","2","3","4"]}},
+            {{"id":3,"type":"multi-part","optionalParts":true,"requiredPartsCount":1,"subquestions":[
+                {{"id":1,"type":"multiple-choice","question":"If λ=680nm:","options":["2","4","6","9"]}},
+                {{"id":2,"type":"multiple-choice","question":"First min at <eq q30_3_2_eq1>:","options":["<eq q30_3_2_optA_eq1>","<eq q30_3_2_optB_eq1>"],"equations":[...]}}
             ]}}
             ]}}
 
@@ -581,10 +581,10 @@ class AssignmentDocumentParser:
             (d) Show E-field 2x for conducting vs nonconducting"
 
             JSON: {{"id":31,"type":"multi-part","optionalParts":true,"requiredPartsCount":2,"subquestions":[
-            {{"id":311,"type":"long-answer","question":"Derive capacitance...","points":5}},
-            {{"id":312,"type":"long-answer","question":"Find potential...","points":5}},
-            {{"id":313,"type":"long-answer","question":"Gauss theorem...","points":5}},
-            {{"id":314,"type":"long-answer","question":"Show E-field...","points":5}}
+            {{"id":1,"type":"long-answer","question":"Derive capacitance...","points":5}},
+            {{"id":2,"type":"long-answer","question":"Find potential...","points":5}},
+            {{"id":3,"type":"long-answer","question":"Gauss theorem...","points":5}},
+            {{"id":4,"type":"long-answer","question":"Show E-field...","points":5}}
             ]}}
 
             Multi-part (ALL required):
@@ -595,10 +595,10 @@ class AssignmentDocumentParser:
             (d) Behavior in AC & DC"
 
             JSON: {{"id":24,"type":"multi-part","optionalParts":false,"requiredPartsCount":4,"subquestions":[
-            {{"id":241,"type":"short-answer","question":"Identify X"}},
-            {{"id":242,"type":"short-answer","question":"Reactance formula"}},
-            {{"id":243,"type":"short-answer","question":"Graph reactance vs freq"}},
-            {{"id":244,"type":"short-answer","question":"Behavior AC & DC"}}
+            {{"id":1,"type":"short-answer","question":"Identify X"}},
+            {{"id":2,"type":"short-answer","question":"Reactance formula"}},
+            {{"id":3,"type":"short-answer","question":"Graph reactance vs freq"}},
+            {{"id":4,"type":"short-answer","question":"Behavior AC & DC"}}
             ]}}
 
             Return structured JSON matching schema.
