@@ -25,6 +25,7 @@ from utils.db import get_db
 from controllers.config import logger, s3_client, AWS_S3_BUCKET
 from controllers.storage import s3_upload_file, s3_presign_url
 from utils.firebase_auth import get_current_user
+from utils.firebase_users import get_users_by_emails
 from models import Assignment, SharedLink, SharedLinkAccess, AssignmentSubmission, Video
 from schemas import (
     AssignmentCreate,
@@ -99,18 +100,17 @@ def calculate_assignment_stats(assignment: Assignment) -> Assignment:
 
 
 @router.post(
-    "/api/assignments/{assignment_id}/submissions/{submission_id}/grade",
-    response_model=GradeSubmissionResponse,
+    "/api/assignments/{assignment_id}/submissions/{submission_id}/override-ai-flag"
 )
-async def grade_submission_endpoint(
+async def override_ai_flag(
     assignment_id: str,
     submission_id: str,
-    grade_req: GradeSubmissionRequest,
+    override_req: dict,
     request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """Trigger AI grading for a submission."""
+    """Override AI plagiarism flag for a specific question in a submission."""
     try:
         user_id = current_user["uid"]
 
@@ -139,9 +139,10 @@ async def grade_submission_endpoint(
 
         if not (is_owner or has_edit_access):
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to grade"
+                status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
             )
 
+        # Get submission
         submission = (
             db.query(AssignmentSubmission)
             .filter(
@@ -157,71 +158,130 @@ async def grade_submission_endpoint(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
             )
 
-        # Prepare assignment dict for grader
-        assignment = calculate_assignment_stats(assignment)
-        assignment_dict = {
-            "id": assignment.id,
-            "title": assignment.title,
-            "questions": assignment.questions or [],
-        }
+        # Extract override details
+        question_id = override_req.get("question_id")
+        action = override_req.get(
+            "action"
+        )  # "dismiss", "apply_penalty", "remove_penalty"
+        reason = override_req.get("reason", "")
 
-        # Run grading
-        from utils.grading_service import LLMGrader
-
-        grader = LLMGrader(
-            model=(
-                grade_req.options.model
-                if grade_req and grade_req.options and grade_req.options.model
-                else "gpt-4o"
+        if not question_id or not action:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="question_id and action are required",
             )
-        )
-        (
-            total_score,
-            total_points,
-            feedback_by_question,
-            overall_feedback,
-        ) = grader.grade_submission(
-            assignment=assignment_dict,
-            submission_answers=submission.answers or {},
-            options=(
-                grade_req.options.dict() if grade_req and grade_req.options else None
-            ),
-        )
+
+        # Get current feedback
+        feedback = submission.feedback or {}
+        question_feedback = feedback.get(question_id)
+
+        if not question_feedback:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No feedback found for question {question_id}",
+            )
+
+        ai_flag = question_feedback.get("ai_flag")
+        if not ai_flag:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"No AI flag found for question {question_id}",
+            )
+
+        # Apply override based on action
+        max_points = question_feedback.get("max_points", 0)
+        current_score = question_feedback.get("score", 0)
+        original_score = ai_flag.get("original_score", current_score)
+
+        # Get assignment penalty percentage (default to 50% for backward compatibility)
+        ai_penalty_percentage = assignment.ai_penalty_percentage
+        if ai_penalty_percentage is None:
+            ai_penalty_percentage = 50.0
+        penalty_multiplier = 1.0 - (ai_penalty_percentage / 100.0)
+
+        if action == "dismiss":
+            # Remove AI flag entirely
+            question_feedback["ai_flag"] = None
+            # Restore original score if it was penalized
+            if ai_flag.get("flag_level") == "hard":
+                question_feedback["score"] = original_score
+
+        elif action == "apply_penalty":
+            # Upgrade soft flag to hard flag and apply penalty
+            if ai_flag.get("flag_level") == "soft":
+                penalized_score = (
+                    original_score * penalty_multiplier
+                )  # Use assignment's penalty percentage
+                ai_flag["flag_level"] = "hard"
+                ai_flag["original_score"] = original_score
+                ai_flag["penalized_score"] = penalized_score
+                question_feedback["score"] = penalized_score
+
+        elif action == "remove_penalty":
+            # Downgrade hard flag to soft (or dismiss) and restore score
+            if ai_flag.get("flag_level") == "hard":
+                ai_flag["flag_level"] = "soft"
+                question_feedback["score"] = original_score
+                ai_flag["penalized_score"] = None
+
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid action: {action}",
+            )
+
+        # Add override metadata
+        if question_feedback.get("ai_flag"):
+            question_feedback["ai_flag"]["override_status"] = {
+                "overridden": True,
+                "by": user_id,
+                "at": datetime.now(timezone.utc).isoformat(),
+                "action": action,
+                "reason": reason,
+            }
+
+        # Update feedback in submission
+        feedback[question_id] = question_feedback
+        submission.feedback = feedback
+
+        # Recalculate total score and percentage
+        from sqlalchemy.orm.attributes import flag_modified
+
+        flag_modified(submission, "feedback")
+
+        total_score = sum(fb.get("score", 0.0) for fb in feedback.values())
+        total_points = sum(fb.get("max_points", 0.0) for fb in feedback.values())
 
         submission.score = f"{total_score:.2f}"
         submission.percentage = (
             f"{(total_score/total_points*100.0) if total_points>0 else 0.0:.2f}"
         )
-        submission.feedback = feedback_by_question
-        submission.overall_feedback = overall_feedback
-        submission.status = "graded"
-        submission.graded_at = datetime.now(timezone.utc)
         submission.updated_at = datetime.now(timezone.utc)
 
         db.commit()
         db.refresh(submission)
 
+        logger.info(
+            f"AI flag overridden for question {question_id} in submission {submission_id} by user {user_id}"
+        )
+
         return {
+            "success": True,
             "submission_id": submission.id,
-            "assignment_id": assignment_id,
-            "total_score": float(total_score),
-            "total_points": float(total_points),
-            "percentage": float(submission.percentage),
-            "overall_feedback": overall_feedback,
-            "feedback_by_question": feedback_by_question,
-            "graded_at": submission.graded_at,
+            "question_id": question_id,
+            "action": action,
+            "new_score": float(submission.score),
+            "new_percentage": float(submission.percentage),
         }
 
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        logger.error(
-            f"Error grading submission {submission_id} for assignment {assignment_id}: {str(e)}"
-        )
+        logger.error(f"Error overriding AI flag: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to grade submission",
+            detail="Failed to override AI flag",
         )
 
 
@@ -524,6 +584,8 @@ async def get_shared_assignments(
                     "shared_count": assignment.shared_count,
                     "created_at": assignment.created_at,
                     "updated_at": assignment.updated_at,
+                    "google_form_url": assignment.google_form_url,
+                    "google_form_response_url": assignment.google_form_response_url,
                 }
 
                 # Filter sensitive data for students
@@ -690,6 +752,7 @@ async def get_assignment(
             "generation_options": assignment.generation_options,
             "questions": assignment.questions,
             "is_template": assignment.is_template,
+            "ai_penalty_percentage": assignment.ai_penalty_percentage,
             "shared_count": assignment.shared_count,
             "created_at": assignment.created_at,
             "updated_at": assignment.updated_at,
@@ -731,6 +794,7 @@ async def create_assignment(
             title=assignment_data.title,
             description=assignment_data.description,
             due_date=assignment_data.due_date,
+            status=assignment_data.status,
             engineering_level=assignment_data.engineering_level,
             engineering_discipline=assignment_data.engineering_discipline,
             question_types=assignment_data.question_types,
@@ -740,6 +804,7 @@ async def create_assignment(
             generation_options=assignment_data.generation_options,
             questions=assignment_data.questions,
             is_template=assignment_data.is_template,
+            ai_penalty_percentage=assignment_data.ai_penalty_percentage,
         )
 
         # Calculate stats
@@ -950,6 +1015,75 @@ async def share_assignment(
                 db.add(shared_access)
                 shared_accesses.append(shared_access)
 
+        # Handle pending emails - check if they're registered users or truly pending
+        if share_data.pending_emails:
+            # Look up all emails in Firebase to see which are registered
+            email_to_user = await get_users_by_emails(share_data.pending_emails)
+
+            for email in share_data.pending_emails:
+                email_lower = email.lower().strip()
+                firebase_user = email_to_user.get(email_lower)
+
+                if firebase_user:
+                    # User is registered - use their Firebase UID
+                    user_id = firebase_user["uid"]
+
+                    # Check if user already has access
+                    existing_access = (
+                        db.query(SharedLinkAccess)
+                        .filter(
+                            and_(
+                                SharedLinkAccess.shared_link_id == shared_link.id,
+                                SharedLinkAccess.user_id == user_id,
+                            )
+                        )
+                        .first()
+                    )
+
+                    if existing_access:
+                        existing_access.permission = share_data.permission
+                        # Update email field if not set
+                        if not existing_access.email:
+                            existing_access.email = email_lower
+                        shared_accesses.append(existing_access)
+                    else:
+                        shared_access = SharedLinkAccess(
+                            shared_link_id=shared_link.id,
+                            user_id=user_id,
+                            email=email_lower,
+                            permission=share_data.permission,
+                        )
+                        db.add(shared_access)
+                        shared_accesses.append(shared_access)
+                else:
+                    # User not registered - create pending invite
+                    pending_user_id = f"pending_{email_lower}"
+
+                    # Check if this pending email already has access
+                    existing_access = (
+                        db.query(SharedLinkAccess)
+                        .filter(
+                            and_(
+                                SharedLinkAccess.shared_link_id == shared_link.id,
+                                SharedLinkAccess.email == email_lower,
+                            )
+                        )
+                        .first()
+                    )
+
+                    if existing_access:
+                        existing_access.permission = share_data.permission
+                        shared_accesses.append(existing_access)
+                    else:
+                        shared_access = SharedLinkAccess(
+                            shared_link_id=shared_link.id,
+                            user_id=pending_user_id,
+                            email=email_lower,
+                            permission=share_data.permission,
+                        )
+                        db.add(shared_access)
+                        shared_accesses.append(shared_access)
+
         db.commit()
         db.refresh(shared_link)
 
@@ -981,6 +1115,7 @@ async def share_assignment(
                 {
                     "id": access.id,
                     "user_id": access.user_id,
+                    "email": access.email,
                     "permission": access.permission,
                     "invited_at": access.invited_at,
                     "accessed_at": access.accessed_at,
@@ -991,7 +1126,7 @@ async def share_assignment(
         }
 
         logger.info(
-            f"Shared assignment {assignment_id} with {len(share_data.shared_with_user_ids)} users"
+            f"Shared assignment {assignment_id} with {len(share_data.shared_with_user_ids)} registered users and {len(share_data.pending_emails)} pending emails"
         )
         return response_data
 
@@ -1798,6 +1933,7 @@ async def submit_assignment(
             submission_method = form.get("submission_method") or "pdf"
             answers_raw = form.get("answers") or "{}"
             time_spent = form.get("time_spent") or "0"
+            telemetry_data_raw = form.get("telemetry_data")
             submitted_files_raw = form.get("submitted_files")
             uploaded_file = form.get("file")  # type: ignore
 
@@ -1851,15 +1987,26 @@ async def submit_assignment(
             except Exception:
                 answers_obj = {}
 
+            telemetry_obj = None
+            if telemetry_data_raw:
+                try:
+                    telemetry_obj = _json.loads(telemetry_data_raw)
+                except Exception:
+                    telemetry_obj = None
+
             submission_data = _SubmissionDraft(
                 answers=answers_obj,
                 submission_method=submission_method,
                 submitted_files=submitted_files,
                 time_spent=time_spent,
             )
+            telemetry_data = telemetry_obj
         else:
             # JSON body
             body_json = await request.json()
+            telemetry_data = body_json.pop(
+                "telemetry_data", None
+            )  # Extract telemetry before creating schema
             submission_data = _SubmissionDraft(**body_json)
 
         # Check for existing submission
@@ -1987,6 +2134,7 @@ async def submit_assignment(
             existing_submission.submission_method = submission_data.submission_method
             existing_submission.submitted_files = submission_data.submitted_files
             existing_submission.time_spent = submission_data.time_spent
+            existing_submission.telemetry_data = telemetry_data  # Store telemetry data
             existing_submission.status = "submitted"
             existing_submission.submitted_at = datetime.now(timezone.utc)
             existing_submission.updated_at = datetime.now(timezone.utc)
@@ -2034,6 +2182,7 @@ async def submit_assignment(
                 submission_method=submission_data.submission_method,
                 submitted_files=submission_data.submitted_files,
                 time_spent=submission_data.time_spent,
+                telemetry_data=telemetry_data,  # Store telemetry data
                 status="submitted",
                 submitted_at=datetime.now(timezone.utc),
             )
@@ -2610,7 +2759,7 @@ async def upload_assignment_diagram(
                         SharedLink.assignment_id == assignment_id,
                         SharedLink.share_type == "assignment",
                         SharedLinkAccess.user_id == user_id,
-                        SharedLinkAccess.permission == "edit",
+                        SharedLinkAccess.permission.in_(["complete", "edit"]),
                     )
                 )
                 .first()
@@ -2826,7 +2975,7 @@ async def delete_assignment_diagram(
                         SharedLink.assignment_id == assignment_id,
                         SharedLink.share_type == "assignment",
                         SharedLinkAccess.user_id == user_id,
-                        SharedLinkAccess.permission == "edit",
+                        SharedLinkAccess.permission.in_(["complete", "edit"]),
                     )
                 )
                 .first()
