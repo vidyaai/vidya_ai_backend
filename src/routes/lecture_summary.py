@@ -141,7 +141,7 @@ async def generate_lecture_summary(
 
             # Generate PDF with video metadata
             pdf_path = pdf_generator.generate_pdf_from_content(
-                summary_markdown, temp_pdf_path, video_metadata=video_metadata
+                summary_markdown, temp_pdf_path
             )
 
             # Read PDF content (pdf_path should be the same as temp_pdf_path)
@@ -222,7 +222,9 @@ async def download_lecture_summary(
         user_id = current_user["uid"]
 
         # Fetch summary
-        summary = db.query(LectureSummary).filter(LectureSummary.id == summary_id).first()
+        summary = (
+            db.query(LectureSummary).filter(LectureSummary.id == summary_id).first()
+        )
         if not summary:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Summary not found"
@@ -232,7 +234,8 @@ async def download_lecture_summary(
         video = db.query(Video).filter(Video.id == summary.video_id).first()
         if not video:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Associated video not found"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Associated video not found",
             )
 
         if video.user_id != user_id and summary.user_id != user_id:
