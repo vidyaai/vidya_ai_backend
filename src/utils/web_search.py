@@ -105,7 +105,10 @@ class WebSearchClient:
 
         try:
             url = "https://google.serper.dev/search"
-            headers = {"X-API-KEY": self.serper_api_key, "Content-Type": "application/json"}
+            headers = {
+                "X-API-KEY": self.serper_api_key,
+                "Content-Type": "application/json",
+            }
             payload = {"q": query, "num": max_results}
 
             response = requests.post(url, headers=headers, json=payload, timeout=10)
@@ -242,13 +245,25 @@ class SearchDecisionAgent:
 
             # PRIORITY CHECK: If user explicitly asks for external sources/links, ALWAYS search
             external_source_keywords = [
-                'source', 'link', 'resource', 'further reading', 'learn more',
-                'external', 'website', 'article', 'tutorial', 'guide online',
-                'where can i learn', 'where to learn', 'recommend'
+                "source",
+                "link",
+                "resource",
+                "further reading",
+                "learn more",
+                "external",
+                "website",
+                "article",
+                "tutorial",
+                "guide online",
+                "where can i learn",
+                "where to learn",
+                "recommend",
             ]
 
             if any(keyword in question_lower for keyword in external_source_keywords):
-                logger.info(f"User explicitly requested external sources, triggering web search")
+                logger.info(
+                    f"User explicitly requested external sources, triggering web search"
+                )
                 return {
                     "should_search": True,
                     "search_query": user_question,
@@ -262,8 +277,34 @@ class SearchDecisionAgent:
 
             # Extract key terms from the question (simple extraction)
             # Remove common question words and get meaningful terms
-            stop_words = {'what', 'is', 'are', 'the', 'a', 'an', 'how', 'does', 'do', 'why', 'can', 'you', 'explain', 'tell', 'me', 'about', 'please', 'i', 'want', 'to', 'know'}
-            question_words = [w.strip('?.,!') for w in question_lower.split() if w.strip('?.,!') not in stop_words and len(w.strip('?.,!')) > 2]
+            stop_words = {
+                "what",
+                "is",
+                "are",
+                "the",
+                "a",
+                "an",
+                "how",
+                "does",
+                "do",
+                "why",
+                "can",
+                "you",
+                "explain",
+                "tell",
+                "me",
+                "about",
+                "please",
+                "i",
+                "want",
+                "to",
+                "know",
+            }
+            question_words = [
+                w.strip("?.,!")
+                for w in question_lower.split()
+                if w.strip("?.,!") not in stop_words and len(w.strip("?.,!")) > 2
+            ]
 
             # Check if key terms appear in transcript
             terms_found_in_transcript = []
@@ -284,7 +325,9 @@ class SearchDecisionAgent:
                     end_pos = min(len(transcript_excerpt), term_position + 1500)
                     relevant_excerpt = transcript_excerpt[start_pos:end_pos]
 
-                    logger.info(f"Found term '{main_term}' in transcript at position {term_position}, using relevant excerpt")
+                    logger.info(
+                        f"Found term '{main_term}' in transcript at position {term_position}, using relevant excerpt"
+                    )
                 else:
                     relevant_excerpt = transcript_excerpt[:2000]
             else:
@@ -343,9 +386,13 @@ CRITICAL Guidelines:
 
             # Override: If key terms are clearly in transcript, don't search
             if len(terms_found_in_transcript) >= 2 and result.get("should_search"):
-                logger.info(f"Overriding search decision: terms {terms_found_in_transcript} found in transcript")
+                logger.info(
+                    f"Overriding search decision: terms {terms_found_in_transcript} found in transcript"
+                )
                 result["should_search"] = False
-                result["reason"] = f"Topic terms ({', '.join(terms_found_in_transcript)}) found in video transcript"
+                result[
+                    "reason"
+                ] = f"Topic terms ({', '.join(terms_found_in_transcript)}) found in video transcript"
                 result["confidence"] = 0.3  # Low confidence in search decision
 
             logger.info(
@@ -378,7 +425,13 @@ CRITICAL Guidelines:
         query = user_question.strip()
 
         # Remove question words for better search results
-        question_words = ["what is", "how does", "why is", "can you explain", "tell me about"]
+        question_words = [
+            "what is",
+            "how does",
+            "why is",
+            "can you explain",
+            "tell me about",
+        ]
         for word in question_words:
             query = query.lower().replace(word, "").strip()
 
@@ -423,8 +476,29 @@ def synthesize_with_web_results(
         # Find relevant sections of transcript based on question
         # Search for key terms in the question within the transcript
         question_lower = user_question.lower()
-        stop_words = {'what', 'is', 'are', 'the', 'a', 'an', 'how', 'does', 'do', 'why', 'can', 'you', 'explain', 'tell', 'me', 'about'}
-        question_terms = [w.strip('?.,!') for w in question_lower.split() if w.strip('?.,!') not in stop_words and len(w.strip('?.,!')) > 2]
+        stop_words = {
+            "what",
+            "is",
+            "are",
+            "the",
+            "a",
+            "an",
+            "how",
+            "does",
+            "do",
+            "why",
+            "can",
+            "you",
+            "explain",
+            "tell",
+            "me",
+            "about",
+        }
+        question_terms = [
+            w.strip("?.,!")
+            for w in question_lower.split()
+            if w.strip("?.,!") not in stop_words and len(w.strip("?.,!")) > 2
+        ]
 
         # Try to find relevant section of transcript
         video_content_lower = video_content.lower() if video_content else ""
@@ -439,11 +513,17 @@ def synthesize_with_web_results(
                     start = max(0, pos - 1000)
                     end = min(len(video_content), pos + 4000)
                     relevant_video_content = video_content[start:end]
-                    logger.info(f"Found term '{term}' at position {pos}, using context from {start} to {end}")
+                    logger.info(
+                        f"Found term '{term}' at position {pos}, using context from {start} to {end}"
+                    )
                     break
 
         # Use more transcript content (up to 5000 chars for better context)
-        video_excerpt = relevant_video_content[:5000] if len(relevant_video_content) > 5000 else relevant_video_content
+        video_excerpt = (
+            relevant_video_content[:5000]
+            if len(relevant_video_content) > 5000
+            else relevant_video_content
+        )
 
         # Build enhanced prompt
         enhanced_prompt = f"""Answer the student's question using BOTH the video content and additional web sources.
@@ -494,11 +574,15 @@ def synthesize_with_web_results(
 - ❌ Saying "I cannot provide links" when links are available above
 """
 
-        messages = [{"role": "system", "content": SYSTEM_PROMPT_CONVERSATIONAL_FORMATTED}]
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT_CONVERSATIONAL_FORMATTED}
+        ]
 
         # Add conversation history (increased to 10 messages for better memory)
         if conversation_history:
-            for msg in conversation_history[-10:]:  # Last 10 messages for context (5 Q&A pairs)
+            for msg in conversation_history[
+                -10:
+            ]:  # Last 10 messages for context (5 Q&A pairs)
                 if isinstance(msg, dict) and "role" in msg and "content" in msg:
                     messages.append({"role": msg["role"], "content": msg["content"]})
 
@@ -515,8 +599,7 @@ def synthesize_with_web_results(
         answer = response.choices[0].message.content
 
         # Extract citation URLs as markdown links (clickable)
-        citations = [f"[{r['title']}]({r['url']})"
-                    for r in search_results]
+        citations = [f"[{r['title']}]({r['url']})" for r in search_results]
 
         return {
             "answer": answer,

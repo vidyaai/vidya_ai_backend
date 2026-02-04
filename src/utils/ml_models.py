@@ -186,7 +186,9 @@ class OpenAIVisionClient:
         try:
             # Create a concise excerpt (first 500 chars of transcript)
             context_sample = (
-                transcript_excerpt[:500] if transcript_excerpt else "No transcript available"
+                transcript_excerpt[:500]
+                if transcript_excerpt
+                else "No transcript available"
             )
 
             prompt = f"""You are analyzing whether a student's question is relevant to a video they're watching.
@@ -299,7 +301,10 @@ Be generous - if the question is even loosely related or could be asking for cla
                 )
 
                 # Perform web search if needed
-                if decision.get("should_search") and decision.get("confidence", 0) > 0.6:
+                if (
+                    decision.get("should_search")
+                    and decision.get("confidence", 0) > 0.6
+                ):
                     search_query = decision.get("search_query", prompt)
                     logger.info(f"Performing web search for: {search_query}")
 
@@ -329,7 +334,9 @@ Be generous - if the question is even loosely related or could be asking for cla
 
             # If no web search or search failed, use standard answer
             logger.info("Generating answer from video content only")
-            result["response"] = self.ask_text_only(prompt, context, conversation_history)
+            result["response"] = self.ask_text_only(
+                prompt, context, conversation_history
+            )
             result["used_web_search"] = False
 
             return result
