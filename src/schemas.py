@@ -64,6 +64,7 @@ class VideoQuery(BaseModel):
     timestamp: Optional[float] = None
     is_image_query: bool = False
     conversation_history: Optional[List[Dict[str, Any]]] = []
+    session_id: Optional[str] = None
 
 
 class TranslationRequest(BaseModel):
@@ -635,6 +636,22 @@ class UserOut(BaseModel):
     stripe_customer_id: Optional[str]
     created_at: datetime
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Lecture Summary schemas
+class LectureSummaryRequest(BaseModel):
+    video_id: str
+    force_regenerate: bool = False
+
+
+class LectureSummaryResponse(BaseModel):
+    summary_id: str
+    video_id: str
+    created_at: datetime
+    summary_metadata: Optional[dict] = None
 
     class Config:
         from_attributes = True
