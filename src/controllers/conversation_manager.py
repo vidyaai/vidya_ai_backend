@@ -17,7 +17,7 @@ def store_conversation_turn(
     user_message: str,
     ai_response: str,
     timestamp: Optional[float],
-    session_id: Optional[str] = None
+    session_id: Optional[str] = None,
 ) -> str:
     """
     Store a conversation turn (user question + AI response) in the database.
@@ -49,10 +49,14 @@ def store_conversation_turn(
         active_session = None
         if session_id:
             # Look for existing session with this ID
-            active_session = next((s for s in chat_sessions if s.get("id") == session_id), None)
+            active_session = next(
+                (s for s in chat_sessions if s.get("id") == session_id), None
+            )
         else:
             # Get most recent session for this user
-            user_sessions = [s for s in chat_sessions if s.get("user_id") == firebase_uid]
+            user_sessions = [
+                s for s in chat_sessions if s.get("user_id") == firebase_uid
+            ]
             if user_sessions:
                 # Use the most recently updated session
                 user_sessions.sort(key=lambda x: x.get("updatedAt", ""), reverse=True)
@@ -67,11 +71,13 @@ def store_conversation_turn(
                 "title": f"Chat {datetime.now().strftime('%b %d, %I:%M %p')}",
                 "messages": [],
                 "createdAt": datetime.now(timezone.utc).isoformat(),
-                "updatedAt": datetime.now(timezone.utc).isoformat()
+                "updatedAt": datetime.now(timezone.utc).isoformat(),
             }
             chat_sessions.append(active_session)
             session_id = new_session_id
-            logger.info(f"Created new chat session {new_session_id} for video {video_id}")
+            logger.info(
+                f"Created new chat session {new_session_id} for video {video_id}"
+            )
         else:
             session_id = active_session.get("id")
 
@@ -79,18 +85,14 @@ def store_conversation_turn(
         messages = active_session.get("messages", [])
 
         # User message
-        messages.append({
-            "role": "user",
-            "content": user_message,
-            "timestamp": timestamp
-        })
+        messages.append(
+            {"role": "user", "content": user_message, "timestamp": timestamp}
+        )
 
         # AI response
-        messages.append({
-            "role": "assistant",
-            "content": ai_response,
-            "timestamp": timestamp
-        })
+        messages.append(
+            {"role": "assistant", "content": ai_response, "timestamp": timestamp}
+        )
 
         # Keep only last 50 messages to prevent database bloat
         active_session["messages"] = messages[-50:]
@@ -101,7 +103,9 @@ def store_conversation_turn(
         db.add(video)
         db.commit()
 
-        logger.info(f"Stored conversation turn in session {session_id} for video {video_id}")
+        logger.info(
+            f"Stored conversation turn in session {session_id} for video {video_id}"
+        )
         return session_id
 
     except Exception as e:
@@ -115,7 +119,7 @@ def get_merged_conversation_history(
     video_id: str,
     firebase_uid: str,
     session_id: Optional[str],
-    client_history: List[Dict[str, Any]]
+    client_history: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     """
     Retrieve conversation history from database and merge with client-sent history.
@@ -135,23 +139,31 @@ def get_merged_conversation_history(
         # Get video record
         video = db.query(Video).filter(Video.id == video_id).first()
         if not video or not video.chat_sessions:
-            logger.info(f"No chat sessions found for video {video_id}, using client history")
+            logger.info(
+                f"No chat sessions found for video {video_id}, using client history"
+            )
             return client_history
 
         # Find the active session
         active_session = None
         if session_id:
             # Look for session with specific ID
-            active_session = next((s for s in video.chat_sessions if s.get("id") == session_id), None)
+            active_session = next(
+                (s for s in video.chat_sessions if s.get("id") == session_id), None
+            )
         else:
             # Get most recent session for this user
-            user_sessions = [s for s in video.chat_sessions if s.get("user_id") == firebase_uid]
+            user_sessions = [
+                s for s in video.chat_sessions if s.get("user_id") == firebase_uid
+            ]
             if user_sessions:
                 user_sessions.sort(key=lambda x: x.get("updatedAt", ""), reverse=True)
                 active_session = user_sessions[0]
 
         if not active_session:
-            logger.info(f"No matching session found for video {video_id}, using client history")
+            logger.info(
+                f"No matching session found for video {video_id}, using client history"
+            )
             return client_history
 
         # Get messages from database (last 20 for context window)
@@ -160,13 +172,17 @@ def get_merged_conversation_history(
         # Convert to OpenAI format
         formatted_messages = []
         for msg in db_messages:
-            formatted_messages.append({
-                "role": msg.get("role", "user"),
-                "content": msg.get("content", ""),
-                "timestamp": msg.get("timestamp")
-            })
+            formatted_messages.append(
+                {
+                    "role": msg.get("role", "user"),
+                    "content": msg.get("content", ""),
+                    "timestamp": msg.get("timestamp"),
+                }
+            )
 
-        logger.info(f"Retrieved {len(formatted_messages)} messages from session {active_session.get('id')} for video {video_id}")
+        logger.info(
+            f"Retrieved {len(formatted_messages)} messages from session {active_session.get('id')} for video {video_id}"
+        )
         return formatted_messages if formatted_messages else client_history
 
     except Exception as e:

@@ -386,7 +386,9 @@ class LectureSummary(Base):
     user_id = Column(String, nullable=False, index=True)
     summary_markdown = Column(Text, nullable=False)
     summary_pdf_s3_key = Column(String, nullable=True)
-    summary_metadata = Column(JSON, nullable=True)  # topics, video_title, generation_time, etc.
+    summary_metadata = Column(
+        JSON, nullable=True
+    )  # topics, video_title, generation_time, etc.
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
         DateTime,

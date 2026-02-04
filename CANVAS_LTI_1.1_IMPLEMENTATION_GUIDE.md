@@ -123,46 +123,46 @@ Add this model to your existing models file:
 class LTI11Session(Base):
     """
     LTI 1.1 session data
-    
+
     Unlike LTI 1.3, we store minimal session data since
     there's no complex OAuth 2.0 flow
     """
     __tablename__ = "lti11_sessions"
-    
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    
+
     # Canvas context
     consumer_key = Column(String, nullable=False)  # Identifies the Canvas instance
     course_id = Column(String, nullable=False)     # Canvas course ID
     course_name = Column(String)
-    
+
     # User info
     user_id = Column(String, nullable=False)       # Canvas user ID
     user_email = Column(String)
     user_name = Column(String)
     user_roles = Column(String)  # Comma-separated roles
-    
+
     # Assignment context (if launched from assignment)
     assignment_id = Column(String)
     assignment_name = Column(String)
-    
+
     # Return URL for sending back assignment
     launch_presentation_return_url = Column(String)
-    
+
     # OAuth parameters from launch
     resource_link_id = Column(String)
     resource_link_title = Column(String)
-    
+
     # Session management
     session_token = Column(String, unique=True, nullable=False)  # For frontend
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime)
     used = Column(Boolean, default=False)
-    
+
     # Canvas API access (if Canvas provides API token)
     canvas_api_token = Column(String)
     canvas_instance_url = Column(String)
-    
+
     __table_args__ = (
         Index('idx_session_token', 'session_token'),
         Index('idx_course_user', 'course_id', 'user_id'),
@@ -299,14 +299,14 @@ def verify_oauth_signature(
 ) -> bool:
     """
     Verify OAuth 1.0 signature from Canvas LTI launch
-    
+
     Canvas signs the LTI launch request using OAuth 1.0 signature.
     We verify this signature to ensure the request is authentic.
-    
+
     Args:
         request: FastAPI request object
         body: Form data from POST request
-        
+
     Returns:
         True if signature is valid, False otherwise
     """
@@ -316,50 +316,50 @@ def verify_oauth_signature(
         if not consumer_key:
             logger.error("Missing oauth_consumer_key in LTI launch")
             return False
-            
+
         consumer_secret = get_consumer_secret(consumer_key)
         if not consumer_secret:
             logger.error(f"Unknown consumer key: {consumer_key}")
             return False
-        
+
         # Build the base string for signature verification
         # OAuth 1.0 signature = HMAC-SHA1(base_string, consumer_secret&)
-        
+
         # Get HTTP method
         http_method = request.method.upper()
-        
+
         # Get base URL (without query parameters)
         base_url = str(request.url).split('?')[0]
-        
+
         # Collect all parameters (OAuth + LTI)
         params = {}
         for key, value in body.items():
             if isinstance(value, str):
                 params[key] = value
-        
+
         # Remove signature from parameters
         params.pop('oauth_signature', None)
-        
+
         # Sort parameters
         sorted_params = sorted(params.items())
-        
+
         # Create parameter string
         param_string = "&".join([
             f"{quote(str(k), safe='')}={quote(str(v), safe='')}"
             for k, v in sorted_params
         ])
-        
+
         # Create base string
         base_string = "&".join([
             quote(http_method, safe=''),
             quote(base_url, safe=''),
             quote(param_string, safe='')
         ])
-        
+
         # Create signature key (consumer_secret&token_secret)
         # In LTI, there's no token_secret, so key is just consumer_secret&
         signing_key = f"{quote(consumer_secret, safe='')}&"
-        
+
         # Calculate signature
         calculated_signature = base64.b64encode(
             hmac.new(
@@ -368,16 +368,16 @@ def verify_oauth_signature(
                 hashlib.sha1
             ).digest()
         ).decode('utf-8')
-        
+
         # Get signature from request
         provided_signature = body.get("oauth_signature", "")
-        
+
         # Compare signatures
         is_valid = hmac.compare_digest(
             calculated_signature,
             provided_signature
         )
-        
+
         if not is_valid:
             logger.error(
                 f"OAuth signature verification failed\n"
@@ -385,9 +385,9 @@ def verify_oauth_signature(
                 f"Received: {provided_signature}\n"
                 f"Base string: {base_string[:200]}..."
             )
-        
+
         return is_valid
-        
+
     except Exception as e:
         logger.error(f"Error verifying OAuth signature: {str(e)}", exc_info=True)
         return False
@@ -397,21 +397,21 @@ def verify_oauth_signature(
 async def get_config_xml():
     """
     Returns LTI 1.1 configuration XML for Canvas
-    
+
     Instructors can use this URL when adding Vidya AI to their course:
     Configuration Type: "By URL"
     Config URL: https://api.vidyaai.co/lti/v1/config.xml
     Consumer Key: vidyaai-lti-default
     Shared Secret: [provided separately]
-    
+
     This XML tells Canvas:
     - Where to launch the tool (/lti/v1/launch)
     - What placements to use (Assignment Selection)
     - What information to send (user info, course info)
     """
-    
+
     base_url = settings.API_BASE_URL
-    
+
     xml = f'''<?xml version="1.0" encoding="UTF-8"?>
 <cartridge_basiclti_link xmlns="http://www.imsglobal.org/xsd/imslticc_v1p0"
     xmlns:blti="http://www.imsglobal.org/xsd/imsbasiclti_v1p0"
@@ -422,17 +422,17 @@ async def get_config_xml():
     http://www.imsglobal.org/xsd/imsbasiclti_v1p0 http://www.imsglobal.org/xsd/lti/ltiv1p0/imsbasiclti_v1p0p1.xsd
     http://www.imsglobal.org/xsd/imslticm_v1p0 http://www.imsglobal.org/xsd/lti/ltiv1p0/imslticm_v1p0.xsd
     http://www.imsglobal.org/xsd/imslticp_v1p0 http://www.imsglobal.org/xsd/lti/ltiv1p0/imslticp_v1p0.xsd">
-    
+
     <blti:title>Vidya AI Assignment Generator</blti:title>
     <blti:description>Generate AI-powered assignments from your lecture notes. Create custom quizzes, problem sets, and assessments in minutes.</blti:description>
     <blti:launch_url>{base_url}/lti/v1/launch</blti:launch_url>
     <blti:secure_launch_url>{base_url}/lti/v1/launch</blti:secure_launch_url>
     <blti:icon>{base_url}/static/vidya-icon.png</blti:icon>
-    
+
     <blti:extensions platform="canvas.instructure.com">
         <lticm:property name="privacy_level">public</lticm:property>
         <lticm:property name="domain">{base_url.replace('https://', '').replace('http://', '')}</lticm:property>
-        
+
         <!-- Assignment Selection Placement -->
         <lticm:options name="assignment_selection">
             <lticm:property name="enabled">true</lticm:property>
@@ -441,7 +441,7 @@ async def get_config_xml():
             <lticm:property name="url">{base_url}/lti/v1/launch</lticm:property>
             <lticm:property name="icon_url">{base_url}/static/vidya-icon.png</lticm:property>
         </lticm:options>
-        
+
         <!-- Optional: Course Navigation Placement -->
         <lticm:options name="course_navigation">
             <lticm:property name="enabled">true</lticm:property>
@@ -451,11 +451,11 @@ async def get_config_xml():
             <lticm:property name="url">{base_url}/lti/v1/launch</lticm:property>
         </lticm:options>
     </blti:extensions>
-    
+
     <cartridge_bundle identifierref="BLTI001_Bundle"/>
     <cartridge_icon identifierref="BLTI001_Icon"/>
 </cartridge_basiclti_link>'''
-    
+
     return Response(content=xml, media_type="application/xml")
 
 
@@ -466,11 +466,11 @@ async def lti_launch(
 ):
     """
     LTI 1.1 Launch Endpoint
-    
+
     This is where Canvas sends the LTI launch POST request when:
     1. Instructor clicks "Create using Vidya AI" in assignment creation
     2. User clicks Vidya AI link in course navigation
-    
+
     LTI 1.1 Launch Parameters (from Canvas):
     - oauth_consumer_key: Identifies the Canvas instance
     - oauth_signature: OAuth 1.0 signature for verification
@@ -482,7 +482,7 @@ async def lti_launch(
     - launch_presentation_return_url: Where to return after tool use
     - lis_person_contact_email_primary: User email
     - lis_person_name_full: User full name
-    
+
     Flow:
     1. Verify OAuth signature
     2. Extract user and course info
@@ -493,13 +493,13 @@ async def lti_launch(
         # Parse form data
         form_data = await request.form()
         launch_params = dict(form_data)
-        
+
         # Log launch (without sensitive data)
         logger.info(
             f"LTI 1.1 Launch received from {launch_params.get('oauth_consumer_key')} "
             f"for course {launch_params.get('context_id')}"
         )
-        
+
         # Verify OAuth 1.0 signature
         if not verify_oauth_signature(request, launch_params):
             logger.error("LTI 1.1 launch failed: Invalid OAuth signature")
@@ -507,23 +507,23 @@ async def lti_launch(
                 status_code=401,
                 detail="Invalid OAuth signature. Please check your consumer key and shared secret."
             )
-        
+
         # Extract required parameters
         consumer_key = launch_params.get("oauth_consumer_key")
         user_id = launch_params.get("user_id")
         course_id = launch_params.get("context_id")
-        
+
         if not all([consumer_key, user_id, course_id]):
             logger.error(f"Missing required LTI parameters: {launch_params.keys()}")
             raise HTTPException(
                 status_code=400,
                 detail="Missing required LTI parameters"
             )
-        
+
         # Generate session token
         import secrets
         session_token = secrets.token_urlsafe(32)
-        
+
         # Create session
         session = LTI11Session(
             consumer_key=consumer_key,
@@ -543,20 +543,20 @@ async def lti_launch(
             # Canvas instance URL (extract from launch URL if available)
             canvas_instance_url=launch_params.get("custom_canvas_api_domain")
         )
-        
+
         db.add(session)
         db.commit()
         db.refresh(session)
-        
+
         logger.info(
             f"Created LTI 1.1 session {session.id} for user {user_id} "
             f"in course {course_id}"
         )
-        
+
         # Redirect to frontend
         frontend_url = f"{settings.FRONTEND_URL}/canvas-assignment-generator"
         redirect_url = f"{frontend_url}?lti_session={session_token}&lti_version=1.1"
-        
+
         # Return HTML that auto-submits to frontend
         # This is necessary because some Canvas configurations don't support direct redirects
         html_content = f"""
@@ -608,9 +608,9 @@ async def lti_launch(
         </body>
         </html>
         """
-        
+
         return HTMLResponse(content=html_content)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -628,19 +628,19 @@ async def get_session(
 ):
     """
     Get LTI 1.1 session details
-    
+
     Frontend calls this to get course/user context after launch
     """
     session = db.query(LTI11Session).filter(
         LTI11Session.session_token == session_token
     ).first()
-    
+
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    
+
     if session.expires_at < datetime.utcnow():
         raise HTTPException(status_code=401, detail="Session expired")
-    
+
     return {
         "session_id": session.id,
         "course_id": session.course_id,
@@ -668,10 +668,10 @@ async def return_assignment(
 ):
     """
     Return generated assignment to Canvas
-    
+
     LTI 1.1 doesn't have Deep Linking, so we use ContentItemReturn
     or redirect back to Canvas with the assignment data
-    
+
     This endpoint is called by the frontend after assignment generation
     """
     try:
@@ -679,23 +679,23 @@ async def return_assignment(
         session = db.query(LTI11Session).filter(
             LTI11Session.session_token == session_token
         ).first()
-        
+
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-        
+
         # Mark session as used
         session.used = True
         db.commit()
-        
+
         # If we have a return URL, redirect back to Canvas
         if session.launch_presentation_return_url:
             # For LTI 1.1, we can pass limited data back via query params
             return_url = session.launch_presentation_return_url
-            
+
             # Add success message
             separator = "&" if "?" in return_url else "?"
             return_url = f"{return_url}{separator}lti_msg=Assignment created successfully"
-            
+
             return RedirectResponse(url=return_url)
         else:
             # No return URL, show success message
@@ -730,7 +730,7 @@ async def return_assignment(
             </html>
             """
             return HTMLResponse(content=html_content)
-            
+
     except Exception as e:
         logger.error(f"Error returning assignment: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -740,11 +740,11 @@ async def return_assignment(
 async def get_consumer_info():
     """
     Returns consumer key information for instructors
-    
+
     This endpoint helps instructors know what consumer key/secret to use
     """
     default_consumer = CONSUMER_CONFIG.get("default_consumer", "vidyaai-lti-default")
-    
+
     return {
         "consumer_key": default_consumer,
         "config_url": f"{settings.API_BASE_URL}/lti/v1/config.xml",
@@ -816,15 +816,15 @@ useEffect(() => {
   const urlParams = new URLSearchParams(window.location.search);
   const sessionToken = urlParams.get('lti_session');
   const version = urlParams.get('lti_version') as '1.1' | '1.3' || '1.3';
-  
+
   setLtiVersion(version);
-  
+
   if (sessionToken) {
     // Load session based on version
-    const endpoint = version === '1.1' 
+    const endpoint = version === '1.1'
       ? `/lti/v1/session/${sessionToken}`
       : `/lti/session/${sessionToken}`;
-      
+
     fetch(`${API_BASE_URL}${endpoint}`)
       .then(res => res.json())
       .then(data => {
@@ -839,25 +839,25 @@ const handleAddToCanvas = async () => {
   if (ltiVersion === '1.1') {
     // LTI 1.1: No Deep Linking, manual return
     // Show assignment text to copy or redirect back to Canvas
-    
+
     // Option 1: Download assignment as file
     downloadAssignmentAsFile(generatedAssignment);
-    
+
     // Option 2: Show assignment in modal for copy-paste
     setShowAssignmentModal(true);
-    
+
     // Option 3: Call return endpoint
     const formData = new FormData();
     formData.append('session_token', session.session_token);
     formData.append('assignment_title', assignment.title);
     formData.append('assignment_description', assignment.description);
     formData.append('assignment_points', assignment.points.toString());
-    
+
     await fetch(`${API_BASE_URL}/lti/v1/return`, {
       method: 'POST',
       body: formData
     });
-    
+
   } else {
     // LTI 1.3: Use Deep Linking (existing code)
     // ... existing Deep Link code
@@ -935,13 +935,13 @@ def list_consumers():
 
 def add_consumer(key, secret, description=""):
     config = load_config()
-    
+
     # Check if exists
     for c in config['consumers']:
         if c['consumer_key'] == key:
             print(f"Error: Consumer key '{key}' already exists")
             return
-    
+
     consumer = {
         "consumer_key": key,
         "shared_secret": secret,
@@ -949,19 +949,19 @@ def add_consumer(key, secret, description=""):
         "enabled": True,
         "created_at": datetime.now().isoformat()
     }
-    
+
     config['consumers'].append(consumer)
-    
+
     # Set as default if first consumer
     if not config.get('default_consumer'):
         config['default_consumer'] = key
-    
+
     save_config(config)
     print(f"✓ Added consumer key: {key}")
 
 def toggle_consumer(key, enable):
     config = load_config()
-    
+
     for c in config['consumers']:
         if c['consumer_key'] == key:
             c['enabled'] = enable
@@ -969,7 +969,7 @@ def toggle_consumer(key, enable):
             status = "enabled" if enable else "disabled"
             print(f"✓ Consumer key '{key}' {status}")
             return
-    
+
     print(f"Error: Consumer key '{key}' not found")
 
 def generate_secret():
@@ -980,9 +980,9 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(__doc__)
         sys.exit(1)
-    
+
     command = sys.argv[1]
-    
+
     if command == "list":
         list_consumers()
     elif command == "add":
@@ -1069,8 +1069,8 @@ Copy the ngrok URL (e.g., `https://abc123.ngrok.io`)
 
 **Expected Flow:**
 ```
-Canvas → LTI Launch POST → Backend verifies signature → 
-Creates session → Redirects to Frontend → 
+Canvas → LTI Launch POST → Backend verifies signature →
+Creates session → Redirects to Frontend →
 Frontend loads with session → Generate assignment →
 Return to Canvas
 ```
@@ -1258,10 +1258,10 @@ async def debug_last_launch(db: Session = Depends(get_db)):
     session = db.query(LTI11Session).order_by(
         LTI11Session.created_at.desc()
     ).first()
-    
+
     if not session:
         return {"message": "No launches yet"}
-    
+
     return {
         "session_id": session.id,
         "consumer_key": session.consumer_key,
