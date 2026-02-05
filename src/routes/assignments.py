@@ -1540,6 +1540,12 @@ async def generate_assignment(
     try:
         user_id = current_user["uid"]
         logger.info(f"Generating assignment for user: {user_id}")
+        
+        # DEBUG: Log what we received
+        logger.info(f"DEBUG - Received generation_prompt: {generate_data.generation_prompt}")
+        logger.info(f"DEBUG - Received title: {generate_data.title}")
+        logger.info(f"DEBUG - Received description: {generate_data.description}")
+        logger.info(f"DEBUG - Generation options: {generate_data.generation_options}")
 
         # Import the assignment generator
         from utils.assignment_generator import AssignmentGenerator

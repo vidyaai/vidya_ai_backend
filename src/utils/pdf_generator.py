@@ -405,6 +405,70 @@ class AssignmentPDFGenerator:
             logger.error(f"Fallback rendering failed: {e}")
             return ""
 
+    def convert_text_math_to_latex(self, text: str) -> str:
+        """
+        Convert plain text mathematical notation to LaTeX format.
+        Handles subscripts (x_1), superscripts (x^2), scientific notation, and special characters.
+        
+        Args:
+            text: Text with plain subscript/superscript notation
+            
+        Returns:
+            Text with notation converted to LaTeX $...$ format
+        """
+        if not text:
+            return ""
+        
+        # Handle scientific notation with units: 7.0×10^−4 °C^−1
+        # This must come FIRST before we process degree symbols separately
+        scientific_with_units_pattern = r'([\d.]+)\s*[×x]\s*10\^([−\-]?\d+)\s*°C\^([−\-]?\d+)'
+        
+        def replace_scientific_with_units(match):
+            coefficient = match.group(1)
+            exponent = match.group(2).replace('−', '-')
+            unit_exp = match.group(3).replace('−', '-')
+            return f'${coefficient}\\times 10^{{{exponent}}}$ °C$^{{{unit_exp}}}$'
+        
+        text = re.sub(scientific_with_units_pattern, replace_scientific_with_units, text)
+        
+        # Now handle degree symbols for regular temperature values
+        # Use HTML entity instead of LaTeX for better rendering
+        text = text.replace('°C', '°C')
+        text = text.replace('°', '°')
+        
+        # Handle regular scientific notation: 7.0×10^−4 or 7.0×10^-4
+        scientific_pattern = r'([\d.]+)\s*[×x]\s*10\^([−\-]?\d+)'
+        
+        def replace_scientific(match):
+            coefficient = match.group(1)
+            exponent = match.group(2).replace('−', '-')
+            return f'${coefficient}\\times 10^{{{exponent}}}$'
+        
+        text = re.sub(scientific_pattern, replace_scientific, text)
+        
+        # Pattern to match variable names with subscripts/superscripts
+        # Matches patterns like: ρ_o, ρ_w, m^3, V_th, X_L, β_o, p_20, etc.
+        math_pattern = r'([A-Za-zΔΔα-ωΑ-Ωβρ]+)([_^])([A-Za-z0-9]+)'
+        
+        def replace_math(match):
+            base = match.group(1)
+            operator = match.group(2)
+            subscript = match.group(3)
+            
+            if operator == '_':
+                return f'${base}_{{{subscript}}}$'
+            else:  # ^
+                return f'${base}^{{{subscript}}}$'
+        
+        # Convert underscore/caret notation to LaTeX
+        text = re.sub(math_pattern, replace_math, text)
+        
+        # Clean up any double spaces or multiple $ signs next to each other
+        text = re.sub(r'\$\s*\$', ' ', text)
+        text = re.sub(r'\s+', ' ', text)
+        
+        return text
+
     def process_question_text(self, text: str) -> str:
         """
         Process question text to render LaTeX equations as professional images.
@@ -417,8 +481,11 @@ class AssignmentPDFGenerator:
         """
         if not text:
             return ""
+        
+        # First convert plain text math notation to LaTeX
+        text = self.convert_text_math_to_latex(text)
 
-        # First handle display equations ($$equation$$)
+        # Handle display equations: $$...$$ and \[...\]
         display_pattern = r"\$\$([^$]+?)\$\$"
 
         def replace_display_equation(match):
@@ -428,10 +495,15 @@ class AssignmentPDFGenerator:
             )
             return f'<div class="display-equation">{html_equation}</div>'
 
-        # Replace display equations first
         processed_text = re.sub(display_pattern, replace_display_equation, text)
+        processed_text = re.sub(
+            r"\\\[(.+?)\\\]",
+            lambda m: f'<div class="display-equation">{self.render_latex_equation(m.group(1), fontsize=11, is_display=True)}</div>',
+            processed_text,
+            flags=re.DOTALL,
+        )
 
-        # Then handle inline equations ($equation$)
+        # Handle inline equations: $...$ and \(...\)
         inline_pattern = r"\$([^$]+?)\$"
 
         def replace_inline_equation(match):
@@ -441,8 +513,12 @@ class AssignmentPDFGenerator:
             )
             return html_equation
 
-        # Replace inline equations
         processed_text = re.sub(inline_pattern, replace_inline_equation, processed_text)
+        processed_text = re.sub(
+            r"\\\((.+?)\\\)",
+            lambda m: self.render_latex_equation(m.group(1), fontsize=11, is_display=False),
+            processed_text,
+        )
 
         # Handle equation placeholders like <eq id> format (from your existing system)
         eq_placeholder_pattern = r"<eq\s+([^>]+)>"
@@ -610,13 +686,16 @@ class AssignmentPDFGenerator:
         if question_type == "multiple-choice" and question.get("options"):
             html += '<div class="question-options">'
             for i, option in enumerate(question["options"]):
+                # Strip leading letter labels (e.g. "A) ", "A. ", "a) ") to avoid
+                # duplication since the PDF adds its own A./B./C./D. prefixes.
+                option_clean = re.sub(r"^[A-Za-z][).]\s*", "", option)
                 # Process options with equations support too
                 if equations:
                     option_text = self.process_question_text_with_equations(
-                        option, equations
+                        option_clean, equations
                     )
                 else:
-                    option_text = self.process_question_text(option)
+                    option_text = self.process_question_text(option_clean)
                 letter = chr(65 + i)  # A, B, C, D...
                 html += f'<div class="option"><strong>{letter}.</strong> {option_text}</div>'
             html += "</div>"
@@ -668,13 +747,13 @@ class AssignmentPDFGenerator:
                 if subq_type == "multiple-choice" and subq.get("options"):
                     html += '<div class="question-options">'
                     for j, option in enumerate(subq["options"]):
-                        # Process options with equations support
+                        option_clean = re.sub(r"^[A-Za-z][).]\s*", "", option)
                         if subq_equations:
                             option_text = self.process_question_text_with_equations(
-                                option, subq_equations
+                                option_clean, subq_equations
                             )
                         else:
-                            option_text = self.process_question_text(option)
+                            option_text = self.process_question_text(option_clean)
                         letter = chr(65 + j)  # A, B, C, D...
                         html += f'<div class="option"><strong>{letter}.</strong> {option_text}</div>'
                     html += "</div>"
@@ -711,15 +790,15 @@ class AssignmentPDFGenerator:
                         ):
                             html += '<div class="question-options">'
                             for m, option in enumerate(sub_subq["options"]):
-                                # Process options with equations support
+                                option_clean = re.sub(r"^[A-Za-z][).]\s*", "", option)
                                 if sub_subq_equations:
                                     option_text = (
                                         self.process_question_text_with_equations(
-                                            option, sub_subq_equations
+                                            option_clean, sub_subq_equations
                                         )
                                     )
                                 else:
-                                    option_text = self.process_question_text(option)
+                                    option_text = self.process_question_text(option_clean)
                                 letter = chr(65 + m)  # A, B, C, D...
                                 html += f'<div class="option"><strong>{letter}.</strong> {option_text}</div>'
                             html += "</div>"
@@ -745,19 +824,19 @@ class AssignmentPDFGenerator:
         @page {
             size: A4;
             margin: 1in;
-            @top-center {{
+            @top-center {
                 content: string(doc-title);
                 font-size: 10pt;
                 color: #666;
-            }}
-            @bottom-center {{
+            }
+            @bottom-center {
                 content: "Page " counter(page) " of " counter(pages);
                 font-size: 9pt;
                 color: #666;
-            }}
-        }}
+            }
+        }
 
-        body {{
+        body {
             font-family: "Times New Roman", Times, serif;
             font-size: 11pt;
             line-height: 1.3;
@@ -765,34 +844,34 @@ class AssignmentPDFGenerator:
             margin: 0;
             padding: 0;
             text-align: justify;
-        }}
+        }
 
         /* KaTeX base styles for proper math rendering */
-        .katex {{
+        .katex {
             font-size: 1em;
             text-indent: 0;
             font-family: KaTeX_Main, "Times New Roman", Times, serif;
-        }}
+        }
 
-        .katex-display {{
+        .katex-display {
             margin: 0.5em 0;
             text-align: center;
-        }}
+        }
 
-        .katex .mrel {{
+        .katex .mrel {
             font-family: KaTeX_Main, "Times New Roman", Times, serif;
-        }}
+        }
 
         /* Ensure not-equal and other relation symbols render correctly */
-        .katex .mord.vbox .thinbox .rlap {{
+        .katex .mord.vbox .thinbox .rlap {
             display: inline-block;
-        }}
+        }
 
-        .katex .strut {{
+        .katex .strut {
             display: inline-block;
-        }}
+        }
 
-        .katex-mathml {{
+        .katex-mathml {
             position: absolute;
             clip: rect(1px, 1px, 1px, 1px);
             padding: 0;
@@ -800,11 +879,11 @@ class AssignmentPDFGenerator:
             height: 1px;
             width: 1px;
             overflow: hidden;
-        }}
+        }
 
-        .katex-html {{
+        .katex-html {
             display: inline-block;
-        }}
+        }
 
         .document-header {
             text-align: center;
