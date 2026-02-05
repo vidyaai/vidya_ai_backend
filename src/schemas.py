@@ -64,6 +64,7 @@ class VideoQuery(BaseModel):
     timestamp: Optional[float] = None
     is_image_query: bool = False
     conversation_history: Optional[List[Dict[str, Any]]] = []
+    session_id: Optional[str] = None
 
 
 class TranslationRequest(BaseModel):
@@ -224,6 +225,7 @@ class AssignmentCreate(BaseModel):
     title: str
     description: Optional[str] = None
     due_date: Optional[datetime] = None
+    status: str = "draft"
     engineering_level: str = "undergraduate"
     engineering_discipline: str = "general"
     question_types: Optional[List[str]] = None
@@ -233,6 +235,7 @@ class AssignmentCreate(BaseModel):
     generation_options: Optional[dict] = None
     questions: List[dict] = []
     is_template: bool = False
+    ai_penalty_percentage: float = 50.0
 
 
 class AssignmentUpdate(BaseModel):
@@ -245,6 +248,7 @@ class AssignmentUpdate(BaseModel):
     question_types: Optional[List[str]] = None
     questions: Optional[List[dict]] = None
     is_template: Optional[bool] = None
+    ai_penalty_percentage: Optional[float] = None
 
 
 class AssignmentOut(BaseModel):
@@ -270,6 +274,7 @@ class AssignmentOut(BaseModel):
     updated_at: datetime
     google_form_url: Optional[str] = None
     google_form_response_url: Optional[str] = None
+    ai_penalty_percentage: Optional[float] = 50.0
 
     class Config:
         from_attributes = True
@@ -337,6 +342,55 @@ class SharedAssignmentAccessOut(BaseModel):
         from_attributes = True
 
 
+# AI Plagiarism Detection Schemas
+class TelemetryData(BaseModel):
+    """Behavioral telemetry captured from frontend during submission.
+
+    Supports two formats:
+    1. Legacy (submission-level): {"pasted": bool, "pasteCount": int, ...}
+    2. New (per-question): {"per_question": {"1": {...}, "2": {...}}, "submission_level": {...}}
+    """
+
+    # Legacy format fields (submission-level)
+    pasted: Optional[bool] = None
+    pasteCount: Optional[int] = None
+    tabSwitches: Optional[int] = None
+    timeToComplete: Optional[int] = None  # milliseconds
+    time_taken_seconds: Optional[int] = None  # seconds
+    typingSpeed: Optional[float] = None  # words per minute
+
+    # New format fields
+    per_question: Optional[Dict[str, Any]] = None  # Question ID -> telemetry mapping
+    submission_level: Optional[Dict[str, Any]] = None  # Overall submission metrics
+
+    class Config:
+        extra = "allow"  # Allow additional fields for flexibility
+
+
+class AIFlagInfo(BaseModel):
+    """AI plagiarism detection result for a single question."""
+
+    flag_level: str  # "none", "soft", "hard"
+    confidence: float  # 0.0 to 1.0
+    reasons: List[str]  # List of detection reasons
+    model_score: float  # Stylometric model score
+    telemetry_score: float  # Behavioral telemetry score
+    original_score: Optional[float] = None  # Score before penalty
+    penalized_score: Optional[float] = None  # Score after penalty (for hard flags)
+    override_status: Optional[
+        Dict[str, Any]
+    ] = None  # {"overridden": bool, "by": user_id, "at": timestamp, "reason": str, "action": str}
+    timestamp: Optional[datetime] = None
+
+
+class AIFlagOverrideRequest(BaseModel):
+    """Request to override an AI flag on a specific question."""
+
+    question_id: str
+    action: str  # "dismiss", "apply_penalty", "remove_penalty"
+    reason: Optional[str] = None
+
+
 class SubmissionAnswerCreate(BaseModel):
     question_id: int
     answer: str  # JSON string or text answer
@@ -368,6 +422,9 @@ class AssignmentSubmissionCreate(BaseModel):
     submission_method: str = "in-app"
     submitted_files: Optional[List[dict]] = None
     time_spent: Optional[str] = None
+    telemetry_data: Optional[
+        Dict[str, Any]
+    ] = None  # Behavioral telemetry for AI detection - supports legacy and per-question formats
 
 
 class AssignmentSubmissionDraft(BaseModel):
@@ -399,6 +456,7 @@ class AssignmentSubmissionOut(BaseModel):
     percentage: Optional[str] = None
     feedback: Optional[dict] = None
     overall_feedback: Optional[str] = None
+    telemetry_data: Optional[Dict[str, Any]] = None  # Behavioral telemetry
     status: str
     is_late: bool
     attempt_number: str
@@ -470,6 +528,9 @@ class QuestionGradeFeedback(BaseModel):
     strengths: Optional[str] = None
     areas_for_improvement: Optional[str] = None
     rubric_alignment: Optional[Dict[str, Any]] = None
+    ai_flag: Optional[
+        Dict[str, Any]
+    ] = None  # AI plagiarism detection info (AIFlagInfo)
 
 
 class GradeSubmissionResponse(BaseModel):
@@ -575,6 +636,22 @@ class UserOut(BaseModel):
     stripe_customer_id: Optional[str]
     created_at: datetime
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Lecture Summary schemas
+class LectureSummaryRequest(BaseModel):
+    video_id: str
+    force_regenerate: bool = False
+
+
+class LectureSummaryResponse(BaseModel):
+    summary_id: str
+    video_id: str
+    created_at: datetime
+    summary_metadata: Optional[dict] = None
 
     class Config:
         from_attributes = True

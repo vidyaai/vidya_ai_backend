@@ -1,7 +1,15 @@
 from openai import OpenAI
 import base64
-from .system_prompt import SYSTEM_PROMPT_FORMATTED, SYSTEM_PROMPT_INITIAL
-from typing import Dict, Any
+from .system_prompt import (
+    SYSTEM_PROMPT_CONVERSATIONAL_FORMATTED,
+    SYSTEM_PROMPT_CONVERSATIONAL_INITIAL,
+)
+from .web_search import (
+    WebSearchClient,
+    SearchDecisionAgent,
+    synthesize_with_web_results,
+)
+from typing import Dict, Any, List, Optional
 import json
 from controllers.config import logger
 
@@ -11,6 +19,8 @@ class OpenAIVisionClient:
         """Initialize the OpenAI client with API key from environment variables"""
         self.client = OpenAI()
         self.model = "gpt-4o"  # OpenAI's vision model
+        self.search_client = WebSearchClient(provider="tavily")  # Web search client
+        self.search_agent = SearchDecisionAgent(self.client)  # Decision agent
 
     def _encode_image(self, image_path):
         """Encode image file to base64 string"""
@@ -31,8 +41,11 @@ class OpenAIVisionClient:
                 )
 
             # Select the appropriate system prompt based on timestamp availability
+            # Use conversational prompts for natural, friendly interactions
             system_prompt = (
-                SYSTEM_PROMPT_FORMATTED if has_timestamps else SYSTEM_PROMPT_INITIAL
+                SYSTEM_PROMPT_CONVERSATIONAL_FORMATTED
+                if has_timestamps
+                else SYSTEM_PROMPT_CONVERSATIONAL_INITIAL
             )
 
             messages = [
@@ -56,9 +69,9 @@ class OpenAIVisionClient:
             )
 
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o-mini",  # Upgraded from gpt-3.5-turbo for better instruction following (timestamps)
                 messages=messages,
-                max_tokens=1000,  # Increased for detailed responses
+                max_tokens=1500,  # Increased for detailed responses with timestamps
                 temperature=0.3,  # Slightly increased for more natural language
             )
 
@@ -80,8 +93,11 @@ class OpenAIVisionClient:
                 )
 
             # Select the appropriate system prompt based on timestamp availability
+            # Use conversational prompts for natural, friendly interactions
             system_prompt = (
-                SYSTEM_PROMPT_FORMATTED if has_timestamps else SYSTEM_PROMPT_INITIAL
+                SYSTEM_PROMPT_CONVERSATIONAL_FORMATTED
+                if has_timestamps
+                else SYSTEM_PROMPT_CONVERSATIONAL_INITIAL
             )
 
             # Encode the image
@@ -146,6 +162,194 @@ class OpenAIVisionClient:
             return response.choices[0].message.content
         except Exception as e:
             return f"Error: {str(e)}"
+
+    def check_question_relevance(
+        self, question: str, transcript_excerpt: str, video_title: str = ""
+    ) -> dict:
+        """
+        Check if a student's question is relevant to the video content.
+
+        Args:
+            question: The student's question
+            transcript_excerpt: A sample of the video transcript (first 500-1000 chars)
+            video_title: Title of the video (optional)
+
+        Returns:
+            dict: {
+                "is_relevant": bool,
+                "confidence": float (0.0-1.0),
+                "reason": str,
+                "video_topic": str,
+                "suggested_redirect": str
+            }
+        """
+        try:
+            # Create a concise excerpt (first 500 chars of transcript)
+            context_sample = (
+                transcript_excerpt[:500]
+                if transcript_excerpt
+                else "No transcript available"
+            )
+
+            prompt = f"""You are analyzing whether a student's question is relevant to a video they're watching.
+
+Video title: {video_title or "Unknown"}
+Video content sample: {context_sample}
+
+Student's question: {question}
+
+Analyze if this question is about the video content or completely unrelated (e.g., asking about homework, other subjects, personal topics, etc.).
+
+Respond with a JSON object:
+{{
+  "is_relevant": true/false,
+  "confidence": 0.0-1.0,
+  "reason": "brief explanation",
+  "video_topic": "what the video is about"
+}}
+
+Be generous - if the question is even loosely related or could be asking for clarification about video concepts, mark it as relevant. Only mark as irrelevant if it's clearly about something else entirely."""
+
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that determines if questions are relevant to video content.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=200,
+                temperature=0.3,
+            )
+
+            result = json.loads(response.choices[0].message.content)
+
+            # Add a friendly redirect message if not relevant
+            if not result.get("is_relevant", False):
+                video_topic = result.get("video_topic", "the video content")
+                result["suggested_redirect"] = (
+                    f"I noticed your question seems to be about something different than what's in this video. "
+                    f"This video focuses on {video_topic}. "
+                    f"Is there something specific from the video you'd like help with? I'm here to help you understand it better!"
+                )
+            else:
+                result["suggested_redirect"] = ""
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error checking relevance: {e}")
+            # Default to relevant on error to avoid blocking valid questions
+            return {
+                "is_relevant": True,
+                "confidence": 0.5,
+                "reason": "Error checking relevance, allowing question",
+                "suggested_redirect": "",
+            }
+
+    def ask_with_web_augmentation(
+        self,
+        prompt: str,
+        context: str = "",
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        video_title: str = "",
+        enable_search: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Answer question with optional web search augmentation.
+
+        This method intelligently decides if web search is needed and synthesizes
+        answers from both video content and web sources, with proper citations.
+
+        Args:
+            prompt: User's question
+            context: Video transcript
+            conversation_history: Previous conversation messages
+            video_title: Title of the video
+            enable_search: Whether to enable web search (default True)
+
+        Returns:
+            dict: {
+                "response": str (the answer),
+                "sources": List[str] (citation URLs),
+                "used_web_search": bool,
+                "search_query": str (if search was used)
+            }
+        """
+        try:
+            # Default response structure
+            result = {
+                "response": "",
+                "sources": [],
+                "used_web_search": False,
+                "search_query": "",
+            }
+
+            # Decide if web search is needed
+            if enable_search:
+                decision = self.search_agent.should_search_web(
+                    user_question=prompt,
+                    transcript_excerpt=context[:1000] if context else "",
+                    video_title=video_title,
+                )
+
+                logger.info(
+                    f"Web search decision: {decision.get('should_search')} "
+                    f"(confidence: {decision.get('confidence')})"
+                )
+
+                # Perform web search if needed
+                if (
+                    decision.get("should_search")
+                    and decision.get("confidence", 0) > 0.6
+                ):
+                    search_query = decision.get("search_query", prompt)
+                    logger.info(f"Performing web search for: {search_query}")
+
+                    search_results = self.search_client.search(
+                        query=search_query, max_results=3, search_depth="basic"
+                    )
+
+                    if search_results:
+                        # Synthesize answer with web results
+                        synthesis = synthesize_with_web_results(
+                            openai_client=self.client,
+                            user_question=prompt,
+                            video_content=context,
+                            search_results=search_results,
+                            conversation_history=conversation_history,
+                        )
+
+                        result["response"] = synthesis["answer"]
+                        result["sources"] = synthesis["sources"]
+                        result["used_web_search"] = True
+                        result["search_query"] = search_query
+
+                        logger.info(
+                            f"Web-augmented answer generated with {len(search_results)} sources"
+                        )
+                        return result
+
+            # If no web search or search failed, use standard answer
+            logger.info("Generating answer from video content only")
+            result["response"] = self.ask_text_only(
+                prompt, context, conversation_history
+            )
+            result["used_web_search"] = False
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in web-augmented answering: {e}")
+            # Fallback to standard answer
+            return {
+                "response": self.ask_text_only(prompt, context, conversation_history),
+                "sources": [],
+                "used_web_search": False,
+                "search_query": "",
+            }
 
 
 class OpenAIQuizClient:

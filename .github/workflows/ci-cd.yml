@@ -68,6 +68,10 @@ jobs:
 
             DIAGRAM_YOLO_MODEL_PATH=${{ secrets.DIAGRAM_YOLO_MODEL_PATH }}
             POPPLER_PATH=/usr/bin/
+
+            TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}
+            GOOGLE_CSE_API_KEY=${{ secrets.GOOGLE_CSE_API_KEY }}
+            GOOGLE_CSE_ID=${{ secrets.GOOGLE_CSE_ID }}
             EOF
             alembic upgrade head
             sudo systemctl start vidyaai_backend_gunicorn
