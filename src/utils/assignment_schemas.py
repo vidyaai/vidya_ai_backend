@@ -3,7 +3,51 @@ Shared JSON schemas for assignment-related AI responses.
 This module provides reusable schemas for structured output from AI models.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional, Union, Type
+from pydantic import BaseModel
+
+
+def create_dynamic_generation_response(
+    enabled_types: List[str],
+) -> Union[Type[BaseModel], Type[BaseModel]]:
+    """
+    Create a dynamic Pydantic response model based on enabled question types.
+
+    This function returns the appropriate response model for assignment generation:
+    - If "multi-part" is in enabled_types: Returns AssignmentGenerationResponseNested
+      (supports nested subquestions with full 3-level hierarchy)
+    - Otherwise: Returns AssignmentGenerationResponseFlat
+      (flat questions only, no subquestions field)
+
+    The returned models exclude the 'equations' field for token efficiency.
+    Equations will be extracted in a separate API call after question generation.
+
+    Args:
+        enabled_types: List of enabled question type strings
+            (e.g., ["multiple-choice", "short-answer", "multi-part"])
+
+    Returns:
+        Appropriate Pydantic response model class (Flat or Nested)
+
+    Examples:
+        >>> # For flat questions only
+        >>> schema = create_dynamic_generation_response(["multiple-choice", "short-answer"])
+        >>> # Returns AssignmentGenerationResponseFlat
+
+        >>> # For questions with multi-part support
+        >>> schema = create_dynamic_generation_response(["multi-part", "short-answer"])
+        >>> # Returns AssignmentGenerationResponseNested
+    """
+    from utils.assignment_pydantic_models import (
+        AssignmentGenerationResponseFlat,
+        AssignmentGenerationResponseNested,
+    )
+
+    # Check if multi-part questions are enabled
+    if "multi-part" in enabled_types:
+        return AssignmentGenerationResponseNested
+    else:
+        return AssignmentGenerationResponseFlat
 
 
 def get_assignment_parsing_schema(

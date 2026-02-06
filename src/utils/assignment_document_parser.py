@@ -527,7 +527,7 @@ class AssignmentDocumentParser:
             4. Options (if MCQ) (with equation placeholders)
             5. Diagrams: page_number, caption (NO bounding_box)
             6. Equations (from ALL contexts: question, options, correctAnswer, rubric):
-            - id: q{{qid}}_eq{{n}}, q{{qid}}_opt{{A}}_eq{{n}}, q{{qid}}_ans_eq{{n}}, q{{qid}}_rub_eq{{n}}
+            - id: equation id unique for each equation (e.g., q1_eq1, q1_ans_eq1, q1_rub_eq1)
             - latex: LaTeX representation
             - position: {{char_index: position AFTER placeholder, context: 'question_text'|'options'|'correctAnswer'|'rubric'}}
             - type: 'inline'|'display'
@@ -1253,7 +1253,6 @@ class AssignmentDocumentParser:
                     "",
                     "EQUATION PLACEHOLDERS:",
                     "- Format: <eq equation_id> where math appears",
-                    "- Naming: q{path}_ans_eq{n} (answers), q{path}_rub_eq{n} (rubrics)",
                     "- CRITICALLY REQUIRED: Include ALL equation objects in 'equations' array",
                     '- Each equation: {"id":"...", "latex":"...", "type":"inline|display", "position":{"context":"correctAnswer|rubric", "char_index":...}}',
                     "",
