@@ -3,162 +3,51 @@ Shared JSON schemas for assignment-related AI responses.
 This module provides reusable schemas for structured output from AI models.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union, Type
+from pydantic import BaseModel
 
 
-def get_assignment_generation_schema(
-    enabled_question_types: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+def create_dynamic_generation_response(
+    enabled_types: List[str],
+) -> Union[Type[BaseModel], Type[BaseModel]]:
     """
-    Get a lightweight JSON schema optimized for assignment *generation*.
+    Create a dynamic Pydantic response model based on enabled question types.
 
-    Unlike the full parsing schema (92 required fields, 3 nesting levels),
-    this schema only includes fields relevant to the requested question types,
-    dramatically reducing completion tokens and API latency.
+    This function returns the appropriate response model for assignment generation:
+    - If "multi-part" is in enabled_types: Returns AssignmentGenerationResponseNested
+      (supports nested subquestions with full 3-level hierarchy)
+    - Otherwise: Returns AssignmentGenerationResponseFlat
+      (flat questions only, no subquestions field)
+
+    The returned models exclude the 'equations' field for token efficiency.
+    Equations will be extracted in a separate API call after question generation.
 
     Args:
-        enabled_question_types: List of enabled question type strings.
-            Defaults to ["multiple-choice"].
+        enabled_types: List of enabled question type strings
+            (e.g., ["multiple-choice", "short-answer", "multi-part"])
 
     Returns:
-        JSON schema dictionary for structured output
+        Appropriate Pydantic response model class (Flat or Nested)
+
+    Examples:
+        >>> # For flat questions only
+        >>> schema = create_dynamic_generation_response(["multiple-choice", "short-answer"])
+        >>> # Returns AssignmentGenerationResponseFlat
+
+        >>> # For questions with multi-part support
+        >>> schema = create_dynamic_generation_response(["multi-part", "short-answer"])
+        >>> # Returns AssignmentGenerationResponseNested
     """
-    if not enabled_question_types:
-        enabled_question_types = ["multiple-choice"]
+    from utils.assignment_pydantic_models import (
+        AssignmentGenerationResponseFlat,
+        AssignmentGenerationResponseNested,
+    )
 
-    needs_subquestions = "multi-part" in enabled_question_types
-    needs_code = "code-writing" in enabled_question_types
-    needs_diagram = "diagram-analysis" in enabled_question_types
-
-    # Equation schema (kept lightweight — useful for engineering/math)
-    equation_schema = {
-        "type": "object",
-        "properties": {
-            "id": {"type": "string"},
-            "latex": {"type": "string"},
-            "position": {
-                "type": "object",
-                "properties": {
-                    "char_index": {"type": "integer"},
-                    "context": {
-                        "type": "string",
-                        "enum": ["question_text", "options", "correctAnswer", "rubric"],
-                    },
-                },
-                "required": ["char_index", "context"],
-                "additionalProperties": False,
-            },
-            "type": {"type": "string", "enum": ["inline", "display"]},
-        },
-        "required": ["id", "latex", "position", "type"],
-        "additionalProperties": False,
-    }
-
-    # Build question properties — start with core fields
-    question_props = {
-        "id": {"type": "integer"},
-        "type": {"type": "string", "enum": enabled_question_types},
-        "question": {"type": "string"},
-        "points": {"type": "number"},
-        "difficulty": {"type": "string", "enum": ["easy", "medium", "hard"]},
-        "order": {"type": "integer"},
-        "options": {"type": "array", "items": {"type": "string"}},
-        "correctAnswer": {"type": "string"},
-        "explanation": {"type": "string"},
-        "allowMultipleCorrect": {"type": "boolean"},
-        "multipleCorrectAnswers": {"type": "array", "items": {"type": "string"}},
-        "equations": {"type": "array", "items": equation_schema},
-        "rubric": {"type": "string"},
-    }
-    question_required = [
-        "id", "type", "question", "points", "difficulty", "order",
-        "options", "correctAnswer", "explanation",
-        "allowMultipleCorrect", "multipleCorrectAnswers",
-        "equations", "rubric",
-    ]
-
-    # Add code fields only when needed
-    if needs_code:
-        question_props["hasCode"] = {"type": "boolean"}
-        question_props["codeLanguage"] = {"type": "string"}
-        question_props["code"] = {"type": "string"}
-        question_props["outputType"] = {"type": "string"}
-        question_required.extend(["hasCode", "codeLanguage", "code", "outputType"])
-
-    # Add diagram fields only when needed
-    if needs_diagram:
-        question_props["hasDiagram"] = {"type": "boolean"}
-        question_props["diagram"] = {
-            "type": "object",
-            "properties": {
-                "s3_url": {"type": ["string", "null"]},
-                "s3_key": {"type": ["string", "null"]},
-            },
-            "required": ["s3_url", "s3_key"],
-            "additionalProperties": False,
-        }
-        question_required.extend(["hasDiagram", "diagram"])
-
-    # Add subquestions only for multi-part
-    if needs_subquestions:
-        # Flat subquestion schema (1 level only — no deeper nesting for generation)
-        sub_props = {
-            "id": {"type": "integer"},
-            "type": {"type": "string"},
-            "question": {"type": "string"},
-            "points": {"type": "number"},
-            "options": {"type": "array", "items": {"type": "string"}},
-            "correctAnswer": {"type": "string"},
-            "explanation": {"type": "string"},
-            "allowMultipleCorrect": {"type": "boolean"},
-            "multipleCorrectAnswers": {"type": "array", "items": {"type": "string"}},
-            "equations": {"type": "array", "items": equation_schema},
-        }
-        sub_required = [
-            "id", "type", "question", "points", "options",
-            "correctAnswer", "explanation",
-            "allowMultipleCorrect", "multipleCorrectAnswers", "equations",
-        ]
-        if needs_code:
-            sub_props["hasCode"] = {"type": "boolean"}
-            sub_props["codeLanguage"] = {"type": "string"}
-            sub_props["code"] = {"type": "string"}
-            sub_required.extend(["hasCode", "codeLanguage", "code"])
-
-        question_props["subquestions"] = {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": sub_props,
-                "required": sub_required,
-                "additionalProperties": False,
-            },
-        }
-        question_props["optionalParts"] = {"type": "boolean"}
-        question_props["requiredPartsCount"] = {"type": "integer"}
-        question_props["rubricType"] = {
-            "type": "string",
-            "enum": ["per-subquestion", "overall"],
-        }
-        question_required.extend([
-            "subquestions", "optionalParts", "requiredPartsCount", "rubricType",
-        ])
-
-    question_schema = {
-        "type": "object",
-        "properties": question_props,
-        "required": question_required,
-        "additionalProperties": False,
-    }
-
-    return {
-        "type": "object",
-        "properties": {
-            "questions": {"type": "array", "items": question_schema},
-        },
-        "required": ["questions"],
-        "additionalProperties": False,
-    }
+    # Check if multi-part questions are enabled
+    if "multi-part" in enabled_types:
+        return AssignmentGenerationResponseNested
+    else:
+        return AssignmentGenerationResponseFlat
 
 
 def get_assignment_parsing_schema(

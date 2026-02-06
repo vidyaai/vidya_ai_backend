@@ -6,12 +6,13 @@ It integrates with OpenAI's GPT models to generate engineering-focused assignmen
 """
 
 import json
-import base64
 from textwrap import dedent
 from typing import Dict, List, Any, Optional
 from openai import OpenAI
 from controllers.config import logger
-from utils.assignment_schemas import get_assignment_parsing_schema, get_assignment_generation_schema
+from utils.assignment_schemas import (
+    create_dynamic_generation_response,
+)
 from utils.document_processor import DocumentProcessor
 
 
@@ -22,6 +23,106 @@ class AssignmentGenerator:
         """Initialize the assignment generator with OpenAI client"""
         self.client = OpenAI()
         self.model = "gpt-4o"
+
+    def _extract_equations_from_questions(
+        self, questions: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Extract equations from generated questions using a separate AI call.
+
+        This method processes all questions in a single batched API call to detect
+        mathematical expressions and add equation metadata with proper positioning.
+
+        Args:
+            questions: List of generated questions (may contain nested subquestions)
+
+        Returns:
+            Modified questions list with equation metadata added
+        """
+        try:
+            logger.info(f"Starting equation extraction for {len(questions)} questions")
+
+            # Serialize questions for equation extraction
+            questions_json = json.dumps(questions, indent=2)
+
+            # Create equation extraction prompt
+            prompt = dedent(
+                f"""
+                Analyze the following assignment questions and identify all mathematical equations,
+                formulas, and expressions that should be rendered using LaTeX.
+
+                For each equation found:
+                1. Extract the LaTeX representation
+                2. Determine the position (context: question_text, options, correctAnswer, or rubric)
+                3. Calculate the character index where the equation appears
+                4. Specify whether it's inline or display type
+                5. Replace the equation in the text with a placeholder: {{{{EQ_ID}}}}
+
+                Questions to process:
+                {questions_json}
+
+                IMPORTANT:
+                - Process ALL question levels (main questions, subquestions at Level 2, nested subquestions at Level 3)
+                - Look for equations in: question text, options, correctAnswer, explanation, and rubric fields
+                - Generate unique equation IDs: q<question_id>_eq<number> (e.g., q1_eq1, q1_eq2)
+                - For subquestions: q<main_id>_<sub_id>_eq<number> (e.g., q1_1_eq1)
+                - Common equation patterns: fractions, exponents, integrals, derivatives, matrices, Greek letters
+                - Inline equations: part of regular text flow
+                - Display equations: standalone mathematical expressions
+
+                Each equation object should have this structure:
+                {{
+                    "id": "q1_eq1",
+                    "latex": "E = mc^2",
+                    "position": {{
+                        "char_index": 25,
+                        "context": "question_text"
+                    }},
+                    "type": "inline"
+                }}
+
+                Return a JSON object with a "questions" array containing the modified questions with:
+                1. Equation placeholders in text (<eq q1_eq1>, <eq q1_eq2>, etc.)
+                2. "equations" array for each question/subquestion containing equation objects
+
+                Return ONLY the JSON object, no additional text.
+            """
+            ).strip()
+
+            # Make API call for equation extraction using regular completion
+            logger.info("Calling GPT-4o for equation extraction...")
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert at identifying mathematical equations and converting them to LaTeX format. You always return valid JSON.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.1,
+            )
+
+            # Parse the JSON response
+            response_text = response.choices[0].message.content
+            extracted_data = json.loads(response_text)
+            questions_with_equations = extracted_data.get("questions", [])
+
+            logger.info(
+                f"Equation extraction complete. Processed {len(questions_with_equations)} questions"
+            )
+
+            return questions_with_equations
+
+        except Exception as e:
+            logger.error(f"Error extracting equations: {str(e)}")
+            logger.warning(
+                "Continuing without equation extraction, returning original questions"
+            )
+            # Graceful degradation - return original questions without equations
+            return questions
 
     def generate_assignment(
         self,
@@ -148,45 +249,69 @@ class AssignmentGenerator:
         content_context = self._prepare_content_context(content_sources)
 
         # Create the generation prompt (pass content_sources for checking)
-        prompt = self._create_generation_prompt(content_context, generation_options, content_sources)
+        prompt = self._create_generation_prompt(
+            content_context, generation_options, content_sources
+        )
+        system_prompt = self._get_system_prompt(generation_options)
+
+        # debug: Log the final prompt and system prompt before sending to AI
+        logger.info(f"Final system prompt for AI:\n{system_prompt}")
+        logger.info(f"Final user prompt for AI:\n{prompt}")
 
         # Generate questions using OpenAI with structured output
         try:
-            # Use lightweight generation schema based on requested question types
+            # Extract enabled types and get dynamic schema
             question_types = generation_options.get("questionTypes", {})
             enabled_types = [k for k, v in question_types.items() if v]
-            response_schema = get_assignment_generation_schema(enabled_types or None)
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": dedent(self._get_system_prompt(generation_options)),
-                    },
-                    {"role": "user", "content": dedent(prompt).strip()},
-                ],
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "assignment_generation_questions",
-                        "schema": response_schema,
-                    },
-                },
+            # Get the appropriate response model based on enabled types
+            response_model = create_dynamic_generation_response(enabled_types or [])
+            logger.info(
+                f"Using response model: {response_model.__name__} for types: {enabled_types}"
             )
 
-            # Parse the response
-            generated_data = json.loads(response.choices[0].message.content)
-            questions = generated_data.get("questions", [])
-            
-            # Debug: Log the raw questions before post-processing
-            logger.info(f"Raw questions from AI: {json.dumps(questions, indent=2)}")
+            user_content = [{"type": "input_text", "text": dedent(prompt).strip()}]
+            input_data = [{"type": "message", "role": "user", "content": user_content}]
+
+            # Generate questions without equations
+            logger.info("Generating questions (without equations)...")
+            response = self.client.responses.parse(
+                model=self.model,
+                instructions=dedent(system_prompt).strip(),
+                input=input_data,
+                text_format=response_model,
+                # reasoning={"effort": "low"},
+            )
+
+            parsed_response = response.output_parsed
+            extracted_data = parsed_response.model_dump()
+            questions = extracted_data.get("questions", [])
+
+            # Debug: Log the raw questions before equation extraction
+            logger.info(
+                f"Raw questions from AI (without equations): {len(questions)} questions"
+            )
+
+            # Extract equations in a separate API call
+            logger.info("Extracting equations from generated questions...")
+            questions = self._extract_equations_from_questions(questions)
+
+            # Debug: Log questions after equation extraction
+            logger.info(
+                f"Questions after equation extraction: {len(questions)} questions"
+            )
+
+            # Sanitize questions to remove null bytes and problematic characters
+            questions = self._sanitize_questions(questions)
+            logger.info(f"Questions sanitized")
 
             # Post-process questions to ensure they meet requirements
             questions = self._post_process_questions(questions, generation_options)
-            
+
             # Debug: Log post-processed questions
-            logger.info(f"Post-processed questions: {json.dumps(questions, indent=2)}")
+            logger.info(
+                f"Post-processed questions: {len(questions)} questions complete"
+            )
 
             return questions
 
@@ -204,7 +329,9 @@ class AssignmentGenerator:
             context_parts.append("## PRIMARY TOPIC INSTRUCTIONS (MUST FOLLOW):")
             context_parts.append(content_sources["custom_prompt"])
             context_parts.append("")
-            context_parts.append("IMPORTANT: Generate questions ONLY on the topic specified above. Do not deviate to other subjects.")
+            context_parts.append(
+                "IMPORTANT: Generate questions ONLY on the topic specified above. Do not deviate to other subjects."
+            )
 
         # Add video transcripts as supporting material
         if content_sources.get("video_transcripts"):
@@ -212,8 +339,8 @@ class AssignmentGenerator:
             for video in content_sources["video_transcripts"]:
                 context_parts.append(f"### {video['title']}")
                 context_parts.append(
-                    video["transcript"][:2000] + "..."
-                    if len(video["transcript"]) > 2000
+                    video["transcript"][:20000] + "..."
+                    if len(video["transcript"]) > 20000
                     else video["transcript"]
                 )
 
@@ -223,15 +350,51 @@ class AssignmentGenerator:
             for doc in content_sources["document_texts"]:
                 context_parts.append(f"### {doc['name']}")
                 context_parts.append(
-                    doc["content"][:2000] + "..."
-                    if len(doc["content"]) > 2000
+                    doc["content"][:20000] + "..."
+                    if len(doc["content"]) > 20000
                     else doc["content"]
                 )
 
         return "\n\n".join(context_parts)
 
+    def _get_multipart_instructions(self, enabled_types: List[str]) -> str:
+        """Generate instructions for multi-part question handling based on enabled types."""
+        has_multipart = "multi-part" in enabled_types
+        other_types = [t for t in enabled_types if t != "multi-part"]
+
+        if not has_multipart:
+            # No multi-part enabled - generate flat questions only
+            return """
+                    - ALL questions should be standalone (flat) questions
+                    - Do NOT create multi-part questions with subquestions
+                    - Each question is independent without nested parts
+            """
+        elif has_multipart and other_types:
+            # Multi-part + other types - natural mix
+            return f"""
+                    - Generate a NATURAL MIX of standalone questions and multi-part questions
+                    - For standalone questions: Use types from {', '.join(other_types)}
+                    - For multi-part questions: Include subquestions that can be any type (including nested multi-part at Level 2)
+                    - At Level 3 (deepest nesting): subquestions can be any type EXCEPT multi-part
+                    - Let the content guide whether to use standalone or multi-part format
+                    - For any multi-part question, ensure subquestions and nested subquestions are serially numbered (id) like 1, 2, 3.
+            """
+        else:
+            # ONLY multi-part enabled
+            return """
+                    - ALL top-level questions MUST be multi-part questions
+                    - Each multi-part question must contain subquestions (Level 2)
+                    - Level 2 subquestions can be: multiple-choice, short-answer, numerical, true-false, code-writing, diagram-analysis, or nested multi-part
+                    - Level 3 subquestions (nested within Level 2 multi-part) can be: multiple-choice, short-answer, numerical, true-false, code-writing, diagram-analysis (NO multi-part at Level 3)
+                    - Generate diverse subquestion types to test different skills
+                    - For any multi-part question, ensure subquestions and nested subquestions are serially numbered (id) like 1, 2, 3.
+            """
+
     def _create_generation_prompt(
-        self, content_context: str, generation_options: Dict[str, Any], content_sources: Dict[str, Any]
+        self,
+        content_context: str,
+        generation_options: Dict[str, Any],
+        content_sources: Dict[str, Any],
     ) -> str:
         """Create the generation prompt for AI"""
 
@@ -255,119 +418,198 @@ class AssignmentGenerator:
 
         # Check if custom prompt exists to determine priority
         has_custom_prompt = content_sources.get("custom_prompt")
-        has_video_or_docs = content_sources.get("video_transcripts") or content_sources.get("document_texts")
-        
+        has_video_or_docs = content_sources.get(
+            "video_transcripts"
+        ) or content_sources.get("document_texts")
+
         # Use different prompts based on whether discipline is specified (engineering vs general)
         if engineering_discipline:
             # Engineering-specific prompt
             if has_custom_prompt and not has_video_or_docs:
                 # Custom prompt only - make it the PRIMARY focus
                 prompt = f"""
-            Generate {num_questions} engineering assignment questions STRICTLY based on the topic specified in the PRIMARY TOPIC INSTRUCTIONS below.
+                    Generate {num_questions} engineering assignment questions STRICTLY based on the topic specified in the PRIMARY TOPIC INSTRUCTIONS below.
 
-            Assignment Requirements:
-            - Engineering Level: {engineering_level}
-            - Engineering Discipline: {engineering_discipline}
-            - Question Types: {', '.join(enabled_types)}
-            - Difficulty Level: {difficulty_level}
+                    Assignment Requirements:
+                    - Engineering Level: {engineering_level}
+                    - Engineering Discipline: {engineering_discipline}
+                    - Question Types: {', '.join(enabled_types)}
+                    - Difficulty Level: {difficulty_level}
+                    - Number of questions: {num_questions}
+                    - Total points: {total_points}
 
-            Content Context:
-            {content_context}
+                    Content Context:
+                    {content_context}
 
-            CRITICAL INSTRUCTIONS:
-            1. You MUST generate questions ONLY on the specific topic mentioned in the PRIMARY TOPIC INSTRUCTIONS above
-            2. DO NOT generate questions on random topics within {engineering_discipline} engineering
-            3. The questions must be appropriate for {engineering_level}-level students
-            4. Test deep understanding of the SPECIFIC concept/topic requested
-            5. Include a mix of question types: {', '.join(enabled_types)}
-            6. Include clear, unambiguous questions with proper answer keys
-            7. Follow the user's specific instructions precisely"""
+                    CRITICAL INSTRUCTIONS:
+                    1. You MUST generate questions ONLY on the specific topic mentioned in the PRIMARY TOPIC INSTRUCTIONS above
+                    2. DO NOT generate questions on random topics within {engineering_discipline} engineering
+                    3. The questions must be appropriate for {engineering_level}-level students
+                    4. Test deep understanding of the SPECIFIC concept/topic requested
+                    5. Include a mix of question types: {', '.join(enabled_types)}
+                    6. Include clear, unambiguous questions with proper answer keys and rubrics
+
+                    For each question, provide:
+                    - Clear, well-structured question text
+                    - Appropriate answer options (for multiple choice)
+                    - Correct answer and Rubric or grading guidelines
+                    - Point value based on difficulty
+                    - Any necessary code templates
+
+                    ANSWER KEY GUIDELINES (ONLY for MCQs):
+                    - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+
+                    MULTI-PART QUESTION GUIDELINES:
+                    {self._get_multipart_instructions(enabled_types)}
+
+                    CRITICAL - SUBQUESTION REQUIREMENTS:
+                    - EVERY subquestion at ALL levels (Level 2 and Level 3) MUST include:
+                      * correctAnswer: The correct answer for that subquestion
+                      * rubric: Detailed grading guidelines for that subquestion
+                      * explanation: Brief explanation of the correct answer
+                    - Do NOT leave correctAnswer, rubric, or explanation empty for subquestions
+                    - Each subquestion should be independently gradable with its own rubric
+
+                    The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
+                """
             else:
                 # Has video/docs or no custom prompt - original behavior
                 prompt = f"""
-            Generate {num_questions} engineering assignment questions based on the provided content.
+                    Generate {num_questions} engineering assignment questions based on the provided content.
 
-            Assignment Requirements:
-            - Engineering Level: {engineering_level}
-            - Engineering Discipline: {engineering_discipline}
-            - Question Types: {', '.join(enabled_types)}
-            - Difficulty Level: {difficulty_level}
+                    Assignment Requirements:
+                    - Engineering Level: {engineering_level}
+                    - Engineering Discipline: {engineering_discipline}
+                    - Question Types: {', '.join(enabled_types)}
+                    - Difficulty Level: {difficulty_level}
+                    - Number of questions: {num_questions}
+                    - Total points: {total_points}
 
-            Content Context:
-            {content_context}
+                    Content Context:
+                    {content_context}
 
-            Please generate questions that:
-            1. Are appropriate for {engineering_level}-level {engineering_discipline} engineering students
-            2. Test understanding of key concepts from the provided content
-            3. Include a mix of question types: {', '.join(enabled_types)}
-            4. Have appropriate difficulty levels for the target audience
-            5. Include clear, unambiguous questions with proper answer keys
-            6. Follow engineering education best practices"
+                    Please generate questions that:
+                    1. Are appropriate for {engineering_level}-level {engineering_discipline} engineering students
+                    2. Test understanding of key concepts from the provided Content Context; DO NOT deviate to unrelated topics other than in the Content Context
+                    3. Include a mix of question types: {', '.join(enabled_types)}
+                    4. Include clear, unambiguous questions with proper answer keys and rubrics
 
-            For each question, provide:
-            - Clear, well-structured question text
-            - Appropriate answer options (for multiple choice) with correctAnswer as index (like "0", "1", "2", "3") of the correct answer in the options array
-            - Correct answer with brief explanation (except for multi-part questions which get answers from sub-questions)
-            - Rubric or grading guidelines
-            - Point value based on difficulty
-            - Any necessary code templates or diagrams
+                    For each question, provide:
+                    - Clear, well-structured question text
+                    - Appropriate answer options (for multiple choice)
+                    - Correct answer and Rubric or grading guidelines
+                    - Point value based on difficulty
+                    - Any necessary code templates
 
-            The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
-        """
+                    ANSWER KEY GUIDELINES (ONLY for MCQs):
+                    - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+
+                    MULTI-PART QUESTION GUIDELINES:
+                    {self._get_multipart_instructions(enabled_types)}
+
+                    CRITICAL - SUBQUESTION REQUIREMENTS:
+                    - EVERY subquestion at ALL levels (Level 2 and Level 3) MUST include:
+                      * correctAnswer: The correct answer for that subquestion
+                      * rubric: Detailed grading guidelines for that subquestion
+                      * explanation: Brief explanation of the correct answer
+                    - Do NOT leave correctAnswer, rubric, or explanation empty for subquestions
+                    - Each subquestion should be independently gradable with its own rubric
+
+                    The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
+                """
         else:
             # General (non-engineering) prompt
             level_text = f"{engineering_level}-level " if engineering_level else ""
             if has_custom_prompt and not has_video_or_docs:
                 # Custom prompt only - make it the PRIMARY focus
                 prompt = f"""
-            Generate {num_questions} assignment questions STRICTLY based on the topic specified in the PRIMARY TOPIC INSTRUCTIONS below.
+                    Generate {num_questions} assignment questions STRICTLY based on the topic specified in the PRIMARY TOPIC INSTRUCTIONS below.
 
-            Assignment Requirements:
-            {f"- Academic Level: {engineering_level}" if engineering_level else ""}
-            - Question Types: {', '.join(enabled_types)}
-            - Difficulty Level: {difficulty_level}
+                    Assignment Requirements:
+                    {f"- Academic Level: {engineering_level}" if engineering_level else ""}
+                    - Question Types: {', '.join(enabled_types)}
+                    - Difficulty Level: {difficulty_level}
+                    - Number of questions: {num_questions}
+                    - Total points: {total_points}
 
-            Content Context:
-            {content_context}
+                    Content Context:
+                    {content_context}
 
-            CRITICAL INSTRUCTIONS:
-            1. You MUST generate questions ONLY on the specific topic mentioned in the PRIMARY TOPIC INSTRUCTIONS above
-            2. DO NOT generate questions on random or unrelated topics
-            3. The questions must be appropriate for {level_text}students
-            4. Test deep understanding of the SPECIFIC concept/topic requested
-            5. Include a mix of question types: {', '.join(enabled_types)}
-            6. Include clear, unambiguous questions with proper answer keys
-            7. Follow the user's specific instructions precisely"""
+                    CRITICAL INSTRUCTIONS:
+                    1. You MUST generate questions ONLY on the specific topic mentioned in the PRIMARY TOPIC INSTRUCTIONS above
+                    2. DO NOT generate questions on random or unrelated topics
+                    3. The questions must be appropriate for {level_text}students
+                    4. Test deep understanding of the SPECIFIC concept/topic requested
+                    5. Include a mix of question types: {', '.join(enabled_types)}
+                    6. Include clear, unambiguous questions with proper answer keys
+                    7. Follow the user's specific instructions precisely and rubrics
+
+                    For each question, provide:
+                    - Clear, well-structured question text
+                    - Appropriate answer options (for multiple choice)
+                    - Correct answer and Rubric or grading guidelines
+                    - Point value based on difficulty
+                    - Any necessary code templates
+
+                    ANSWER KEY GUIDELINES (ONLY for MCQs):
+                    - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+
+                    MULTI-PART QUESTION GUIDELINES:
+                    {self._get_multipart_instructions(enabled_types)}
+
+                    CRITICAL - SUBQUESTION REQUIREMENTS:
+                    - EVERY subquestion at ALL levels (Level 2 and Level 3) MUST include:
+                      * correctAnswer: The correct answer for that subquestion
+                      * rubric: Detailed grading guidelines for that subquestion
+                      * explanation: Brief explanation of the correct answer
+                    - Do NOT leave correctAnswer, rubric, or explanation empty for subquestions
+                    - Each subquestion should be independently gradable with its own rubric
+
+                    The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
+                """
             else:
                 # Has video/docs or no custom prompt - original behavior
                 prompt = f"""
-            Generate {num_questions} assignment questions based on the provided content.
+                    Generate {num_questions} assignment questions based on the provided content.
 
-            Assignment Requirements:
-            {f"- Academic Level: {engineering_level}" if engineering_level else ""}
-            - Question Types: {', '.join(enabled_types)}
-            - Difficulty Level: {difficulty_level}
+                    Assignment Requirements:
+                    {f"- Academic Level: {engineering_level}" if engineering_level else ""}
+                    - Question Types: {', '.join(enabled_types)}
+                    - Difficulty Level: {difficulty_level}
+                    - Number of questions: {num_questions}
+                    - Total points: {total_points}
 
-            Content Context:
-            {content_context}
+                    Content Context:
+                    {content_context}
 
-            Please generate questions that:
-            1. Are appropriate for {level_text}students
-            2. Test understanding of key concepts from the provided content
-            3. Include a mix of question types: {', '.join(enabled_types)}
-            4. Have appropriate difficulty levels for the target audience
-            5. Include clear, unambiguous questions with proper answer keys
-            6. Follow education best practices"
+                    Please generate questions that:
+                    1. Are appropriate for {level_text}students
+                    2. Test understanding of key concepts from the provided Content Context; DO NOT deviate to unrelated topics other than in the Content Context
+                    3. Include a mix of question types: {', '.join(enabled_types)}
+                    4. Include clear, unambiguous questions with proper answer keys
 
-            For each question, provide:
-            - Clear, well-structured question text
-            - Appropriate answer options (for multiple choice) with correctAnswer as index (like "0", "1", "2", "3") of the correct answer in the options array
-            - Correct answer with brief explanation (except for multi-part questions which get answers from sub-questions)
-            - Rubric or grading guidelines
-            - Point value based on difficulty
+                    For each question, provide:
+                    - Clear, well-structured question text
+                    - Appropriate answer options (for multiple choice)
+                    - Correct answer and Rubric or grading guidelines
+                    - Point value based on difficulty
 
-            The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
-        """
+                    ANSWER KEY GUIDELINES (ONLY for MCQs):
+                    - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+
+                    MULTI-PART QUESTION GUIDELINES:
+                    {self._get_multipart_instructions(enabled_types)}
+
+                    CRITICAL - SUBQUESTION REQUIREMENTS:
+                    - EVERY subquestion at ALL levels (Level 2 and Level 3) MUST include:
+                      * correctAnswer: The correct answer for that subquestion
+                      * rubric: Detailed grading guidelines for that subquestion
+                      * explanation: Brief explanation of the correct answer
+                    - Do NOT leave correctAnswer, rubric, or explanation empty for subquestions
+                    - Each subquestion should be independently gradable with its own rubric
+
+                    The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
+                """
 
         # Add difficulty distribution if specified
         if difficulty_distribution:
@@ -416,6 +658,14 @@ class AssignmentGenerator:
             - Include code examples and diagrams when appropriate
             - Follow academic integrity standards
 
+            MANDATORY FOR MULTI-PART QUESTIONS:
+            - EVERY subquestion at ALL nesting levels MUST have:
+              * A complete correctAnswer
+              * A detailed rubric for grading
+              * An explanation of the answer
+            - Never leave subquestion answers or rubrics empty
+            - Each subquestion should be independently gradable
+
             The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
         """
         else:
@@ -444,8 +694,102 @@ class AssignmentGenerator:
             - Use proper terminology and notation appropriate to the subject
             - Follow academic integrity standards
 
+            MANDATORY FOR MULTI-PART QUESTIONS:
+            - EVERY subquestion at ALL nesting levels MUST have:
+              * A complete correctAnswer
+              * A detailed rubric for grading
+              * An explanation of the answer
+            - Never leave subquestion answers or rubrics empty
+            - Each subquestion should be independently gradable
+
             The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
         """
+
+    def _sanitize_string(self, text: Any) -> str:
+        """
+        Sanitize string to remove null bytes and other problematic characters.
+
+        Args:
+            text: Text to sanitize (can be any type)
+
+        Returns:
+            Sanitized string with null bytes removed
+        """
+        if text is None:
+            return ""
+        if not isinstance(text, str):
+            text = str(text)
+        # Remove null bytes and other control characters that PostgreSQL can't handle
+        return text.replace("\x00", "").replace("\u0000", "")
+
+    def _sanitize_questions(
+        self, questions: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Recursively sanitize all text fields in questions to remove null bytes.
+
+        Args:
+            questions: List of questions with potential null bytes
+
+        Returns:
+            Sanitized questions list
+        """
+        for question in questions:
+            # Sanitize top-level string fields
+            if "question" in question:
+                question["question"] = self._sanitize_string(question["question"])
+            if "text" in question:
+                question["text"] = self._sanitize_string(question["text"])
+            if "correctAnswer" in question:
+                question["correctAnswer"] = self._sanitize_string(
+                    question["correctAnswer"]
+                )
+            if "explanation" in question:
+                question["explanation"] = self._sanitize_string(question["explanation"])
+            if "rubric" in question:
+                question["rubric"] = self._sanitize_string(question["rubric"])
+            if "code" in question:
+                question["code"] = self._sanitize_string(question["code"])
+            if "codeLanguage" in question:
+                question["codeLanguage"] = self._sanitize_string(
+                    question["codeLanguage"]
+                )
+            if "outputType" in question:
+                question["outputType"] = self._sanitize_string(question["outputType"])
+
+            # Sanitize options array
+            if "options" in question and isinstance(question["options"], list):
+                question["options"] = [
+                    self._sanitize_string(opt) for opt in question["options"]
+                ]
+
+            # Sanitize multipleCorrectAnswers array
+            if "multipleCorrectAnswers" in question and isinstance(
+                question["multipleCorrectAnswers"], list
+            ):
+                question["multipleCorrectAnswers"] = [
+                    self._sanitize_string(ans)
+                    for ans in question["multipleCorrectAnswers"]
+                ]
+
+            # Sanitize equations
+            if "equations" in question and isinstance(question["equations"], list):
+                for eq in question["equations"]:
+                    if isinstance(eq, dict):
+                        if "id" in eq:
+                            eq["id"] = self._sanitize_string(eq["id"])
+                        if "latex" in eq:
+                            eq["latex"] = self._sanitize_string(eq["latex"])
+
+            # Recursively sanitize subquestions
+            if "subquestions" in question and isinstance(
+                question["subquestions"], list
+            ):
+                question["subquestions"] = self._sanitize_questions(
+                    question["subquestions"]
+                )
+
+        return questions
 
     def _post_process_questions(
         self, questions: List[Dict[str, Any]], generation_options: Dict[str, Any]
@@ -472,12 +816,25 @@ class AssignmentGenerator:
 
             # Correct answer defaults
             if question.get("correctAnswer") is None:
-                if question.get("type") == "multiple-choice" and question.get("options"):
+                if question.get("type") == "multiple-choice" and question.get(
+                    "options"
+                ):
                     question["correctAnswer"] = "0"
                 elif question.get("type") == "multi-part":
                     question["correctAnswer"] = ""
                 else:
                     question["correctAnswer"] = "0"
+
+            if question.get("type") == "true-false" and question.get(
+                "correctAnswer"
+            ) not in [True, False]:
+                if isinstance(question["correctAnswer"], str):
+                    if question["correctAnswer"].lower() in ["true", "false"]:
+                        question["correctAnswer"] = (
+                            question["correctAnswer"].lower() == "true"
+                        )
+                    if question["correctAnswer"] in ["1", "0"]:
+                        question["correctAnswer"] = question["correctAnswer"] == "1"
 
             # Fields omitted from the lightweight generation schema — set defaults
             question.setdefault("allowMultipleCorrect", False)
@@ -523,6 +880,33 @@ class AssignmentGenerator:
                     sub["text"] = sub["question"]
                 elif "text" in sub and "question" not in sub:
                     sub["question"] = sub["text"]
+
+                # Fill defaults for Level 3 nested subquestions
+                for k, nested_sub in enumerate(sub.get("subquestions", [])):
+                    nested_sub.setdefault("id", k + 1)
+                    nested_sub.setdefault("type", "short-answer")
+                    nested_sub.setdefault("points", 1)
+                    nested_sub.setdefault("options", [])
+                    nested_sub.setdefault("correctAnswer", "")
+                    nested_sub.setdefault("explanation", "")
+                    nested_sub.setdefault("allowMultipleCorrect", False)
+                    nested_sub.setdefault("multipleCorrectAnswers", [])
+                    nested_sub.setdefault("equations", [])
+                    nested_sub.setdefault("hasCode", False)
+                    nested_sub.setdefault("hasDiagram", False)
+                    nested_sub.setdefault("codeLanguage", "")
+                    nested_sub.setdefault("outputType", "")
+                    nested_sub.setdefault("rubricType", "overall")
+                    nested_sub.setdefault("code", "")
+                    nested_sub.setdefault("diagram", {"s3_url": None, "s3_key": None})
+                    nested_sub.setdefault("rubric", "")
+                    nested_sub.setdefault("optionalParts", False)
+                    nested_sub.setdefault("requiredPartsCount", 0)
+                    # Normalize question/text
+                    if "question" in nested_sub and "text" not in nested_sub:
+                        nested_sub["text"] = nested_sub["question"]
+                    elif "text" in nested_sub and "question" not in nested_sub:
+                        nested_sub["question"] = nested_sub["text"]
 
         return questions
 

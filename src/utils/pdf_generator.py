@@ -409,64 +409,68 @@ class AssignmentPDFGenerator:
         """
         Convert plain text mathematical notation to LaTeX format.
         Handles subscripts (x_1), superscripts (x^2), scientific notation, and special characters.
-        
+
         Args:
             text: Text with plain subscript/superscript notation
-            
+
         Returns:
             Text with notation converted to LaTeX $...$ format
         """
         if not text:
             return ""
-        
+
         # Handle scientific notation with units: 7.0×10^−4 °C^−1
         # This must come FIRST before we process degree symbols separately
-        scientific_with_units_pattern = r'([\d.]+)\s*[×x]\s*10\^([−\-]?\d+)\s*°C\^([−\-]?\d+)'
-        
+        scientific_with_units_pattern = (
+            r"([\d.]+)\s*[×x]\s*10\^([−\-]?\d+)\s*°C\^([−\-]?\d+)"
+        )
+
         def replace_scientific_with_units(match):
             coefficient = match.group(1)
-            exponent = match.group(2).replace('−', '-')
-            unit_exp = match.group(3).replace('−', '-')
-            return f'${coefficient}\\times 10^{{{exponent}}}$ °C$^{{{unit_exp}}}$'
-        
-        text = re.sub(scientific_with_units_pattern, replace_scientific_with_units, text)
-        
+            exponent = match.group(2).replace("−", "-")
+            unit_exp = match.group(3).replace("−", "-")
+            return f"${coefficient}\\times 10^{{{exponent}}}$ °C$^{{{unit_exp}}}$"
+
+        text = re.sub(
+            scientific_with_units_pattern, replace_scientific_with_units, text
+        )
+
         # Now handle degree symbols for regular temperature values
         # Use HTML entity instead of LaTeX for better rendering
-        text = text.replace('°C', '°C')
-        text = text.replace('°', '°')
-        
+        text = text.replace("°C", "°C")
+        text = text.replace("°", "°")
+
         # Handle regular scientific notation: 7.0×10^−4 or 7.0×10^-4
-        scientific_pattern = r'([\d.]+)\s*[×x]\s*10\^([−\-]?\d+)'
-        
+        scientific_pattern = r"([\d.]+)\s*[×x]\s*10\^([−\-]?\d+)"
+
         def replace_scientific(match):
             coefficient = match.group(1)
-            exponent = match.group(2).replace('−', '-')
-            return f'${coefficient}\\times 10^{{{exponent}}}$'
-        
+            exponent = match.group(2).replace("−", "-")
+            return f"${coefficient}\\times 10^{{{exponent}}}$"
+
         text = re.sub(scientific_pattern, replace_scientific, text)
-        
+
         # Pattern to match variable names with subscripts/superscripts
         # Matches patterns like: ρ_o, ρ_w, m^3, V_th, X_L, β_o, p_20, etc.
-        math_pattern = r'([A-Za-zΔΔα-ωΑ-Ωβρ]+)([_^])([A-Za-z0-9]+)'
-        
+        math_pattern = r"([A-Za-zΔΔα-ωΑ-Ωβρ]+)([_^])([A-Za-z0-9]+)"
+
         def replace_math(match):
             base = match.group(1)
             operator = match.group(2)
             subscript = match.group(3)
-            
-            if operator == '_':
-                return f'${base}_{{{subscript}}}$'
+
+            if operator == "_":
+                return f"${base}_{{{subscript}}}$"
             else:  # ^
-                return f'${base}^{{{subscript}}}$'
-        
+                return f"${base}^{{{subscript}}}$"
+
         # Convert underscore/caret notation to LaTeX
         text = re.sub(math_pattern, replace_math, text)
-        
+
         # Clean up any double spaces or multiple $ signs next to each other
-        text = re.sub(r'\$\s*\$', ' ', text)
-        text = re.sub(r'\s+', ' ', text)
-        
+        text = re.sub(r"\$\s*\$", " ", text)
+        text = re.sub(r"\s+", " ", text)
+
         return text
 
     def process_question_text(self, text: str) -> str:
@@ -481,7 +485,7 @@ class AssignmentPDFGenerator:
         """
         if not text:
             return ""
-        
+
         # First convert plain text math notation to LaTeX
         text = self.convert_text_math_to_latex(text)
 
@@ -516,7 +520,9 @@ class AssignmentPDFGenerator:
         processed_text = re.sub(inline_pattern, replace_inline_equation, processed_text)
         processed_text = re.sub(
             r"\\\((.+?)\\\)",
-            lambda m: self.render_latex_equation(m.group(1), fontsize=11, is_display=False),
+            lambda m: self.render_latex_equation(
+                m.group(1), fontsize=11, is_display=False
+            ),
             processed_text,
         )
 
@@ -798,7 +804,9 @@ class AssignmentPDFGenerator:
                                         )
                                     )
                                 else:
-                                    option_text = self.process_question_text(option_clean)
+                                    option_text = self.process_question_text(
+                                        option_clean
+                                    )
                                 letter = chr(65 + m)  # A, B, C, D...
                                 html += f'<div class="option"><strong>{letter}.</strong> {option_text}</div>'
                             html += "</div>"
