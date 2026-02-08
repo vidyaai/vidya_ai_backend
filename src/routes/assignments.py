@@ -465,6 +465,7 @@ async def get_user_assignments(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
     status_filter: Optional[str] = None,
+    course_id: Optional[str] = None,
     sort_by: str = "created_at",
     sort_order: str = "desc",
 ):
@@ -479,6 +480,13 @@ async def get_user_assignments(
         # Apply status filter
         if status_filter:
             query = query.filter(Assignment.status == status_filter)
+
+        # Apply course_id filter (use "null" string to mean open assignments)
+        if course_id is not None:
+            if course_id.lower() == "null":
+                query = query.filter(Assignment.course_id == None)
+            else:
+                query = query.filter(Assignment.course_id == course_id)
 
         # Apply sorting
         if sort_by == "created_at":
@@ -807,6 +815,7 @@ async def create_assignment(
             user_id=user_id,
             title=assignment_data.title,
             description=assignment_data.description,
+            course_id=assignment_data.course_id,
             due_date=assignment_data.due_date,
             status=assignment_data.status,
             engineering_level=assignment_data.engineering_level,

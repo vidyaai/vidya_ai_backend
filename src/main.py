@@ -19,6 +19,7 @@ from routes.sharing import router as sharing_router
 from routes.assignments import router as assignments_router
 from routes.payments import router as payments_router
 from routes.lecture_summary import router as lecture_summary_router
+from routes.courses import router as courses_router
 from utils.youtube_utils import start_cache_cleanup_thread
 
 
@@ -108,6 +109,7 @@ app.include_router(sharing_router)
 app.include_router(assignments_router)
 app.include_router(payments_router)
 app.include_router(lecture_summary_router)
+app.include_router(courses_router)
 
 
 if __name__ == "__main__":
