@@ -409,30 +409,44 @@ def filter_sensitive_data_for_students(
         filtered_questions = []
         for question in filtered_data["questions"]:
             filtered_question = question.copy()
+            q_type = filtered_question.get("type", "")
             # Remove sensitive fields
             filtered_question.pop("rubric", None)
             filtered_question.pop("correctAnswer", None)
-            filtered_question.pop(
-                "correct_answer", None
-            )  # Handle both naming conventions
+            filtered_question.pop("correct_answer", None)  # Handle both naming conventions
+            filtered_question.pop("explanation", None)
+
+            # For code-writing questions, the AI-generated 'code' field may contain
+            # the solution. Only keep 'starterCode' (the template for students).
+            if q_type in ("code-writing", "code_writing"):
+                filtered_question.pop("code", None)
+                # Keep starterCode — that's the student-visible template
 
             # Handle subquestions for multi-part questions
             if "subquestions" in filtered_question:
                 filtered_subquestions = []
                 for subq in filtered_question["subquestions"]:
                     filtered_subq = subq.copy()
+                    sub_type = filtered_subq.get("type", "")
                     filtered_subq.pop("rubric", None)
                     filtered_subq.pop("correctAnswer", None)
                     filtered_subq.pop("correct_answer", None)
+                    filtered_subq.pop("explanation", None)
+                    if sub_type in ("code-writing", "code_writing"):
+                        filtered_subq.pop("code", None)
 
                     # Handle nested subquestions
                     if "subquestions" in filtered_subq:
                         nested_filtered = []
                         for nested_subq in filtered_subq["subquestions"]:
                             nested_filtered_subq = nested_subq.copy()
+                            nested_sub_type = nested_filtered_subq.get("type", "")
                             nested_filtered_subq.pop("rubric", None)
                             nested_filtered_subq.pop("correctAnswer", None)
                             nested_filtered_subq.pop("correct_answer", None)
+                            nested_filtered_subq.pop("explanation", None)
+                            if nested_sub_type in ("code-writing", "code_writing"):
+                                nested_filtered_subq.pop("code", None)
                             nested_filtered.append(nested_filtered_subq)
                         filtered_subq["subquestions"] = nested_filtered
 
@@ -3112,6 +3126,7 @@ async def download_assignment_pdf(
         # Prepare assignment data for PDF generation
         assignment_data = {
             "id": assignment.id,
+            "user_id": assignment.user_id,
             "title": assignment.title,
             "description": assignment.description,
             "questions": assignment.questions or [],
@@ -3121,6 +3136,12 @@ async def download_assignment_pdf(
             "engineering_discipline": assignment.engineering_discipline,
             "created_at": assignment.created_at,
         }
+
+        # Filter sensitive data (correctAnswer, rubric, explanation, code for code-writing)
+        # for students who are not the owner or editors
+        assignment_data = filter_sensitive_data_for_students(
+            assignment_data, user_id, db
+        )
 
         # Process diagram URLs in questions to be accessible
         for question in assignment_data["questions"]:

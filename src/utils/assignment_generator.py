@@ -281,7 +281,11 @@ class AssignmentGenerator:
             4. Test deep understanding of the SPECIFIC concept/topic requested
             5. Include a mix of question types: {', '.join(enabled_types)}
             6. Include clear, unambiguous questions with proper answer keys
-            7. Follow the user's specific instructions precisely"""
+            7. Follow the user's specific instructions precisely
+            8. For multiple-choice questions: correctAnswer must be the INDEX ("0", "1", "2", or "3") of the correct option. Always select exactly one correct answer.
+            9. For true-false questions: correctAnswer must be "true" or "false"
+            10. For ALL other question types (short-answer, long-answer, fill-blank, numerical, code-writing, diagram-analysis): correctAnswer MUST contain a complete, detailed sample answer text. NEVER leave it empty.
+            11. Every single question MUST have a non-empty correctAnswer. Professors need AI-generated sample answers to review and edit."""
             else:
                 # Has video/docs or no custom prompt - original behavior
                 prompt = f"""
@@ -306,11 +310,15 @@ class AssignmentGenerator:
 
             For each question, provide:
             - Clear, well-structured question text
-            - Appropriate answer options (for multiple choice) with correctAnswer as index (like "0", "1", "2", "3") of the correct answer in the options array
-            - Correct answer with brief explanation (except for multi-part questions which get answers from sub-questions)
+            - Appropriate answer options (for multiple choice) with correctAnswer as the INDEX (like "0", "1", "2", "3") of the correct answer in the options array. You MUST select a correct answer for every MCQ.
+            - For true-false questions: correctAnswer must be "true" or "false"
+            - For short-answer, long-answer, fill-blank, numerical, code-writing, and diagram-analysis questions: correctAnswer MUST contain a complete, detailed sample answer text (NOT an index). This is critical — professors need AI-generated sample answers they can review and edit. NEVER leave correctAnswer empty for these types.
+            - Brief explanation for the answer
             - Rubric or grading guidelines
             - Point value based on difficulty
             - Any necessary code templates or diagrams
+
+            CRITICAL: Every question MUST have a non-empty correctAnswer field. For MCQ this is the option index, for all other types this is the full sample answer text. Do NOT leave any correctAnswer empty or as a placeholder.
 
             The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
         """
@@ -337,7 +345,11 @@ class AssignmentGenerator:
             4. Test deep understanding of the SPECIFIC concept/topic requested
             5. Include a mix of question types: {', '.join(enabled_types)}
             6. Include clear, unambiguous questions with proper answer keys
-            7. Follow the user's specific instructions precisely"""
+            7. Follow the user's specific instructions precisely
+            8. For multiple-choice questions: correctAnswer must be the INDEX ("0", "1", "2", or "3") of the correct option. Always select exactly one correct answer.
+            9. For true-false questions: correctAnswer must be "true" or "false"
+            10. For ALL other question types (short-answer, long-answer, fill-blank, numerical, code-writing, diagram-analysis): correctAnswer MUST contain a complete, detailed sample answer text. NEVER leave it empty.
+            11. Every single question MUST have a non-empty correctAnswer. Professors need AI-generated sample answers to review and edit."""
             else:
                 # Has video/docs or no custom prompt - original behavior
                 prompt = f"""
@@ -361,10 +373,14 @@ class AssignmentGenerator:
 
             For each question, provide:
             - Clear, well-structured question text
-            - Appropriate answer options (for multiple choice) with correctAnswer as index (like "0", "1", "2", "3") of the correct answer in the options array
-            - Correct answer with brief explanation (except for multi-part questions which get answers from sub-questions)
+            - Appropriate answer options (for multiple choice) with correctAnswer as the INDEX (like "0", "1", "2", "3") of the correct answer in the options array. You MUST select a correct answer for every MCQ.
+            - For true-false questions: correctAnswer must be "true" or "false"
+            - For short-answer, long-answer, fill-blank, numerical, code-writing, and diagram-analysis questions: correctAnswer MUST contain a complete, detailed sample answer text (NOT an index). This is critical — professors need AI-generated sample answers they can review and edit. NEVER leave correctAnswer empty for these types.
+            - Brief explanation for the answer
             - Rubric or grading guidelines
             - Point value based on difficulty
+
+            CRITICAL: Every question MUST have a non-empty correctAnswer field. For MCQ this is the option index, for all other types this is the full sample answer text. Do NOT leave any correctAnswer empty or as a placeholder.
 
             The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
         """
@@ -415,6 +431,12 @@ class AssignmentGenerator:
             - Use proper engineering terminology and notation
             - Include code examples and diagrams when appropriate
             - Follow academic integrity standards
+            - ALWAYS provide a complete correctAnswer for EVERY question:
+              * Multiple-choice: correctAnswer = index of correct option ("0", "1", "2", "3")
+              * True-false: correctAnswer = "true" or "false"
+              * Short-answer, long-answer, fill-blank, numerical, code-writing, diagram-analysis: correctAnswer = detailed sample answer text
+              * Multi-part: each subquestion must have its own correctAnswer
+            - Never leave correctAnswer empty or as a placeholder
 
             The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
         """
@@ -443,6 +465,12 @@ class AssignmentGenerator:
             - Ensure questions are self-contained and don't require external resources
             - Use proper terminology and notation appropriate to the subject
             - Follow academic integrity standards
+            - ALWAYS provide a complete correctAnswer for EVERY question:
+              * Multiple-choice: correctAnswer = index of correct option ("0", "1", "2", "3")
+              * True-false: correctAnswer = "true" or "false"
+              * Short-answer, long-answer, fill-blank, numerical, code-writing, diagram-analysis: correctAnswer = detailed sample answer text
+              * Multi-part: each subquestion must have its own correctAnswer
+            - Never leave correctAnswer empty or as a placeholder
 
             The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
         """
@@ -470,14 +498,45 @@ class AssignmentGenerator:
             elif "text" in question and "question" not in question:
                 question["question"] = question["text"]
 
-            # Correct answer defaults
-            if question.get("correctAnswer") is None:
-                if question.get("type") == "multiple-choice" and question.get("options"):
+            # Correct answer defaults & validation
+            q_type = question.get("type", "multiple-choice")
+            correct_answer = question.get("correctAnswer")
+
+            if q_type == "multiple-choice":
+                options = question.get("options", [])
+                # Validate that correctAnswer is a valid option index
+                if correct_answer is not None and options:
+                    try:
+                        idx = int(correct_answer)
+                        if idx < 0 or idx >= len(options):
+                            question["correctAnswer"] = "0"
+                    except (ValueError, TypeError):
+                        # AI may have returned the answer text instead of index — try to match it
+                        matched = False
+                        for opt_idx, opt in enumerate(options):
+                            if correct_answer and correct_answer.strip().lower() == opt.strip().lower():
+                                question["correctAnswer"] = str(opt_idx)
+                                matched = True
+                                break
+                        if not matched:
+                            question["correctAnswer"] = "0"
+                elif correct_answer is None:
                     question["correctAnswer"] = "0"
-                elif question.get("type") == "multi-part":
-                    question["correctAnswer"] = ""
-                else:
-                    question["correctAnswer"] = "0"
+            elif q_type == "true-false":
+                if correct_answer not in ("true", "false"):
+                    question["correctAnswer"] = "true"
+            elif q_type == "multi-part":
+                question["correctAnswer"] = ""
+            else:
+                # short-answer, long-answer, fill-blank, numerical, code-writing, diagram-analysis
+                # correctAnswer should contain a sample answer text, not an index
+                if not correct_answer or correct_answer.strip() == "":
+                    # Use explanation as fallback if correctAnswer is empty
+                    explanation = question.get("explanation", "")
+                    if explanation and explanation != "No explanation provided":
+                        question["correctAnswer"] = explanation
+                    else:
+                        question["correctAnswer"] = "Sample answer not generated — please provide a sample answer."
 
             # Fields omitted from the lightweight generation schema — set defaults
             question.setdefault("allowMultipleCorrect", False)
@@ -502,8 +561,39 @@ class AssignmentGenerator:
                 sub.setdefault("type", "short-answer")
                 sub.setdefault("points", 1)
                 sub.setdefault("options", [])
-                sub.setdefault("correctAnswer", "")
                 sub.setdefault("explanation", "")
+
+                # Validate subquestion correctAnswer
+                sub_type = sub.get("type", "short-answer")
+                sub_answer = sub.get("correctAnswer")
+                if sub_type == "multiple-choice":
+                    sub_options = sub.get("options", [])
+                    if sub_answer is not None and sub_options:
+                        try:
+                            idx = int(sub_answer)
+                            if idx < 0 or idx >= len(sub_options):
+                                sub["correctAnswer"] = "0"
+                        except (ValueError, TypeError):
+                            matched = False
+                            for opt_idx, opt in enumerate(sub_options):
+                                if sub_answer and sub_answer.strip().lower() == opt.strip().lower():
+                                    sub["correctAnswer"] = str(opt_idx)
+                                    matched = True
+                                    break
+                            if not matched:
+                                sub["correctAnswer"] = "0"
+                    elif sub_answer is None:
+                        sub["correctAnswer"] = "0"
+                elif sub_type == "true-false":
+                    if sub_answer not in ("true", "false"):
+                        sub["correctAnswer"] = "true"
+                else:
+                    if not sub_answer or str(sub_answer).strip() == "":
+                        sub_explanation = sub.get("explanation", "")
+                        if sub_explanation and sub_explanation.strip():
+                            sub["correctAnswer"] = sub_explanation
+                        else:
+                            sub["correctAnswer"] = "Sample answer not generated — please provide a sample answer."
                 sub.setdefault("allowMultipleCorrect", False)
                 sub.setdefault("multipleCorrectAnswers", [])
                 sub.setdefault("equations", [])

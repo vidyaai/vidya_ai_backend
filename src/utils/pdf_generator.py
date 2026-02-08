@@ -665,7 +665,15 @@ class AssignmentPDFGenerator:
         """
 
         # Add code block if present
-        if question.get("hasCode") and question.get("code"):
+        # For code-writing questions, use starterCode (student template) instead of
+        # code (which may contain the solution). For other types, code is reference code.
+        if question_type in ("code-writing", "code_writing"):
+            starter_code = question.get("starterCode", "")
+            if starter_code:
+                html += f"""
+            <div class="question-code" style="background: #f3f4f6; padding: 10px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; margin-top: 10px;">{starter_code}</div>
+            """
+        elif question.get("hasCode") and question.get("code"):
             code_text = question["code"]
             html += f"""
             <div class="question-code" style="background: #f3f4f6; padding: 10px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; margin-top: 10px;">{code_text}</div>
@@ -726,7 +734,14 @@ class AssignmentPDFGenerator:
                 """
 
                 # handle subquestion code block if present
-                if subq.get("hasCode") and subq.get("code"):
+                # For code-writing subquestions, use starterCode instead of code
+                if subq_type in ("code-writing", "code_writing"):
+                    starter_code = subq.get("starterCode", "")
+                    if starter_code:
+                        html += f"""
+                    <div class="subquestion-code" style="background: #f3f4f6; padding: 10px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; margin-top: 10px;">{starter_code}</div>
+                    """
+                elif subq.get("hasCode") and subq.get("code"):
                     code_text = subq["code"]
                     html += f"""
                     <div class="subquestion-code" style="background: #f3f4f6; padding: 10px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; margin-top: 10px;">{code_text}</div>
