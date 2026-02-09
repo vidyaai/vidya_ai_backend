@@ -67,7 +67,9 @@ class SubquestionLevel3(BaseModel):
     codeLanguage: str = Field(
         default="", description="Programming language if code question"
     )
-    outputType: str = Field(default="", description="Expected output type")
+    outputType: Literal["code", "function", "algorithm", "output", ""] = Field(
+        default="", description="Expected answer type for code questions"
+    )
     rubricType: Literal["overall"] = Field(default="overall", description="Rubric type")
     code: str = Field(default="", description="Code content if applicable")
     equations: List[Equation] = Field(
@@ -85,7 +87,6 @@ class SubquestionLevel3(BaseModel):
     correctAnswer: str = Field(
         default="", description="Correct answer if present in document"
     )
-    explanation: str = Field(default="", description="Explanation if present")
     rubric: str = Field(default="", description="Grading rubric if present")
 
 
@@ -119,7 +120,9 @@ class SubquestionLevel2(BaseModel):
     codeLanguage: str = Field(
         default="", description="Programming language if code question"
     )
-    outputType: str = Field(default="", description="Expected output type")
+    outputType: Literal["code", "function", "algorithm", "output", ""] = Field(
+        default="", description="Expected answer type for code questions"
+    )
     rubricType: Literal["per-subquestion", "overall"] = Field(
         default="overall", description="Rubric type"
     )
@@ -139,7 +142,6 @@ class SubquestionLevel2(BaseModel):
     correctAnswer: str = Field(
         default="", description="Correct answer if present in document"
     )
-    explanation: str = Field(default="", description="Explanation if present")
     rubric: str = Field(default="", description="Grading rubric if present")
     subquestions: List[SubquestionLevel3] = Field(
         default_factory=list, description="Nested subquestions"
@@ -181,7 +183,9 @@ class Question(BaseModel):
     codeLanguage: str = Field(
         default="", description="Programming language if code question"
     )
-    outputType: str = Field(default="", description="Expected output type")
+    outputType: Literal["code", "function", "algorithm", "output", ""] = Field(
+        default="", description="Expected answer type for code questions"
+    )
     rubricType: Literal["per-subquestion", "overall"] = Field(
         default="overall", description="Rubric type"
     )
@@ -201,7 +205,6 @@ class Question(BaseModel):
     correctAnswer: str = Field(
         default="", description="Correct answer if present in document"
     )
-    explanation: str = Field(default="", description="Explanation if present")
     rubric: str = Field(default="", description="Grading rubric if present")
     subquestions: List[SubquestionLevel2] = Field(
         default_factory=list, description="Nested subquestions"
@@ -220,14 +223,6 @@ class AssignmentParsingResponse(BaseModel):
     )
     total_points: float = Field(
         default=0, description="Total points for the assignment"
-    )
-
-
-class AssignmentGenerationResponse(BaseModel):
-    """Complete assignment generation response with all generated content."""
-
-    questions: List[Question] = Field(
-        default_factory=list, description="List of generated questions"
     )
 
 
@@ -264,9 +259,11 @@ class SubquestionLevel3Generation(BaseModel):
     codeLanguage: str = Field(
         default="", description="Programming language if code question"
     )
-    outputType: str = Field(default="", description="Expected output type")
+    outputType: Literal["code", "function", "algorithm", "output", ""] = Field(
+        default="", description="Expected answer type for code questions"
+    )
     rubricType: Literal["overall"] = Field(default="overall", description="Rubric type")
-    code: str = Field(default="", description="Code content if applicable")
+    code: str = Field(default="", description="Code template if applicable")
     diagram: Optional[DiagramNoBbox] = Field(
         default=None, description="Diagram reference"
     )
@@ -276,10 +273,7 @@ class SubquestionLevel3Generation(BaseModel):
     requiredPartsCount: int = Field(
         default=0, description="Number of parts student must answer"
     )
-    correctAnswer: str = Field(
-        default="", description="Correct answer if present in document"
-    )
-    explanation: str = Field(default="", description="Explanation if present")
+    correctAnswer: str = Field(default="", description="Correct answer")
     rubric: str = Field(default="", description="Grading rubric if present")
 
 
@@ -312,11 +306,13 @@ class SubquestionLevel2Generation(BaseModel):
     codeLanguage: str = Field(
         default="", description="Programming language if code question"
     )
-    outputType: str = Field(default="", description="Expected output type")
+    outputType: Literal["code", "function", "algorithm", "output", ""] = Field(
+        default="", description="Expected answer type for code questions"
+    )
     rubricType: Literal["per-subquestion", "overall"] = Field(
         default="overall", description="Rubric type"
     )
-    code: str = Field(default="", description="Code content if applicable")
+    code: str = Field(default="", description="Code template if applicable")
     diagram: Optional[DiagramNoBbox] = Field(
         default=None, description="Diagram reference"
     )
@@ -326,10 +322,7 @@ class SubquestionLevel2Generation(BaseModel):
     requiredPartsCount: int = Field(
         default=0, description="Number of parts student must answer"
     )
-    correctAnswer: str = Field(
-        default="", description="Correct answer if present in document"
-    )
-    explanation: str = Field(default="", description="Explanation if present")
+    correctAnswer: str = Field(default="", description="Correct answer")
     rubric: str = Field(default="", description="Grading rubric if present")
     subquestions: List[SubquestionLevel3Generation] = Field(
         default_factory=list, description="Nested subquestions (Level 3 only)"
@@ -369,11 +362,13 @@ class QuestionGenerationFlat(BaseModel):
     codeLanguage: str = Field(
         default="", description="Programming language if code question"
     )
-    outputType: str = Field(default="", description="Expected output type")
+    outputType: Literal["code", "function", "algorithm", "output", ""] = Field(
+        default="", description="Expected answer type for code questions"
+    )
     rubricType: Literal["overall"] = Field(
         default="overall", description="Rubric type (no per-subquestion for flat)"
     )
-    code: str = Field(default="", description="Code content if applicable")
+    code: str = Field(default="", description="Code template if applicable")
     diagram: Optional[DiagramNoBbox] = Field(
         default=None, description="Diagram reference"
     )
@@ -383,10 +378,7 @@ class QuestionGenerationFlat(BaseModel):
     requiredPartsCount: int = Field(
         default=0, description="Number of parts student must answer"
     )
-    correctAnswer: str = Field(
-        default="", description="Correct answer if present in document"
-    )
-    explanation: str = Field(default="", description="Explanation if present")
+    correctAnswer: str = Field(default="", description="Correct answer")
     rubric: str = Field(default="", description="Grading rubric if present")
 
 
@@ -424,11 +416,13 @@ class QuestionGenerationNested(BaseModel):
     codeLanguage: str = Field(
         default="", description="Programming language if code question"
     )
-    outputType: str = Field(default="", description="Expected output type")
+    outputType: Literal["code", "function", "algorithm", "output", ""] = Field(
+        default="", description="Expected answer type for code questions"
+    )
     rubricType: Literal["per-subquestion", "overall"] = Field(
         default="overall", description="Rubric type"
     )
-    code: str = Field(default="", description="Code content if applicable")
+    code: str = Field(default="", description="Code template if applicable")
     diagram: Optional[DiagramNoBbox] = Field(
         default=None, description="Diagram reference"
     )
@@ -438,10 +432,7 @@ class QuestionGenerationNested(BaseModel):
     requiredPartsCount: int = Field(
         default=0, description="Number of parts student must answer"
     )
-    correctAnswer: str = Field(
-        default="", description="Correct answer if present in document"
-    )
-    explanation: str = Field(default="", description="Explanation if present")
+    correctAnswer: str = Field(default="", description="Correct answer")
     rubric: str = Field(default="", description="Grading rubric if present")
     subquestions: List[SubquestionLevel2Generation] = Field(
         default_factory=list, description="Nested subquestions"

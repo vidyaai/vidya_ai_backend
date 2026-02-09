@@ -646,7 +646,17 @@ class AssignmentPDFGenerator:
             question_text = self.process_question_text(question.get("question", ""))
 
         question_type = question.get("type", "unknown")
-        points = question.get("points", 0)
+        if question_type == "multi-part":
+            points = 0
+            for subq in question.get("subquestions", []):
+                if subq.get("type") == "multi-part":
+                    points += sum(
+                        sq.get("points", 0) for sq in subq.get("subquestions", [])
+                    )
+                else:
+                    points += subq.get("points", 0)
+        else:
+            points = question.get("points", 0)
         difficulty = question.get("difficulty", "medium")
 
         # Difficulty badge colors
@@ -706,6 +716,15 @@ class AssignmentPDFGenerator:
                 html += f'<div class="option"><strong>{letter}.</strong> {option_text}</div>'
             html += "</div>"
 
+        # Add true and false options for true/false questions
+        if question_type == "true-false":
+            html += """
+            <div class="question-options">
+                <div class="option"><strong>☐</strong> True</div>
+                <div class="option"><strong>☐</strong> False</div>
+            </div>
+            """
+
         # Handle subquestions for multi-part questions
         if question.get("subquestions"):
             html += '<div class="subquestions">'
@@ -722,12 +741,22 @@ class AssignmentPDFGenerator:
                 else:
                     subq_text = self.process_question_text(subq.get("question", ""))
 
-                subq_points = subq.get("points", 0)
                 subq_type = subq.get("type", "short-answer")
+                if subq_type == "multi-part":
+                    subq_points = sum(
+                        sq.get("points", 0) for sq in subq.get("subquestions", [])
+                    )
+                else:
+                    subq_points = subq.get("points", 0)
 
                 html += f"""
                 <div class="subquestion">
-                    <h4>Part {chr(97 + i)}) ({subq_points} points)</h4>
+                    <div class="subquestion-header">
+                        <h4>Part {question_num}.{i+1}</h4>
+                        <div class="question-meta">
+                            <span class="points">{subq_points} points</span>
+                        </div>
+                    </div>
                     <div class="subquestion-text">{subq_text}</div>
                 """
 
@@ -764,6 +793,15 @@ class AssignmentPDFGenerator:
                         html += f'<div class="option"><strong>{letter}.</strong> {option_text}</div>'
                     html += "</div>"
 
+                # Add true/false options for true/false subquestions
+                if subq_type == "true-false":
+                    html += """
+                    <div class="question-options">
+                        <div class="option"><strong>☐</strong> True</div>
+                        <div class="option"><strong>☐</strong> False</div>
+                    </div>
+                    """
+
                 # Handle sub-subquestions
                 if subq.get("subquestions"):
                     html += '<div class="sub-subquestions" style="padding-left: 20px; margin-top: 10px;">'
@@ -784,10 +822,13 @@ class AssignmentPDFGenerator:
 
                         html += f"""
                         <div class="sub-subquestion" style="margin-bottom: 12px;">
+                          <div class="sub-subquestion-header" style="display: flex; align-items: center; justify-content: space-between;">
                             <h5 style="margin: 0 0 6px 0; font-size: 10.5pt; color: #666;">
-                                Part {chr(97 + i)}.{k + 1}) ({sub_subq_points} points)
+                                Part {question_num}.{i+1}.{k + 1}
                             </h5>
-                            <div class="sub-subquestion-text">{sub_subq_text}</div>
+                            <span class="points">{sub_subq_points} points</span>
+                          </div>
+                          <div class="sub-subquestion-text">{sub_subq_text}</div>
                         """
 
                         # Add options for multiple choice sub-subquestions
@@ -810,6 +851,15 @@ class AssignmentPDFGenerator:
                                 letter = chr(65 + m)  # A, B, C, D...
                                 html += f'<div class="option"><strong>{letter}.</strong> {option_text}</div>'
                             html += "</div>"
+
+                        # Add true/false options for true/false sub-subquestions
+                        if sub_subq_type == "true-false":
+                            html += """
+                            <div class="question-options">
+                                <div class="option"><strong>☐</strong> True</div>
+                                <div class="option"><strong>☐</strong> False</div>
+                            </div>
+                            """
 
                         html += """
                             <div class="answer-space">
@@ -930,6 +980,9 @@ class AssignmentPDFGenerator:
 
         .question-header {
             margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .question-header h3 {
@@ -937,15 +990,27 @@ class AssignmentPDFGenerator:
             font-size: 11pt;
             color: #000;
             font-weight: bold;
-            display: inline;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .question-meta {
-            display: none; /* Hide meta information for clean paper look */
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
-        .points, .difficulty, .type {
-            display: none; /* Hide badges for professional appearance */
+        .points {
+            font-size: 9pt;
+            color: #555;
+            margin-right: 8px;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .difficulty, .type {
+            display: none; /* Hide difficulty and type for cleaner look, can be enabled if desired */
         }
 
         .question-text {
@@ -990,6 +1055,12 @@ class AssignmentPDFGenerator:
             margin: 0 0 8px 0;
             font-size: 11pt;
             color: #555;
+        }
+
+        .subquestion-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .footer-info {
