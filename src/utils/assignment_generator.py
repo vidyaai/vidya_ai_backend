@@ -63,7 +63,7 @@ class AssignmentGenerator:
 
                 IMPORTANT:
                 - Process ALL question levels (main questions, subquestions at Level 2, nested subquestions at Level 3)
-                - Look for equations in: question text, options, correctAnswer, explanation, and rubric fields
+                - Look for equations in: question text, options, correctAnswer, and rubric fields
                 - Generate unique equation IDs: q<question_id>_eq<number> (e.g., q1_eq1, q1_eq2)
                 - For subquestions: q<main_id>_<sub_id>_eq<number> (e.g., q1_1_eq1)
                 - Common equation patterns: fractions, exponents, integrals, derivatives, matrices, Greek letters
@@ -289,7 +289,7 @@ class AssignmentGenerator:
 
             # Debug: Log the raw questions before equation extraction
             logger.info(
-                f"Raw questions from AI (without equations): {len(questions)} questions"
+                f"Raw questions from AI (without equations): {questions} questions"
             )
 
             # Extract equations in a separate API call
@@ -454,10 +454,24 @@ class AssignmentGenerator:
                     - Appropriate answer options (for multiple choice)
                     - Correct answer and Rubric or grading guidelines
                     - Point value based on difficulty
-                    - Any necessary code templates
+                    - Any necessary code templates in the code field
 
-                    ANSWER KEY GUIDELINES (ONLY for MCQs):
+                    CODE FIELD GUIDELINES:
+                    - if code question
+                      -- if outputType is "code", provide a code template with the correct code structure but with key parts left blank for the student to fill in.
+                      -- if outputType is "function", provide a function definition template with the correct signature but with the body left blank for the student to implement.
+                      -- if outputType is "algorithm", provide a detailed outline of the algorithm steps with key steps left blank for the student to fill in.
+                      -- if outputType is "output", provide the code snippet that the student needs to analyze and determine the expected output.
+                    - if question includes code (for non-code-writing question types), provide the necessary code snippet in the code field to support the question
+
+                    CORRECTANSWER AND MULTIPLECORRECTANSWERS FIELD GUIDELINES:
+                    - correctAnswer is the complete correct answer for the question or subquestion expected from the student. It should be a fully formed answer, not just keywords
                     - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+                    - for code questions, correctAnswer should depend on outputType.
+                      -- If outputType is "code", correctAnswer should be the full code.
+                      -- If outputType is "function", correctAnswer should be the full function defination.
+                      -- If outputType is "algorithm", correctAnswer should be a detailed description of the algorithm steps.
+                      -- If outputType is "output", correctAnswer should be the expected output from running the code.
 
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
@@ -466,8 +480,7 @@ class AssignmentGenerator:
                     - EVERY subquestion at ALL levels (Level 2 and Level 3) MUST include:
                       * correctAnswer: The correct answer for that subquestion
                       * rubric: Detailed grading guidelines for that subquestion
-                      * explanation: Brief explanation of the correct answer
-                    - Do NOT leave correctAnswer, rubric, or explanation empty for subquestions
+                    - Do NOT leave correctAnswer or rubric empty for subquestions
                     - Each subquestion should be independently gradable with its own rubric
 
                     The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
@@ -499,10 +512,24 @@ class AssignmentGenerator:
                     - Appropriate answer options (for multiple choice)
                     - Correct answer and Rubric or grading guidelines
                     - Point value based on difficulty
-                    - Any necessary code templates
+                    - Any necessary code templates in the code field
 
-                    ANSWER KEY GUIDELINES (ONLY for MCQs):
+                    CODE FIELD GUIDELINES:
+                    - if code question
+                      -- if outputType is "code", provide a code template with the correct code structure but with key parts left blank for the student to fill in.
+                      -- if outputType is "function", provide a function definition template with the correct signature but with the body left blank for the student to implement.
+                      -- if outputType is "algorithm", provide a detailed outline of the algorithm steps with key steps left blank for the student to fill in.
+                      -- if outputType is "output", provide the code snippet that the student needs to analyze and determine the expected output.
+                    - if question includes code (for non-code-writing question types), provide the necessary code snippet in the code field to support the question
+
+                    CORRECTANSWER AND MULTIPLECORRECTANSWERS FIELD GUIDELINES:
+                    - correctAnswer is the complete correct answer for the question or subquestion expected from the student. It should be a fully formed answer, not just keywords
                     - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+                    - for code questions, correctAnswer should depend on outputType.
+                      -- If outputType is "code", correctAnswer should be the full code.
+                      -- If outputType is "function", correctAnswer should be the full function defination.
+                      -- If outputType is "algorithm", correctAnswer should be a detailed description of the algorithm steps.
+                      -- If outputType is "output", correctAnswer should be the expected output from running the code.
 
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
@@ -511,8 +538,7 @@ class AssignmentGenerator:
                     - EVERY subquestion at ALL levels (Level 2 and Level 3) MUST include:
                       * correctAnswer: The correct answer for that subquestion
                       * rubric: Detailed grading guidelines for that subquestion
-                      * explanation: Brief explanation of the correct answer
-                    - Do NOT leave correctAnswer, rubric, or explanation empty for subquestions
+                    - Do NOT leave correctAnswer or rubric empty for subquestions
                     - Each subquestion should be independently gradable with its own rubric
 
                     The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
@@ -549,10 +575,24 @@ class AssignmentGenerator:
                     - Appropriate answer options (for multiple choice)
                     - Correct answer and Rubric or grading guidelines
                     - Point value based on difficulty
-                    - Any necessary code templates
+                    - Any necessary code templates in the code field
 
-                    ANSWER KEY GUIDELINES (ONLY for MCQs):
+                    CODE FIELD GUIDELINES:
+                    - if code question
+                      -- if outputType is "code", provide a code template with the correct code structure but with key parts left blank for the student to fill in.
+                      -- if outputType is "function", provide a function definition template with the correct signature but with the body left blank for the student to implement.
+                      -- if outputType is "algorithm", provide a detailed outline of the algorithm steps with key steps left blank for the student to fill in.
+                      -- if outputType is "output", provide the code snippet that the student needs to analyze and determine the expected output.
+                    - if question includes code (for non-code-writing question types), provide the necessary code snippet in the code field to support the question
+
+                    CORRECTANSWER AND MULTIPLECORRECTANSWERS FIELD GUIDELINES:
+                    - correctAnswer is the complete correct answer for the question or subquestion expected from the student. It should be a fully formed answer, not just keywords
                     - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+                    - for code questions, correctAnswer should depend on outputType.
+                      -- If outputType is "code", correctAnswer should be the full code.
+                      -- If outputType is "function", correctAnswer should be the full function defination.
+                      -- If outputType is "algorithm", correctAnswer should be a detailed description of the algorithm steps.
+                      -- If outputType is "output", correctAnswer should be the expected output from running the code.
 
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
@@ -561,8 +601,7 @@ class AssignmentGenerator:
                     - EVERY subquestion at ALL levels (Level 2 and Level 3) MUST include:
                       * correctAnswer: The correct answer for that subquestion
                       * rubric: Detailed grading guidelines for that subquestion
-                      * explanation: Brief explanation of the correct answer
-                    - Do NOT leave correctAnswer, rubric, or explanation empty for subquestions
+                    - Do NOT leave correctAnswer or rubric empty for subquestions
                     - Each subquestion should be independently gradable with its own rubric
 
                     The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
@@ -592,10 +631,24 @@ class AssignmentGenerator:
                     - Clear, well-structured question text
                     - Appropriate answer options (for multiple choice)
                     - Correct answer and Rubric or grading guidelines
-                    - Point value based on difficulty
+                    - Any necessary code templates in the code field
 
-                    ANSWER KEY GUIDELINES (ONLY for MCQs):
+                    CODE FIELD GUIDELINES:
+                    - if code question
+                      -- if outputType is "code", provide a code template with the correct code structure but with key parts left blank for the student to fill in.
+                      -- if outputType is "function", provide a function definition template with the correct signature but with the body left blank for the student to implement.
+                      -- if outputType is "algorithm", provide a detailed outline of the algorithm steps with key steps left blank for the student to fill in.
+                      -- if outputType is "output", provide the code snippet that the student needs to analyze and determine the expected output.
+                    - if question includes code (for non-code-writing question types), provide the necessary code snippet in the code field to support the question
+
+                    CORRECTANSWER AND MULTIPLECORRECTANSWERS FIELD GUIDELINES:
+                    - correctAnswer is the complete correct answer for the question or subquestion expected from the student. It should be a fully formed answer, not just keywords
                     - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+                    - for code questions, correctAnswer should depend on outputType.
+                      -- If outputType is "code", correctAnswer should be the full code.
+                      -- If outputType is "function", correctAnswer should be the full function defination.
+                      -- If outputType is "algorithm", correctAnswer should be a detailed description of the algorithm steps.
+                      -- If outputType is "output", correctAnswer should be the expected output from running the code.
 
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
@@ -604,8 +657,7 @@ class AssignmentGenerator:
                     - EVERY subquestion at ALL levels (Level 2 and Level 3) MUST include:
                       * correctAnswer: The correct answer for that subquestion
                       * rubric: Detailed grading guidelines for that subquestion
-                      * explanation: Brief explanation of the correct answer
-                    - Do NOT leave correctAnswer, rubric, or explanation empty for subquestions
+                    - Do NOT leave correctAnswer or rubric empty for subquestions
                     - Each subquestion should be independently gradable with its own rubric
 
                     The response will be automatically structured according to the provided JSON schema. Focus on generating high-quality questions that meet the specified requirements.
@@ -662,7 +714,6 @@ class AssignmentGenerator:
             - EVERY subquestion at ALL nesting levels MUST have:
               * A complete correctAnswer
               * A detailed rubric for grading
-              * An explanation of the answer
             - Never leave subquestion answers or rubrics empty
             - Each subquestion should be independently gradable
 
@@ -698,7 +749,6 @@ class AssignmentGenerator:
             - EVERY subquestion at ALL nesting levels MUST have:
               * A complete correctAnswer
               * A detailed rubric for grading
-              * An explanation of the answer
             - Never leave subquestion answers or rubrics empty
             - Each subquestion should be independently gradable
 
@@ -744,8 +794,6 @@ class AssignmentGenerator:
                 question["correctAnswer"] = self._sanitize_string(
                     question["correctAnswer"]
                 )
-            if "explanation" in question:
-                question["explanation"] = self._sanitize_string(question["explanation"])
             if "rubric" in question:
                 question["rubric"] = self._sanitize_string(question["rubric"])
             if "code" in question:
@@ -805,7 +853,6 @@ class AssignmentGenerator:
             question.setdefault("type", "multiple-choice")
             question.setdefault("points", 5)
             question.setdefault("difficulty", "medium")
-            question.setdefault("explanation", "No explanation provided")
             question.setdefault("order", i + 1)
 
             # Normalize "question" <-> "text" for frontend compatibility
@@ -853,6 +900,15 @@ class AssignmentGenerator:
             question.setdefault("requiredPartsCount", 0)
             question.setdefault("subquestions", [])
 
+            if not question.get("code"):
+                question["hasCode"] = False
+            else:
+                question["hasCode"] = True
+            if not question.get("diagram") or not question["diagram"].get("s3_url"):
+                question["hasDiagram"] = False
+            else:
+                question["hasDiagram"] = True
+
             # Fill defaults for subquestions too
             for j, sub in enumerate(question.get("subquestions", [])):
                 sub.setdefault("id", j + 1)
@@ -860,7 +916,6 @@ class AssignmentGenerator:
                 sub.setdefault("points", 1)
                 sub.setdefault("options", [])
                 sub.setdefault("correctAnswer", "")
-                sub.setdefault("explanation", "")
                 sub.setdefault("allowMultipleCorrect", False)
                 sub.setdefault("multipleCorrectAnswers", [])
                 sub.setdefault("equations", [])
@@ -881,6 +936,15 @@ class AssignmentGenerator:
                 elif "text" in sub and "question" not in sub:
                     sub["question"] = sub["text"]
 
+                if not sub.get("code"):
+                    sub["hasCode"] = False
+                else:
+                    sub["hasCode"] = True
+                if not sub.get("diagram") or not sub["diagram"].get("s3_url"):
+                    sub["hasDiagram"] = False
+                else:
+                    sub["hasDiagram"] = True
+
                 # Fill defaults for Level 3 nested subquestions
                 for k, nested_sub in enumerate(sub.get("subquestions", [])):
                     nested_sub.setdefault("id", k + 1)
@@ -888,7 +952,6 @@ class AssignmentGenerator:
                     nested_sub.setdefault("points", 1)
                     nested_sub.setdefault("options", [])
                     nested_sub.setdefault("correctAnswer", "")
-                    nested_sub.setdefault("explanation", "")
                     nested_sub.setdefault("allowMultipleCorrect", False)
                     nested_sub.setdefault("multipleCorrectAnswers", [])
                     nested_sub.setdefault("equations", [])
@@ -907,7 +970,16 @@ class AssignmentGenerator:
                         nested_sub["text"] = nested_sub["question"]
                     elif "text" in nested_sub and "question" not in nested_sub:
                         nested_sub["question"] = nested_sub["text"]
-
+                    if not nested_sub.get("code"):
+                        nested_sub["hasCode"] = False
+                    else:
+                        nested_sub["hasCode"] = True
+                    if not nested_sub.get("diagram") or not nested_sub["diagram"].get(
+                        "s3_url"
+                    ):
+                        nested_sub["hasDiagram"] = False
+                    else:
+                        nested_sub["hasDiagram"] = True
         return questions
 
     def _generate_title(self, generation_options: Dict[str, Any]) -> str:
