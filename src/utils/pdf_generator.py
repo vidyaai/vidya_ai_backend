@@ -409,64 +409,68 @@ class AssignmentPDFGenerator:
         """
         Convert plain text mathematical notation to LaTeX format.
         Handles subscripts (x_1), superscripts (x^2), scientific notation, and special characters.
-        
+
         Args:
             text: Text with plain subscript/superscript notation
-            
+
         Returns:
             Text with notation converted to LaTeX $...$ format
         """
         if not text:
             return ""
-        
+
         # Handle scientific notation with units: 7.0×10^−4 °C^−1
         # This must come FIRST before we process degree symbols separately
-        scientific_with_units_pattern = r'([\d.]+)\s*[×x]\s*10\^([−\-]?\d+)\s*°C\^([−\-]?\d+)'
-        
+        scientific_with_units_pattern = (
+            r"([\d.]+)\s*[×x]\s*10\^([−\-]?\d+)\s*°C\^([−\-]?\d+)"
+        )
+
         def replace_scientific_with_units(match):
             coefficient = match.group(1)
-            exponent = match.group(2).replace('−', '-')
-            unit_exp = match.group(3).replace('−', '-')
-            return f'${coefficient}\\times 10^{{{exponent}}}$ °C$^{{{unit_exp}}}$'
-        
-        text = re.sub(scientific_with_units_pattern, replace_scientific_with_units, text)
-        
+            exponent = match.group(2).replace("−", "-")
+            unit_exp = match.group(3).replace("−", "-")
+            return f"${coefficient}\\times 10^{{{exponent}}}$ °C$^{{{unit_exp}}}$"
+
+        text = re.sub(
+            scientific_with_units_pattern, replace_scientific_with_units, text
+        )
+
         # Now handle degree symbols for regular temperature values
         # Use HTML entity instead of LaTeX for better rendering
-        text = text.replace('°C', '°C')
-        text = text.replace('°', '°')
-        
+        text = text.replace("°C", "°C")
+        text = text.replace("°", "°")
+
         # Handle regular scientific notation: 7.0×10^−4 or 7.0×10^-4
-        scientific_pattern = r'([\d.]+)\s*[×x]\s*10\^([−\-]?\d+)'
-        
+        scientific_pattern = r"([\d.]+)\s*[×x]\s*10\^([−\-]?\d+)"
+
         def replace_scientific(match):
             coefficient = match.group(1)
-            exponent = match.group(2).replace('−', '-')
-            return f'${coefficient}\\times 10^{{{exponent}}}$'
-        
+            exponent = match.group(2).replace("−", "-")
+            return f"${coefficient}\\times 10^{{{exponent}}}$"
+
         text = re.sub(scientific_pattern, replace_scientific, text)
-        
+
         # Pattern to match variable names with subscripts/superscripts
         # Matches patterns like: ρ_o, ρ_w, m^3, V_th, X_L, β_o, p_20, etc.
-        math_pattern = r'([A-Za-zΔΔα-ωΑ-Ωβρ]+)([_^])([A-Za-z0-9]+)'
-        
+        math_pattern = r"([A-Za-zΔΔα-ωΑ-Ωβρ]+)([_^])([A-Za-z0-9]+)"
+
         def replace_math(match):
             base = match.group(1)
             operator = match.group(2)
             subscript = match.group(3)
-            
-            if operator == '_':
-                return f'${base}_{{{subscript}}}$'
+
+            if operator == "_":
+                return f"${base}_{{{subscript}}}$"
             else:  # ^
-                return f'${base}^{{{subscript}}}$'
-        
+                return f"${base}^{{{subscript}}}$"
+
         # Convert underscore/caret notation to LaTeX
         text = re.sub(math_pattern, replace_math, text)
-        
+
         # Clean up any double spaces or multiple $ signs next to each other
-        text = re.sub(r'\$\s*\$', ' ', text)
-        text = re.sub(r'\s+', ' ', text)
-        
+        text = re.sub(r"\$\s*\$", " ", text)
+        text = re.sub(r"\s+", " ", text)
+
         return text
 
     def process_question_text(self, text: str) -> str:
@@ -481,7 +485,7 @@ class AssignmentPDFGenerator:
         """
         if not text:
             return ""
-        
+
         # First convert plain text math notation to LaTeX
         text = self.convert_text_math_to_latex(text)
 
@@ -516,7 +520,9 @@ class AssignmentPDFGenerator:
         processed_text = re.sub(inline_pattern, replace_inline_equation, processed_text)
         processed_text = re.sub(
             r"\\\((.+?)\\\)",
-            lambda m: self.render_latex_equation(m.group(1), fontsize=11, is_display=False),
+            lambda m: self.render_latex_equation(
+                m.group(1), fontsize=11, is_display=False
+            ),
             processed_text,
         )
 
@@ -640,7 +646,17 @@ class AssignmentPDFGenerator:
             question_text = self.process_question_text(question.get("question", ""))
 
         question_type = question.get("type", "unknown")
-        points = question.get("points", 0)
+        if question_type == "multi-part":
+            points = 0
+            for subq in question.get("subquestions", []):
+                if subq.get("type") == "multi-part":
+                    points += sum(
+                        sq.get("points", 0) for sq in subq.get("subquestions", [])
+                    )
+                else:
+                    points += subq.get("points", 0)
+        else:
+            points = question.get("points", 0)
         difficulty = question.get("difficulty", "medium")
 
         # Difficulty badge colors
@@ -665,15 +681,7 @@ class AssignmentPDFGenerator:
         """
 
         # Add code block if present
-        # For code-writing questions, use starterCode (student template) instead of
-        # code (which may contain the solution). For other types, code is reference code.
-        if question_type in ("code-writing", "code_writing"):
-            starter_code = question.get("starterCode", "")
-            if starter_code:
-                html += f"""
-            <div class="question-code" style="background: #f3f4f6; padding: 10px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; margin-top: 10px;">{starter_code}</div>
-            """
-        elif question.get("hasCode") and question.get("code"):
+        if question.get("hasCode") and question.get("code"):
             code_text = question["code"]
             html += f"""
             <div class="question-code" style="background: #f3f4f6; padding: 10px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; margin-top: 10px;">{code_text}</div>
@@ -708,6 +716,15 @@ class AssignmentPDFGenerator:
                 html += f'<div class="option"><strong>{letter}.</strong> {option_text}</div>'
             html += "</div>"
 
+        # Add true and false options for true/false questions
+        if question_type == "true-false":
+            html += """
+            <div class="question-options">
+                <div class="option"><strong>☐</strong> True</div>
+                <div class="option"><strong>☐</strong> False</div>
+            </div>
+            """
+
         # Handle subquestions for multi-part questions
         if question.get("subquestions"):
             html += '<div class="subquestions">'
@@ -724,24 +741,27 @@ class AssignmentPDFGenerator:
                 else:
                     subq_text = self.process_question_text(subq.get("question", ""))
 
-                subq_points = subq.get("points", 0)
                 subq_type = subq.get("type", "short-answer")
+                if subq_type == "multi-part":
+                    subq_points = sum(
+                        sq.get("points", 0) for sq in subq.get("subquestions", [])
+                    )
+                else:
+                    subq_points = subq.get("points", 0)
 
                 html += f"""
                 <div class="subquestion">
-                    <h4>Part {chr(97 + i)}) ({subq_points} points)</h4>
+                    <div class="subquestion-header">
+                        <h4>Part {question_num}.{i+1}</h4>
+                        <div class="question-meta">
+                            <span class="points">{subq_points} points</span>
+                        </div>
+                    </div>
                     <div class="subquestion-text">{subq_text}</div>
                 """
 
                 # handle subquestion code block if present
-                # For code-writing subquestions, use starterCode instead of code
-                if subq_type in ("code-writing", "code_writing"):
-                    starter_code = subq.get("starterCode", "")
-                    if starter_code:
-                        html += f"""
-                    <div class="subquestion-code" style="background: #f3f4f6; padding: 10px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; margin-top: 10px;">{starter_code}</div>
-                    """
-                elif subq.get("hasCode") and subq.get("code"):
+                if subq.get("hasCode") and subq.get("code"):
                     code_text = subq["code"]
                     html += f"""
                     <div class="subquestion-code" style="background: #f3f4f6; padding: 10px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; margin-top: 10px;">{code_text}</div>
@@ -773,6 +793,15 @@ class AssignmentPDFGenerator:
                         html += f'<div class="option"><strong>{letter}.</strong> {option_text}</div>'
                     html += "</div>"
 
+                # Add true/false options for true/false subquestions
+                if subq_type == "true-false":
+                    html += """
+                    <div class="question-options">
+                        <div class="option"><strong>☐</strong> True</div>
+                        <div class="option"><strong>☐</strong> False</div>
+                    </div>
+                    """
+
                 # Handle sub-subquestions
                 if subq.get("subquestions"):
                     html += '<div class="sub-subquestions" style="padding-left: 20px; margin-top: 10px;">'
@@ -793,10 +822,13 @@ class AssignmentPDFGenerator:
 
                         html += f"""
                         <div class="sub-subquestion" style="margin-bottom: 12px;">
+                          <div class="sub-subquestion-header" style="display: flex; align-items: center; justify-content: space-between;">
                             <h5 style="margin: 0 0 6px 0; font-size: 10.5pt; color: #666;">
-                                Part {chr(97 + i)}.{k + 1}) ({sub_subq_points} points)
+                                Part {question_num}.{i+1}.{k + 1}
                             </h5>
-                            <div class="sub-subquestion-text">{sub_subq_text}</div>
+                            <span class="points">{sub_subq_points} points</span>
+                          </div>
+                          <div class="sub-subquestion-text">{sub_subq_text}</div>
                         """
 
                         # Add options for multiple choice sub-subquestions
@@ -813,10 +845,21 @@ class AssignmentPDFGenerator:
                                         )
                                     )
                                 else:
-                                    option_text = self.process_question_text(option_clean)
+                                    option_text = self.process_question_text(
+                                        option_clean
+                                    )
                                 letter = chr(65 + m)  # A, B, C, D...
                                 html += f'<div class="option"><strong>{letter}.</strong> {option_text}</div>'
                             html += "</div>"
+
+                        # Add true/false options for true/false sub-subquestions
+                        if sub_subq_type == "true-false":
+                            html += """
+                            <div class="question-options">
+                                <div class="option"><strong>☐</strong> True</div>
+                                <div class="option"><strong>☐</strong> False</div>
+                            </div>
+                            """
 
                         html += """
                             <div class="answer-space">
@@ -937,6 +980,9 @@ class AssignmentPDFGenerator:
 
         .question-header {
             margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .question-header h3 {
@@ -944,15 +990,27 @@ class AssignmentPDFGenerator:
             font-size: 11pt;
             color: #000;
             font-weight: bold;
-            display: inline;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .question-meta {
-            display: none; /* Hide meta information for clean paper look */
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
-        .points, .difficulty, .type {
-            display: none; /* Hide badges for professional appearance */
+        .points {
+            font-size: 9pt;
+            color: #555;
+            margin-right: 8px;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .difficulty, .type {
+            display: none; /* Hide difficulty and type for cleaner look, can be enabled if desired */
         }
 
         .question-text {
@@ -997,6 +1055,12 @@ class AssignmentPDFGenerator:
             margin: 0 0 8px 0;
             font-size: 11pt;
             color: #555;
+        }
+
+        .subquestion-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .footer-info {
