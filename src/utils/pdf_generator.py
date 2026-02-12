@@ -692,9 +692,14 @@ class AssignmentPDFGenerator:
             diagram_url = s3_presign_url(question["diagram"]["s3_key"])
             diagram_base64 = self.download_image_as_base64(diagram_url)
             if diagram_base64:
+                # Use diagram description as caption if available
+                caption_text = question.get("diagram", {}).get("description", "")
+                if not caption_text:
+                    caption_text = f"Circuit diagram for Question {question_num}"
                 html += f"""
-                <div class="question-diagram">
-                    <img src="{diagram_base64}" alt="Question diagram" style="max-width: 100%; height: auto;">
+                <div class="figure-container">
+                    <img src="{diagram_base64}" alt="Question diagram">
+                    <div class="figure-caption">Fig. {question_num}. {caption_text}</div>
                 </div>
                 """
 
@@ -772,9 +777,11 @@ class AssignmentPDFGenerator:
                     diagram_url = s3_presign_url(subq["diagram"]["s3_key"])
                     diagram_base64 = self.download_image_as_base64(diagram_url)
                     if diagram_base64:
+                        sub_caption = subq.get("diagram", {}).get("description", f"Circuit diagram for Part {question_num}.{i+1}")
                         html += f"""
-                        <div class="subquestion-diagram">
-                            <img src="{diagram_base64}" alt="Subquestion diagram" style="max-width: 100%; height: auto;">
+                        <div class="figure-container">
+                            <img src="{diagram_base64}" alt="Subquestion diagram">
+                            <div class="figure-caption">Fig. {question_num}.{i+1}. {sub_caption}</div>
                         </div>
                         """
 
@@ -881,23 +888,24 @@ class AssignmentPDFGenerator:
         return """
         @page {
             size: A4;
-            margin: 1in;
+            margin: 0.75in 0.85in;
             @top-center {
                 content: string(doc-title);
-                font-size: 10pt;
-                color: #666;
+                font-size: 9pt;
+                color: #888;
+                font-style: italic;
             }
             @bottom-center {
                 content: "Page " counter(page) " of " counter(pages);
-                font-size: 9pt;
-                color: #666;
+                font-size: 8pt;
+                color: #888;
             }
         }
 
         body {
             font-family: "Times New Roman", Times, serif;
-            font-size: 11pt;
-            line-height: 1.3;
+            font-size: 10.5pt;
+            line-height: 1.35;
             color: #000;
             margin: 0;
             padding: 0;
@@ -945,23 +953,24 @@ class AssignmentPDFGenerator:
 
         .document-header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             padding-bottom: 10px;
+            border-bottom: 1pt solid #000;
         }
 
         .document-title {
-            font-size: 14pt;
+            font-size: 16pt;
             font-weight: bold;
             margin-bottom: 6px;
             string-set: doc-title content();
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
         }
 
         .document-meta {
-            font-size: 10pt;
+            font-size: 9.5pt;
             color: #333;
-            margin-bottom: 10px;
+            margin-bottom: 4px;
         }
 
         .instructions {
@@ -974,12 +983,14 @@ class AssignmentPDFGenerator:
         }
 
         .question {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
+            padding-top: 6px;
+            border-top: 0.25pt solid #ccc;
             page-break-inside: avoid;
         }
 
         .question-header {
-            margin-bottom: 8px;
+            margin-bottom: 4px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -987,7 +998,7 @@ class AssignmentPDFGenerator:
 
         .question-header h3 {
             margin: 0;
-            font-size: 11pt;
+            font-size: 10.5pt;
             color: #000;
             font-weight: bold;
             display: flex;
@@ -1014,8 +1025,8 @@ class AssignmentPDFGenerator:
         }
 
         .question-text {
-            margin-bottom: 10px;
-            line-height: 1.3;
+            margin-bottom: 6px;
+            line-height: 1.35;
             text-align: justify;
         }
 
@@ -1024,12 +1035,39 @@ class AssignmentPDFGenerator:
             margin: 15px 0;
         }
 
+        /* IEEE-style figure container */
+        .figure-container {
+            text-align: center;
+            margin: 12px auto;
+            padding: 8px;
+            max-width: 55%;
+            border: 0.5pt solid #ccc;
+            background: #fafafa;
+            page-break-inside: avoid;
+        }
+
+        .figure-container img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .figure-caption {
+            font-size: 9pt;
+            font-style: normal;
+            color: #333;
+            margin-top: 6px;
+            text-align: center;
+            line-height: 1.3;
+        }
+
         .question-options {
-            margin: 15px 0;
+            margin: 8px 0;
         }
 
         .option {
-            margin: 8px 0;
+            margin: 4px 0;
             padding-left: 20px;
         }
 
@@ -1043,17 +1081,17 @@ class AssignmentPDFGenerator:
         }
 
         .subquestions {
-            margin-top: 15px;
+            margin-top: 8px;
             padding-left: 20px;
         }
 
         .subquestion {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
 
         .subquestion h4 {
-            margin: 0 0 8px 0;
-            font-size: 11pt;
+            margin: 0 0 4px 0;
+            font-size: 10.5pt;
             color: #555;
         }
 
@@ -1064,12 +1102,13 @@ class AssignmentPDFGenerator:
         }
 
         .footer-info {
-            margin-top: 40px;
-            border-top: 1px solid #ddd;
-            padding-top: 15px;
-            font-size: 9pt;
-            color: #666;
+            margin-top: 20px;
+            border-top: 0.5pt solid #999;
+            padding-top: 8px;
+            font-size: 8pt;
+            color: #888;
             text-align: center;
+            font-style: italic;
         }
 
         /* Professional Mathematical Text Styling */
@@ -1157,8 +1196,8 @@ class AssignmentPDFGenerator:
         /* IEEE paper styling */
         .question-text {
             text-align: justify;
-            line-height: 1.3;
-            font-size: 11pt;
+            line-height: 1.35;
+            font-size: 10.5pt;
         }
 
         .question-text p {
@@ -1176,10 +1215,12 @@ class AssignmentPDFGenerator:
             margin-right: 6px;
         }
 
-        /* Professional diagram styling */
+        /* Professional diagram styling (legacy) */
         .question-diagram img {
-            max-width: 100%;
+            max-width: 60%;
             height: auto;
+            display: block;
+            margin: 0 auto;
         }
 
         /* Remove answer spaces completely */

@@ -1,0 +1,1 @@
+Make a problem regarding heat transfer from a silicon chip with an aluminum substrate at the bottom and exposed to air on either side. Add a figure to visualize the problem.
