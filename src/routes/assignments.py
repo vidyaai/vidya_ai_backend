@@ -20,6 +20,8 @@ import string
 import uuid
 import os
 import mimetypes
+import threading
+import tempfile
 
 from utils.db import get_db
 from controllers.config import logger, s3_client, AWS_S3_BUCKET
@@ -53,6 +55,100 @@ from utils.pdf_generator import AssignmentPDFGenerator
 from utils.google_forms_service import get_google_forms_service
 
 router = APIRouter()
+
+
+def process_pdf_in_background(
+    submission_id: str, s3_key: str, assignment_questions: List[dict]
+):
+    """Process PDF in background thread and update submission status"""
+    from utils.db import get_db_session
+    from utils.pdf_answer_processor import PDFAnswerProcessor
+    from sqlalchemy.orm.attributes import flag_modified
+
+    db_session = None
+    try:
+        # Create new database session for background thread
+        db_session = get_db_session()
+
+        submission = (
+            db_session.query(AssignmentSubmission)
+            .filter(AssignmentSubmission.id == submission_id)
+            .first()
+        )
+
+        if not submission:
+            logger.error(
+                f"Submission {submission_id} not found for background processing"
+            )
+            return
+
+        logger.info(
+            f"Starting background PDF processing for submission {submission_id}"
+        )
+
+        processor = PDFAnswerProcessor()
+
+        # Download PDF from S3 temporarily for processing
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            s3_client.download_fileobj(AWS_S3_BUCKET, s3_key, tmp)
+            tmp_pdf_path = tmp.name
+
+        # Extract answers from PDF
+        answers_from_pdf = processor.process_pdf_to_json(
+            tmp_pdf_path, assignment_questions
+        )
+
+        # Extract and upload diagrams
+        updated_answers = processor.extract_and_upload_diagrams(
+            submission_id=submission.id,
+            pdf_s3_key=s3_key,
+            answers=answers_from_pdf,
+            s3_client=s3_client,
+            s3_bucket=AWS_S3_BUCKET,
+            s3_upload_func=s3_upload_file,
+            logger=logger,
+        )
+
+        # Update submission with extracted answers and set status to submitted
+        submission.answers = updated_answers
+        flag_modified(submission, "answers")
+        submission.status = "submitted"
+        submission.updated_at = datetime.now(timezone.utc)
+        db_session.commit()
+
+        # Clean up temp file
+        if os.path.exists(tmp_pdf_path):
+            os.unlink(tmp_pdf_path)
+
+        logger.info(
+            f"Completed background PDF processing for submission {submission_id}"
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Background PDF processing failed for submission {submission_id}: {str(e)}"
+        )
+
+        if db_session:
+            try:
+                submission = (
+                    db_session.query(AssignmentSubmission)
+                    .filter(AssignmentSubmission.id == submission_id)
+                    .first()
+                )
+
+                if submission:
+                    submission.status = "failed"
+                    submission.updated_at = datetime.now(timezone.utc)
+                    db_session.commit()
+            except Exception as update_error:
+                logger.error(
+                    f"Failed to update submission status to failed: {str(update_error)}"
+                )
+
+    finally:
+        if db_session:
+            db_session.close()
 
 
 def generate_share_token() -> str:
@@ -2399,6 +2495,198 @@ async def save_assignment_draft(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save draft",
+        )
+
+
+@router.post("/api/assignments/{assignment_id}/bulk-upload-pdfs")
+async def bulk_upload_pdfs(
+    assignment_id: str,
+    files: List[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Bulk upload PDF files as on-behalf submissions (assignment owner only)"""
+    try:
+        user_id = current_user["uid"]
+        logger.info(
+            f"Bulk uploading PDFs for assignment {assignment_id} by user: {user_id}"
+        )
+
+        # Verify assignment exists and user is owner
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+            )
+
+        # Only assignment owner can do bulk uploads (for now)
+        if assignment.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only assignment owner can perform bulk uploads",
+            )
+
+        if not files:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="No files provided"
+            )
+
+        successful_uploads = []
+        failed_uploads = []
+
+        for file in files:
+            try:
+                # Validate file type and size
+                if not file.content_type == "application/pdf":
+                    failed_uploads.append(
+                        {
+                            "filename": file.filename,
+                            "error": "Invalid file type. Only PDF files are allowed.",
+                        }
+                    )
+                    continue
+
+                # Read file content
+                file_content = await file.read()
+                if len(file_content) > 10 * 1024 * 1024:  # 10MB limit
+                    failed_uploads.append(
+                        {
+                            "filename": file.filename,
+                            "error": "File size exceeds 10MB limit.",
+                        }
+                    )
+                    continue
+
+                # Extract student name from filename (remove .pdf extension)
+                student_name = file.filename.replace(".pdf", "").strip()
+                if not student_name:
+                    failed_uploads.append(
+                        {
+                            "filename": file.filename,
+                            "error": "Invalid filename. Cannot extract student name.",
+                        }
+                    )
+                    continue
+
+                # Create unique user_id for this submission (filename-based)
+                import tempfile
+
+                submission_user_id = f"bulk_{student_name}_{assignment_id}_{datetime.now().strftime('%Y%m%d')}"
+
+                # Upload file to S3
+                tmp_path = None
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=".pdf"
+                    ) as tmp:
+                        tmp.write(file_content)
+                        tmp_path = tmp.name
+
+                    file_id = str(uuid.uuid4())
+                    s3_key = f"assignments/{assignment_id}/uploads/{file_id}.pdf"
+                    s3_upload_file(
+                        tmp_path,
+                        s3_key,
+                        content_type="application/pdf",
+                    )
+                finally:
+                    if tmp_path and os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+
+                # Create submitted_files metadata
+                submitted_files = [
+                    {
+                        "s3_key": s3_key,
+                        "file_id": file_id,
+                        "filename": file.filename,
+                        "content_type": "application/pdf",
+                        "size": len(file_content),
+                        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                ]
+
+                # Check if submission already exists for this filename-based user_id
+                existing_submission = (
+                    db.query(AssignmentSubmission)
+                    .filter(
+                        and_(
+                            AssignmentSubmission.assignment_id == assignment_id,
+                            AssignmentSubmission.user_id == submission_user_id,
+                        )
+                    )
+                    .first()
+                )
+
+                if existing_submission:
+                    # Update existing submission
+                    existing_submission.submitted_files = submitted_files
+                    existing_submission.submission_method = "on-behalf"
+                    existing_submission.submitted_by_user_id = user_id
+                    existing_submission.status = "processing"  # Set to processing
+                    existing_submission.submitted_at = datetime.now(timezone.utc)
+                    existing_submission.updated_at = datetime.now(timezone.utc)
+                    submission = existing_submission
+                else:
+                    # Create new submission
+                    submission = AssignmentSubmission(
+                        assignment_id=assignment_id,
+                        user_id=submission_user_id,  # Filename-based identifier
+                        submitted_by_user_id=user_id,  # Actual person who uploaded
+                        answers={},  # Will be populated by PDF processing
+                        submission_method="on-behalf",
+                        submitted_files=submitted_files,
+                        status="processing",  # Start with processing status
+                        submitted_at=datetime.now(timezone.utc),
+                    )
+                    db.add(submission)
+
+                db.commit()
+                db.refresh(submission)
+
+                # Schedule PDF processing in background thread
+                thread = threading.Thread(
+                    target=process_pdf_in_background,
+                    args=(submission.id, s3_key, assignment.questions or []),
+                )
+                thread.daemon = True
+                thread.start()
+
+                successful_uploads.append(
+                    {
+                        "filename": file.filename,
+                        "student_name": student_name,
+                        "submission_id": submission.id,
+                    }
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to upload {file.filename}: {str(e)}")
+                failed_uploads.append({"filename": file.filename, "error": str(e)})
+                continue
+
+        return {
+            "message": f"Processed {len(files)} files",
+            "successful_count": len(successful_uploads),
+            "failed_count": len(failed_uploads),
+            "successful_uploads": successful_uploads,
+            "failed_uploads": failed_uploads,
+            "errors": [
+                f"{item['filename']}: {item['error']}" for item in failed_uploads
+            ]
+            if failed_uploads
+            else [],
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Error in bulk PDF upload for assignment {assignment_id}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload PDF files",
         )
 
 
