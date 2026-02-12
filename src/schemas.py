@@ -449,6 +449,9 @@ class AssignmentSubmissionOut(BaseModel):
     id: str
     assignment_id: str
     user_id: str
+    submitted_by_user_id: Optional[
+        str
+    ] = None  # Who submitted on behalf (for bulk uploads)
     answers: dict
     submission_method: str
     submitted_files: Optional[List[dict]] = None

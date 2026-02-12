@@ -300,7 +300,9 @@ def grade_submission_background(
             "id": assignment.id,
             "title": assignment.title,
             "questions": assignment.questions or [],
-            "ai_penalty_percentage": assignment.ai_penalty_percentage or 50.0,
+            "ai_penalty_percentage": assignment.ai_penalty_percentage
+            if assignment.ai_penalty_percentage is not None
+            else 50.0,
         }
 
         # Run grading
