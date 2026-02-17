@@ -23,7 +23,7 @@ DIAGRAM_TOOLS = [
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "Complete Python code using matplotlib to generate the diagram. Must include 'import matplotlib.pyplot as plt' and 'plt.savefig('output.png', dpi=150, bbox_inches='tight')'",
+                        "description": "Complete Python code using matplotlib to generate the diagram. Must include 'import matplotlib.pyplot as plt' and 'plt.savefig('output.png', dpi=200, bbox_inches='tight')'",
                     },
                     "description": {
                         "type": "string",
@@ -44,7 +44,7 @@ DIAGRAM_TOOLS = [
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "Complete Python code using networkx and matplotlib to generate the diagram. Must include necessary imports and 'plt.savefig('output.png', dpi=150, bbox_inches='tight')'",
+                        "description": "Complete Python code using networkx and matplotlib to generate the diagram. Must include necessary imports and 'plt.savefig('output.png', dpi=200, bbox_inches='tight')'",
                     },
                     "description": {
                         "type": "string",
@@ -65,7 +65,7 @@ DIAGRAM_TOOLS = [
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "Complete Python code using schemdraw to generate the circuit diagram. Must include 'import schemdraw' and save the drawing with 'd.save('output.png', dpi=150)'",
+                        "description": "Complete Python code using schemdraw to generate the circuit diagram. Must include 'import schemdraw' and save the drawing with 'd.save('output.png', dpi=200)'",
                     },
                     "description": {
                         "type": "string",
@@ -80,7 +80,7 @@ DIAGRAM_TOOLS = [
         "type": "function",
         "function": {
             "name": "claude_code_tool",
-            "description": "RECOMMENDED: Use Claude 3.5 Sonnet to generate diagram code for ANY domain. Works for: physics, electrical, computer science, mathematics, chemistry, biology, mechanical, civil - literally ANY technical diagram. Claude generates clean matplotlib/schemdraw/networkx code which is then executed for perfect accuracy.",
+            "description": "RECOMMENDED: Use Claude to generate diagram code for any STEM domain. Works for: physics, mechanical, CS data structures, mathematics, chemistry, civil, biology — any technical diagram that is NOT a circuit schematic. Claude generates clean matplotlib/schemdraw/networkx code executed for technical accuracy.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -110,7 +110,7 @@ DIAGRAM_TOOLS = [
         "type": "function",
         "function": {
             "name": "svg_circuit_tool",
-            "description": "BEST FOR ALL CIRCUITS: Generate professional, textbook-quality circuit diagrams using Claude SVG generation. Supports BOTH: (1) IEEE block-level digital logic gate symbols (AND, OR, NOT, NAND, NOR, XOR gate shapes) and (2) CMOS transistor-level circuits with vertical layouts (VDD/PMOS/NMOS/GND). Use for: ANY circuit diagram including digital logic gates, combinational/sequential circuits, CMOS inverters, NAND/NOR gates, push-pull networks, analog circuits. STRONGLY PREFERRED over schemdraw_tool.",
+            "description": "Generate professional circuit/schematic diagrams via Claude SVG. Best for: electrical circuits, digital logic gates, ALU schematics, gate-level computer engineering diagrams. Supports IEEE block-level gate symbols (AND, OR, NOT, NAND, NOR, XOR) and CMOS transistor-level circuits with vertical VDD/PMOS/NMOS/GND layouts. Produces clean orthogonal wiring with standard component symbols. Preferred over schemdraw_tool for all circuit diagrams.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -276,7 +276,8 @@ class DiagramTools:
         description: str,
         assignment_id: str,
         question_idx: int,
-        question_text: str = ""
+        question_text: str = "",
+        subject_guidance: str = "",
     ) -> Dict[str, Any]:
         """
         Generate diagram code using Claude 3.5 Sonnet, then execute it.
@@ -308,7 +309,8 @@ class DiagramTools:
                 question_text=question_text or description,
                 domain=domain,
                 diagram_type=diagram_type,
-                tool_type=tool_type
+                tool_type=tool_type,
+                subject_guidance=subject_guidance,
             )
 
             logger.info(f"Claude generated {len(code)} characters of {tool_type} code")
@@ -343,7 +345,8 @@ class DiagramTools:
         description: str,
         assignment_id: str,
         question_idx: int,
-        question_text: str = ""
+        question_text: str = "",
+        subject_context: str = "",
     ) -> Dict[str, Any]:
         """
         Generate professional circuit diagram using Claude SVG generation.
@@ -369,12 +372,13 @@ class DiagramTools:
                 from utils.svg_circuit_generator import SVGCircuitGenerator
                 self._svg_circuit_gen = SVGCircuitGenerator()
 
-            # Generate PNG via SVG pipeline
+            # Generate PNG via SVG pipeline (HD: 800px wide at 200 DPI)
             image_bytes = await self._svg_circuit_gen.generate_circuit_png(
                 question_text=question_text or description,
                 diagram_description=description,
-                output_width=400,
+                output_width=800,
                 dpi=200,
+                subject_context=subject_context,
             )
 
             # Upload to S3
@@ -595,7 +599,8 @@ class DiagramTools:
                     description=tool_arguments.get("description"),
                     assignment_id=assignment_id,
                     question_idx=question_idx,
-                    question_text=question_text
+                    question_text=question_text,
+                    subject_guidance=tool_arguments.get("subject_guidance", ""),
                 )
             elif tool_name == "matplotlib_tool":
                 return await self.matplotlib_tool(
@@ -624,6 +629,7 @@ class DiagramTools:
                     assignment_id=assignment_id,
                     question_idx=question_idx,
                     question_text=question_text,
+                    subject_context=tool_arguments.get("subject_context", ""),
                 )
             elif tool_name == "dalle_tool":
                 return await self.dalle_tool(

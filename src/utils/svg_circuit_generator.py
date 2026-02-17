@@ -89,8 +89,15 @@ class SVGCircuitGenerator:
    - Junction dots (filled circles, r=3) where 3+ wires meet
    - Connection nodes are small open circles (r=4, fill=white, stroke=black) for output terminals
 
-4. **Labels:**
+4. **Labels (MUST be readable):**
    - Use clear sans-serif font (font-family="Arial, Helvetica, sans-serif")
+   - **TEXT BACKGROUND (MANDATORY):** Every text label MUST have a white background rectangle behind it for readability. Use this pattern:
+     ```svg
+     <!-- White background rect behind text, slightly larger than text -->
+     <rect x="TEXT_X-4" y="TEXT_Y-14" width="APPROX_TEXT_WIDTH+8" height="18" rx="3" fill="white" fill-opacity="0.9" stroke="#ccc" stroke-width="0.5"/>
+     <text x="TEXT_X" y="TEXT_Y" font-family="Arial" font-size="15">Label</text>
+     ```
+   - For every `<text>` element, place a `<rect>` immediately before it with white fill
    - Input labels (A, B, Vin) on the LEFT side
    - Output labels (Out, Vout) on the RIGHT side
    - VDD/VSS labels at top/bottom
@@ -317,13 +324,22 @@ These diagrams are for STUDENT ASSIGNMENTS. The student must figure out the answ
 
 Return ONLY the SVG markup. No explanation. No markdown fences. Just pure SVG starting with <svg and ending with </svg>."""
 
-    def _build_user_prompt(self, question_text: str, diagram_description: str) -> str:
+    def _build_user_prompt(
+        self,
+        question_text: str,
+        diagram_description: str,
+        subject_context: str = "",
+    ) -> str:
+        subject_section = ""
+        if subject_context:
+            subject_section = f"\n**Subject Context:**\n{subject_context}\n"
+
         return f"""Generate a professional, textbook-quality SVG circuit diagram for this question:
 
 **Question:** {question_text}
 
 **Diagram Description:** {diagram_description}
-
+{subject_section}
 **Requirements:**
 1. If this is a CMOS transistor-level circuit: Use VERTICAL layout — VDD at top, GND/VSS at bottom, proper MOSFET symbols (bubble on PMOS gate, no bubble on NMOS)
 2. If this is a digital logic gate circuit (AND, OR, NOT, NAND, NOR, XOR): Use LEFT-TO-RIGHT flow with standard IEEE gate symbols (D-shaped AND, curved OR, triangle NOT with bubble, etc.)
@@ -347,6 +363,7 @@ Return ONLY the SVG markup. No explanations."""
         self,
         question_text: str,
         diagram_description: str = "",
+        subject_context: str = "",
     ) -> str:
         """
         Generate SVG markup for a circuit diagram using Claude.
@@ -372,7 +389,7 @@ Return ONLY the SVG markup. No explanations."""
                 system=self._build_system_prompt(),
                 messages=[{
                     "role": "user",
-                    "content": self._build_user_prompt(question_text, diagram_description)
+                    "content": self._build_user_prompt(question_text, diagram_description, subject_context)
                 }]
             )
 
@@ -437,6 +454,7 @@ Return ONLY the SVG markup. No explanations."""
         diagram_description: str = "",
         output_width: int = 400,
         dpi: int = 200,
+        subject_context: str = "",
     ) -> bytes:
         """
         Generate a circuit diagram as PNG bytes.
@@ -456,7 +474,7 @@ Return ONLY the SVG markup. No explanations."""
             raise RuntimeError("cairosvg is required for SVG→PNG conversion. Install with: pip install cairosvg")
 
         # Generate SVG
-        svg_content = await self.generate_circuit_svg(question_text, diagram_description)
+        svg_content = await self.generate_circuit_svg(question_text, diagram_description, subject_context)
 
         # Convert SVG → PNG
         try:

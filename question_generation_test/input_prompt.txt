@@ -1,25 +1,29 @@
-Generate a challenging problem involving a two-stage CMOS op-amp with Miller compensation.
+Open Channel Flow (Weir or Hydraulic Jump Figure)
 
-Provide:
+Generate a problem based on a hydraulic jump in a rectangular channel.
 
-First stage differential pair
+The figure must include:
 
-Second stage common-source
+Upstream depth (y1)
 
-Compensation capacitor with nulling resistor
+Downstream depth (y2)
 
-Load capacitance
+Flow direction
 
-Ask for:
+Channel width
 
-Open-loop DC gain
+Provide flow rate and gravitational acceleration.
 
-Pole-zero locations
+Ask students to:
 
-Phase margin
+Compute upstream Froude number
 
-Required compensation capacitor for 60° phase margin
+Determine downstream depth using momentum equation
 
-Slew rate
+Calculate energy loss across jump
 
-Include a labeled circuit diagram.
+Classify jump type
+
+Comment on design implications
+
+Include a labeled cross-sectional diagram.

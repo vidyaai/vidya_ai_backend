@@ -30,6 +30,8 @@ class DiagramReviewer:
         question_text: str,
         diagram_description: str,
         user_prompt_context: str = "",
+        domain: str = "",
+        diagram_type: str = "",
     ) -> Dict[str, Any]:
         """
         Review a generated diagram image for quality and prompt alignment.
@@ -40,6 +42,8 @@ class DiagramReviewer:
             diagram_description: The description used to generate the diagram
             user_prompt_context: The original user prompt for the assignment
                 (e.g., "digital logic gates at gate level")
+            domain: Subject domain (e.g., "mechanical", "electrical")
+            diagram_type: Type of diagram (e.g., "fluid_flow", "circuit_schematic")
 
         Returns:
             Dict with:
@@ -54,7 +58,8 @@ class DiagramReviewer:
             img_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
             review_prompt = self._build_review_prompt(
-                question_text, diagram_description, user_prompt_context
+                question_text, diagram_description, user_prompt_context,
+                domain=domain, diagram_type=diagram_type,
             )
 
             response = self.client.chat.completions.create(
@@ -143,7 +148,19 @@ Be STRICT about these failure criteria:
         question_text: str,
         diagram_description: str,
         user_prompt_context: str,
+        domain: str = "",
+        diagram_type: str = "",
     ) -> str:
+        style_hint_section = ""
+        if domain and diagram_type:
+            try:
+                from utils.subject_prompt_registry import SubjectPromptRegistry
+                hint = SubjectPromptRegistry().get_reviewer_style_hint(domain, diagram_type)
+                if hint:
+                    style_hint_section = f"\nDIAGRAM STYLE HINT: {hint}\n"
+            except Exception:
+                pass
+
         context_section = ""
         if user_prompt_context:
             context_section = f"""
@@ -160,7 +177,7 @@ the diagram MUST show block-level IEEE gate symbols, NOT CMOS transistor-level c
 QUESTION: {question_text}
 
 DIAGRAM DESCRIPTION (used to generate it): {diagram_description}
-{context_section}
+{style_hint_section}{context_section}
 Analyze the image and check:
 1. Does the diagram correctly represent what was described?
 2. Is the diagram style appropriate? (gate-level vs transistor-level)

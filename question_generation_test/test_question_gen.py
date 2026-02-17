@@ -5,7 +5,12 @@ Test script for programmatic assignment generation without UI
 Usage:
     python test_question_gen.py -input input_prompt.txt -subject electrical -level grad -pdf_gen True
     python test_question_gen.py -input input_prompt.txt -subject mechanical -level grad -pdf_gen True -engine ai
-    python test_question_gen.py -input input_prompt.txt -subject computer -level grad -pdf_gen True -engine nonai
+    python test_question_gen.py -input input_prompt.txt -subject cs -level grad -pdf_gen True -engine nonai
+    python test_question_gen.py -input input_prompt.txt -subject physics -level grad -pdf_gen True -engine ai -model pro
+    python test_question_gen.py -input input_prompt.txt -subject chemistry -level undergrad -pdf_gen True
+    python test_question_gen.py -input input_prompt.txt -subject computer_eng -level grad -pdf_gen True -engine ai
+
+Subjects: electrical, mechanical, cs, civil, math, physics, chemistry, computer_eng
 """
 
 import sys
@@ -99,8 +104,8 @@ def main():
     parser = argparse.ArgumentParser(description='Generate assignment questions programmatically')
     parser.add_argument('-input', '--input', required=True, help='Path to input prompt file')
     parser.add_argument('-subject', '--subject', required=True,
-                       choices=['electrical', 'mechanical', 'computer', 'civil', 'math'],
-                       help='Subject area: electrical, mechanical, computer, civil, or math')
+                       choices=['electrical', 'mechanical', 'cs', 'civil', 'math', 'physics', 'chemistry', 'computer_eng'],
+                       help='Subject area: electrical, mechanical, cs, civil, math, physics, chemistry, computer_eng')
     parser.add_argument('-level', '--level', required=True, choices=['undergrad', 'grad'],
                        help='Education level: undergrad or grad')
     parser.add_argument('-pdf_gen', '--pdf_gen', type=str, choices=['True', 'False'],

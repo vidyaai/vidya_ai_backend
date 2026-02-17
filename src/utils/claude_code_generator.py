@@ -58,7 +58,8 @@ class ClaudeCodeGenerator:
         question_text: str,
         domain: str,
         diagram_type: str,
-        tool_type: str = "matplotlib"
+        tool_type: str = "matplotlib",
+        subject_guidance: str = "",
     ) -> str:
         """
         Generate Python diagram code using Claude
@@ -68,6 +69,7 @@ class ClaudeCodeGenerator:
             domain: Domain (physics, electrical, computer_science, etc.)
             diagram_type: Specific diagram type
             tool_type: Library to use (matplotlib, schemdraw, networkx)
+            subject_guidance: Subject-specific code generation guidance from SubjectPromptRegistry
 
         Returns:
             Complete executable Python code
@@ -76,7 +78,7 @@ class ClaudeCodeGenerator:
 
         system_prompt = self._build_system_prompt()
         user_prompt = self._build_user_prompt(
-            question_text, domain, diagram_type, tool_type
+            question_text, domain, diagram_type, tool_type, subject_guidance
         )
 
         # Skip entirely if we already know the key is invalid
@@ -134,12 +136,41 @@ class ClaudeCodeGenerator:
    - Use correct syntax and library conventions
    - Add comments only for complex sections
 
-2. **Figure Size:**
-   - ALWAYS use compact size: figsize=(6, 4) or figsize=(5, 4)
-   - NEVER use large sizes like (10, 8) or (8, 6)
-   - Use DPI=100 for good quality without huge files
+2. **Figure Size & DPI — scale to complexity:**
+   - Simple diagram (single object, ≤3 labels): figsize=(8, 5)
+   - Standard (multi-component, FBD, beam): figsize=(10, 6)
+   - Complex (fluid flow, streamlines, truss, multi-label): figsize=(12, 8)
+   - Two-panel comparative (e.g. laminar vs turbulent): figsize=(14, 7) with subplots(1, 2)
+   - ALWAYS use DPI=200 for crisp, HD-quality output
+   - NEVER use figsize smaller than (8, 5)
 
-3. **Technical Accuracy:**
+3. **Textbook Quality Style (apply to ALL diagrams):**
+   - Prefer black/white or minimal color: black lines, white fill, light gray shading
+   - Set professional font sizes BEFORE creating the figure:
+     ```python
+     plt.rcParams.update({'font.size': 13, 'font.family': 'serif',
+                          'axes.titlesize': 16, 'axes.labelsize': 14,
+                          'xtick.labelsize': 12, 'ytick.labelsize': 12,
+                          'legend.fontsize': 12, 'lines.linewidth': 1.8})
+     ```
+   - **TEXT BACKGROUND BOX (MANDATORY):** ALL text labels MUST have a white background box so they are readable when placed on top of diagram elements:
+     ```python
+     # For ax.text():
+     ax.text(x, y, 'Label', fontsize=14, ha='center', va='center',
+             bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='gray', alpha=0.9))
+     # For ax.annotate():
+     ax.annotate('Label', xy=(x,y), xytext=(tx,ty),
+                 fontsize=13, ha='center',
+                 bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='gray', alpha=0.9),
+                 arrowprops=dict(arrowstyle='->', color='black'))
+     ```
+   - NEVER place bare text without bbox on a diagram — text MUST always be readable
+   - Use `ax.annotate()` with `arrowprops=dict(arrowstyle='->', color='black')` for labeled arrows
+   - Add ≥10% padding so labels never clip at figure edges
+   - Use `plt.tight_layout(pad=1.5)` before saving
+   - Save with: `plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')`
+
+4. **Technical Accuracy:**
    - Extract ALL values, dimensions, labels from the question
    - Use correct symbols and conventions for the domain
    - Label all components clearly with values
@@ -149,22 +180,34 @@ class ClaudeCodeGenerator:
 
 **MATPLOTLIB** (general plots, 2D diagrams, physics):
 ```python
+import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 
-fig, ax = plt.subplots(figsize=(6, 4))
+# Set HD textbook-quality style FIRST — large readable fonts
+plt.rcParams.update({'font.size': 13, 'font.family': 'serif',
+                     'axes.titlesize': 16, 'axes.labelsize': 14,
+                     'xtick.labelsize': 12, 'ytick.labelsize': 12,
+                     'legend.fontsize': 12, 'lines.linewidth': 1.8})
 
-# Your diagram code here
+# Scale figsize to complexity (see rule 2 above) — MINIMUM (8, 5)
+fig, ax = plt.subplots(figsize=(10, 6))  # adjust per complexity
+
 # Use patches.Rectangle, Circle, Polygon for shapes
-# Use FancyArrowPatch for arrows
-# Use ax.text() for labels
+# Use ax.annotate() with arrowprops for labeled arrows (NOT FancyArrowPatch for labels)
+# Use ax.text() only for standalone text with no arrow
+# MANDATORY: ALL text must have white background box for readability:
+#   bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='gray', alpha=0.9)
+# For dimension labels, use fontsize=14 or larger
+# For legend, use fontsize=12 with framealpha=0.9
 
 ax.set_xlim(0, 10)
 ax.set_ylim(0, 10)
 ax.set_aspect('equal')  # For geometric diagrams
-plt.tight_layout()
-plt.savefig('output.png', dpi=100, bbox_inches='tight')
+ax.axis('off')  # Hide axes for technical diagrams (NOT plots)
+plt.tight_layout(pad=1.5)
+plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')
 ```
 
 **SCHEMDRAW** (electrical circuits — schemdraw 0.19):
@@ -218,7 +261,7 @@ import schemdraw.elements as elm
 from schemdraw.util import Point
 
 with schemdraw.Drawing(show=False) as d:
-    d.config(fontsize=11, unit=3)
+    d.config(fontsize=13, unit=3)
 
     # === TOP-TO-BOTTOM vertical chain ===
     # 1. VDD at the very top
@@ -248,7 +291,7 @@ with schemdraw.Drawing(show=False) as d:
     # Output: goes RIGHT from middle node
     d.add(elm.Line().at(pmos.drain).right().length(1.5).label('Vout', loc='right'))
 
-    d.save('output.png', dpi=100)
+    d.save('output.png', dpi=200)
 ```
 
 ★ WORKING CMOS NAND GATE — VERTICAL layout, VDD top, GND bottom:
@@ -260,7 +303,7 @@ import schemdraw.elements as elm
 from schemdraw.util import Point
 
 with schemdraw.Drawing(show=False) as d:
-    d.config(fontsize=11, unit=3)
+    d.config(fontsize=13, unit=3)
 
     # === VERTICAL chain: VDD → PMOS (parallel) → NMOS (series) → GND ===
     # 1. VDD at top
@@ -297,7 +340,7 @@ with schemdraw.Drawing(show=False) as d:
 
     # Output goes RIGHT from middle node
     d.add(elm.Line().at(p1.drain).right().length(2).label('Vout', loc='right'))
-    d.save('output.png', dpi=100)
+    d.save('output.png', dpi=200)
 ```
 
 **NETWORKX** (graphs, trees, algorithms):
@@ -305,7 +348,8 @@ with schemdraw.Drawing(show=False) as d:
 import networkx as nx
 import matplotlib.pyplot as plt
 
-fig, ax = plt.subplots(figsize=(6, 4))
+plt.rcParams.update({'font.size': 13, 'font.family': 'serif'})
+fig, ax = plt.subplots(figsize=(10, 7))
 
 G = nx.Graph()  # or nx.DiGraph() for directed
 
@@ -316,12 +360,12 @@ G.add_edge('A', 'B', weight=5)
 # Choose layout
 pos = nx.spring_layout(G)  # or hierarchical_layout, circular_layout
 
-# Draw
+# Draw with large readable labels
 nx.draw(G, pos, with_labels=True, node_color='lightblue',
-        node_size=500, font_size=10, font_weight='bold')
+        node_size=700, font_size=13, font_weight='bold')
 
-plt.tight_layout()
-plt.savefig('output.png', dpi=100, bbox_inches='tight')
+plt.tight_layout(pad=1.5)
+plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')
 ```
 
 5. **Domain-Specific Requirements:**
@@ -330,7 +374,8 @@ plt.savefig('output.png', dpi=100, bbox_inches='tight')
 - For U-tube: Draw TWO vertical rectangles + horizontal connection
 - Show fluid layers with different colors
 - Label heights, pressures (P₁, P₂), fluid names
-- Use subscripts: ax.text(x, y, 'P₁', fontsize=14)
+- Use subscripts: ax.text(x, y, 'P₁', fontsize=14, bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='gray', alpha=0.9))
+- ALL dimension labels and annotations MUST have white background bbox
 
 **Electrical Circuits (schemdraw 0.19):**
 ⚠️  CRITICAL API RULES:
@@ -353,15 +398,16 @@ plt.savefig('output.png', dpi=100, bbox_inches='tight')
 
 **Data Structures:**
 - Use hierarchical layout for trees
-- Label nodes clearly
+- Label nodes clearly with bbox background
 - Show parent-child relationships
 - Use different colors for different types
 
 **Geometry/Physics:**
 - Use matplotlib.patches for shapes
 - Show dimensions with arrows (FancyArrowPatch)
-- Label angles, forces, distances
+- Label angles, forces, distances with bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='gray', alpha=0.9)
 - Use equal aspect ratio
+- ALL text annotations must have white background box for readability
 
 **Return ONLY Python code. No explanations, no markdown formatting (unless it's code block), no extra text.**"""
 
@@ -377,11 +423,16 @@ plt.savefig('output.png', dpi=100, bbox_inches='tight')
         question_text: str,
         domain: str,
         diagram_type: str,
-        tool_type: str
+        tool_type: str,
+        subject_guidance: str = "",
     ) -> str:
         """Build user prompt"""
 
         tool_guidance = self._get_tool_specific_guidance(tool_type, domain, diagram_type)
+
+        subject_section = ""
+        if subject_guidance:
+            subject_section = f"\n**Subject-Specific Guidance:**\n{subject_guidance}\n"
 
         return f"""Generate complete Python code to create this diagram:
 
@@ -391,15 +442,16 @@ plt.savefig('output.png', dpi=100, bbox_inches='tight')
 **Domain:** {domain}
 **Diagram Type:** {diagram_type}
 **Library to use:** {tool_type}
-
+{subject_section}
 {tool_guidance}
 
 **Requirements:**
-1. Use figsize=(6, 4) for compact size
+1. Scale figsize to diagram complexity (see system prompt rule 2 — MINIMUM (8,5), use (10,7) or (14,7) for fluid/complex diagrams)
 2. Extract ALL values, dimensions, labels from the question
-3. Use correct technical symbols and conventions
-4. Save to 'output.png' with dpi=100
-5. Make it textbook-quality professional
+3. Use correct technical symbols and conventions for the domain
+4. Apply textbook style: serif font, black/white palette, rcParams with font.size=13, axes.labelsize=14
+5. Save to 'output.png' with: plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')
+6. Use fontsize=14+ for dimension labels, axis labels, and annotations so text is readable in PDF
 
 Return ONLY the Python code, ready to execute."""
 

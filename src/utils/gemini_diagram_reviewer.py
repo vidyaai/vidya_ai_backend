@@ -67,6 +67,8 @@ class GeminiDiagramReviewer:
         question_text: str,
         diagram_description: str,
         user_prompt_context: str = "",
+        domain: str = "",
+        diagram_type: str = "",
     ) -> Dict[str, Any]:
         """
         Review a generated diagram image using Gemini 2.5 Pro vision.
@@ -104,7 +106,8 @@ class GeminiDiagramReviewer:
 
             # Build the review prompt
             review_prompt = self._build_review_prompt(
-                question_text, diagram_description, user_prompt_context
+                question_text, diagram_description, user_prompt_context,
+                domain=domain, diagram_type=diagram_type,
             )
 
             # Create image part from bytes
@@ -139,7 +142,20 @@ class GeminiDiagramReviewer:
         question_text: str,
         diagram_description: str,
         user_prompt_context: str,
+        domain: str = "",
+        diagram_type: str = "",
     ) -> str:
+        # Subject style hint — not a new pass/fail rule, just visual guidance
+        style_hint_section = ""
+        if domain and diagram_type:
+            try:
+                from utils.subject_prompt_registry import SubjectPromptRegistry
+                hint = SubjectPromptRegistry().get_reviewer_style_hint(domain, diagram_type)
+                if hint:
+                    style_hint_section = f"\nDIAGRAM STYLE HINT: {hint}\n"
+            except Exception:
+                pass
+
         context_section = ""
         if user_prompt_context:
             context_section = f"""
@@ -162,7 +178,7 @@ Review the attached diagram image and assess its quality.
 QUESTION: {question_text}
 
 DIAGRAM DESCRIPTION (used to generate it): {diagram_description}
-{context_section}
+{style_hint_section}{context_section}
 
 CHECK ONLY THE FOLLOWING — DO NOT check topology, circuit correctness, or domain knowledge:
 

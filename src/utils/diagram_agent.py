@@ -14,6 +14,9 @@ from openai import OpenAI
 from controllers.config import logger
 from utils.diagram_tools import DiagramTools, DIAGRAM_TOOLS
 from utils.diagram_reviewer import DiagramReviewer
+from utils.domain_router import DomainRouter
+from utils.subject_prompt_registry import SubjectPromptRegistry
+from utils.fallback_router import SubjectSpecificFallbackRouter
 
 
 def _repair_truncated_json(s: str) -> dict:
@@ -79,6 +82,11 @@ class DiagramAnalysisAgent:
         self.subject = subject.lower().strip()
         self.diagram_model = diagram_model.lower().strip()
 
+        # Subject-aware routing components
+        self.domain_router = DomainRouter(client=self.client)
+        self.prompt_registry = SubjectPromptRegistry()
+        self.fallback_router = SubjectSpecificFallbackRouter()
+
         # Select reviewer based on engine
         if self.engine in ("ai", "both"):
             from utils.gemini_diagram_reviewer import GeminiDiagramReviewer
@@ -88,22 +96,27 @@ class DiagramAnalysisAgent:
             self.reviewer = DiagramReviewer(client=self.client)
             logger.info("DiagramAnalysisAgent: engine=nonai → current flow + GPT-4o reviewer")
 
-    def _get_agent_prompt(self, has_diagram_analysis: bool) -> str:
+    def _get_agent_prompt(
+        self,
+        has_diagram_analysis: bool,
+        domain: str = "",
+        diagram_type: str = "",
+    ) -> str:
         """
         Get the system prompt for the diagram analysis agent.
 
         Args:
             has_diagram_analysis: Whether diagram-analysis question type is enabled
+            domain: Classified domain from DomainRouter (for subject-specific additions)
+            diagram_type: Classified diagram type from DomainRouter
 
         Returns:
             System prompt string
         """
-        # Always use intelligent mode that evaluates if diagrams add educational value
-        # The has_diagram_analysis flag only affects the target percentage
         target_guidance = "Aim for ~33-40% total" if has_diagram_analysis else "Use good judgment - quality over quantity"
         mode_name = "GENEROUS (33%+ target)" if has_diagram_analysis else "INTELLIGENT (quality-focused)"
 
-        return f"""You are a diagram analysis agent for educational assignments. Your role: add diagrams whenever they genuinely help students visualize and understand the problem.
+        base_prompt = f"""You are a diagram analysis agent for educational assignments. Your role: add diagrams whenever they genuinely help students visualize and understand the problem.
 
 OPERATING MODE: {mode_name}
 - Generate diagrams when they ADD EDUCATIONAL VALUE
@@ -117,179 +130,70 @@ YOUR TASK:
 2. Decide: Would a diagram significantly help the student understand or solve this problem?
 3. If YES, generate the diagram:
    a) Choose the appropriate tool:
-      - **svg_circuit_tool** (🏆 BEST FOR ALL CIRCUITS): Generates professional, textbook-quality vertical circuit diagrams via Claude SVG. Produces beautiful CMOS layouts with VDD on top, PMOS, output, NMOS, GND on bottom — like real textbook schematics. USE THIS FOR ALL electrical circuit diagrams (CMOS inverters, NAND/NOR gates, push-pull networks, amplifiers, any MOSFET/BJT circuit).
-      - **claude_code_tool** (RECOMMENDED for non-circuit diagrams): Use Claude to generate matplotlib/networkx code for physics, CS, math, chemistry, biology, mechanical diagrams. Works for everything except circuits.
+      - **svg_circuit_tool**: Generates professional circuit/schematic diagrams via Claude SVG. Best for: electrical circuits, digital logic, ALU schematics, gate-level computer engineering diagrams. Produces clean orthogonal wiring with standard component symbols.
+      - **claude_code_tool** (RECOMMENDED for most diagrams): Use Claude to generate matplotlib/networkx code for any technical domain — physics, CS, math, chemistry, biology, mechanical, civil. Highly versatile.
       - matplotlib_tool: Direct matplotlib code (ONLY if very simple plot)
-      - schemdraw_tool: AVOID entirely — produces horizontal, unprofessional layouts
+      - schemdraw_tool: AVOID entirely — produces unprofessional layouts
       - networkx_tool: Direct networkx code (ONLY if very simple graph)
       - dalle_tool: AVOID - use code-based tools for technical accuracy
-   b) For svg_circuit_tool: Provide a description of the CIRCUIT STRUCTURE only — gate types, connections, topology.
+   b) For svg_circuit_tool: Provide a description of the CIRCUIT STRUCTURE only.
       ⚠️ CRITICAL: NEVER include answer information in the description! This is a student assignment.
-      - Do NOT include output values ("output is 0") or boolean expressions ("F = A'B")
-      - Do NOT include specific input values ("A=1, B=0") — just say "inputs A and B"
-      - Describe ONLY: what gates, how they connect, what inputs/outputs are named
-      - Example GOOD: "Two-input AND gate with inputs A and B, output Y"
-      - Example BAD: "AND gate with A=1, B=0, output = 0"
+      - Do NOT include output values, boolean expressions, or specific input values
+      - Describe ONLY: what components, how they connect, what nodes are named
    c) For claude_code_tool: Specify domain, diagram_type, and tool_type (matplotlib/networkx)
-   d) For other tools: Generate ACCURATE, executable code with correct technical details
-   e) Rephrase question naturally to reference "the diagram below" or "shown below"
+   d) Rephrase question naturally to reference "the diagram below" or "shown below"
 
-   ⚠️  CRITICAL: For ANY circuit diagram, ALWAYS use svg_circuit_tool.
-   It produces vertical, textbook-quality schematics. Never use schemdraw_tool or claude_code_tool for circuits.
+WHEN TO ADD DIAGRAMS:
 
-WHEN TO ADD DIAGRAMS (Examples across disciplines):
+✅ Questions with physical setups, spatial configurations, or geometric relationships
+✅ Questions with multiple components that have labeled values and connections
+✅ Data structure questions (trees, graphs) — students need to see the structure
+✅ Questions where the setup is reused across multiple sub-questions
+✅ Questions where the original LLM suggested a diagram (strong hint)
 
-✅ PHYSICS/MECHANICS questions with physical setups:
-   - "Calculate pressure in a manometer with three fluids..." → Add U-tube manometer diagram showing two connected columns with fluid layers
-   - "Find the force on a beam with distributed load..." → Add beam diagram with forces
-   - "A fluid flows through a pipe with varying diameter..." → Add pipe diagram with dimensions
+❌ DO NOT ADD for pure theory, definitions, or abstract conceptual questions
+❌ DO NOT ADD for simple single-step calculations without spatial complexity
 
-✅ ELECTRICAL questions with circuits or configurations:
-   - "Calculate VDS for a MOSFET with RD=2kΩ..." → Add circuit diagram (use svg_circuit_tool)
-   - "Find the gain of this amplifier configuration..." → Add amplifier circuit (use svg_circuit_tool)
-   - "Determine operating point from I-V characteristics..." → Add I-V curve plot (use claude_code_tool with matplotlib)
-   - "CMOS inverter / NAND / NOR gate..." → Add circuit diagram (use svg_circuit_tool)
-   - "Push-pull network / complementary MOS..." → Add circuit diagram (use svg_circuit_tool)
-   NOTE: ALWAYS use svg_circuit_tool for circuit schematics. It produces professional vertical layouts.
-   Only use claude_code_tool with matplotlib for I-V curves, characteristic plots, or transfer functions.
-
-✅ NUMERICAL/CALCULATION questions describing specific setups:
-   - "A manometer uses water, mercury, and oil (SG=0.85)..." → Add labeled diagram
-   - "Three resistors are connected in series-parallel..." → Add circuit topology
-   - "Calculate flow rate through the nozzle shown..." → Add nozzle geometry
-
-✅ SHORT-ANSWER questions benefiting from visualization:
-   - "Explain how pressure varies in this manometer..." → Add manometer with pressure points
-   - "Describe current flow in this configuration..." → Add circuit with current paths
-   - "Analyze the binary tree's structure..." → Add tree diagram
-
-✅ MULTI-PART questions with consistent physical setup:
-   - If the setup is reused across subquestions → Add diagram for main question
-
-❌ DO NOT ADD DIAGRAMS for:
-- Pure conceptual/theoretical questions ("Explain the difference between...")
-- Definition questions ("What is threshold voltage?")
-- Derivations without specific configurations
-- Questions that work better with symbolic/abstract reasoning
-- Simple calculations without complex setups
-
-PROFESSOR'S JUDGMENT CRITERIA:
-Ask yourself: "If I were teaching this in class, would I draw this on the board?"
-✅ YES → Student needs to visualize the physical setup, geometry, or configuration
-✅ YES → Multiple components/fluids/elements with spatial relationships
-✅ YES → Numerical values assigned to specific parts of a system
-✅ NO → Pure theory, definitions, or abstract concepts
-✅ NO → Simple calculations without geometric/spatial complexity
+PROFESSOR'S JUDGMENT:
+Ask: "If I were teaching this in class, would I draw this on the board?"
 
 CRITICAL RULES:
-1. NEVER mention "image taken from page X" or reference source pages
+1. NEVER mention page numbers or source references
 2. Generate diagrams with CORRECT values, labels, and units from the question
-3. For fluid systems: Show fluid levels, densities (SG values), dimensions
-4. For circuits: Use correct component values and connection topology
-5. For plots: Accurate axis labels, scales, and curves
-6. Rephrase naturally: "For the manometer shown below" NOT "image from page 20"
-7. If the question ALREADY generated by the first LLM has diagram metadata (caption, page_number),
-   treat this as a STRONG HINT that a diagram would be valuable
+3. Rephrase naturally: "For the beam shown below" NOT "image from page 20"
+4. PRESERVE ALL numerical values and given data in the rephrased question
 
 DIAGRAM SIZE REQUIREMENTS:
-- Use SMALLER figure sizes to fit in assignments: figsize=(6, 4) or figsize=(5, 4)
-- NEVER use default large sizes like (10, 8) or (8, 6)
-- Keep diagrams compact and clear
-- DPI: Use 100-150 for good quality without huge file sizes
+- Use compact sizes: figsize=(6, 4) or figsize=(5, 4)
+- NEVER use large sizes like (10, 8) or (8, 6)
+- DPI: 100-150
 
-DOMAIN-SPECIFIC GUIDELINES:
-
-**Fluid Systems** (manometers, pipes, pressure systems):
-- For U-tube manometers: Draw TWO connected vertical tubes
-- Show fluid layers with different colors and densities
-- Label heights, pressures, measurement points clearly
-- Use matplotlib.patches.Rectangle for tubes and fluid layers
-
-**Electrical Circuits** (use svg_circuit_tool — ALWAYS):
-- svg_circuit_tool generates professional textbook-quality circuit diagrams
-- Produces VERTICAL layouts: VDD on top → PMOS → output → NMOS → GND on bottom
-- PMOS gate bubbles, clean orthogonal wiring, proper labels
-- Include all component values (R1=2kΩ, VDD=12V, CL=2fF) in description
-- Include topology info (series/parallel, connections) in description
-- ⚠️ NEVER use schemdraw_tool or claude_code_tool for circuit schematics — use svg_circuit_tool
-
-**Description quality rules (apply to ALL domains — electrical, mechanical, physics, chemistry, math, civil):**
-Your description MUST be derived DIRECTLY from the question text. Do NOT add components or details not in the question.
-  1. Restate EXACTLY what the question mentions: every named component, value, and relationship
-  2. Include ALL labeled values from the question (e.g., "gm1=1.5mS", "CL=10pF", "F=250N")
-  3. For connections: state direction explicitly ("A connects to B via C", "X is in SERIES with Y")
-  4. Name inputs and outputs as the question labels them (Vin+, Vin-, Vout, A, B, P1, etc.)
-  5. State the diagram type: "circuit schematic", "free body diagram", "graph", "molecular structure"
-  6. If the question only mentions certain components, include ONLY those — nothing extra
-Example (electrical): Q says "two-stage op-amp, gm1=1.5mS, CL=10pF, Cc=2pF connecting output back to second-stage input" → description: "Two-stage op-amp schematic. Label gm1=1.5mS on first stage, CL=10pF load capacitor at output Vout, Miller capacitor Cc=2pF from Vout back to second-stage input. Differential inputs Vin+ and Vin-. VDD top, GND bottom."
-Example (mechanical): Q says "simply-supported beam, 4m span, 500N midpoint load" → description: "Simply supported beam, length 4m, pin at left end, roller at right end. Point load 500N downward at midpoint. Label span 4m and load 500N."
-
-**Data Structures** (use networkx):
-- Trees: Use hierarchical layout with clear parent-child relationships
-- Graphs: Label nodes and edges, show weights if applicable
-- Use different colors for different node/edge types
-- Add legends for node/edge meanings
-
-**2D Geometry/Physics**:
-- Use matplotlib with patches for shapes (Rectangle, Circle, Polygon)
-- Show dimensions, angles, forces with arrows
-- Label all key points and values
-- Use coordinate system when needed
-
-**Plots/Graphs**:
-- Clear axis labels with units
-- Legend for multiple series
-- Grid for readability (if helpful)
-- Title describing what's plotted
-
-**Flowcharts/Algorithms** (if graphviz available):
-- Use boxes for processes, diamonds for decisions
-- Clear flow direction with arrows
-- Label all steps and conditions
+DESCRIPTION QUALITY RULES (all domains):
+Your description MUST be derived DIRECTLY from the question text.
+  1. Restate EXACTLY what the question mentions: every named component, value, relationship
+  2. Include ALL labeled values from the question (e.g., "F=250N", "R1=2kΩ", "n=5 nodes")
+  3. Name inputs and outputs as the question labels them
+  4. State the diagram type clearly
+  5. Include ONLY what the question mentions — nothing extra
 
 CODE GENERATION BEST PRACTICES:
-1. Always import required libraries at top
-2. Set figure size early: plt.subplots(figsize=(6, 4))
-3. Use meaningful variable names
-4. Add comments for complex sections
-5. Use tight_layout() before saving
-6. Save with: plt.savefig('output.png', dpi=100, bbox_inches='tight')
-
-Example structure template:
-```python
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches  # If needed
-import numpy as np  # If needed
-
-fig, ax = plt.subplots(figsize=(6, 4))
-
-# Set up axes
-ax.set_xlim(0, 10)
-ax.set_ylim(0, 10)
-ax.set_aspect('equal')  # If needed
-
-# Draw diagram elements
-# (rectangles, circles, lines, arrows, text)
-
-# Add labels, title, legend
-ax.set_xlabel('X axis')
-ax.set_ylabel('Y axis')
-ax.set_title('Diagram Title')
-ax.legend()
-
-plt.tight_layout()
-plt.savefig('output.png', dpi=100, bbox_inches='tight')
-```
+1. Set figure size early: plt.subplots(figsize=(6, 4))
+2. Use tight_layout() before saving
+3. Save with: plt.savefig('output.png', dpi=100, bbox_inches='tight')
 
 REPHRASING EXAMPLES:
-Original: "Calculate pressure in a manometer with three fluids..."
-Better: "For the manometer shown below with three fluids (water, mercury, oil), calculate the pressure..."
+"A simply-supported beam 4m long with 500N load..." → "For the beam shown below (L=4m, P=500N), find the reactions."
+"Insert 5,3,7,1 into a BST..." → "For the BST shown below, insert the values 5, 3, 7, 1."
+"Explain the difference between..." → Keep as-is (no diagram needed)
+"""
 
-Original: "A MOSFET circuit has RD=2kΩ, VDD=12V..."
-Better: "For the MOSFET circuit shown below, calculate the drain current..."
+        # Append subject-specific prompt additions from registry
+        if domain:
+            subject_section = self.prompt_registry.get_agent_system_prompt(domain, diagram_type)
+            if subject_section:
+                base_prompt += f"\n{subject_section}"
 
-Original: "Explain the difference between U-tube and well-type manometers"
-Keep as-is: (conceptual comparison - no specific setup to diagram)"""
+        return base_prompt
 
     async def _analyze_single_question(
         self,
@@ -320,6 +224,31 @@ Keep as-is: (conceptual comparison - no specific setup to diagram)"""
                 f"Analyzing question {question_idx}: {question_text[:100]}..."
             )
 
+            # ── Step 1: DomainRouter classification ──────────────────────────
+            classification = self.domain_router.classify(
+                question_text=question_text,
+                subject_hint=self.subject,
+            )
+            q_domain = classification["domain"]
+            q_diagram_type = classification["diagram_type"]
+            q_ai_suitable = classification["ai_suitable"]
+            q_preferred_tool = classification["preferred_tool"]
+            logger.info(
+                f"Q{question_idx} classified: domain={q_domain}, type={q_diagram_type}, "
+                f"ai_suitable={q_ai_suitable}, preferred_tool={q_preferred_tool}"
+            )
+
+            # ── Phase 5: ai_suitable override ────────────────────────────────
+            # If engine=ai but diagram type is better rendered by code tools, downgrade
+            effective_engine = self.engine
+            if self.engine in ("ai", "both") and not q_ai_suitable:
+                if self.domain_router.should_override_to_nonai(q_diagram_type):
+                    effective_engine = "nonai"
+                    logger.info(
+                        f"Q{question_idx}: ai_suitable=False for {q_diagram_type} → "
+                        f"overriding engine=ai to nonai (code tools are better)"
+                    )
+
             # Check if the original question generation LLM suggested a diagram
             llm_diagram_hint = ""
             if existing_diagram_hint:
@@ -339,12 +268,13 @@ This is a STRONG HINT that a diagram would add educational value. Consider gener
             analysis_prompt = f"""Analyze this question and decide if a diagram would help students visualize and understand the problem:
 
 Question Type: {question_type}
-Question Text: {question_text}{llm_diagram_hint}
+Question Text: {question_text}
+Domain classification: {q_domain} / {q_diagram_type}{llm_diagram_hint}
 
-If a diagram would genuinely enhance understanding and help students visualize the setup/problem:
-1. Choose the appropriate tool (matplotlib_tool, schemdraw_tool, networkx_tool)
-2. Generate complete, executable code with accurate values from the question
-3. Call the tool to generate the diagram
+If a diagram would genuinely enhance understanding:
+1. Choose the appropriate tool for this domain
+2. Provide an accurate description of what to draw
+3. Call the tool
 
 If no diagram is needed (pure theory, definitions, abstract concepts):
 - Respond with "No diagram needed" and briefly explain why
@@ -352,9 +282,9 @@ If no diagram is needed (pure theory, definitions, abstract concepts):
 Mode: {mode_description}
 """
 
-            # Call agent with tool access
+            # Call agent with tool access — use subject-specific system prompt
             messages = [
-                {"role": "system", "content": self._get_agent_prompt(has_diagram_analysis)},
+                {"role": "system", "content": self._get_agent_prompt(has_diagram_analysis, q_domain, q_diagram_type)},
                 {"role": "user", "content": analysis_prompt},
             ]
 
@@ -404,13 +334,24 @@ Mode: {mode_description}
                 imagen_accepted = False  # Track whether Imagen retry loop accepted a diagram
 
                 # ── ENGINE=AI or BOTH: Route to Gemini native image gen with retry loop ──
-                if self.engine in ("ai", "both"):
+                if effective_engine in ("ai", "both"):
                     # Extract description from whatever tool the agent picked
                     imagen_description = tool_arguments.get(
                         "description", tool_arguments.get("prompt", question_text[:300])
                     )
                     # Strip <eq qN_eqM> placeholders — they confuse Gemini image gen
                     imagen_description = re.sub(r'<eq\s+\S+>', '', imagen_description).strip()
+
+                    # ── Phase 3: Prepend subject-specific imagen style guidance ──
+                    style_guidance = self.prompt_registry.get_imagen_description_prompt(
+                        q_domain, q_diagram_type
+                    )
+                    if style_guidance:
+                        imagen_description = f"{style_guidance}\n\n{imagen_description}"
+                        logger.info(
+                            f"Q{question_idx}: Prepended {q_domain}/{q_diagram_type} imagen guidance"
+                        )
+
                     logger.info(
                         f"Engine=ai: Routing Q{question_idx} to imagen_tool "
                         f"(agent originally picked {tool_name})"
@@ -528,6 +469,8 @@ Mode: {mode_description}
                                 question_text=clean_question_for_review,
                                 diagram_description=description_for_review,
                                 user_prompt_context=getattr(self, "_generation_prompt", ""),
+                                domain=q_domain,
+                                diagram_type=q_diagram_type,
                             )
 
                             if review_result["passed"]:
@@ -597,14 +540,36 @@ Mode: {mode_description}
                         )
                         diagram_data = None  # Force nonai fallback
 
-                # ── ENGINE=NONAI / BOTH (or Gemini fallback): Use the original code-based flow ──
+                # ── ENGINE=NONAI / BOTH (or Gemini fallback): Use the code-based flow ──
                 # For engine=both we always run nonai even when AI succeeded.
                 # For engine=ai we only run nonai as a fallback when Gemini failed.
                 # For engine=both: save the AI result before running nonai
-                _ai_diagram_data = diagram_data if self.engine == "both" and imagen_accepted else None
+                _ai_diagram_data = diagram_data if effective_engine == "both" and imagen_accepted else None
+
+                # ── Inject subject_guidance into primary tool call ────────────
+                # The GPT-4o agent doesn't know about our registry, so we inject
+                # subject-specific code generation guidance here for quality/style.
+                if tool_name == "claude_code_tool" and not tool_arguments.get("subject_guidance"):
+                    injected_guidance = self.prompt_registry.get_nonai_tool_prompt(
+                        q_domain, q_diagram_type, "matplotlib"
+                    )
+                    if injected_guidance:
+                        tool_arguments = dict(tool_arguments)  # copy before mutating
+                        tool_arguments["subject_guidance"] = injected_guidance
+                        logger.info(
+                            f"Q{question_idx}: Injected {q_domain}/{q_diagram_type} subject_guidance "
+                            f"into claude_code_tool ({len(injected_guidance)} chars)"
+                        )
+                elif tool_name == "svg_circuit_tool" and not tool_arguments.get("subject_context"):
+                    injected_ctx = self.prompt_registry.get_nonai_tool_prompt(
+                        q_domain, q_diagram_type, "svg"
+                    )
+                    if injected_ctx:
+                        tool_arguments = dict(tool_arguments)
+                        tool_arguments["subject_context"] = injected_ctx
 
                 # Run nonai when: engine=nonai, engine=both (always), or engine=ai as fallback
-                if self.engine != "ai" or diagram_data is None:
+                if effective_engine != "ai" or diagram_data is None:
                     diagram_data = await self.diagram_tools.execute_tool_call(
                         tool_name=tool_name,
                         tool_arguments=tool_arguments,
@@ -613,52 +578,30 @@ Mode: {mode_description}
                         question_text=question_text,
                     )
 
-                # --- Retry with svg_circuit_tool (for electrical) or claude_code_tool (for others) ---
+                # ── Phase 4: Subject-specific fallback routing ─────────────────
+                # If primary tool failed, use FallbackRouter to pick the right tool
                 if diagram_data is None and tool_name not in ("svg_circuit_tool", "claude_code_tool"):
-                    domain = self._infer_domain(question_text)
+                    logger.warning(
+                        f"Primary tool '{tool_name}' failed for Q{question_idx}. "
+                        f"Using subject-specific fallback router..."
+                    )
+                    fallback_tool, fallback_args = self.fallback_router.build_tool_arguments(
+                        domain=q_domain,
+                        diagram_type=q_diagram_type,
+                        description=tool_arguments.get("description", question_text[:300]),
+                        question_text=question_text,
+                    )
+                    logger.info(f"FallbackRouter selected: {fallback_tool}")
 
-                    if domain == "electrical":
-                        # For circuits, try svg_circuit_tool first (produces better results)
-                        logger.warning(
-                            f"Primary tool '{tool_name}' failed for question {question_idx}. "
-                            f"Retrying with svg_circuit_tool..."
-                        )
-                        fallback_args = {
-                            "description": tool_arguments.get("description", question_text[:300]),
-                        }
-                        diagram_data = await self.diagram_tools.execute_tool_call(
-                            tool_name="svg_circuit_tool",
-                            tool_arguments=fallback_args,
-                            assignment_id=assignment_id,
-                            question_idx=question_idx,
-                            question_text=question_text,
-                        )
-                        if diagram_data:
-                            logger.info(f"svg_circuit_tool fallback succeeded for question {question_idx}")
-                    else:
-                        logger.warning(
-                            f"Primary tool '{tool_name}' failed for question {question_idx}. "
-                            f"Retrying with claude_code_tool..."
-                        )
-                        claude_tool_type = "matplotlib"
-                        if tool_name == "networkx_tool":
-                            claude_tool_type = "networkx"
-
-                        fallback_args = {
-                            "domain": domain,
-                            "diagram_type": tool_arguments.get("description", "diagram")[:100],
-                            "tool_type": claude_tool_type,
-                            "description": tool_arguments.get("description", question_text[:300]),
-                        }
-                        diagram_data = await self.diagram_tools.execute_tool_call(
-                            tool_name="claude_code_tool",
-                            tool_arguments=fallback_args,
-                            assignment_id=assignment_id,
-                            question_idx=question_idx,
-                            question_text=question_text,
-                        )
-                        if diagram_data:
-                            logger.info(f"claude_code_tool fallback succeeded for question {question_idx}")
+                    diagram_data = await self.diagram_tools.execute_tool_call(
+                        tool_name=fallback_tool,
+                        tool_arguments=fallback_args,
+                        assignment_id=assignment_id,
+                        question_idx=question_idx,
+                        question_text=question_text,
+                    )
+                    if diagram_data:
+                        logger.info(f"Subject-specific fallback succeeded for Q{question_idx}")
 
                 # If svg_circuit_tool failed, retry svg_circuit_tool with enriched description
                 if diagram_data is None and tool_name == "svg_circuit_tool":
@@ -689,18 +632,20 @@ Mode: {mode_description}
                     else:
                         logger.error(f"All fallbacks failed for question {question_idx}")
 
-                # --- Final fallback: GPT-4o direct code generation if Claude is unavailable ---
+                # --- Final fallback: GPT-4o direct code generation if all tools unavailable ---
                 if diagram_data is None:
-                    domain = self._infer_domain(question_text)
-                    if domain == "electrical":
-                        # For electrical, give svg_circuit_tool one more try with explicit instructions
+                    # Use the classified domain (not keyword inference) for the final fallback
+                    if q_domain in ("electrical", "computer_eng") and q_diagram_type in (
+                        "circuit_schematic", "logic_circuit", "alu_circuit"
+                    ):
+                        # For circuit types, try svg_circuit_tool one more time with simplified description
                         logger.warning(
-                            f"All primary tools failed for question {question_idx}. "
-                            f"Final retry with svg_circuit_tool (explicit instructions)..."
+                            f"All primary tools failed for Q{question_idx}. "
+                            f"Final retry with svg_circuit_tool (simplified)..."
                         )
                         final_desc = (
                             f"SIMPLE circuit diagram for: {question_text[:200]}. "
-                            f"Use standard IEEE block-level logic gate symbols for digital gates. "
+                            f"Use standard IEEE gate symbols for digital gates. "
                             f"Keep it minimal and clean."
                         )
                         diagram_data = await self.diagram_tools.execute_tool_call(
@@ -717,10 +662,11 @@ Mode: {mode_description}
                                 description=tool_arguments.get("description", question_text[:300]),
                                 assignment_id=assignment_id,
                                 question_idx=question_idx,
+                                domain=q_domain,
                             )
                     else:
                         logger.warning(
-                            f"All primary tools failed for question {question_idx}. "
+                            f"All primary tools failed for Q{question_idx}. "
                             f"Trying GPT-4o direct code generation fallback..."
                         )
                         diagram_data = await self._gpt_direct_code_fallback(
@@ -728,10 +674,11 @@ Mode: {mode_description}
                             description=tool_arguments.get("description", question_text[:300]),
                             assignment_id=assignment_id,
                             question_idx=question_idx,
+                            domain=q_domain,
                         )
 
                 # ── ENGINE=BOTH: Stitch AI + Claude images side by side ────────
-                if self.engine == "both" and _ai_diagram_data and diagram_data:
+                if effective_engine == "both" and _ai_diagram_data and diagram_data:
                     try:
                         # Get AI bytes
                         ai_bytes = _ai_image_bytes_for_stitch
@@ -767,7 +714,7 @@ Mode: {mode_description}
                 if diagram_data:
                     # ── Diagram Review Step ──────────────────────────────
                     # Skip review if engine=ai/both already reviewed in the Imagen retry loop
-                    if self.engine in ("ai", "both") and imagen_accepted:
+                    if effective_engine in ("ai", "both") and imagen_accepted:
                         logger.info(
                             f"Skipping duplicate review for Q{question_idx} — "
                             f"already reviewed in Imagen retry loop"
@@ -796,6 +743,8 @@ Mode: {mode_description}
                                 question_text=clean_question_for_review,
                                 diagram_description=description_for_review,
                                 user_prompt_context=getattr(self, "_generation_prompt", ""),
+                                domain=q_domain,
+                                diagram_type=q_diagram_type,
                             )
 
                             if not review_result["passed"]:
@@ -1066,6 +1015,7 @@ Examples:
         description: str,
         assignment_id: str,
         question_idx: int,
+        domain: str = "",
     ) -> Optional[Dict[str, Any]]:
         """
         Final fallback: Ask GPT-4o to generate diagram code directly with
@@ -1076,10 +1026,12 @@ Examples:
         MAX_ATTEMPTS = 3
 
         try:
-            domain = self._infer_domain(question_text)
+            # Use the passed domain if available, otherwise infer
+            if not domain:
+                domain = self._infer_domain(question_text)
 
             # Determine the best library
-            if domain == "electrical":
+            if domain in ("electrical", "computer_eng"):
                 lib = "schemdraw"
                 lib_guidance = """SCHEMDRAW 0.19 API RULES (follow EXACTLY or code will crash):
 

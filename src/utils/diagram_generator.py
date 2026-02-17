@@ -125,18 +125,44 @@ class DiagramGenerator:
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
                 output_path = tmp_file.name
 
-            # Modify code to save to our output file
-            # Use regex to replace the first argument of plt.savefig() with our output path
+            # ── Force HD quality: override DPI and enforce minimum figsize ──
             import re
-            savefig_pattern = r"plt\.savefig\(['\"].*?['\"]"
-            replacement = f"plt.savefig('{output_path}'"
 
-            if re.search(savefig_pattern, code):
-                # Replace existing plt.savefig() calls
-                code_with_output = re.sub(savefig_pattern, replacement, code)
+            # 1. Inject minimum figsize + large fonts BEFORE figure creation
+            #    This ensures all diagrams are at least 8×5 inches and text is readable
+            hd_preamble = (
+                "import matplotlib\n"
+                "matplotlib.use('Agg')\n"
+                "import matplotlib.pyplot as plt\n"
+                "# === HD quality overrides ===\n"
+                "plt.rcParams.update({\n"
+                "    'figure.dpi': 200,\n"
+                "    'savefig.dpi': 200,\n"
+                "    'font.size': 13,\n"
+                "    'axes.titlesize': 15,\n"
+                "    'axes.labelsize': 13,\n"
+                "    'xtick.labelsize': 11,\n"
+                "    'ytick.labelsize': 11,\n"
+                "    'legend.fontsize': 11,\n"
+                "    'lines.linewidth': 1.8,\n"
+                "})\n"
+            )
+            # Remove duplicate matplotlib imports/backend settings from Claude's code
+            code = re.sub(r"import matplotlib\s*\n", "", code)
+            code = re.sub(r"matplotlib\.use\(['\"]Agg['\"]\)\s*\n", "", code)
+            code = hd_preamble + code
+
+            # 2. Replace savefig filename AND force dpi=200
+            #    Match full plt.savefig(...) call and rewrite with our path + dpi=200
+            savefig_full_pattern = r"plt\.savefig\([^)]*\)"
+            hd_savefig = f"plt.savefig('{output_path}', dpi=200, bbox_inches='tight', facecolor='white')"
+
+            if re.search(savefig_full_pattern, code):
+                # Replace ALL existing plt.savefig() calls with our HD version
+                code_with_output = re.sub(savefig_full_pattern, hd_savefig, code)
             else:
                 # Add plt.savefig() if not present
-                code_with_output = code + f"\nplt.savefig('{output_path}', dpi=10, bbox_inches='tight')"
+                code_with_output = code + f"\nplt.savefig('{output_path}', dpi=200, bbox_inches='tight', facecolor='white')"
 
             # Write code to temporary Python file
             with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as code_file:
@@ -151,7 +177,7 @@ class DiagramGenerator:
                     [sys.executable, code_path],
                     capture_output=True,
                     text=True,
-                    timeout=10,  # 10 second timeout
+                    timeout=30,  # 30 second timeout (complex HD diagrams need more time)
                     env={**os.environ, 'MPLBACKEND': 'Agg'}  # Use non-interactive backend
                 )
 
@@ -313,7 +339,7 @@ class DiagramGenerator:
                 # Also ensure matplotlib.pyplot is imported for fallback
                 if 'import matplotlib.pyplot' not in code:
                     code = "import matplotlib.pyplot as plt\n" + code
-                code_with_output = code + f"\nplt.savefig('{output_path}', dpi=150, bbox_inches='tight')"
+                code_with_output = code + f"\nplt.savefig('{output_path}', dpi=200, bbox_inches='tight')"
 
             # 5. Write code to temporary Python file and execute
             with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as code_file:
