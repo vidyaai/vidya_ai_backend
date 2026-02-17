@@ -1,1 +1,25 @@
-Make a problem regarding heat transfer from a silicon chip with an aluminum substrate at the bottom and exposed to air on either side. Add a figure to visualize the problem.
+Generate a challenging problem involving a two-stage CMOS op-amp with Miller compensation.
+
+Provide:
+
+First stage differential pair
+
+Second stage common-source
+
+Compensation capacitor with nulling resistor
+
+Load capacitance
+
+Ask for:
+
+Open-loop DC gain
+
+Pole-zero locations
+
+Phase margin
+
+Required compensation capacitor for 60° phase margin
+
+Slew rate
+
+Include a labeled circuit diagram.

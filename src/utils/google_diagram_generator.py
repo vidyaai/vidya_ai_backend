@@ -26,66 +26,95 @@ from controllers.config import logger
 
 
 class GoogleDiagramGenerator:
-    """Generate diagrams using Gemini native image generation via Vertex AI."""
+    """Generate diagrams using Gemini native image generation.
 
-    # Nano Banana — confirmed working on Vertex AI with service account
-    MODEL_NAME = "gemini-2.5-flash-image"
+    Supports two models selectable via the `diagram_model` constructor arg:
+      - "flash"  → gemini-2.5-flash-image   via Vertex AI (service account auth)
+      - "pro"    → gemini-3-pro-image-preview via Google AI Studio (API key auth)
+    """
 
-    def __init__(self):
+    MODELS = {
+        "flash": "gemini-2.5-flash-image",
+        "pro":   "gemini-3-pro-image-preview",
+    }
+
+    def __init__(self, diagram_model: str = "flash"):
+        """
+        Args:
+            diagram_model: "flash" for gemini-2.5-flash-image (Vertex AI),
+                           "pro"   for gemini-3-pro-image-preview (Google AI Studio API key)
+        """
+        self.diagram_model = diagram_model.lower().strip()
+        self.MODEL_NAME = self.MODELS.get(self.diagram_model, self.MODELS["flash"])
+
         self.project_id = None
         self.location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
         self._client = None
         self._initialized = False
         self._credentials_path = None
 
-        # Find the service account credentials file
+        # Find the service account credentials file (needed for flash/Vertex AI)
         backend_root = os.path.join(os.path.dirname(__file__), '..', '..')
         for f in os.listdir(backend_root):
             if f.startswith("vidyaai-forms-integrations") and f.endswith(".json"):
                 self._credentials_path = os.path.join(backend_root, f)
                 break
 
-        if not self._credentials_path:
+        if self.diagram_model == "flash" and not self._credentials_path:
             logger.warning(
-                "No vidyaai-forms-integrations-*.json found — Gemini image generation disabled"
+                "No vidyaai-forms-integrations-*.json found — Gemini flash image generation disabled"
             )
 
     def _ensure_initialized(self):
-        """Lazy-initialize the google-genai Client with Vertex AI credentials."""
+        """Lazy-initialize the google-genai Client.
+
+        - flash: Vertex AI with service account credentials
+        - pro:   Google AI Studio with GEMINI_API_KEY from environment
+        """
         if self._initialized:
             return True
 
-        if not self._credentials_path:
-            logger.error("No Google service account credentials file found")
-            return False
-
         try:
-            with open(self._credentials_path, 'r') as f:
-                creds_data = json.load(f)
-            self.project_id = creds_data.get("project_id")
-
-            # Build service account credentials
-            from google.oauth2 import service_account
-            credentials = service_account.Credentials.from_service_account_file(
-                self._credentials_path,
-                scopes=["https://www.googleapis.com/auth/cloud-platform"],
-            )
-
-            # Initialize google-genai client with Vertex AI backend
             from google import genai
-            self._client = genai.Client(
-                vertexai=True,
-                project=self.project_id,
-                location=self.location,
-                credentials=credentials,
-            )
 
-            self._initialized = True
-            logger.info(
-                f"Gemini image gen initialized: project={self.project_id}, "
-                f"location={self.location}, model={self.MODEL_NAME}"
-            )
-            return True
+            if self.diagram_model == "pro":
+                # Google AI Studio API key auth — no Vertex AI allowlist needed
+                api_key = os.getenv("GEMINI_API_KEY")
+                if not api_key:
+                    logger.error("GEMINI_API_KEY not set in environment — pro model disabled")
+                    return False
+                self._client = genai.Client(api_key=api_key)
+                self._initialized = True
+                logger.info(f"Gemini image gen initialized: model={self.MODEL_NAME} (Google AI Studio)")
+                return True
+
+            else:
+                # flash — Vertex AI with service account
+                if not self._credentials_path:
+                    logger.error("No Google service account credentials file found")
+                    return False
+
+                with open(self._credentials_path, 'r') as f:
+                    creds_data = json.load(f)
+                self.project_id = creds_data.get("project_id")
+
+                from google.oauth2 import service_account
+                credentials = service_account.Credentials.from_service_account_file(
+                    self._credentials_path,
+                    scopes=["https://www.googleapis.com/auth/cloud-platform"],
+                )
+                self._client = genai.Client(
+                    vertexai=True,
+                    project=self.project_id,
+                    location=self.location,
+                    credentials=credentials,
+                )
+                self._initialized = True
+                logger.info(
+                    f"Gemini image gen initialized: project={self.project_id}, "
+                    f"location={self.location}, model={self.MODEL_NAME}"
+                )
+                return True
 
         except Exception as e:
             logger.error(f"Failed to initialize Gemini image gen: {e}")

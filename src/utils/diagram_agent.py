@@ -60,26 +60,30 @@ def _repair_truncated_json(s: str) -> dict:
 class DiagramAnalysisAgent:
     """AI agent that analyzes questions and generates diagrams via tool calls"""
 
-    def __init__(self, engine: str = "nonai", subject: str = "electrical"):
+    def __init__(self, engine: str = "nonai", subject: str = "electrical", diagram_model: str = "flash"):
         """
         Initialize the diagram analysis agent.
 
         Args:
             engine: "ai" for Gemini native image gen + Gemini 2.5 Pro reviewer,
-                    "nonai" for current flow (claude code + svg + schemdraw + matplotlib)
+                    "nonai" for current flow (claude code + svg + schemdraw + matplotlib),
+                    "both" for side-by-side comparison of ai and nonai outputs
             subject: Subject domain for diagram routing
+            diagram_model: "flash" for gemini-2.5-flash-image (Vertex AI),
+                           "pro"   for gemini-3-pro-image-preview (Google AI Studio)
         """
         self.client = OpenAI()
         self.model = "gpt-4o"
-        self.diagram_tools = DiagramTools()
+        self.diagram_tools = DiagramTools(diagram_model=diagram_model)
         self.engine = engine.lower().strip()
         self.subject = subject.lower().strip()
+        self.diagram_model = diagram_model.lower().strip()
 
         # Select reviewer based on engine
-        if self.engine == "ai":
+        if self.engine in ("ai", "both"):
             from utils.gemini_diagram_reviewer import GeminiDiagramReviewer
             self.reviewer = GeminiDiagramReviewer()
-            logger.info("DiagramAnalysisAgent: engine=ai → Gemini native image gen + Gemini 2.5 Pro reviewer")
+            logger.info(f"DiagramAnalysisAgent: engine={self.engine}, diagram_model={self.diagram_model} → Gemini image gen + Gemini 2.5 Pro reviewer")
         else:
             self.reviewer = DiagramReviewer(client=self.client)
             logger.info("DiagramAnalysisAgent: engine=nonai → current flow + GPT-4o reviewer")
@@ -205,10 +209,20 @@ DOMAIN-SPECIFIC GUIDELINES:
 - svg_circuit_tool generates professional textbook-quality circuit diagrams
 - Produces VERTICAL layouts: VDD on top → PMOS → output → NMOS → GND on bottom
 - PMOS gate bubbles, clean orthogonal wiring, proper labels
-- Just describe the circuit in the 'description' field — Claude handles the SVG
 - Include all component values (R1=2kΩ, VDD=12V, CL=2fF) in description
 - Include topology info (series/parallel, connections) in description
 - ⚠️ NEVER use schemdraw_tool or claude_code_tool for circuit schematics — use svg_circuit_tool
+
+**Description quality rules (apply to ALL domains — electrical, mechanical, physics, chemistry, math, civil):**
+Your description MUST be derived DIRECTLY from the question text. Do NOT add components or details not in the question.
+  1. Restate EXACTLY what the question mentions: every named component, value, and relationship
+  2. Include ALL labeled values from the question (e.g., "gm1=1.5mS", "CL=10pF", "F=250N")
+  3. For connections: state direction explicitly ("A connects to B via C", "X is in SERIES with Y")
+  4. Name inputs and outputs as the question labels them (Vin+, Vin-, Vout, A, B, P1, etc.)
+  5. State the diagram type: "circuit schematic", "free body diagram", "graph", "molecular structure"
+  6. If the question only mentions certain components, include ONLY those — nothing extra
+Example (electrical): Q says "two-stage op-amp, gm1=1.5mS, CL=10pF, Cc=2pF connecting output back to second-stage input" → description: "Two-stage op-amp schematic. Label gm1=1.5mS on first stage, CL=10pF load capacitor at output Vout, Miller capacitor Cc=2pF from Vout back to second-stage input. Differential inputs Vin+ and Vin-. VDD top, GND bottom."
+Example (mechanical): Q says "simply-supported beam, 4m span, 500N midpoint load" → description: "Simply supported beam, length 4m, pin at left end, roller at right end. Point load 500N downward at midpoint. Label span 4m and load 500N."
 
 **Data Structures** (use networkx):
 - Trees: Use hierarchical layout with clear parent-child relationships
@@ -389,12 +403,14 @@ Mode: {mode_description}
 
                 imagen_accepted = False  # Track whether Imagen retry loop accepted a diagram
 
-                # ── ENGINE=AI: Route to Gemini native image gen with retry loop ──
-                if self.engine == "ai":
+                # ── ENGINE=AI or BOTH: Route to Gemini native image gen with retry loop ──
+                if self.engine in ("ai", "both"):
                     # Extract description from whatever tool the agent picked
                     imagen_description = tool_arguments.get(
                         "description", tool_arguments.get("prompt", question_text[:300])
                     )
+                    # Strip <eq qN_eqM> placeholders — they confuse Gemini image gen
+                    imagen_description = re.sub(r'<eq\s+\S+>', '', imagen_description).strip()
                     logger.info(
                         f"Engine=ai: Routing Q{question_idx} to imagen_tool "
                         f"(agent originally picked {tool_name})"
@@ -403,6 +419,7 @@ Mode: {mode_description}
                     max_imagen_attempts = 3
                     imagen_accepted = False
                     last_image_bytes = None  # Track bytes for fix-vs-regen
+                    _ai_image_bytes_for_stitch = None  # Only used when engine=both
                     dimension_failures = 0  # Track dimension/label related failures
 
                     # Determine local save directory for AI-generated images
@@ -497,10 +514,18 @@ Mode: {mode_description}
                                 logger.warning(f"Could not download Gemini diagram for review: {dl_err}")
 
                         if image_bytes_for_review:
-                            description_for_review = tool_arguments.get("description", question_text[:300])
+                            # Use current_description (may be updated corrected description),
+                            # not the stale original tool_arguments description.
+                            description_for_review = current_description
+                            # Strip <eq qN_eqM> placeholder tags from question_text before
+                            # passing to reviewer — they cause false label-mismatch failures
+                            # because the reviewer sees "<eq" as a label name.
+                            clean_question_for_review = re.sub(
+                                r'<eq\s+\S+>', '', question_text
+                            ).strip()
                             review_result = await self.reviewer.review_diagram(
                                 image_bytes=image_bytes_for_review,
-                                question_text=question_text,
+                                question_text=clean_question_for_review,
                                 diagram_description=description_for_review,
                                 user_prompt_context=getattr(self, "_generation_prompt", ""),
                             )
@@ -510,6 +535,9 @@ Mode: {mode_description}
                                     f"Gemini diagram PASSED review on attempt {attempt} for Q{question_idx}: "
                                     f"{review_result['reason'][:100]}"
                                 )
+                                # For engine=both, keep the AI image bytes for stitching later
+                                if self.engine == "both":
+                                    _ai_image_bytes_for_stitch = image_bytes_for_review
                                 # Remove _image_bytes before attaching to question
                                 diagram_data.pop("_image_bytes", None)
                                 imagen_accepted = True
@@ -556,6 +584,8 @@ Mode: {mode_description}
                         else:
                             # Can't review -- accept it and move on
                             logger.warning(f"No image bytes for review on attempt {attempt}, accepting as-is")
+                            if self.engine == "both":
+                                _ai_image_bytes_for_stitch = diagram_data.get("_image_bytes")
                             diagram_data.pop("_image_bytes", None)
                             imagen_accepted = True
                             break
@@ -567,15 +597,20 @@ Mode: {mode_description}
                         )
                         diagram_data = None  # Force nonai fallback
 
-                # ── ENGINE=NONAI (or Gemini fallback): Use the original code-based flow ──
+                # ── ENGINE=NONAI / BOTH (or Gemini fallback): Use the original code-based flow ──
+                # For engine=both we always run nonai even when AI succeeded.
+                # For engine=ai we only run nonai as a fallback when Gemini failed.
+                # For engine=both: save the AI result before running nonai
+                _ai_diagram_data = diagram_data if self.engine == "both" and imagen_accepted else None
+
+                # Run nonai when: engine=nonai, engine=both (always), or engine=ai as fallback
                 if self.engine != "ai" or diagram_data is None:
-                    # Execute the tool
                     diagram_data = await self.diagram_tools.execute_tool_call(
                         tool_name=tool_name,
                         tool_arguments=tool_arguments,
                         assignment_id=assignment_id,
                         question_idx=question_idx,
-                        question_text=question_text  # Pass question text for Claude code generation
+                        question_text=question_text,
                     )
 
                 # --- Retry with svg_circuit_tool (for electrical) or claude_code_tool (for others) ---
@@ -695,10 +730,44 @@ Mode: {mode_description}
                             question_idx=question_idx,
                         )
 
+                # ── ENGINE=BOTH: Stitch AI + Claude images side by side ────────
+                if self.engine == "both" and _ai_diagram_data and diagram_data:
+                    try:
+                        # Get AI bytes
+                        ai_bytes = _ai_image_bytes_for_stitch
+                        if ai_bytes is None:
+                            import requests as _req
+                            resp = _req.get(_ai_diagram_data["s3_url"], timeout=15)
+                            ai_bytes = resp.content if resp.status_code == 200 else None
+
+                        # Get nonai bytes
+                        nonai_bytes = diagram_data.pop("_image_bytes", None)
+                        if nonai_bytes is None:
+                            import requests as _req
+                            resp = _req.get(diagram_data["s3_url"], timeout=15)
+                            nonai_bytes = resp.content if resp.status_code == 200 else None
+
+                        if ai_bytes and nonai_bytes:
+                            logger.info(f"Stitching AI + Claude diagrams for Q{question_idx}")
+                            stitched_bytes = self._stitch_side_by_side(ai_bytes, nonai_bytes)
+                            # Upload stitched image to S3
+                            stitched_data = await self.diagram_tools.diagram_gen.upload_to_s3(
+                                image_bytes=stitched_bytes,
+                                assignment_id=assignment_id,
+                                question_index=question_idx,
+                            )
+                            stitched_data.pop("_image_bytes", None)
+                            diagram_data = stitched_data
+                            logger.info(f"Stitched comparison diagram uploaded for Q{question_idx}")
+                        else:
+                            logger.warning(f"Could not get both image bytes for stitching Q{question_idx}, using nonai only")
+                    except Exception as _stitch_err:
+                        logger.error(f"Stitch failed for Q{question_idx}: {_stitch_err} — using nonai diagram")
+
                 if diagram_data:
                     # ── Diagram Review Step ──────────────────────────────
-                    # Skip review if engine=ai already reviewed in the Imagen retry loop
-                    if self.engine == "ai" and imagen_accepted:
+                    # Skip review if engine=ai/both already reviewed in the Imagen retry loop
+                    if self.engine in ("ai", "both") and imagen_accepted:
                         logger.info(
                             f"Skipping duplicate review for Q{question_idx} — "
                             f"already reviewed in Imagen retry loop"
@@ -718,9 +787,13 @@ Mode: {mode_description}
 
                         if image_bytes_for_review:
                             description_for_review = tool_arguments.get("description", question_text[:300])
+                            # Strip <eq> placeholders to prevent false label-mismatch failures
+                            clean_question_for_review = re.sub(
+                                r'<eq\s+\S+>', '', question_text
+                            ).strip()
                             review_result = await self.reviewer.review_diagram(
                                 image_bytes=image_bytes_for_review,
-                                question_text=question_text,
+                                question_text=clean_question_for_review,
                                 diagram_description=description_for_review,
                                 user_prompt_context=getattr(self, "_generation_prompt", ""),
                             )
@@ -839,6 +912,124 @@ Examples:
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return question  # Return unchanged on error
+
+    def _stitch_side_by_side(
+        self,
+        ai_bytes: bytes,
+        nonai_bytes: bytes,
+        ai_label: str = "AI Generated",
+        nonai_label: str = "Schematic Generated",
+    ) -> bytes:
+        """
+        Combine two PNG images into a side-by-side comparison layout.
+        Each diagram is placed in its own named box with a coloured header bar.
+
+        Layout per box:
+          ┌─────────────────────────┐
+          │  ■ AI Generated         │  ← coloured header bar
+          ├─────────────────────────┤
+          │                         │
+          │       <image>           │  ← white image area with padding
+          │                         │
+          └─────────────────────────┘
+        """
+        from PIL import Image, ImageDraw, ImageFont
+        import io
+
+        AI_COLOR    = (25,  100, 210)   # blue  — AI Generated header
+        NONAI_COLOR = (20,  145,  65)   # green — Schematic Generated header
+        HEADER_TEXT = (255, 255, 255)   # white text in header
+        BOX_BORDER  = (200, 200, 200)   # light grey outer border
+        BG          = (245, 246, 248)   # off-white canvas background
+
+        HEADER_H  = 38    # header bar height
+        IMG_PAD   = 16    # padding around image inside box
+        BOX_GAP   = 28    # horizontal gap between the two boxes
+        OUTER_PAD = 20    # canvas margin on all sides
+        BORDER_W  = 2     # box border width
+
+        # ── Load & normalise images ──────────────────────────────────────
+        img_ai    = Image.open(io.BytesIO(ai_bytes)).convert("RGB")
+        img_nonai = Image.open(io.BytesIO(nonai_bytes)).convert("RGB")
+
+        # Scale both to the same width (use the larger width as target)
+        target_w = max(img_ai.width, img_nonai.width)
+
+        def scale_to_width(img, w):
+            if img.width == w:
+                return img
+            ratio = w / img.width
+            return img.resize((w, int(img.height * ratio)), Image.LANCZOS)
+
+        img_ai    = scale_to_width(img_ai,    target_w)
+        img_nonai = scale_to_width(img_nonai, target_w)
+
+        # ── Compute box dimensions ───────────────────────────────────────
+        box_inner_w = target_w + IMG_PAD * 2
+
+        ai_box_h    = HEADER_H + IMG_PAD + img_ai.height    + IMG_PAD
+        nonai_box_h = HEADER_H + IMG_PAD + img_nonai.height + IMG_PAD
+        max_box_h   = max(ai_box_h, nonai_box_h)
+
+        total_w = OUTER_PAD + box_inner_w + BORDER_W * 2 + BOX_GAP + box_inner_w + BORDER_W * 2 + OUTER_PAD
+        total_h = OUTER_PAD + max_box_h + BORDER_W * 2 + OUTER_PAD
+
+        canvas = Image.new("RGB", (total_w, total_h), BG)
+        draw   = ImageDraw.Draw(canvas)
+
+        # ── Font ─────────────────────────────────────────────────────────
+        try:
+            font_bold   = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 17)
+            font_normal = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 14)
+        except Exception:
+            font_bold   = ImageFont.load_default()
+            font_normal = font_bold
+
+        # ── Draw one box ─────────────────────────────────────────────────
+        def draw_box(x0, y0, img, label, header_color):
+            box_h = HEADER_H + IMG_PAD + img.height + IMG_PAD
+            x1 = x0 + BORDER_W * 2 + box_inner_w
+            y1 = y0 + BORDER_W * 2 + box_h
+
+            # Outer border
+            draw.rectangle([x0, y0, x1, y1], outline=BOX_BORDER, width=BORDER_W)
+
+            # Header bar
+            hx0 = x0 + BORDER_W
+            hy0 = y0 + BORDER_W
+            hx1 = x1 - BORDER_W
+            hy1 = hy0 + HEADER_H
+            draw.rectangle([hx0, hy0, hx1, hy1], fill=header_color)
+
+            # ■ icon + label text centred vertically in header
+            icon_x  = hx0 + 12
+            icon_y  = hy0 + (HEADER_H - 14) // 2
+            draw.rectangle([icon_x, icon_y, icon_x + 12, icon_y + 12], fill=HEADER_TEXT)
+            text_x  = icon_x + 20
+            text_y  = hy0 + (HEADER_H - 17) // 2
+            draw.text((text_x, text_y), label, fill=HEADER_TEXT, font=font_bold)
+
+            # Divider line between header and image area
+            draw.line([hx0, hy1, hx1, hy1], fill=header_color, width=1)
+
+            # Paste image centred horizontally inside the box
+            img_x = x0 + BORDER_W + IMG_PAD
+            img_y = hy1 + IMG_PAD
+            canvas.paste(img, (img_x, img_y))
+
+        # Left box — AI Generated
+        left_x = OUTER_PAD
+        left_y = OUTER_PAD
+        draw_box(left_x, left_y, img_ai, ai_label, AI_COLOR)
+
+        # Right box — Schematic Generated
+        right_x = left_x + BORDER_W * 2 + box_inner_w + BOX_GAP
+        right_y = OUTER_PAD
+        draw_box(right_x, right_y, img_nonai, nonai_label, NONAI_COLOR)
+
+        out = io.BytesIO()
+        canvas.save(out, format="PNG")
+        return out.getvalue()
 
     def _infer_domain(self, question_text: str) -> str:
         """Infer the domain from question text for diagram generation."""

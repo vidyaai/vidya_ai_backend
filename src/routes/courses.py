@@ -532,18 +532,37 @@ async def upload_course_material(
 ):
     course = _verify_course_owner(course_id, current_user["uid"], db)
 
-    allowed_types = [
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ]
-    if file.content_type not in allowed_types:
-        raise HTTPException(
-            status_code=400, detail="Only PDF and DOCX files are supported"
-        )
+    fname = (file.filename or "").lower()
+
+    if material_type == "video":
+        video_types = [
+            "video/mp4", "video/webm", "video/quicktime", "video/x-msvideo",
+            "video/x-matroska", "video/ogg",
+        ]
+        video_extensions = (".mp4", ".webm", ".mov", ".avi", ".mkv", ".ogg")
+        if file.content_type not in video_types and not fname.endswith(video_extensions):
+            raise HTTPException(
+                status_code=400,
+                detail="Only MP4, WebM, MOV, AVI, MKV, and OGG video files are supported",
+            )
+        max_size = 500 * 1024 * 1024  # 500 MB for videos
+    else:
+        allowed_types = [
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ]
+        allowed_extensions = (".pdf", ".docx", ".pptx")
+        if file.content_type not in allowed_types and not fname.endswith(allowed_extensions):
+            raise HTTPException(
+                status_code=400, detail="Only PDF, DOCX, and PPTX files are supported"
+            )
+        max_size = 50 * 1024 * 1024  # 50 MB for documents
 
     file_content = await file.read()
-    if len(file_content) > 50 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="File too large (max 50 MB)")
+    if len(file_content) > max_size:
+        limit_mb = max_size // (1024 * 1024)
+        raise HTTPException(status_code=400, detail=f"File too large (max {limit_mb} MB)")
 
     file_uuid = str(uuid.uuid4())
     s3_key = f"courses/{course_id}/materials/{file_uuid}_{file.filename}"
@@ -760,15 +779,22 @@ def list_course_assignments(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    _verify_course_access(course_id, current_user["uid"], db)
+    course = _verify_course_access(course_id, current_user["uid"], db)
     assignments = (
         db.query(Assignment)
         .filter(Assignment.course_id == course_id)
         .order_by(Assignment.created_at.desc())
         .all()
     )
-    return [
-        {
+
+    from routes.assignments import filter_sensitive_data_for_students
+
+    user_uid = current_user["uid"]
+    is_owner = course.user_id == user_uid
+
+    result = []
+    for a in assignments:
+        assignment_dict = {
             "id": a.id,
             "user_id": a.user_id,
             "title": a.title,
@@ -784,8 +810,14 @@ def list_course_assignments(
             "engineering_discipline": a.engineering_discipline,
             "google_form_url": a.google_form_url,
             "google_form_response_url": a.google_form_response_url,
+            "questions": a.questions,
             "created_at": a.created_at,
             "updated_at": a.updated_at,
         }
-        for a in assignments
-    ]
+        if not is_owner:
+            assignment_dict = filter_sensitive_data_for_students(
+                assignment_dict, user_uid, db
+            )
+        result.append(assignment_dict)
+
+    return result

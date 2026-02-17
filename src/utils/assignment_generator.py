@@ -188,6 +188,7 @@ class AssignmentGenerator:
         assignment_id: Optional[str] = None,
         engine: str = "nonai",
         subject: str = "electrical",
+        diagram_model: str = "flash",
     ) -> Dict[str, Any]:
         """
         Generate an assignment using AI based on provided content and options.
@@ -200,8 +201,9 @@ class AssignmentGenerator:
             title: Assignment title
             description: Assignment description
             assignment_id: Unique assignment ID
-            engine: "ai" for Imagen 3 + Gemini reviewer, "nonai" for current flow
+            engine: "ai" for Gemini image gen, "nonai" for current flow, "both" for comparison
             subject: Subject domain for diagram routing
+            diagram_model: "flash" for gemini-2.5-flash-image, "pro" for gemini-3-pro-image-preview
 
         Returns:
             Generated assignment data
@@ -231,7 +233,7 @@ class AssignmentGenerator:
                 has_diagram_analysis = generation_options.get("questionTypes", {}).get("diagram-analysis", False)
 
                 logger.info(f"Starting multi-agent diagram analysis (diagram-analysis: {has_diagram_analysis}, engine: {engine})...")
-                agent = DiagramAnalysisAgent(engine=engine, subject=subject)
+                agent = DiagramAnalysisAgent(engine=engine, subject=subject, diagram_model=diagram_model)
                 questions = agent.analyze_and_generate_diagrams(
                     questions=questions,
                     assignment_id=assignment_id,

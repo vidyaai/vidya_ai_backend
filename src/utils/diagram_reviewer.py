@@ -126,7 +126,17 @@ Be STRICT about these failure criteria:
   * Truth table included in the diagram
   * Signal values (0 or 1) annotated on intermediate wires
   If an answer leak is detected, CORRECTED_DESCRIPTION must instruct:
-  "Show only circuit structure with generic input labels (A, B, C) and output label (Y/Out). Do NOT show any computed values, boolean expressions, or truth tables."""
+  "Show only circuit structure with generic input labels (A, B, C) and output label (Y/Out). Do NOT show any computed values, boolean expressions, or truth tables.
+- **LABEL CONSISTENCY CHECK**: Every named entity in the QUESTION text — regardless of
+  subject, field, or discipline — must appear in the diagram with the EXACT same name or
+  symbol. This rule applies universally: mathematics, physics, chemistry, biology, computer
+  science, electrical engineering, mechanical engineering, astronomy, medicine, economics,
+  or any other field. If the question names something, the diagram must use that same name.
+  Any mismatch is a FAIL — the name used in the question is the authoritative label.
+  Also verify that every specific numerical value stated in the question (quantities,
+  measurements, parameters) appears on or near the corresponding element in the diagram.
+  A duplicate/double label on the same element (same name rendered twice) is a rendering
+  error — FAIL."""
 
     def _build_review_prompt(
         self,
@@ -164,6 +174,18 @@ Analyze the image and check:
    - Truth tables embedded in the diagram
    - Signal values (0/1) annotated on wires
    If ANY answer is visible, this is a FAIL.
+7. **LABEL CONSISTENCY CHECK**: Read every label in the diagram and compare it against
+   every named entity in the QUESTION text above. This rule is universal — it applies to
+   any subject or discipline without exception. The question is the authoritative source of
+   names; the diagram must match it exactly.
+   - If any entity named in the question appears under a different name or symbol in the
+     diagram, that is a FAIL — list the mismatch in ISSUES
+   - If the question states a specific numerical value for any element, that value must be
+     visible on or near the corresponding element in the diagram
+   - If any entity named in the question is entirely absent from the diagram, that is a FAIL
+   - A duplicate/double label on a single element (same name rendered twice) is a rendering
+     error — FAIL
+   List every mismatch explicitly in ISSUES.
 
 Respond in the EXACT format specified."""
 

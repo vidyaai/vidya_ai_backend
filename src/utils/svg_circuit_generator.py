@@ -464,10 +464,11 @@ Return ONLY the SVG markup. No explanations."""
                 bytestring=svg_content.encode('utf-8'),
                 output_width=output_width,
                 dpi=dpi,
+                background_color="white",
             )
 
-            if not png_bytes or len(png_bytes) < 100:
-                raise ValueError("SVG→PNG conversion produced empty/tiny output")
+            if not png_bytes or len(png_bytes) < 1000:
+                raise ValueError(f"SVG→PNG conversion produced empty/tiny output ({len(png_bytes) if png_bytes else 0} bytes)")
 
             logger.info(f"SVG→PNG conversion successful: {len(png_bytes)} bytes")
             return png_bytes

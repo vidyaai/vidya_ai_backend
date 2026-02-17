@@ -136,7 +136,7 @@ class DiagramGenerator:
                 code_with_output = re.sub(savefig_pattern, replacement, code)
             else:
                 # Add plt.savefig() if not present
-                code_with_output = code + f"\nplt.savefig('{output_path}', dpi=150, bbox_inches='tight')"
+                code_with_output = code + f"\nplt.savefig('{output_path}', dpi=10, bbox_inches='tight')"
 
             # Write code to temporary Python file
             with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as code_file:

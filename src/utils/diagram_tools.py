@@ -150,9 +150,16 @@ DIAGRAM_TOOLS = [
 class DiagramTools:
     """Execution handlers for diagram generation tools"""
 
-    def __init__(self):
-        """Initialize diagram tools with generator"""
+    def __init__(self, diagram_model: str = "flash"):
+        """
+        Initialize diagram tools with generator.
+
+        Args:
+            diagram_model: "flash" for gemini-2.5-flash-image (Vertex AI),
+                           "pro"   for gemini-3-pro-image-preview (Google AI Studio)
+        """
         self.diagram_gen = DiagramGenerator()
+        self.diagram_model = diagram_model
         self.claude_generator = None  # Lazy load to avoid requiring API key if not used
         self._google_generator = None  # Lazy load for Gemini image gen
 
@@ -451,7 +458,7 @@ class DiagramTools:
             # Lazy load Google generator
             if self._google_generator is None:
                 from utils.google_diagram_generator import GoogleDiagramGenerator
-                self._google_generator = GoogleDiagramGenerator()
+                self._google_generator = GoogleDiagramGenerator(diagram_model=self.diagram_model)
 
             result = await self._google_generator.generate_diagram(
                 description=description,
@@ -522,7 +529,7 @@ class DiagramTools:
             # Lazy load Google generator
             if self._google_generator is None:
                 from utils.google_diagram_generator import GoogleDiagramGenerator
-                self._google_generator = GoogleDiagramGenerator()
+                self._google_generator = GoogleDiagramGenerator(diagram_model=self.diagram_model)
 
             result = await self._google_generator.fix_diagram(
                 image_bytes=image_bytes,

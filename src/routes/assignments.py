@@ -26,7 +26,7 @@ from controllers.config import logger, s3_client, AWS_S3_BUCKET
 from controllers.storage import s3_upload_file, s3_presign_url
 from utils.firebase_auth import get_current_user
 from utils.firebase_users import get_users_by_emails
-from models import Assignment, SharedLink, SharedLinkAccess, AssignmentSubmission, Video
+from models import Assignment, SharedLink, SharedLinkAccess, AssignmentSubmission, Video, CourseEnrollment
 from schemas import (
     AssignmentCreate,
     AssignmentUpdate,
@@ -716,21 +716,37 @@ async def get_assignment(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
 
-        # Check access permissions
-        has_access = (
-            assignment.user_id == user_id
-            or db.query(SharedLinkAccess)  # Owner
-            .join(SharedLink)
-            .filter(
-                and_(
-                    SharedLink.assignment_id == assignment_id,
-                    SharedLink.share_type == "assignment",
-                    SharedLinkAccess.user_id == user_id,
+        # Check access permissions (owner, shared, or enrolled in course)
+        has_access = assignment.user_id == user_id
+
+        if not has_access:
+            has_access = (
+                db.query(SharedLinkAccess)
+                .join(SharedLink)
+                .filter(
+                    and_(
+                        SharedLink.assignment_id == assignment_id,
+                        SharedLink.share_type == "assignment",
+                        SharedLinkAccess.user_id == user_id,
+                    )
                 )
+                .first()
+                is not None
             )
-            .first()
-            is not None  # Shared with user
-        )
+
+        if not has_access and assignment.course_id:
+            has_access = (
+                db.query(CourseEnrollment)
+                .filter(
+                    and_(
+                        CourseEnrollment.course_id == assignment.course_id,
+                        CourseEnrollment.user_id == user_id,
+                        CourseEnrollment.status == "active",
+                    )
+                )
+                .first()
+                is not None
+            )
 
         if not has_access:
             raise HTTPException(
@@ -1561,19 +1577,6 @@ async def generate_assignment(
         # Import the assignment generator
         from utils.assignment_generator import AssignmentGenerator
 
-        # Initialize the generator
-        generator = AssignmentGenerator()
-
-        # Generate assignment using AI
-        generated_data = generator.generate_assignment(
-            generation_options=generate_data.generation_options,
-            linked_videos=generate_data.linked_videos,
-            uploaded_files=generate_data.uploaded_files,
-            generation_prompt=generate_data.generation_prompt,
-            title=generate_data.title,
-            description=generate_data.description,
-        )
-
         # Extract question types for database storage
         question_types = []
         for q_type, enabled in generate_data.generation_options.get(
@@ -1582,11 +1585,11 @@ async def generate_assignment(
             if enabled:
                 question_types.append(q_type)
 
-        # Create assignment
+        # Create placeholder assignment to get an ID (needed for S3 diagram upload)
         assignment = Assignment(
             user_id=user_id,
-            title=generated_data["title"],
-            description=generated_data["description"],
+            title=generate_data.title or "AI Generated Assignment",
+            description=generate_data.description or "Generating...",
             engineering_level=generate_data.generation_options.get(
                 "engineeringLevel", "undergraduate"
             ),
@@ -1598,14 +1601,38 @@ async def generate_assignment(
             uploaded_files=generate_data.uploaded_files,
             generation_prompt=generate_data.generation_prompt,
             generation_options=generate_data.generation_options,
-            questions=generated_data["questions"],
+            questions=[],  # Will be populated after generation
             status="draft",
         )
+
+        db.add(assignment)
+        db.commit()
+        db.refresh(assignment)
+
+        logger.info(f"Created placeholder assignment with ID: {assignment.id}")
+
+        # Initialize the generator
+        generator = AssignmentGenerator()
+
+        # Generate assignment using AI (pass assignment_id for diagram S3 upload)
+        generated_data = generator.generate_assignment(
+            generation_options=generate_data.generation_options,
+            linked_videos=generate_data.linked_videos,
+            uploaded_files=generate_data.uploaded_files,
+            generation_prompt=generate_data.generation_prompt,
+            title=generate_data.title,
+            description=generate_data.description,
+            assignment_id=str(assignment.id),  # Pass ID for diagram upload
+        )
+
+        # Update assignment with generated data
+        assignment.title = generated_data["title"]
+        assignment.description = generated_data["description"]
+        assignment.questions = generated_data["questions"]
 
         # Calculate stats
         assignment = calculate_assignment_stats(assignment)
 
-        db.add(assignment)
         db.commit()
         db.refresh(assignment)
 
@@ -1915,22 +1942,38 @@ async def submit_assignment(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
 
-        # Check if user has access to submit
-        has_access = (
-            assignment.user_id == user_id
-            or db.query(SharedLinkAccess)  # Owner can submit (for testing)
-            .join(SharedLink)
-            .filter(
-                and_(
-                    SharedLink.assignment_id == assignment_id,
-                    SharedLink.share_type == "assignment",
-                    SharedLinkAccess.user_id == user_id,
-                    SharedLinkAccess.permission.in_(["complete", "edit"]),
+        # Check if user has access to submit (owner, shared, or enrolled in course)
+        has_access = assignment.user_id == user_id
+
+        if not has_access:
+            has_access = (
+                db.query(SharedLinkAccess)
+                .join(SharedLink)
+                .filter(
+                    and_(
+                        SharedLink.assignment_id == assignment_id,
+                        SharedLink.share_type == "assignment",
+                        SharedLinkAccess.user_id == user_id,
+                        SharedLinkAccess.permission.in_(["complete", "edit"]),
+                    )
                 )
+                .first()
+                is not None
             )
-            .first()
-            is not None
-        )
+
+        if not has_access and assignment.course_id:
+            has_access = (
+                db.query(CourseEnrollment)
+                .filter(
+                    and_(
+                        CourseEnrollment.course_id == assignment.course_id,
+                        CourseEnrollment.user_id == user_id,
+                        CourseEnrollment.status == "active",
+                    )
+                )
+                .first()
+                is not None
+            )
 
         if not has_access:
             raise HTTPException(
@@ -2325,22 +2368,38 @@ async def save_assignment_draft(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
 
-        # Check if user has access
-        has_access = (
-            assignment.user_id == user_id
-            or db.query(SharedLinkAccess)
-            .join(SharedLink)
-            .filter(
-                and_(
-                    SharedLink.assignment_id == assignment_id,
-                    SharedLink.share_type == "assignment",
-                    SharedLinkAccess.user_id == user_id,
-                    SharedLinkAccess.permission.in_(["complete", "edit"]),
+        # Check if user has access (owner, shared, or enrolled in course)
+        has_access = assignment.user_id == user_id
+
+        if not has_access:
+            has_access = (
+                db.query(SharedLinkAccess)
+                .join(SharedLink)
+                .filter(
+                    and_(
+                        SharedLink.assignment_id == assignment_id,
+                        SharedLink.share_type == "assignment",
+                        SharedLinkAccess.user_id == user_id,
+                        SharedLinkAccess.permission.in_(["complete", "edit"]),
+                    )
                 )
+                .first()
+                is not None
             )
-            .first()
-            is not None
-        )
+
+        if not has_access and assignment.course_id:
+            has_access = (
+                db.query(CourseEnrollment)
+                .filter(
+                    and_(
+                        CourseEnrollment.course_id == assignment.course_id,
+                        CourseEnrollment.user_id == user_id,
+                        CourseEnrollment.status == "active",
+                    )
+                )
+                .first()
+                is not None
+            )
 
         if not has_access:
             raise HTTPException(
@@ -2546,21 +2605,37 @@ async def get_assignment_status(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
 
-        # Check if user has access
-        has_access = (
-            assignment.user_id == user_id
-            or db.query(SharedLinkAccess)
-            .join(SharedLink)
-            .filter(
-                and_(
-                    SharedLink.assignment_id == assignment_id,
-                    SharedLink.share_type == "assignment",
-                    SharedLinkAccess.user_id == user_id,
+        # Check if user has access (owner, shared link, or enrolled in the course)
+        has_access = assignment.user_id == user_id
+
+        if not has_access:
+            has_access = (
+                db.query(SharedLinkAccess)
+                .join(SharedLink)
+                .filter(
+                    and_(
+                        SharedLink.assignment_id == assignment_id,
+                        SharedLink.share_type == "assignment",
+                        SharedLinkAccess.user_id == user_id,
+                    )
                 )
+                .first()
+                is not None
             )
-            .first()
-            is not None
-        )
+
+        if not has_access and assignment.course_id:
+            has_access = (
+                db.query(CourseEnrollment)
+                .filter(
+                    and_(
+                        CourseEnrollment.course_id == assignment.course_id,
+                        CourseEnrollment.user_id == user_id,
+                        CourseEnrollment.status == "active",
+                    )
+                )
+                .first()
+                is not None
+            )
 
         if not has_access:
             raise HTTPException(
@@ -3088,7 +3163,7 @@ async def download_assignment_pdf(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
 
-        # Verify user has access (owner or shared access)
+        # Verify user has access (owner, shared access, or enrolled in course)
         has_access = assignment.user_id == user_id
 
         if not has_access:
@@ -3106,6 +3181,21 @@ async def download_assignment_pdf(
                 .first()
             )
             has_access = shared_access is not None
+
+        if not has_access and assignment.course_id:
+            # Check if user is enrolled in the course
+            has_access = (
+                db.query(CourseEnrollment)
+                .filter(
+                    and_(
+                        CourseEnrollment.course_id == assignment.course_id,
+                        CourseEnrollment.user_id == user_id,
+                        CourseEnrollment.status == "active",
+                    )
+                )
+                .first()
+                is not None
+            )
 
         if not has_access:
             raise HTTPException(

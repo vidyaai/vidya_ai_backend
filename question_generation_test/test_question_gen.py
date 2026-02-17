@@ -105,9 +105,12 @@ def main():
                        help='Education level: undergrad or grad')
     parser.add_argument('-pdf_gen', '--pdf_gen', type=str, choices=['True', 'False'],
                        default='False', help='Generate PDF: True or False')
-    parser.add_argument('-engine', '--engine', type=str, choices=['ai', 'nonai'],
+    parser.add_argument('-engine', '--engine', type=str, choices=['ai', 'nonai', 'both'],
                        default='nonai',
-                       help='Diagram engine: ai (Imagen 3 + Gemini reviewer) or nonai (current flow)')
+                       help='Diagram engine: ai (Gemini image gen), nonai (Claude SVG/code), or both (side-by-side comparison)')
+    parser.add_argument('-model', '--model', type=str, choices=['flash', 'pro'],
+                       default='flash',
+                       help='Gemini model: flash (gemini-2.5-flash-image via Vertex AI) or pro (gemini-3-pro-image-preview via Google AI Studio)')
 
     args = parser.parse_args()
 
@@ -137,14 +140,15 @@ def main():
     print(f"Input prompt: {input_path.name}")
     print(f"Level: {args.level}")
     print(f"Engine: {args.engine}")
+    print(f"Model: {args.model} ({'gemini-3-pro-image-preview via AI Studio' if args.model == 'pro' else 'gemini-2.5-flash-image via Vertex AI'})")
     print(f"PDF generation: {args.pdf_gen}")
     print(f"Output directory: {output_dir}")
     print(f"{'='*60}\n")
 
     # Configure generation options
     generation_options = {
-        "numQuestions": 1,  # Test with 15 questions for robustness
-        "totalPoints": 10,  # 150 marks total (~10 marks per question)
+        "numQuestions": 4,  # Test with 15 questions for robustness
+        "totalPoints": 40,  # 150 marks total (~10 marks per question)
         "questionTypes": {
             "mcq": False,
             "short-answer": True,
@@ -179,6 +183,7 @@ def main():
             assignment_id=assignment_id,
             engine=args.engine,
             subject=args.subject,
+            diagram_model=args.model,
         )
 
         questions = assignment_data.get('questions', [])
@@ -267,6 +272,7 @@ def main():
             f.write(f"Subject: {args.subject}\n")
             f.write(f"Level: {args.level}\n")
             f.write(f"Engine: {args.engine}\n")
+            f.write(f"Model: {args.model}\n")
             f.write(f"Assignment ID: {assignment_id}\n\n")
             f.write(f"INPUT PROMPT:\n{'-'*60}\n")
             f.write(f"{generation_prompt}\n\n")
