@@ -834,6 +834,16 @@ class AssignmentGenerator:
             - Include code examples and diagrams when appropriate
             - Follow academic integrity standards
 
+            SELF-CONTAINED QUESTION RULES (CRITICAL):
+            - Every question MUST explicitly state ALL values, parameters, states, and conditions in the question text itself.
+            - NEVER write vague references like "as shown in the diagram", "see the figure", "from the circuit above" or "given the values in the table".
+            - If a question involves state transitions, truth tables, or specific input/output values, list them ALL explicitly in the question text.
+            - Example of WRONG: "Calculate the output for the states shown in the diagram."
+            - Example of RIGHT: "Calculate the output Z when Q1=1, Q0=0, I=1 using the formula Z = (Q1 XOR I) AND (Q0 OR I)."
+            - Diagrams may be added later by a separate system — the question text must be independently comprehensible without any diagram.
+            - For FSM/state machine questions: always include the complete state transition table or explicit transition rules in the question text.
+            - For circuit analysis: always specify ALL component values, node labels, and connection topology in the question text.
+
             MANDATORY FOR MULTI-PART QUESTIONS:
             - EVERY subquestion at ALL nesting levels MUST have:
               * A complete correctAnswer
@@ -868,6 +878,15 @@ class AssignmentGenerator:
             - Ensure questions are self-contained and don't require external resources
             - Use proper terminology and notation appropriate to the subject
             - Follow academic integrity standards
+
+            SELF-CONTAINED QUESTION RULES (CRITICAL):
+            - Every question MUST explicitly state ALL values, parameters, states, and conditions in the question text itself.
+            - NEVER write vague references like "as shown in the diagram", "see the figure", "from the circuit above" or "given the values in the table".
+            - If a question involves state transitions, truth tables, or specific input/output values, list them ALL explicitly in the question text.
+            - Example of WRONG: "Calculate the output for the states shown in the diagram."
+            - Example of RIGHT: "Calculate the output Z when Q1=1, Q0=0, I=1 using the formula Z = (Q1 XOR I) AND (Q0 OR I)."
+            - Diagrams may be added later by a separate system — the question text must be independently comprehensible without any diagram.
+            - For FSM/state machine questions: always include the complete state transition table or explicit transition rules in the question text.
 
             MANDATORY FOR MULTI-PART QUESTIONS:
             - EVERY subquestion at ALL nesting levels MUST have:

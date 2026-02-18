@@ -13,7 +13,6 @@ from typing import Dict, List, Any, Optional
 from openai import OpenAI
 from controllers.config import logger
 from utils.diagram_tools import DiagramTools, DIAGRAM_TOOLS
-from utils.diagram_reviewer import DiagramReviewer
 from utils.domain_router import DomainRouter
 from utils.subject_prompt_registry import SubjectPromptRegistry
 from utils.fallback_router import SubjectSpecificFallbackRouter
@@ -87,14 +86,14 @@ class DiagramAnalysisAgent:
         self.prompt_registry = SubjectPromptRegistry()
         self.fallback_router = SubjectSpecificFallbackRouter()
 
-        # Select reviewer based on engine
-        if self.engine in ("ai", "both"):
-            from utils.gemini_diagram_reviewer import GeminiDiagramReviewer
-            self.reviewer = GeminiDiagramReviewer()
-            logger.info(f"DiagramAnalysisAgent: engine={self.engine}, diagram_model={self.diagram_model} → Gemini image gen + Gemini 2.5 Pro reviewer")
-        else:
-            self.reviewer = DiagramReviewer(client=self.client)
-            logger.info("DiagramAnalysisAgent: engine=nonai → current flow + GPT-4o reviewer")
+        # Always use Gemini 2.5 Pro as the diagram reviewer (best vision
+        # accuracy for semantic consistency checks across all subjects).
+        from utils.gemini_diagram_reviewer import GeminiDiagramReviewer
+        self.reviewer = GeminiDiagramReviewer()
+        logger.info(
+            f"DiagramAnalysisAgent: engine={self.engine}, diagram_model={self.diagram_model} "
+            f"→ Gemini 2.5 Pro reviewer (unified for ai/nonai/fallback)"
+        )
 
     def _get_agent_prompt(
         self,
@@ -130,10 +129,11 @@ YOUR TASK:
 2. Decide: Would a diagram significantly help the student understand or solve this problem?
 3. If YES, generate the diagram:
    a) Choose the appropriate tool:
-      - **svg_circuit_tool**: Generates professional circuit/schematic diagrams via Claude SVG. Best for: electrical circuits, digital logic, ALU schematics, gate-level computer engineering diagrams. Produces clean orthogonal wiring with standard component symbols.
-      - **claude_code_tool** (RECOMMENDED for most diagrams): Use Claude to generate matplotlib/networkx code for any technical domain — physics, CS, math, chemistry, biology, mechanical, civil. Highly versatile.
+      - **circuitikz_tool** ⭐ BEST FOR ALL CIRCUITS: Generates publication-quality circuit diagrams via CircuiTikZ (LaTeX). Output is identical to Sedra & Smith / Mano textbook diagrams. Use for: ALL electrical circuits, MOSFET/CMOS transistor circuits, analog circuits, digital logic gates, op-amp circuits, BJT circuits, RLC networks, D/JK/SR/T flip-flop circuits, shift registers, counters, sequential logic, encoders/decoders, MUX/DEMUX, register files, ALU/datapath, CDC. ALWAYS use this for any circuit schematic.
+      - **claude_code_tool** (RECOMMENDED for non-circuit diagrams AND timing/waveform): Use Claude to generate matplotlib/networkx code for any technical domain — physics, CS, math, chemistry, biology, mechanical, civil. ALSO use this for timing diagrams and waveforms (with tool_type=matplotlib). Highly versatile.
       - matplotlib_tool: Direct matplotlib code (ONLY if very simple plot)
       - schemdraw_tool: AVOID entirely — produces unprofessional layouts
+      - svg_circuit_tool: DEPRECATED — use circuitikz_tool instead
       - networkx_tool: Direct networkx code (ONLY if very simple graph)
       - dalle_tool: AVOID - use code-based tools for technical accuracy
    b) For svg_circuit_tool: Provide a description of the CIRCUIT STRUCTURE only.
@@ -163,6 +163,43 @@ CRITICAL RULES:
 3. Rephrase naturally: "For the beam shown below" NOT "image from page 20"
 4. PRESERVE ALL numerical values and given data in the rephrased question
 
+⚠️ ANSWER HIDING IN DIAGRAMS (CRITICAL — THIS IS A STUDENT ASSIGNMENT):
+Diagrams must NEVER reveal the answer to the question. Students must work out the answer themselves.
+This rule applies to ALL subjects and ALL diagram types.
+
+**Timing / Waveform Diagrams (Electrical, Computer Eng):**
+- Show ONLY the INPUT signals that are GIVEN in the question (CLK, D, A, B, RESET, EN, etc.)
+- OUTPUT signals (Q, Q1, Q2, Q̄, Y, etc.) must be drawn as BLANK rows with "?" labels
+  or left completely empty for the student to fill in
+- For a D flip-flop circuit: show CLK and D waveforms, but leave Q and Q̄ blank
+- For sequential circuits with multiple FFs: show input waveforms only, leave ALL output waveforms blank
+- The purpose is for students to DRAW the output waveforms themselves
+
+**Counter / State Machine Diagrams (Electrical, Computer Eng):**
+- Show ONLY the circuit topology (flip-flops, gates, feedback connections)
+- Show the initial state if given in the question
+- Do NOT show state transition sequences, state tables, or output sequences
+- For ring counters: show the shift register circuit with feedback, NOT the sequence of states
+- For Johnson counters: show the twisted ring counter circuit, NOT the state table
+- Students must determine the state transitions themselves
+
+**Mechanical / Civil / Physics Diagrams:**
+- Do NOT show computed reaction forces, deflections, or resultant forces if students must calculate them
+- Do NOT draw shear force / bending moment diagrams if the question asks students to draw them
+- For FBDs: show given forces and setup, NOT the net force or acceleration
+- For ray diagrams: show setup (lens, object), NOT the image location if students must find it
+
+**CS / Math / Chemistry Diagrams:**
+- Do NOT show algorithm results (sorted array, shortest path, traversal order) if asked to trace/compute
+- For BST/tree operations: show the tree BEFORE, NOT after the operation
+- Do NOT shade/label areas, intersection points, or derivatives if students must compute them
+- Do NOT show reaction products or mechanisms if students must predict/draw them
+
+**General Rule (ALL SUBJECTS):**
+- If the question asks "what is the output?", "determine", "find", "calculate",
+  "draw", "sketch", "describe", "predict", or "trace" — the diagram must NOT contain that answer
+- Diagrams are visual aids showing the PROBLEM SETUP, not the SOLUTION
+
 DIAGRAM SIZE REQUIREMENTS:
 - Use compact sizes: figsize=(6, 4) or figsize=(5, 4)
 - NEVER use large sizes like (10, 8) or (8, 6)
@@ -185,6 +222,32 @@ REPHRASING EXAMPLES:
 "A simply-supported beam 4m long with 500N load..." → "For the beam shown below (L=4m, P=500N), find the reactions."
 "Insert 5,3,7,1 into a BST..." → "For the BST shown below, insert the values 5, 3, 7, 1."
 "Explain the difference between..." → Keep as-is (no diagram needed)
+
+MULTI-DIAGRAM QUESTIONS (CRITICAL — when a question needs more than one diagram):
+When a question requires BOTH a schematic/structure AND a supplementary diagram (timing, graph, chart):
+1. Make TWO tool calls in your response:
+   - FIRST: The primary diagram (e.g. circuitikz_tool for circuit, matplotlib for structure)
+   - SECOND: claude_code_tool with tool_type="matplotlib" for the supplementary diagram
+2. The system will automatically combine both diagrams into one image (primary on top, supplementary below).
+3. Examples that need two diagrams:
+   - "D flip-flop circuit with timing diagrams for CLK, D, Q"
+   - "Shift register with input waveforms"
+   - "Sequential logic circuit — draw timing diagrams for 8 clock cycles"
+   - "Beam with loading diagram and blank SFD/BMD axes"
+   - Any question asking students to "draw/complete" diagrams based on a given structure
+4. For the supplementary diagram:
+   - Show ONLY the GIVEN information (inputs, loading, boundary conditions, etc.)
+   - Any values the student must DETERMINE → draw as BLANK rows with "?" labels
+   - NEVER draw actual answer values — that IS the answer
+   - Title the figure descriptively based on what it shows (e.g. 'Input Signals',
+     'Given Loading', 'Initial Conditions') — NOT based on the answer
+   - For digital waveforms: use matplotlib ax.step() for rectangular/square-wave style
+   - Include alignment aids (dashed grid lines, clock edges, reference lines)
+
+QUESTION TYPE AUTO-CONVERSION:
+When the question requires students to draw, determine, or analyze output waveforms, counter states,
+or timing diagrams, the question type SHOULD be "diagram-analysis" (not "short-answer" or "numerical").
+If you detect such a question, note this in your response so the system can update the type.
 """
 
         # Append subject-specific prompt additions from registry
@@ -194,6 +257,32 @@ REPHRASING EXAMPLES:
                 base_prompt += f"\n{subject_section}"
 
         return base_prompt
+
+    def _resolve_equation_placeholders(self, question: Dict[str, Any], text: str) -> str:
+        """
+        Replace <eq ID> placeholders with their LaTeX values so the diagram
+        agent and downstream tools see actual values instead of opaque tokens.
+
+        Example: "<eq q2_eq1>" → "01"  (from the question's equations array)
+        """
+        equations = question.get("equations", [])
+        if not equations:
+            return text
+
+        eq_map = {eq["id"]: eq.get("latex", "") for eq in equations if "id" in eq}
+        if not eq_map:
+            return text
+
+        def _replacer(m):
+            eq_id = m.group(1)
+            return eq_map.get(eq_id, m.group(0))  # keep original if ID not found
+
+        resolved = re.sub(r'<eq\s+(\S+)>', _replacer, text)
+        if resolved != text:
+            logger.info(
+                f"Resolved {len(eq_map)} equation placeholders in question text"
+            )
+        return resolved
 
     async def _analyze_single_question(
         self,
@@ -219,6 +308,12 @@ REPHRASING EXAMPLES:
             question_text = question.get("question") or question.get("text", "")
             question_type = question.get("type", "")
             existing_diagram_hint = question.get("diagram")  # Check if original LLM suggested a diagram
+
+            # ── Resolve <eq> placeholders so diagram tools see actual values ──
+            # The equation extractor runs BEFORE the diagram agent, replacing
+            # math expressions with tokens like <eq q2_eq1>.  We substitute
+            # the LaTeX values back so the diagram description is precise.
+            question_text = self._resolve_equation_placeholders(question, question_text)
 
             logger.info(
                 f"Analyzing question {question_idx}: {question_text[:100]}..."
@@ -302,6 +397,26 @@ Mode: {mode_description}
             if message.tool_calls:
                 tool_call = message.tool_calls[0]  # Get first tool call
                 tool_name = tool_call.function.name
+
+                # ── Parse secondary tool calls (for multi-diagram questions) ──
+                # When the agent makes 2+ tool calls (e.g., circuitikz for circuit +
+                # claude_code for timing), we process each and stitch vertically.
+                secondary_tool_calls = []
+                for tc in message.tool_calls[1:]:
+                    try:
+                        sec_args = json.loads(tc.function.arguments)
+                        secondary_tool_calls.append((tc.function.name, sec_args))
+                        logger.info(
+                            f"Q{question_idx}: Parsed secondary tool call: {tc.function.name}"
+                        )
+                    except json.JSONDecodeError:
+                        try:
+                            sec_args = _repair_truncated_json(tc.function.arguments)
+                            secondary_tool_calls.append((tc.function.name, sec_args))
+                        except json.JSONDecodeError:
+                            logger.warning(
+                                f"Q{question_idx}: Could not parse secondary tool call args"
+                            )
 
                 # --- Robust JSON parsing with repair for truncated arguments ---
                 try:
@@ -580,7 +695,7 @@ Mode: {mode_description}
 
                 # ── Phase 4: Subject-specific fallback routing ─────────────────
                 # If primary tool failed, use FallbackRouter to pick the right tool
-                if diagram_data is None and tool_name not in ("svg_circuit_tool", "claude_code_tool"):
+                if diagram_data is None and tool_name not in ("circuitikz_tool", "svg_circuit_tool", "claude_code_tool"):
                     logger.warning(
                         f"Primary tool '{tool_name}' failed for Q{question_idx}. "
                         f"Using subject-specific fallback router..."
@@ -603,32 +718,33 @@ Mode: {mode_description}
                     if diagram_data:
                         logger.info(f"Subject-specific fallback succeeded for Q{question_idx}")
 
-                # If svg_circuit_tool failed, retry svg_circuit_tool with enriched description
-                if diagram_data is None and tool_name == "svg_circuit_tool":
+                # If circuitikz_tool failed, retry with enriched description
+                if diagram_data is None and tool_name in ("circuitikz_tool", "svg_circuit_tool"):
                     logger.warning(
-                        f"svg_circuit_tool failed for question {question_idx}. "
-                        f"Retrying svg_circuit_tool with enriched description..."
+                        f"circuit tool failed for question {question_idx}. "
+                        f"Retrying circuitikz_tool with enriched description..."
                     )
-                    # Provide a more explicit description to help Claude
                     enriched_desc = (
-                        f"Draw a professional SVG circuit diagram for: {question_text[:200]}. "
+                        f"Draw a professional circuit diagram for: {question_text[:200]}. "
                         f"Original description: {tool_arguments.get('description', '')}. "
-                        f"Use standard IEEE logic gate symbols (AND, OR, NOT shapes) for digital logic gates. "
-                        f"Use CMOS transistor symbols only for transistor-level circuits. "
-                        f"Keep the diagram simple and clean."
+                        f"Use standard MOSFET symbols for transistor circuits. "
+                        f"Use IEEE gate symbols (AND, OR, NOT shapes) for digital logic gates. "
+                        f"Draw flip-flops as labeled rectangles with D/CLK/Q/Q-bar pins. "
+                        f"Draw shift registers as chained flip-flops with Q→D connections. "
+                        f"Keep wiring clean and orthogonal."
                     )
                     fallback_args = {
                         "description": enriched_desc,
                     }
                     diagram_data = await self.diagram_tools.execute_tool_call(
-                        tool_name="svg_circuit_tool",
+                        tool_name="circuitikz_tool",
                         tool_arguments=fallback_args,
                         assignment_id=assignment_id,
                         question_idx=question_idx,
                         question_text=question_text,
                     )
                     if diagram_data:
-                        logger.info(f"svg_circuit_tool retry succeeded for question {question_idx}")
+                        logger.info(f"circuitikz_tool retry succeeded for question {question_idx}")
                     else:
                         logger.error(f"All fallbacks failed for question {question_idx}")
 
@@ -636,27 +752,32 @@ Mode: {mode_description}
                 if diagram_data is None:
                     # Use the classified domain (not keyword inference) for the final fallback
                     if q_domain in ("electrical", "computer_eng") and q_diagram_type in (
-                        "circuit_schematic", "logic_circuit", "alu_circuit"
+                        "circuit_schematic", "analog_circuit", "mosfet_circuit",
+                        "logic_circuit", "alu_circuit",
+                        "sequential_circuit", "flip_flop_circuit", "counter_circuit",
+                        "shift_register", "cdc_diagram", "block_diagram",
+                        "circuit_with_timing",
                     ):
-                        # For circuit types, try svg_circuit_tool one more time with simplified description
+                        # For circuit types, try circuitikz_tool one more time with simplified description
                         logger.warning(
                             f"All primary tools failed for Q{question_idx}. "
-                            f"Final retry with svg_circuit_tool (simplified)..."
+                            f"Final retry with circuitikz_tool (simplified)..."
                         )
                         final_desc = (
                             f"SIMPLE circuit diagram for: {question_text[:200]}. "
+                            f"Use standard MOSFET symbols for transistor circuits. "
                             f"Use standard IEEE gate symbols for digital gates. "
                             f"Keep it minimal and clean."
                         )
                         diagram_data = await self.diagram_tools.execute_tool_call(
-                            tool_name="svg_circuit_tool",
+                            tool_name="circuitikz_tool",
                             tool_arguments={"description": final_desc},
                             assignment_id=assignment_id,
                             question_idx=question_idx,
                             question_text=question_text,
                         )
                         if not diagram_data:
-                            logger.warning(f"Final svg_circuit_tool retry failed. Trying GPT-4o fallback...")
+                            logger.warning(f"Final circuitikz_tool retry failed. Trying GPT-4o fallback...")
                             diagram_data = await self._gpt_direct_code_fallback(
                                 question_text=question_text,
                                 description=tool_arguments.get("description", question_text[:300]),
@@ -711,6 +832,88 @@ Mode: {mode_description}
                     except Exception as _stitch_err:
                         logger.error(f"Stitch failed for Q{question_idx}: {_stitch_err} — using nonai diagram")
 
+                # ── Multi-diagram stitching (circuit + timing/waveform) ────────
+                # If the agent made secondary tool calls, execute them and
+                # stitch all results vertically (primary on top).
+                if diagram_data and secondary_tool_calls:
+                    primary_bytes = diagram_data.pop("_image_bytes", None)
+                    if primary_bytes is None:
+                        try:
+                            import requests as _req
+                            resp = _req.get(diagram_data["s3_url"], timeout=15)
+                            if resp.status_code == 200:
+                                primary_bytes = resp.content
+                        except Exception:
+                            pass
+
+                    if primary_bytes:
+                        all_image_bytes = [primary_bytes]
+                        all_labels = [self._label_for_tool(tool_name, q_diagram_type)]
+
+                        for sec_tool_name, sec_tool_args in secondary_tool_calls:
+                            # Inject subject_guidance for secondary claude_code_tool calls
+                            if sec_tool_name == "claude_code_tool" and not sec_tool_args.get("subject_guidance"):
+                                sec_guidance = self.prompt_registry.get_nonai_tool_prompt(
+                                    q_domain, q_diagram_type, sec_tool_args.get("tool_type", "matplotlib")
+                                )
+                                if sec_guidance:
+                                    sec_tool_args = dict(sec_tool_args)
+                                    sec_tool_args["subject_guidance"] = sec_guidance
+
+                            logger.info(
+                                f"Q{question_idx}: Executing secondary tool: {sec_tool_name}"
+                            )
+                            sec_data = await self.diagram_tools.execute_tool_call(
+                                tool_name=sec_tool_name,
+                                tool_arguments=sec_tool_args,
+                                assignment_id=assignment_id,
+                                question_idx=question_idx,
+                                question_text=question_text,
+                            )
+                            if sec_data:
+                                sec_bytes = sec_data.pop("_image_bytes", None)
+                                if sec_bytes is None:
+                                    try:
+                                        import requests as _req
+                                        resp = _req.get(sec_data["s3_url"], timeout=15)
+                                        if resp.status_code == 200:
+                                            sec_bytes = resp.content
+                                    except Exception:
+                                        pass
+                                if sec_bytes:
+                                    all_image_bytes.append(sec_bytes)
+                                    all_labels.append(self._label_for_tool(sec_tool_name, q_diagram_type))
+                                    logger.info(
+                                        f"Q{question_idx}: Secondary diagram from {sec_tool_name} ready"
+                                    )
+                            else:
+                                logger.warning(
+                                    f"Q{question_idx}: Secondary tool {sec_tool_name} failed, skipping"
+                                )
+
+                        # Stitch all diagrams vertically if we have more than one
+                        if len(all_image_bytes) > 1:
+                            try:
+                                stitched = self._stitch_vertical(all_image_bytes, all_labels)
+                                stitched_data = await self.diagram_tools.diagram_gen.upload_to_s3(
+                                    image_bytes=stitched,
+                                    assignment_id=assignment_id,
+                                    question_index=question_idx,
+                                )
+                                stitched_data.pop("_image_bytes", None)
+                                diagram_data = stitched_data
+                                logger.info(
+                                    f"Q{question_idx}: Multi-diagram stitch uploaded "
+                                    f"({len(all_image_bytes)} diagrams)"
+                                )
+                            except Exception as _stitch_err:
+                                logger.error(
+                                    f"Q{question_idx}: Multi-diagram stitch failed: {_stitch_err}"
+                                )
+                    else:
+                        # Could not get primary bytes — skip secondary calls
+                        diagram_data.pop("_image_bytes", None)
+
                 if diagram_data:
                     # ── Diagram Review Step ──────────────────────────────
                     # Skip review if engine=ai/both already reviewed in the Imagen retry loop
@@ -758,9 +961,28 @@ Mode: {mode_description}
                                         f"Regenerating Q{question_idx} with corrected description: "
                                         f"{corrected_desc[:120]}..."
                                     )
+                                    # Preserve the original tool for regeneration so matplotlib
+                                    # diagrams don't degrade to SVG (which can't render LaTeX
+                                    # and produces overlapping text for plots/iv_curves).
+                                    if tool_name == "claude_code_tool":
+                                        regen_tool = "claude_code_tool"
+                                        regen_args = dict(tool_arguments)
+                                        regen_args["description"] = (
+                                            corrected_desc
+                                            + " Do NOT include any computed answer values, "
+                                            "specific numeric results, or parameters that reveal "
+                                            "the solution."
+                                        )
+                                    else:
+                                        regen_tool = "circuitikz_tool"
+                                        regen_args = {"description": corrected_desc}
+                                    logger.info(
+                                        f"Regenerating Q{question_idx} using {regen_tool} "
+                                        f"(original tool preserved)"
+                                    )
                                     regen_data = await self.diagram_tools.execute_tool_call(
-                                        tool_name="svg_circuit_tool",
-                                        tool_arguments={"description": corrected_desc},
+                                        tool_name=regen_tool,
+                                        tool_arguments=regen_args,
                                         assignment_id=assignment_id,
                                         question_idx=question_idx,
                                         question_text=question_text,
@@ -837,6 +1059,56 @@ Examples:
                         "filename": diagram_data.get("filename"),
                     }
                     question["hasDiagram"] = True
+
+                    # ── Auto-convert question type for diagram-dependent questions ──
+                    # When a diagram is generated for a question that asks students
+                    # to draw, determine, or analyze outputs/results from a diagram,
+                    # the question type should be "diagram-analysis" so students know
+                    # they need to work with the diagram (e.g., draw waveforms, trace
+                    # algorithms, complete diagrams).
+                    _qt_lower = question_text.lower()
+
+                    # Electrical/CompEng: waveform, timing, counter, sequential circuit questions
+                    _is_waveform_or_counter_q = (
+                        q_diagram_type in (
+                            "waveform", "timing_diagram", "circuit_with_timing",
+                            "flip_flop_circuit", "sequential_circuit",
+                            "counter_circuit", "shift_register",
+                            "isa_timing",
+                        )
+                        and any(kw in _qt_lower for kw in [
+                            "output waveform", "draw the waveform", "sketch the waveform",
+                            "determine the output", "describe the output",
+                            "find the output", "complete the timing",
+                            "state after", "clock pulse", "clock cycle",
+                            "state of the counter", "state transition",
+                        ])
+                    )
+
+                    # Generic across all domains: questions that ask students to
+                    # draw, sketch, trace, or complete something on the diagram
+                    _is_draw_or_trace_q = (
+                        question.get("hasDiagram", False)
+                        and any(kw in _qt_lower for kw in [
+                            "draw the", "sketch the", "complete the diagram",
+                            "trace the", "fill in the", "plot the",
+                            "draw a free body", "draw the shear",
+                            "draw the bending moment", "draw the ray diagram",
+                            "draw the mechanism", "draw the state diagram",
+                            "complete the truth table", "complete the timing diagram",
+                            "draw the output", "construct the",
+                        ])
+                    )
+
+                    if (_is_waveform_or_counter_q or _is_draw_or_trace_q) and question.get("type") in (
+                        "short-answer", "numerical", "fill-in-blanks",
+                    ):
+                        old_type = question["type"]
+                        question["type"] = "diagram-analysis"
+                        logger.info(
+                            f"Q{question_idx}: Auto-converted type '{old_type}' → "
+                            f"'diagram-analysis' (question requires diagram interaction)"
+                        )
 
                     logger.info(
                         f"Successfully added diagram to question {question_idx}"
@@ -975,6 +1247,159 @@ Examples:
         right_x = left_x + BORDER_W * 2 + box_inner_w + BOX_GAP
         right_y = OUTER_PAD
         draw_box(right_x, right_y, img_nonai, nonai_label, NONAI_COLOR)
+
+        out = io.BytesIO()
+        canvas.save(out, format="PNG")
+        return out.getvalue()
+
+    @staticmethod
+    def _label_for_tool(tool_name: str, diagram_type: str = "") -> str:
+        """Return a human-readable label for a tool name.
+        
+        For multi-diagram stitching, uses diagram_type to produce
+        context-aware labels. When a secondary diagram is stitched
+        below a primary one, we label it generically ('Given Information')
+        so it works across all subjects — not just electrical.
+        """
+        # Context-aware labels for the secondary (supplementary) portion
+        # of multi-diagram questions — generic across all subjects.
+        # The primary diagram gets its own label (Circuit Diagram, etc.);
+        # the secondary one is labeled generically so it works for any domain.
+        _multi_diagram_secondary_types = {
+            "circuit_with_timing", "sequential_circuit",
+            "flip_flop_circuit", "counter_circuit", "shift_register",
+        }
+        if tool_name in ("claude_code_tool", "matplotlib_tool") and diagram_type in _multi_diagram_secondary_types:
+            return "Given Information"
+
+        _labels = {
+            "circuitikz_tool": "Circuit Diagram",
+            "svg_circuit_tool": "Circuit Diagram",
+            "schemdraw_tool": "Circuit Diagram",
+            "claude_code_tool": "Timing / Waveform Diagram",
+            "matplotlib_tool": "Timing / Waveform Diagram",
+            "networkx_tool": "Graph / Tree Diagram",
+            "imagen_tool": "AI Generated",
+            "dalle_tool": "AI Generated",
+        }
+        return _labels.get(tool_name, "Diagram")
+
+    def _stitch_vertical(
+        self,
+        image_bytes_list: list,
+        labels: list = None,
+    ) -> bytes:
+        """
+        Stack multiple PNG images vertically with optional header labels.
+
+        Layout:
+          ┌──────────────────────────────┐
+          │  ■ Circuit Diagram           │  ← header bar
+          ├──────────────────────────────┤
+          │        <circuit image>       │
+          ├──────────────────────────────┤
+          │  ■ Timing / Waveform Diagram │  ← header bar
+          ├──────────────────────────────┤
+          │       <waveform image>       │
+          └──────────────────────────────┘
+        """
+        from PIL import Image, ImageDraw, ImageFont
+        import io
+
+        if not image_bytes_list:
+            raise ValueError("No images to stitch")
+
+        COLORS = [
+            (25,  100, 210),   # blue
+            (20,  145,  65),   # green
+            (180,  70,  20),   # orange
+            (120,  50, 160),   # purple
+        ]
+        HEADER_TEXT = (255, 255, 255)
+        BG          = (245, 246, 248)
+        BOX_BORDER  = (200, 200, 200)
+
+        HEADER_H  = 34
+        IMG_PAD   = 12
+        OUTER_PAD = 16
+        BORDER_W  = 2
+        BOX_GAP   = 12  # vertical gap between boxes
+
+        # ── Load images ──────────────────────────────────────────────────
+        images = []
+        for ib in image_bytes_list:
+            images.append(Image.open(io.BytesIO(ib)).convert("RGB"))
+
+        # Scale all to the same width (use the max width)
+        target_w = max(img.width for img in images)
+
+        def scale_to_width(img, w):
+            if img.width == w:
+                return img
+            ratio = w / img.width
+            return img.resize((w, int(img.height * ratio)), Image.LANCZOS)
+
+        images = [scale_to_width(img, target_w) for img in images]
+
+        if labels is None:
+            labels = [f"Diagram {i+1}" for i in range(len(images))]
+
+        # ── Compute total canvas size ────────────────────────────────────
+        box_inner_w = target_w + IMG_PAD * 2
+        total_w = OUTER_PAD * 2 + BORDER_W * 2 + box_inner_w
+
+        total_h = OUTER_PAD
+        for img in images:
+            total_h += BORDER_W * 2 + HEADER_H + IMG_PAD + img.height + IMG_PAD + BOX_GAP
+        total_h += OUTER_PAD - BOX_GAP  # remove last gap, add bottom pad
+
+        canvas = Image.new("RGB", (total_w, total_h), BG)
+        draw   = ImageDraw.Draw(canvas)
+
+        # ── Font ─────────────────────────────────────────────────────────
+        try:
+            font_bold = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 15)
+        except Exception:
+            font_bold = ImageFont.load_default()
+
+        # ── Draw each box ────────────────────────────────────────────────
+        y_cursor = OUTER_PAD
+        for idx, (img, label) in enumerate(zip(images, labels)):
+            color = COLORS[idx % len(COLORS)]
+
+            x0 = OUTER_PAD
+            y0 = y_cursor
+            box_h = HEADER_H + IMG_PAD + img.height + IMG_PAD
+            x1 = x0 + BORDER_W * 2 + box_inner_w
+            y1 = y0 + BORDER_W * 2 + box_h
+
+            # Outer border
+            draw.rectangle([x0, y0, x1, y1], outline=BOX_BORDER, width=BORDER_W)
+
+            # Header bar
+            hx0 = x0 + BORDER_W
+            hy0 = y0 + BORDER_W
+            hx1 = x1 - BORDER_W
+            hy1 = hy0 + HEADER_H
+            draw.rectangle([hx0, hy0, hx1, hy1], fill=color)
+
+            # ■ icon + label
+            icon_x = hx0 + 10
+            icon_y = hy0 + (HEADER_H - 12) // 2
+            draw.rectangle([icon_x, icon_y, icon_x + 10, icon_y + 10], fill=HEADER_TEXT)
+            text_x = icon_x + 16
+            text_y = hy0 + (HEADER_H - 15) // 2
+            draw.text((text_x, text_y), label, fill=HEADER_TEXT, font=font_bold)
+
+            # Divider
+            draw.line([hx0, hy1, hx1, hy1], fill=color, width=1)
+
+            # Paste image
+            img_x = x0 + BORDER_W + IMG_PAD
+            img_y = hy1 + IMG_PAD
+            canvas.paste(img, (img_x, img_y))
+
+            y_cursor = y1 + BOX_GAP
 
         out = io.BytesIO()
         canvas.save(out, format="PNG")

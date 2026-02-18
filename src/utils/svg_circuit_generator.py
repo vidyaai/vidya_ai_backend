@@ -103,6 +103,24 @@ class SVGCircuitGenerator:
    - VDD/VSS labels at top/bottom
    - Component values where specified (e.g., "R = 2kΩ", "CL = 2fF")
    - Font size 14-16px for labels, 12px for values
+   - **SUBSCRIPTS AND SUPERSCRIPTS (MANDATORY for variables like y₁, P₂, V_in):**
+     Use `<tspan>` with baseline-shift and smaller font-size. NEVER omit subscripts.
+     ```svg
+     <!-- Example: y₁ with proper subscript -->
+     <text x="100" y="200" font-family="Arial" font-size="15">
+       y<tspan baseline-shift="sub" font-size="11">1</tspan>
+     </text>
+     <!-- Example: P₂ -->
+     <text x="100" y="250" font-family="Arial" font-size="15">
+       P<tspan baseline-shift="sub" font-size="11">2</tspan>
+     </text>
+     <!-- Example: V_out -->
+     <text x="100" y="300" font-family="Arial" font-size="15">
+       V<tspan baseline-shift="sub" font-size="11">out</tspan>
+     </text>
+     ```
+   - ALWAYS use `<tspan baseline-shift="sub">` for subscripts — NEVER just concatenate (e.g., NEVER write "y1", always use proper subscript)
+   - For superscripts use `<tspan baseline-shift="super" font-size="11">`
 
 5. **Sizing:**
    - SVG viewBox should be appropriately sized for the circuit complexity

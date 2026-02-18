@@ -21,6 +21,9 @@ _CODE_BETTER_TYPES = frozenset({
     "function_plot", "3d_surface", "number_line", "matrix_visualization",
     "titration_curve", "chromatography",
     "isa_timing", "cache_organization",
+    "sequential_circuit", "flip_flop_circuit", "counter_circuit",
+    "shift_register", "fsm_diagram", "cdc_diagram",
+    "circuit_with_timing",
 })
 
 _CLASSIFICATION_PROMPT = """You are a subject-domain classifier for educational diagrams.
@@ -29,7 +32,7 @@ Given a question, classify it into ONE of these 8 domains and select the most sp
 
 DOMAINS AND DIAGRAM TYPES:
 
-electrical: circuit_schematic, bode_plot, iv_curve, waveform, block_diagram, timing_diagram
+electrical: circuit_schematic, bode_plot, iv_curve, waveform, block_diagram, timing_diagram, sequential_circuit, flip_flop_circuit, counter_circuit, shift_register, fsm_diagram, cdc_diagram, circuit_with_timing
 mechanical: free_body_diagram, beam_diagram, truss_diagram, stress_strain_curve, pv_diagram, fluid_flow, mechanism_linkage
 cs: binary_tree, linked_list, graph_network, sorting_visualization, flowchart, automata_fsm, stack_queue, hash_table
 civil: truss_frame, cross_section, retaining_wall, flow_network, contour_map, soil_profile
@@ -45,13 +48,21 @@ COMPLEXITY:
 
 AI_SUITABLE (whether Gemini image gen works well — True for spatial/structural, False for precise mathematical plots and data structures):
 - True: circuit_schematic, free_body_diagram, truss_diagram, ray_diagram, molecular_structure, cpu_block_diagram, lab_apparatus, mechanism_linkage, optics_setup, field_lines, energy_level_diagram, wave_diagram, spring_mass, pendulum, truss_frame, cross_section, retaining_wall, beam_diagram, orbital_diagram, reaction_mechanism, pipeline_diagram, memory_hierarchy, logic_circuit, alu_circuit, block_diagram, geometric_construction, fluid_flow
-- False: all plots (bode_plot, iv_curve, function_plot, stress_strain_curve, titration_curve, pv_diagram, titration_curve), data structures (binary_tree, linked_list, graph_network, sorting_visualization, stack_queue, hash_table), timing_diagram, automata_fsm, flowchart, 3d_surface, number_line, matrix_visualization, isa_timing, cache_organization, waveform, chromatography
+- False: all plots (bode_plot, iv_curve, function_plot, stress_strain_curve, titration_curve, pv_diagram, titration_curve), data structures (binary_tree, linked_list, graph_network, sorting_visualization, stack_queue, hash_table), timing_diagram, automata_fsm, flowchart, 3d_surface, number_line, matrix_visualization, isa_timing, cache_organization, waveform, chromatography, sequential_circuit, flip_flop_circuit, counter_circuit, shift_register, fsm_diagram, cdc_diagram, circuit_with_timing
 
 PREFERRED_TOOL (for nonai path):
-- matplotlib: most diagram types
+- circuitikz: circuit_schematic, sequential_circuit, flip_flop_circuit, counter_circuit, shift_register, cdc_diagram (best for ALL electrical circuits with precise pin labels)
+- matplotlib: most diagram types, timing_diagram, waveform, bode_plot, iv_curve, fsm_diagram
 - networkx: binary_tree, linked_list, graph_network, automata_fsm, stack_queue, hash_table
 - graphviz: flowchart, automata_fsm
-- svg: circuit_schematic, alu_circuit, logic_circuit
+- circuit_with_timing: Use circuitikz for the circuit + matplotlib for the timing → preferred_tool = circuitikz (primary)
+
+IMPORTANT CLASSIFICATION RULES:
+- If a question involves flip-flops, shift registers, counters, or sequential logic with gates → diagram_type = sequential_circuit or flip_flop_circuit
+- If a question asks for BOTH a circuit diagram AND a timing/waveform diagram → diagram_type = circuit_with_timing
+- circuit_with_timing means: the circuit schematic uses circuitikz AND the timing waveform uses matplotlib (two outputs)
+- For questions about D flip-flops, JK flip-flops, SR latches etc → flip_flop_circuit or sequential_circuit, NOT block_diagram
+- For questions about shift registers → shift_register, NOT block_diagram
 
 Respond with ONLY valid JSON — no markdown, no explanation:
 {
@@ -157,7 +168,12 @@ class DomainRouter:
         if "electrical" in hint or any(kw in q for kw in [
             "circuit", "cmos", "mosfet", "transistor", "amplifier", "resistor",
             "capacitor", "voltage", "current", "inverter", "nand", "nor",
-            "vdd", "drain", "source", "op-amp", "bode", "iv curve"
+            "vdd", "drain", "source", "op-amp", "bode", "iv curve",
+            "flip-flop", "flip flop", "d flip", "jk flip", "sr latch",
+            "shift register", "counter", "sequential", "clock edge",
+            "rising edge", "falling edge", "timing diagram", "waveform",
+            "combinational logic", "and gate", "or gate", "xor gate",
+            "mux", "demux", "decoder", "encoder", "alu", "register file"
         ]):
             return "electrical"
         if "computer" in hint or any(kw in q for kw in [
@@ -202,10 +218,43 @@ class DomainRouter:
     def _fallback_classification(self, question_text: str, subject_hint: str) -> Dict[str, Any]:
         """Returns a safe fallback classification."""
         domain = self._infer_domain(question_text, subject_hint)
+        q = question_text.lower()
+
+        # Determine diagram type and tool from keywords
+        diagram_type = "block_diagram"
+        preferred_tool = "matplotlib"
+        ai_suitable = True
+
+        if domain == "electrical":
+            # Check for sequential / flip-flop circuits
+            _seq_kws = ["flip-flop", "flip flop", "shift register", "counter",
+                        "d flip", "jk flip", "sr latch", "sequential"]
+            _timing_kws = ["timing diagram", "waveform", "clock cycle", "input waveform"]
+            has_circuit = any(kw in q for kw in _seq_kws + ["circuit", "gate", "logic"])
+            has_timing = any(kw in q for kw in _timing_kws)
+
+            if has_circuit and has_timing:
+                diagram_type = "circuit_with_timing"
+                preferred_tool = "circuitikz"
+                ai_suitable = False
+            elif any(kw in q for kw in _seq_kws):
+                diagram_type = "sequential_circuit"
+                preferred_tool = "circuitikz"
+                ai_suitable = False
+            elif any(kw in q for kw in ["circuit", "mosfet", "cmos", "transistor",
+                                         "op-amp", "amplifier", "resistor"]):
+                diagram_type = "circuit_schematic"
+                preferred_tool = "circuitikz"
+                ai_suitable = False
+            elif has_timing:
+                diagram_type = "timing_diagram"
+                preferred_tool = "matplotlib"
+                ai_suitable = False
+
         return {
             "domain": domain,
-            "diagram_type": "block_diagram",
+            "diagram_type": diagram_type,
             "complexity": "moderate",
-            "ai_suitable": True,
-            "preferred_tool": "matplotlib",
+            "ai_suitable": ai_suitable,
+            "preferred_tool": preferred_tool,
         }

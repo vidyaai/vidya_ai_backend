@@ -205,10 +205,61 @@ CHECK ONLY THE FOLLOWING — DO NOT check topology, circuit correctness, or doma
    - Totally illegible text that cannot be read at all → FAIL
    - Otherwise PASS even with minor typos or font issues
 
-⛔ DO NOT verify circuit topology, component connections, or domain-specific correctness.
+4. **SEMANTIC DATA CONSISTENCY CHECK** (CRITICAL — applies to ALL subjects):
+   Extract EVERY specific data value, number, sequence, label, or transition from the
+   QUESTION text. Then verify each one appears CORRECTLY in the diagram image. Any
+   mismatch between what the question states and what the diagram shows is a FAIL
+   with FIXABLE=NO (the diagram must be regenerated from scratch).
+
+   What to compare (domain-generic examples):
+   ── Electrical / Computer Engineering ──
+   • FSM: state names (S0, S1…), transitions (input/output on arrows), reset state
+   • Circuits: component labels (R1, C2), node names (Vout, Vin), pin names
+   • Timing: signal names, clock edges, sequence order
+
+   ── Computer Science ──
+   • Linked lists: node values AND their order (3→5→7→9, NOT 3→5→7→8)
+   • Trees: node values, parent-child relationships, left/right placement
+   • Graphs: vertex labels, edge weights, directed vs undirected
+   • Stack/Queue: element values and their top-to-bottom or front-to-back order
+   • Hash tables: keys, values, bucket indices
+
+   ── Physics ──
+   • Free-body diagrams: force labels (F₁, mg, T), directions (up/down/left/right)
+   • Optics: focal lengths, object/image distances, lens/mirror labels
+   • Waves: wavelength (λ), amplitude (A), frequency values
+
+   ── Mathematics ──
+   • Graphs: axis labels, function names (f(x), g(x)), key points/intercepts
+   • Geometry: side lengths, angle measures, vertex labels (A, B, C)
+   • Coordinate geometry: specific point coordinates ((2,3), (-1,4))
+
+   ── Chemistry ──
+   • Molecular diagrams: atom labels, bond types (single/double/triple)
+   • Reaction diagrams: reactant/product formulas, arrow directions
+   • Orbital diagrams: energy levels, electron counts
+
+   ── Mechanical / Civil Engineering ──
+   • Free-body/structural: force magnitudes (F=250N), moment values, support types
+   • Beams: lengths (L=4m), load positions, support locations (pin, roller)
+   • Stress/strain: dimension labels, material regions
+
+   HOW TO CHECK:
+   a) Read the QUESTION text and list every specific value, name, or sequence.
+   b) For each item in the list, locate it in the diagram image.
+   c) If a value is DIFFERENT in the diagram than in the question → FAIL.
+   d) If a sequence/order is DIFFERENT (e.g., linked list nodes in wrong order) → FAIL.
+   e) If a structural relationship is WRONG (e.g., wrong parent-child in tree) → FAIL.
+   f) Missing values that ARE structural labels → covered by Check #2 (LABEL CHECK).
+   When FAILING for data mismatch, list EVERY mismatch in ISSUES, e.g.:
+     "Question says node sequence 3→5→7→9 but diagram shows 3→5→7→8"
+     "Question says state S2 transitions to S0 on input 1 but diagram shows S2→S3"
+
+⛔ DO NOT verify circuit topology correctness or domain-specific design rules.
 ⛔ DO NOT fail a diagram because you think a component is "wired incorrectly" or "in the wrong position".
 ⛔ DO NOT apply your knowledge of standard circuit topologies to judge the diagram.
-⛔ The ONLY authority is: (a) the QUESTION labels are present, (b) no answer is leaked, (c) text is legible.
+✅ DO verify that specific data values, labels, sequences, and transitions in the QUESTION
+   match what is shown in the diagram — this is a DATA ACCURACY check, not a design correctness check.
 
 TOLERANCE GUIDELINES:
 - PASS diagrams with minor cosmetic issues that do NOT affect understanding:
@@ -229,6 +280,7 @@ CORRECTED_DESCRIPTION: <if FAIL due to missing/wrong labels, write a complete se
 FIXABLE GUIDELINES:
 - YES if the diagram structure is visible but has PURE TEXT errors (wrong/missing labels, illegible text)
 - NO for answer leaks or if the diagram is fundamentally unreadable/blank
+- NO for semantic data mismatches (wrong values, wrong sequences, wrong transitions) — these require full regeneration
 
 If an answer leak is detected, CORRECTED_DESCRIPTION must say:
 "Show only the diagram structure with generic input labels and output label. Do NOT show any computed values, boolean expressions, or truth tables."

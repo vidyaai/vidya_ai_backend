@@ -13,12 +13,21 @@ from controllers.config import logger
 # tool_type is the library hint passed to claude_code_tool
 _FALLBACK_TOOL_MAP = {
     # ── Electrical ──────────────────────────────────────────────────────────
-    ("electrical", "circuit_schematic"):    ("svg_circuit_tool", "svg"),
+    ("electrical", "circuit_schematic"):    ("circuitikz_tool", "circuitikz"),
+    ("electrical", "analog_circuit"):       ("circuitikz_tool", "circuitikz"),
+    ("electrical", "mosfet_circuit"):       ("circuitikz_tool", "circuitikz"),
+    ("electrical", "sequential_circuit"):   ("circuitikz_tool", "circuitikz"),
+    ("electrical", "flip_flop_circuit"):    ("circuitikz_tool", "circuitikz"),
+    ("electrical", "counter_circuit"):      ("circuitikz_tool", "circuitikz"),
+    ("electrical", "shift_register"):       ("circuitikz_tool", "circuitikz"),
+    ("electrical", "cdc_diagram"):          ("circuitikz_tool", "circuitikz"),
+    ("electrical", "circuit_with_timing"):  ("circuitikz_tool", "circuitikz"),
     ("electrical", "bode_plot"):            ("claude_code_tool", "matplotlib"),
     ("electrical", "iv_curve"):             ("claude_code_tool", "matplotlib"),
     ("electrical", "waveform"):             ("claude_code_tool", "matplotlib"),
     ("electrical", "block_diagram"):        ("claude_code_tool", "matplotlib"),
     ("electrical", "timing_diagram"):       ("claude_code_tool", "matplotlib"),
+    ("electrical", "fsm_diagram"):          ("claude_code_tool", "matplotlib"),
 
     # ── Mechanical ──────────────────────────────────────────────────────────
     ("mechanical", "free_body_diagram"):    ("claude_code_tool", "matplotlib"),
@@ -79,8 +88,8 @@ _FALLBACK_TOOL_MAP = {
     ("computer_eng", "cpu_block_diagram"):  ("claude_code_tool", "matplotlib"),
     ("computer_eng", "memory_hierarchy"):   ("claude_code_tool", "matplotlib"),
     ("computer_eng", "pipeline_diagram"):   ("claude_code_tool", "matplotlib"),
-    ("computer_eng", "alu_circuit"):        ("svg_circuit_tool", "svg"),
-    ("computer_eng", "logic_circuit"):      ("svg_circuit_tool", "svg"),
+    ("computer_eng", "alu_circuit"):        ("circuitikz_tool", "circuitikz"),
+    ("computer_eng", "logic_circuit"):      ("circuitikz_tool", "circuitikz"),
     ("computer_eng", "isa_timing"):         ("claude_code_tool", "matplotlib"),
     ("computer_eng", "cache_organization"): ("claude_code_tool", "matplotlib"),
 }
@@ -161,8 +170,8 @@ class SubjectSpecificFallbackRouter:
             domain, diagram_type, description, question_text
         )
 
-        if tool_name == "svg_circuit_tool":
-            # For SVG tool: prepend subject context to description
+        if tool_name in ("circuitikz_tool", "svg_circuit_tool"):
+            # For circuit tools: pass description and optional subject context
             enhanced_desc = description
             if subject_guidance:
                 enhanced_desc = f"{subject_guidance}\n\n{description}"

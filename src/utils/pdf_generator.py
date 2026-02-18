@@ -1330,6 +1330,188 @@ class AssignmentPDFGenerator:
             logger.error(f"Error generating assignment PDF: {e}")
             raise
 
+    def generate_solution_question_html(self, question: Dict[str, Any], question_num: int) -> str:
+        """Generate HTML for a single question including answer and rubric (solution key)."""
+        # Reuse the standard question HTML but strip its closing </div> so we can
+        # append answer/rubric sections before re-closing.
+        base = self.generate_question_html(question, question_num)
+        # Remove the final closing </div> that generate_question_html appends
+        last_close = base.rfind("</div>")
+        html = base[:last_close] if last_close != -1 else base
+
+        equations = question.get("equations", [])
+
+        # Append correct answer
+        raw_answer = question.get("correctAnswer") or question.get("correct_answer", "")
+        if raw_answer:
+            if equations:
+                answer_html = self.process_question_text_with_equations(raw_answer, equations)
+            else:
+                answer_html = self.process_question_text(raw_answer)
+            html += f"""
+        <div class="solution-answer">
+            <div class="solution-label">Answer</div>
+            <div class="solution-content">{answer_html}</div>
+        </div>"""
+
+        # Append rubric
+        rubric = question.get("rubric", "")
+        if rubric:
+            if equations:
+                rubric_html = self.process_question_text_with_equations(rubric, equations)
+            else:
+                rubric_html = self.process_question_text(rubric)
+            html += f"""
+        <div class="solution-rubric">
+            <div class="solution-label">Grading Rubric</div>
+            <div class="solution-content">{rubric_html}</div>
+        </div>"""
+
+        # Handle subquestion answers
+        if question.get("subquestions"):
+            for i, subq in enumerate(question["subquestions"]):
+                subq_equations = subq.get("equations", equations)
+                raw_subq_answer = subq.get("correctAnswer") or subq.get("correct_answer", "")
+                if raw_subq_answer:
+                    if subq_equations:
+                        subq_ans_html = self.process_question_text_with_equations(raw_subq_answer, subq_equations)
+                    else:
+                        subq_ans_html = self.process_question_text(raw_subq_answer)
+                    html += f"""
+        <div class="solution-answer" style="margin-left:20px">
+            <div class="solution-label">Part ({chr(97 + i)}) Answer</div>
+            <div class="solution-content">{subq_ans_html}</div>
+        </div>"""
+
+        # Close the question div
+        html += "\n        </div>"
+        return html
+
+    def generate_solution_pdf(self, assignment: Dict[str, Any]) -> bytes:
+        """
+        Generate a solution/answer-key PDF for an assignment.
+        Includes all question content plus correctAnswer and rubric for each question.
+        """
+        try:
+            title = assignment.get("title", "Assignment")
+            description = assignment.get("description", "")
+            questions = assignment.get("questions", [])
+            total_points = assignment.get("total_points", 0)
+
+            katex_css = ""
+            if MARKDOWN_KATEX_AVAILABLE:
+                try:
+                    katex_css = """
+                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+                    <style>
+                    .katex { font-size: 1em; }
+                    .katex-display { margin: 0.5em 0; }
+                    </style>
+                    """
+                except:
+                    pass
+
+            solution_css_extra = """
+            .solution-answer {
+                margin-top: 12px;
+                padding: 10px 14px;
+                background: #f0fdf4;
+                border-left: 4px solid #16a34a;
+                border-radius: 4px;
+            }
+            .solution-rubric {
+                margin-top: 8px;
+                padding: 10px 14px;
+                background: #eff6ff;
+                border-left: 4px solid #2563eb;
+                border-radius: 4px;
+            }
+            .solution-label {
+                font-size: 0.78em;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-bottom: 4px;
+                color: #374151;
+            }
+            .solution-content {
+                font-size: 0.92em;
+                color: #1f2937;
+            }
+            .solution-banner {
+                background: #fef9c3;
+                border: 1px solid #f59e0b;
+                padding: 8px 14px;
+                border-radius: 6px;
+                font-size: 0.85em;
+                font-weight: 600;
+                color: #92400e;
+                margin-bottom: 16px;
+                text-align: center;
+            }
+            """
+
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>{title} — Solution Key</title>
+                {katex_css}
+                <style>{solution_css_extra}</style>
+            </head>
+            <body>
+                <div class="document-header">
+                    <div class="document-title">{title} — Solution Key</div>
+                    <div class="document-meta">
+                        Total Points: {total_points} | Questions: {len(questions)} | Date: {datetime.now().strftime('%B %d, %Y')}
+                    </div>
+                </div>
+
+                <div class="solution-banner">INSTRUCTOR COPY — CONTAINS ANSWERS &amp; RUBRICS — DO NOT DISTRIBUTE TO STUDENTS</div>
+
+                {f'''
+                <div class="instructions">
+                    <p>{self.process_question_text(description)}</p>
+                </div>
+                ''' if description else ''}
+
+                <div class="questions">
+            """
+
+            for i, question in enumerate(questions, 1):
+                html_content += self.generate_solution_question_html(question, i)
+
+            html_content += """
+                </div>
+                <div class="footer-info">
+                    <p>Generated by Vidya AI Assignment System — Solution Key</p>
+                </div>
+            </body>
+            </html>
+            """
+
+            html_doc = HTML(string=html_content)
+            css_doc = CSS(string=self.generate_css())
+            stylesheets = [css_doc]
+            if MARKDOWN_KATEX_AVAILABLE:
+                try:
+                    katex_cdn_css = CSS(
+                        url="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+                    )
+                    stylesheets.insert(0, katex_cdn_css)
+                except Exception as e:
+                    logger.warning(f"Failed to fetch KaTeX CSS from CDN: {e}")
+
+            pdf_buffer = io.BytesIO()
+            html_doc.write_pdf(pdf_buffer, stylesheets=stylesheets)
+            pdf_buffer.seek(0)
+            return pdf_buffer.getvalue()
+
+        except Exception as e:
+            logger.error(f"Error generating solution PDF: {e}")
+            raise
+
     def cleanup(self):
         """Clean up temporary files."""
         try:

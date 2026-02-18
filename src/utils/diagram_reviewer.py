@@ -141,7 +141,22 @@ Be STRICT about these failure criteria:
   Also verify that every specific numerical value stated in the question (quantities,
   measurements, parameters) appears on or near the corresponding element in the diagram.
   A duplicate/double label on the same element (same name rendered twice) is a rendering
-  error — FAIL."""
+  error — FAIL.
+- **SEMANTIC DATA CONSISTENCY CHECK** (CRITICAL — applies to ALL subjects):
+  Extract EVERY specific data value, number, sequence, label, or transition from the
+  QUESTION text. Then verify each one appears CORRECTLY in the diagram image. Any
+  mismatch between what the question states and what the diagram shows is a FAIL.
+  Examples across domains:
+  * Electrical/FSM: state names, transition labels (input/output), reset state MUST match question
+  * CS linked-list: node values AND order must match (3→5→7→9 ≠ 3→5→7→8)
+  * CS trees: node values, parent-child relationships, left/right placement
+  * CS graphs: vertex labels, edge weights, directed vs undirected
+  * Physics: force labels/directions, wavelengths, object/image distances
+  * Math: axis labels, function names, specific points/coordinates
+  * Chemistry: atom labels, bond types, reaction arrows
+  * Mechanical/Civil: force magnitudes, beam lengths, support types/positions
+  When a data mismatch is found, list EVERY mismatch explicitly in ISSUES and provide a
+  CORRECTED_DESCRIPTION that includes ALL correct values from the question text."""
 
     def _build_review_prompt(
         self,
@@ -152,12 +167,28 @@ Be STRICT about these failure criteria:
         diagram_type: str = "",
     ) -> str:
         style_hint_section = ""
-        if domain and diagram_type:
+        domain_rules_section = ""
+        
+        if domain:
             try:
                 from utils.subject_prompt_registry import SubjectPromptRegistry
-                hint = SubjectPromptRegistry().get_reviewer_style_hint(domain, diagram_type)
-                if hint:
-                    style_hint_section = f"\nDIAGRAM STYLE HINT: {hint}\n"
+                registry = SubjectPromptRegistry()
+                
+                # Get style hint for the specific diagram type
+                if diagram_type:
+                    hint = registry.get_reviewer_style_hint(domain, diagram_type)
+                    if hint:
+                        style_hint_section = f"\nDIAGRAM STYLE HINT: {hint}\n"
+                
+                # Get comprehensive domain-specific review rules
+                domain_rules = registry.get_reviewer_domain_rules(domain)
+                if domain_rules:
+                    domain_rules_section = f"""
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  SUBJECT-SPECIFIC REVIEW RULES — Apply these rigorously for this domain      ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+{domain_rules}
+"""
             except Exception:
                 pass
 
@@ -177,34 +208,70 @@ the diagram MUST show block-level IEEE gate symbols, NOT CMOS transistor-level c
 QUESTION: {question_text}
 
 DIAGRAM DESCRIPTION (used to generate it): {diagram_description}
-{style_hint_section}{context_section}
-Analyze the image and check:
-1. Does the diagram correctly represent what was described?
-2. Is the diagram style appropriate? (gate-level vs transistor-level)
-3. Are all labels, wires, and components clearly visible and not overlapping?
-4. Is the circuit topology correct for the described function?
-5. Would a professor approve this diagram for a student assignment?
-6. **ANSWER LEAK CHECK**: Does the diagram reveal the answer? Look for:
-   - Output values shown ("Output = 0", "Y = 1")
-   - Boolean expressions displayed on the diagram
-   - Input values shown ("A=1", "B=0") instead of just variable names
-   - Truth tables embedded in the diagram
-   - Signal values (0/1) annotated on wires
-   If ANY answer is visible, this is a FAIL.
-7. **LABEL CONSISTENCY CHECK**: Read every label in the diagram and compare it against
-   every named entity in the QUESTION text above. This rule is universal — it applies to
-   any subject or discipline without exception. The question is the authoritative source of
-   names; the diagram must match it exactly.
-   - If any entity named in the question appears under a different name or symbol in the
-     diagram, that is a FAIL — list the mismatch in ISSUES
-   - If the question states a specific numerical value for any element, that value must be
-     visible on or near the corresponding element in the diagram
-   - If any entity named in the question is entirely absent from the diagram, that is a FAIL
-   - A duplicate/double label on a single element (same name rendered twice) is a rendering
-     error — FAIL
-   List every mismatch explicitly in ISSUES.
+{style_hint_section}{domain_rules_section}{context_section}
+══════════════════════════════════════════════════════════════════════════════
+REVIEW CHECKLIST — Verify each item against the image
+══════════════════════════════════════════════════════════════════════════════
 
-Respond in the EXACT format specified."""
+1. **STRUCTURAL CORRECTNESS**: Does the diagram correctly represent what was described?
+   - All components present and correctly connected
+   - Topology matches the described function
+   
+2. **STYLE APPROPRIATENESS**: Is the diagram style correct for the domain?
+   - For digital logic: IEEE gate symbols (not transistor-level) unless CMOS asked
+   - For circuits: correct symbol conventions for the region/style
+   
+3. **VISUAL CLARITY**: Are all elements clearly visible?
+   - No overlapping labels or wires
+   - All text readable
+   - No rendering artifacts
+   
+4. **WIRING/CONNECTION RULES**: Are connections drawn correctly?
+   - Wires horizontal/vertical where required (e.g., circuit schematics)
+   - No floating nodes (unless intentional open circuit)
+   - Junction dots where wires connect
+   
+5. **LABELING COMPLETENESS**: Are all components properly labeled?
+   - Every named entity in question appears in diagram with EXACT same name
+   - All numerical values from question shown on corresponding elements
+   - No duplicate/overlapping labels on same element
+   
+6. **ANSWER LEAK CHECK**: Does the diagram reveal the answer? FAIL if:
+   - Output values shown ("Output = 0", "Y = 1")
+   - Boolean expressions on output
+   - Input values shown ("A=1") instead of just "A"
+   - Truth tables embedded
+   - Signal values on intermediate wires
+   - Computed results shown (current, voltage, etc. that student should calculate)
+
+7. **SEMANTIC DATA CONSISTENCY CHECK** (CRITICAL — applies to ALL subjects):
+   Extract EVERY specific data value, number, sequence, label, or transition from the
+   QUESTION text. Verify each one appears CORRECTLY in the diagram image.
+   
+   What to compare (domain-generic examples):
+   • Electrical/FSM: state names (S0,S1…), transition labels, reset state
+   • CS linked-list/tree/graph: node values AND their order/structure
+   • Physics: force labels/magnitudes, directions, wavelengths
+   • Math: axis labels, function names, point coordinates
+   • Chemistry: atom labels, bond types, reaction formulas
+   • Mech/Civil: force values, beam lengths, support types/positions
+   
+   HOW TO CHECK:
+   a) Read the QUESTION and list every specific value, name, or sequence.
+   b) For each item, locate it in the diagram.
+   c) If a value is DIFFERENT in the diagram vs the question → FAIL.
+   d) If a sequence/order is DIFFERENT (e.g., nodes in wrong order) → FAIL.
+   e) If a structural relationship is WRONG (e.g., wrong parent in tree) → FAIL.
+   List EVERY mismatch in ISSUES.
+   
+8. **DOMAIN-SPECIFIC RULES**: Apply ALL rules from the subject-specific section above.
+
+Respond in the EXACT format:
+
+VERDICT: PASS or FAIL
+REASON: <one sentence explanation>
+ISSUES: <comma-separated list of specific issues, or "none">
+CORRECTED_DESCRIPTION: <if FAIL, provide a better description for regeneration, or "none">"""
 
     def _parse_review_result(
         self,

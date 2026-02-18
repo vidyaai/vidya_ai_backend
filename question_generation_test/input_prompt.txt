@@ -1,29 +1,4 @@
-Open Channel Flow (Weir or Hydraulic Jump Figure)
-
-Generate a problem based on a hydraulic jump in a rectangular channel.
-
-The figure must include:
-
-Upstream depth (y1)
-
-Downstream depth (y2)
-
-Flow direction
-
-Channel width
-
-Provide flow rate and gravitational acceleration.
-
-Ask students to:
-
-Compute upstream Froude number
-
-Determine downstream depth using momentum equation
-
-Calculate energy loss across jump
-
-Classify jump type
-
-Comment on design implications
-
-Include a labeled cross-sectional diagram.
+Create 4 questions to test the students' knowledge on sequential circuit designs. Ask them questions on the following topics:
+1. Output waveforms of circuits consist of 2 Flipflops and a combo logic between them. Give them the input circuit and the input waveforms for each clock cycle.
+2. Ask them questions on counters like ring counter, johnston counter, decode counter etc.
+Make sure all the questions consists of images and circuits.

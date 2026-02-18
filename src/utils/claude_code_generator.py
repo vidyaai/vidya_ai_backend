@@ -370,11 +370,19 @@ plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')
 
 5. **Domain-Specific Requirements:**
 
+**SUBSCRIPTS & SUPERSCRIPTS (MANDATORY — applies to ALL domains):**
+- ALWAYS use matplotlib mathtext for subscripts: `$y_1$`, `$y_2$`, `$P_1$`, `$V_{out}$`, `$F_{drag}$`
+- NEVER write plain text like 'y1' or 'y2' — ALWAYS use `$y_1$` and `$y_2$`
+- For Greek letters with subscripts: `$\\rho_{water}$`, `$\\mu_{air}$`
+- Example: `ax.text(x, y, r'$y_1$', fontsize=16, bbox=dict(...))`
+- For axis labels: `ax.set_ylabel(r'Depth $y$ (m)', fontsize=14)`
+
 **Fluid Systems (manometers, pipes):**
 - For U-tube: Draw TWO vertical rectangles + horizontal connection
 - Show fluid layers with different colors
-- Label heights, pressures (P₁, P₂), fluid names
-- Use subscripts: ax.text(x, y, 'P₁', fontsize=14, bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='gray', alpha=0.9))
+- Label heights, pressures, fluid names using mathtext subscripts
+- Example: `ax.text(x, y, r'$P_1$', fontsize=16, bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='gray', alpha=0.9))`
+- Use `$y_1$`, `$y_2$` for depths — NEVER plain 'y1', 'y2'
 - ALL dimension labels and annotations MUST have white background bbox
 
 **Electrical Circuits (schemdraw 0.19):**
@@ -452,6 +460,16 @@ plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')
 4. Apply textbook style: serif font, black/white palette, rcParams with font.size=13, axes.labelsize=14
 5. Save to 'output.png' with: plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')
 6. Use fontsize=14+ for dimension labels, axis labels, and annotations so text is readable in PDF
+7. MANDATORY: Use matplotlib mathtext for ALL subscripts — $y_1$ NOT 'y1', $P_2$ NOT 'P2', $V_{{out}}$ NOT 'Vout'
+8. MANDATORY: ALL text labels must have white bbox background for readability
+9. ANSWER HIDING (CRITICAL): This is a student assignment — the diagram must NOT reveal the answer.
+   - For timing/waveform diagrams: draw ONLY INPUT waveforms (CLK, D, A, B, EN, RESET).
+     OUTPUT signals (Q, Q1, Q2, Q̄, Y) must be BLANK dashed lines with "?" labels.
+     NEVER draw actual output waveform values — students must determine these.
+   - For counter/state machine diagrams: show ONLY the circuit topology and initial state.
+     Do NOT show state transition sequences or output values.
+   - For any diagram where the question asks "find", "determine", "calculate", "draw",
+     or "describe" an output — do NOT include that output in the diagram.
 
 Return ONLY the Python code, ready to execute."""
 

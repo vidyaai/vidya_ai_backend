@@ -109,8 +109,25 @@ DIAGRAM_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "circuitikz_tool",
+            "description": "BEST for ALL circuit diagrams: Generates publication-quality circuit schematics via CircuiTikZ (LaTeX). Output is identical to Sedra & Smith / Mano textbook diagrams. Use for: ALL electrical circuits including MOSFET/CMOS transistor circuits, analog circuits with Vgs/Vds sources, digital logic gate circuits, op-amp circuits, BJT circuits, RLC networks, D/JK/SR/T flip-flop circuits, shift registers, counters, sequential logic circuits, encoders/decoders, MUX/DEMUX, register files, ALU/datapath, clock domain crossing. Produces perfect component symbols, proper SI unit labels, and textbook-standard layouts. ALWAYS prefer this over svg_circuit_tool for ANY circuit schematic.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "Detailed description of the circuit: all components, values, connections, and node labels. Example: 'NMOS transistor with Vgs=3V source on gate, Vds=4V source from drain to ground, Vth=1V, kn=300uA/V2, find ID'",
+                    },
+                },
+                "required": ["description"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "svg_circuit_tool",
-            "description": "Generate professional circuit/schematic diagrams via Claude SVG. Best for: electrical circuits, digital logic gates, ALU schematics, gate-level computer engineering diagrams. Supports IEEE block-level gate symbols (AND, OR, NOT, NAND, NOR, XOR) and CMOS transistor-level circuits with vertical VDD/PMOS/NMOS/GND layouts. Produces clean orthogonal wiring with standard component symbols. Preferred over schemdraw_tool for all circuit diagrams.",
+            "description": "DEPRECATED — use circuitikz_tool instead. Legacy SVG circuit generator. Only use if circuitikz_tool is unavailable.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -340,6 +357,72 @@ class DiagramTools:
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
+    async def circuitikz_tool(
+        self,
+        description: str,
+        assignment_id: str,
+        question_idx: int,
+        question_text: str = "",
+        subject_context: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Generate publication-quality circuit diagram using CircuiTikZ (LaTeX).
+
+        Pipeline: Claude → CircuiTikZ LaTeX → pdflatex → pdf2image → PNG → S3
+
+        Output matches Sedra & Smith textbook style:
+        - American-style components with siunitx unit labels
+        - Proper MOSFET symbols (NMOS/PMOS with G/D/S terminals)
+        - Vertical CMOS layout (VDD → PMOS → output → NMOS → GND)
+        - Clean orthogonal wiring
+
+        Args:
+            description: Description of the circuit
+            assignment_id: Assignment ID for S3 upload
+            question_idx: Question index for filename
+            question_text: Full question text for context
+            subject_context: Optional subject hint
+
+        Returns:
+            Diagram data dict with S3 info
+        """
+        try:
+            logger.info(
+                f"Executing circuitikz_tool for question {question_idx}: {description[:100]}"
+            )
+
+            # Lazy load generator
+            if not hasattr(self, '_circuitikz_gen') or self._circuitikz_gen is None:
+                from utils.circuitikz_generator import CircuiTikZGenerator
+                self._circuitikz_gen = CircuiTikZGenerator()
+
+            # Generate PNG via CircuiTikZ pipeline (300 DPI = print quality)
+            image_bytes = await self._circuitikz_gen.generate_circuit_png(
+                question_text=question_text or description,
+                diagram_description=description,
+                output_dpi=300,
+                subject_context=subject_context,
+            )
+
+            # Upload to S3
+            diagram_data = await self.diagram_gen.upload_to_s3(
+                image_bytes, assignment_id, question_idx
+            )
+
+            # Attach image_bytes for downstream review
+            diagram_data['_image_bytes'] = image_bytes
+
+            logger.info(
+                f"Successfully generated CircuiTikZ diagram: {description[:80]}"
+            )
+            return diagram_data
+
+        except Exception as e:
+            logger.error(f"Error in circuitikz_tool: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return None
+
     async def svg_circuit_tool(
         self,
         description: str,
@@ -349,7 +432,7 @@ class DiagramTools:
         subject_context: str = "",
     ) -> Dict[str, Any]:
         """
-        Generate professional circuit diagram using Claude SVG generation.
+        Generate circuit diagram using Claude SVG generation (legacy).
 
         Pipeline: Claude → SVG → cairosvg → PNG → S3
 
@@ -622,6 +705,14 @@ class DiagramTools:
                     description=tool_arguments.get("description"),
                     assignment_id=assignment_id,
                     question_idx=question_idx,
+                )
+            elif tool_name == "circuitikz_tool":
+                return await self.circuitikz_tool(
+                    description=tool_arguments.get("description"),
+                    assignment_id=assignment_id,
+                    question_idx=question_idx,
+                    question_text=question_text,
+                    subject_context=tool_arguments.get("subject_context", ""),
                 )
             elif tool_name == "svg_circuit_tool":
                 return await self.svg_circuit_tool(
