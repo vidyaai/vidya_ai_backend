@@ -240,41 +240,8 @@ def create_formatted_transcript(
 
     logger.debug(f"transcript_data: {transcript_data[0]}")
 
-    # Handle both old RapidAPI format and new Deepgram format
-    first_item = transcript_data[0]
-
-    # Check if this is old RapidAPI format (has transcriptionAsText instead of transcription array)
-    if "transcriptionAsText" in first_item and "transcription" not in first_item:
-        logger.info("Converting old RapidAPI format to new timed format")
-        # Convert old format to new format
-        # Old format: {"transcriptionAsText": "text...", "title": "...", "lengthInSeconds": 500}
-        # New format: {"transcription": [{"start": 0, "dur": 5, "text": "..."}], ...}
-        plain_text = first_item["transcriptionAsText"]
-        title = first_item.get("title", "Video")
-        length_seconds = first_item.get("lengthInSeconds", 0)
-
-        # Split into sentences and create timed segments (rough approximation)
-        sentences = plain_text.split('. ')
-        if sentences:
-            time_per_sentence = length_seconds / len(sentences) if len(sentences) > 0 else 5.0
-            transcription_array = []
-            current_time = 0.0
-
-            for sentence in sentences:
-                if sentence.strip():
-                    transcription_array.append({
-                        "start": current_time,
-                        "dur": time_per_sentence,
-                        "text": sentence.strip() + ("." if not sentence.strip().endswith(".") else "")
-                    })
-                    current_time += time_per_sentence
-
-            # Update the data structure
-            first_item["transcription"] = transcription_array
-            logger.info(f"Converted {len(transcription_array)} sentences to timed segments")
-
-    # Now we can safely access transcription array
-    groups = group_subtitles(first_item["transcription"], group_duration=15.0)
+    # Group subtitles into manageable chunks
+    groups = group_subtitles(transcript_data[0]["transcription"], group_duration=15.0)
 
     # Extract text chunks for formatting
     text_chunks = [group["text"] for group in groups]
@@ -285,9 +252,9 @@ def create_formatted_transcript(
 
     # Create final formatted transcript
     formatted_transcript = []
-    formatted_transcript.append(f"Title: {first_item.get('title', 'Video')}\n")
+    formatted_transcript.append(f"Title: {transcript_data[0]['title']}\n")
     formatted_transcript.append(
-        f"Duration: {first_item.get('lengthInSeconds', 0)} seconds\n"
+        f"Duration: {transcript_data[0]['lengthInSeconds']} seconds\n"
     )
     formatted_transcript.append("=" * 80 + "\n")
 

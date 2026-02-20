@@ -36,20 +36,3 @@ question_papers_log/
 *.log
 
 debug/
-
-# Test artifacts and outputs
-test_outputs/
-extracted_diagrams/
-misc/
-yolo_weights/
-question_generation_test/
-
-# Binary and media files (keep out of repo root)
-*.png
-*.jpg
-*.jpeg
-*.pdf
-*.pt
-
-# Temporary / one-off scripts
-reset_db_local.sql
