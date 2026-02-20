@@ -358,3 +358,44 @@ async def get_youtube_info(
         "thumbnail_url": thumbnail_url,
         "formatted_transcript_url": formatted_transcript_url,
     }
+
+
+@router.delete("/clear-transcript/{video_id}")
+async def clear_video_transcript(
+    video_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """
+    Clear all transcript data for a video to force re-download with new Deepgram flow.
+    Useful for regenerating transcripts with better timing.
+    """
+    # Check if video belongs to current user
+    video = (
+        db.query(Video)
+        .filter(Video.id == video_id, Video.user_id == current_user["uid"])
+        .first()
+    )
+    
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found or access denied")
+    
+    # Clear all transcript-related fields
+    video.transcript_text = None
+    video.transcript_json = None
+    video.formatted_transcript = None
+    video.transcript_s3_key = None
+    
+    # Clear status fields if they exist
+    if hasattr(video, 'transcript_status'):
+        video.transcript_status = None
+    if hasattr(video, 'formatting_status'):
+        video.formatting_status = None
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Cleared all transcript data for video {video_id}. You can now reload to trigger new Deepgram transcription.",
+        "video_id": video_id
+    }
