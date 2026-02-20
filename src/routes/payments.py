@@ -233,7 +233,19 @@ async def get_subscription_status(
     try:
         user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
         if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+            # User not in DB yet (e.g. student) – treat as Free tier
+            return {
+                "subscription": {
+                    "plan_name": "Free",
+                    "plan_key": "free",
+                    "status": "free",
+                    "billing_period": None,
+                    "cancel_at_period_end": False,
+                    "current_period_start": None,
+                    "current_period_end": None,
+                    "stripe_subscription_id": None,
+                }
+            }
 
         subscription = (
             db.query(Subscription)

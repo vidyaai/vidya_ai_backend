@@ -19,6 +19,7 @@ from routes.sharing import router as sharing_router
 from routes.assignments import router as assignments_router
 from routes.payments import router as payments_router
 from routes.lecture_summary import router as lecture_summary_router
+from routes.courses import router as courses_router
 from utils.youtube_utils import start_cache_cleanup_thread
 
 
@@ -65,13 +66,10 @@ async def logging_middleware(request, call_next):
 @app.middleware("http")
 async def add_security_headers(request, call_next):
     response = await call_next(request)
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    # Remove CORS headers - let CORSMiddleware handle them
+    # Only add non-CORS security headers
     response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
-    response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
-    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    # Removed COEP and COOP as they can interfere with embedded content
     return response
 
 
@@ -108,6 +106,7 @@ app.include_router(sharing_router)
 app.include_router(assignments_router)
 app.include_router(payments_router)
 app.include_router(lecture_summary_router)
+app.include_router(courses_router)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,23 @@ from models import User, Subscription, PricingPlan, UserUsage
 from controllers.config import logger
 import os
 
+# Developer accounts with unlimited access (bypasses all subscription limits)
+DEVELOPER_EMAILS = [
+    "pingakshya2008@gmail.com",
+    "pingu_asn@rediffmail.com",
+    "dhritimant@gmail.com",
+]
+
+
+def is_developer_account(db: Session, user_id: str) -> bool:
+    """Check if user is a developer account with unlimited access"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.email:
+        return False
+
+    # Check against developer whitelist
+    return user.email.lower() in [email.lower() for email in DEVELOPER_EMAILS]
+
 
 def initialize_pricing_plans(db: Session):
     """Initialize pricing plans in the database"""
@@ -225,6 +242,11 @@ def check_usage_limits(
         video_id: Video ID (required for 'question_per_video' check)
     """
 
+    # Developer accounts have unlimited access
+    if is_developer_account(db, user_id):
+        logger.info(f"Developer account {user_id} - unlimited access granted")
+        return {"allowed": True, "limit": "unlimited", "current": 0, "is_developer": True}
+
     subscription = get_user_subscription(db, user_id)
     if not subscription or not subscription.plan:
         return {"allowed": False, "reason": "No active subscription found"}
@@ -407,6 +429,20 @@ def increment_usage(
 
 def get_subscription_features(db: Session, user_id: str) -> dict:
     """Get user's subscription features"""
+
+    # Developer accounts get unlimited features
+    if is_developer_account(db, user_id):
+        return {
+            "videos_per_day": -1,  # unlimited
+            "questions_per_video_per_day": -1,  # unlimited
+            "video_uploads_per_month": -1,  # unlimited
+            "youtube_chats_per_month": -1,  # unlimited
+            "translation_minutes_per_month": -1,  # unlimited
+            "ai_model_quality": "premium",
+            "priority_support": True,
+            "team_collaboration": True,
+            "is_developer": True,
+        }
 
     subscription = get_user_subscription(db, user_id)
     if not subscription or not subscription.plan:

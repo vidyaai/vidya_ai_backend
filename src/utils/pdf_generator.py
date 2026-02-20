@@ -692,9 +692,14 @@ class AssignmentPDFGenerator:
             diagram_url = s3_presign_url(question["diagram"]["s3_key"])
             diagram_base64 = self.download_image_as_base64(diagram_url)
             if diagram_base64:
+                # Use diagram description as caption if available
+                caption_text = question.get("diagram", {}).get("description", "")
+                if not caption_text:
+                    caption_text = f"Circuit diagram for Question {question_num}"
                 html += f"""
-                <div class="question-diagram">
-                    <img src="{diagram_base64}" alt="Question diagram" style="max-width: 100%; height: auto;">
+                <div class="figure-container">
+                    <img src="{diagram_base64}" alt="Question diagram">
+                    <div class="figure-caption">Fig. {question_num}. {caption_text}</div>
                 </div>
                 """
 
@@ -772,9 +777,11 @@ class AssignmentPDFGenerator:
                     diagram_url = s3_presign_url(subq["diagram"]["s3_key"])
                     diagram_base64 = self.download_image_as_base64(diagram_url)
                     if diagram_base64:
+                        sub_caption = subq.get("diagram", {}).get("description", f"Circuit diagram for Part {question_num}.{i+1}")
                         html += f"""
-                        <div class="subquestion-diagram">
-                            <img src="{diagram_base64}" alt="Subquestion diagram" style="max-width: 100%; height: auto;">
+                        <div class="figure-container">
+                            <img src="{diagram_base64}" alt="Subquestion diagram">
+                            <div class="figure-caption">Fig. {question_num}.{i+1}. {sub_caption}</div>
                         </div>
                         """
 
@@ -881,23 +888,24 @@ class AssignmentPDFGenerator:
         return """
         @page {
             size: A4;
-            margin: 1in;
+            margin: 0.75in 0.85in;
             @top-center {
                 content: string(doc-title);
-                font-size: 10pt;
-                color: #666;
+                font-size: 9pt;
+                color: #888;
+                font-style: italic;
             }
             @bottom-center {
                 content: "Page " counter(page) " of " counter(pages);
-                font-size: 9pt;
-                color: #666;
+                font-size: 8pt;
+                color: #888;
             }
         }
 
         body {
             font-family: "Times New Roman", Times, serif;
-            font-size: 11pt;
-            line-height: 1.3;
+            font-size: 10.5pt;
+            line-height: 1.35;
             color: #000;
             margin: 0;
             padding: 0;
@@ -945,23 +953,24 @@ class AssignmentPDFGenerator:
 
         .document-header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             padding-bottom: 10px;
+            border-bottom: 1pt solid #000;
         }
 
         .document-title {
-            font-size: 14pt;
+            font-size: 16pt;
             font-weight: bold;
             margin-bottom: 6px;
             string-set: doc-title content();
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
         }
 
         .document-meta {
-            font-size: 10pt;
+            font-size: 9.5pt;
             color: #333;
-            margin-bottom: 10px;
+            margin-bottom: 4px;
         }
 
         .instructions {
@@ -974,12 +983,14 @@ class AssignmentPDFGenerator:
         }
 
         .question {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
+            padding-top: 6px;
+            border-top: 0.25pt solid #ccc;
             page-break-inside: avoid;
         }
 
         .question-header {
-            margin-bottom: 8px;
+            margin-bottom: 4px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -987,7 +998,7 @@ class AssignmentPDFGenerator:
 
         .question-header h3 {
             margin: 0;
-            font-size: 11pt;
+            font-size: 10.5pt;
             color: #000;
             font-weight: bold;
             display: flex;
@@ -1014,8 +1025,8 @@ class AssignmentPDFGenerator:
         }
 
         .question-text {
-            margin-bottom: 10px;
-            line-height: 1.3;
+            margin-bottom: 6px;
+            line-height: 1.35;
             text-align: justify;
         }
 
@@ -1024,12 +1035,39 @@ class AssignmentPDFGenerator:
             margin: 15px 0;
         }
 
+        /* IEEE-style figure container */
+        .figure-container {
+            text-align: center;
+            margin: 12px auto;
+            padding: 8px;
+            max-width: 55%;
+            border: 0.5pt solid #ccc;
+            background: #fafafa;
+            page-break-inside: avoid;
+        }
+
+        .figure-container img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .figure-caption {
+            font-size: 9pt;
+            font-style: normal;
+            color: #333;
+            margin-top: 6px;
+            text-align: center;
+            line-height: 1.3;
+        }
+
         .question-options {
-            margin: 15px 0;
+            margin: 8px 0;
         }
 
         .option {
-            margin: 8px 0;
+            margin: 4px 0;
             padding-left: 20px;
         }
 
@@ -1043,17 +1081,17 @@ class AssignmentPDFGenerator:
         }
 
         .subquestions {
-            margin-top: 15px;
+            margin-top: 8px;
             padding-left: 20px;
         }
 
         .subquestion {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
 
         .subquestion h4 {
-            margin: 0 0 8px 0;
-            font-size: 11pt;
+            margin: 0 0 4px 0;
+            font-size: 10.5pt;
             color: #555;
         }
 
@@ -1064,12 +1102,13 @@ class AssignmentPDFGenerator:
         }
 
         .footer-info {
-            margin-top: 40px;
-            border-top: 1px solid #ddd;
-            padding-top: 15px;
-            font-size: 9pt;
-            color: #666;
+            margin-top: 20px;
+            border-top: 0.5pt solid #999;
+            padding-top: 8px;
+            font-size: 8pt;
+            color: #888;
             text-align: center;
+            font-style: italic;
         }
 
         /* Professional Mathematical Text Styling */
@@ -1157,8 +1196,8 @@ class AssignmentPDFGenerator:
         /* IEEE paper styling */
         .question-text {
             text-align: justify;
-            line-height: 1.3;
-            font-size: 11pt;
+            line-height: 1.35;
+            font-size: 10.5pt;
         }
 
         .question-text p {
@@ -1176,10 +1215,12 @@ class AssignmentPDFGenerator:
             margin-right: 6px;
         }
 
-        /* Professional diagram styling */
+        /* Professional diagram styling (legacy) */
         .question-diagram img {
-            max-width: 100%;
+            max-width: 60%;
             height: auto;
+            display: block;
+            margin: 0 auto;
         }
 
         /* Remove answer spaces completely */
@@ -1287,6 +1328,223 @@ class AssignmentPDFGenerator:
 
         except Exception as e:
             logger.error(f"Error generating assignment PDF: {e}")
+            raise
+
+    def generate_solution_question_html(self, question: Dict[str, Any], question_num: int) -> str:
+        """Generate HTML for a single question including answer and rubric (solution key)."""
+        # Reuse the standard question HTML but strip its closing </div> so we can
+        # append answer/rubric sections before re-closing.
+        base = self.generate_question_html(question, question_num)
+        # Remove the final closing </div> that generate_question_html appends
+        last_close = base.rfind("</div>")
+        html = base[:last_close] if last_close != -1 else base
+
+        equations = question.get("equations", [])
+
+        # Append correct answer
+        raw_answer = question.get("correctAnswer") or question.get("correct_answer", "")
+        if raw_answer:
+            if equations:
+                answer_html = self.process_question_text_with_equations(raw_answer, equations)
+            else:
+                answer_html = self.process_question_text(raw_answer)
+            html += f"""
+        <div class="solution-answer">
+            <div class="solution-label">Answer</div>
+            <div class="solution-content">{answer_html}</div>
+        </div>"""
+
+        # Append rubric
+        rubric = question.get("rubric", "")
+        if rubric:
+            if equations:
+                rubric_html = self.process_question_text_with_equations(rubric, equations)
+            else:
+                rubric_html = self.process_question_text(rubric)
+            html += f"""
+        <div class="solution-rubric">
+            <div class="solution-label">Grading Rubric</div>
+            <div class="solution-content">{rubric_html}</div>
+        </div>"""
+
+        # Handle subquestion answers — show full question text + answer + rubric for each part
+        if question.get("subquestions"):
+            for i, subq in enumerate(question["subquestions"]):
+                subq_equations = subq.get("equations", equations)
+                part_label = chr(97 + i)  # a, b, c, ...
+
+                raw_subq_q = subq.get("question", "")
+                raw_subq_answer = subq.get("correctAnswer") or subq.get("correct_answer", "")
+                subq_rubric = subq.get("rubric", "")
+
+                if raw_subq_q or raw_subq_answer:
+                    html += f"""
+        <div style="margin-left:20px; margin-top:10px; padding:8px 12px; background:#f8fafc; border-left:3px solid #94a3b8; border-radius:4px;">
+            <div class="solution-label">Part ({part_label})</div>"""
+
+                    # Full subquestion text
+                    if raw_subq_q:
+                        if subq_equations:
+                            subq_q_html = self.process_question_text_with_equations(raw_subq_q, subq_equations)
+                        else:
+                            subq_q_html = self.process_question_text(raw_subq_q)
+                        html += f"""
+            <div style="font-size:0.92em; color:#1f2937; margin-bottom:6px;">{subq_q_html}</div>"""
+
+                    # Answer
+                    if raw_subq_answer:
+                        if subq_equations:
+                            subq_ans_html = self.process_question_text_with_equations(raw_subq_answer, subq_equations)
+                        else:
+                            subq_ans_html = self.process_question_text(raw_subq_answer)
+                        html += f"""
+            <div class="solution-answer" style="margin-top:6px;">
+                <div class="solution-label">Answer</div>
+                <div class="solution-content">{subq_ans_html}</div>
+            </div>"""
+
+                    # Rubric
+                    if subq_rubric:
+                        if subq_equations:
+                            subq_rub_html = self.process_question_text_with_equations(subq_rubric, subq_equations)
+                        else:
+                            subq_rub_html = self.process_question_text(subq_rubric)
+                        html += f"""
+            <div class="solution-rubric" style="margin-top:6px;">
+                <div class="solution-label">Grading Rubric</div>
+                <div class="solution-content">{subq_rub_html}</div>
+            </div>"""
+
+                    html += """
+        </div>"""
+
+        # Close the question div
+        html += "\n        </div>"
+        return html
+
+    def generate_solution_pdf(self, assignment: Dict[str, Any]) -> bytes:
+        """
+        Generate a solution/answer-key PDF for an assignment.
+        Includes all question content plus correctAnswer and rubric for each question.
+        """
+        try:
+            title = assignment.get("title", "Assignment")
+            description = assignment.get("description", "")
+            questions = assignment.get("questions", [])
+            total_points = assignment.get("total_points", 0)
+
+            katex_css = ""
+            if MARKDOWN_KATEX_AVAILABLE:
+                try:
+                    katex_css = """
+                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+                    <style>
+                    .katex { font-size: 1em; }
+                    .katex-display { margin: 0.5em 0; }
+                    </style>
+                    """
+                except:
+                    pass
+
+            solution_css_extra = """
+            .solution-answer {
+                margin-top: 12px;
+                padding: 10px 14px;
+                background: #f0fdf4;
+                border-left: 4px solid #16a34a;
+                border-radius: 4px;
+            }
+            .solution-rubric {
+                margin-top: 8px;
+                padding: 10px 14px;
+                background: #eff6ff;
+                border-left: 4px solid #2563eb;
+                border-radius: 4px;
+            }
+            .solution-label {
+                font-size: 0.78em;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-bottom: 4px;
+                color: #374151;
+            }
+            .solution-content {
+                font-size: 0.92em;
+                color: #1f2937;
+            }
+            .solution-banner {
+                background: #fef9c3;
+                border: 1px solid #f59e0b;
+                padding: 8px 14px;
+                border-radius: 6px;
+                font-size: 0.85em;
+                font-weight: 600;
+                color: #92400e;
+                margin-bottom: 16px;
+                text-align: center;
+            }
+            """
+
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>{title} — Solution Key</title>
+                {katex_css}
+                <style>{solution_css_extra}</style>
+            </head>
+            <body>
+                <div class="document-header">
+                    <div class="document-title">{title} — Solution Key</div>
+                    <div class="document-meta">
+                        Total Points: {total_points} | Questions: {len(questions)} | Date: {datetime.now().strftime('%B %d, %Y')}
+                    </div>
+                </div>
+
+                <div class="solution-banner">INSTRUCTOR COPY — CONTAINS ANSWERS &amp; RUBRICS — DO NOT DISTRIBUTE TO STUDENTS</div>
+
+                {f'''
+                <div class="instructions">
+                    <p>{self.process_question_text(description)}</p>
+                </div>
+                ''' if description else ''}
+
+                <div class="questions">
+            """
+
+            for i, question in enumerate(questions, 1):
+                html_content += self.generate_solution_question_html(question, i)
+
+            html_content += """
+                </div>
+                <div class="footer-info">
+                    <p>Generated by Vidya AI Assignment System — Solution Key</p>
+                </div>
+            </body>
+            </html>
+            """
+
+            html_doc = HTML(string=html_content)
+            css_doc = CSS(string=self.generate_css())
+            stylesheets = [css_doc]
+            if MARKDOWN_KATEX_AVAILABLE:
+                try:
+                    katex_cdn_css = CSS(
+                        url="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+                    )
+                    stylesheets.insert(0, katex_cdn_css)
+                except Exception as e:
+                    logger.warning(f"Failed to fetch KaTeX CSS from CDN: {e}")
+
+            pdf_buffer = io.BytesIO()
+            html_doc.write_pdf(pdf_buffer, stylesheets=stylesheets)
+            pdf_buffer.seek(0)
+            return pdf_buffer.getvalue()
+
+        except Exception as e:
+            logger.error(f"Error generating solution PDF: {e}")
             raise
 
     def cleanup(self):

@@ -1,0 +1,127 @@
+Hello everyone, welcome back to my channel. Today, I’m going to talk about reinforcement learning and policy optimization algorithms such as PPO, DPO, and GRPO.
+
+Before I start, let’s review the basic training process for large language models. The pre-training phase involves training a large model on a massive dataset to learn general language patterns. The model learns grammar, facts, reasoning abilities, and more, but it’s not aligned with human values or instructions yet.
+
+Then, in the supervised fine-tuning (SFT) phase, the model is fine-tuned using curated datasets of human-written prompts and responses. This teaches the model how to follow instructions better.
+
+After that, reinforcement learning with human feedback (RLHF) is applied. The model is further optimized using human preferences rather than just text completion accuracy. This is where PPO, DPO, and GRPO come into play.
+
+So, let’s start by reviewing the pre-training part. Pre-training involves feeding the model large-scale text data, typically hundreds of billions of tokens, from sources like Common Crawl, Wikipedia, books, and other open datasets. The objective is to predict the next token in a sequence given the previous ones.
+
+Mathematically, this is a maximum likelihood estimation (MLE) problem — minimizing the negative log-likelihood of the observed tokens. This helps the model learn general knowledge and language structure. However, since the data includes all kinds of content, including noise and bias, the pre-trained model might generate text that’s factually incorrect, unsafe, or misaligned with human values.
+
+To address that, we move to the SFT phase.
+
+In supervised fine-tuning, the model is fine-tuned using high-quality instruction-following data, where each prompt has a human-crafted response. The goal is to train the model to generate outputs that follow human instructions and desired formats.
+
+The loss function is again cross-entropy, where the model tries to maximize the probability of human-written responses. After SFT, the model becomes an instruction-following model, but it still doesn’t fully understand what humans prefer. For example, it might produce verbose, repetitive, or low-quality answers.
+
+To fix this, we apply reinforcement learning with human feedback (RLHF).
+
+In RLHF, we train a reward model that predicts how much a human would prefer one response over another. This reward model then guides the policy model (the language model we’re fine-tuning) to produce outputs that maximize human satisfaction.
+
+Let’s go step-by-step through the RLHF process.
+
+Step one: We collect a dataset of prompts and multiple model responses for each prompt.
+
+Step two: Human annotators rank these responses from best to worst based on quality, helpfulness, and alignment with instructions.
+
+Step three: A reward model is trained to predict these rankings. Typically, the model takes a prompt and response as input and outputs a scalar reward score.
+
+Finally, step four: The policy model (the language model being fine-tuned) is trained using reinforcement learning, with the reward model providing the reward signals. The goal is to maximize expected reward while staying close to the original model distribution using a KL divergence penalty.
+
+Now, let’s go through some reinforcement learning basics before we dive deeper.
+
+Reinforcement learning (RL) involves an agent that interacts with an environment by taking actions and receiving rewards. The agent’s goal is to learn a policy that maximizes cumulative rewards over time.
+
+The key elements of RL are:
+
+Agent: The decision-maker (in our case, the language model).
+
+Environment: The context or system the agent interacts with (for example, prompts and responses).
+
+State: The situation the agent is currently in (for example, the conversation history).
+
+Action: The decision the agent makes (for example, the next token or sentence).
+
+Reward: The feedback the agent receives from the environment (for example, human preference score).
+
+The agent learns by trial and error, exploring different actions and learning from the rewards it receives.
+
+Discounted rewards are a way of measuring how much an agent values future rewards compared to immediate rewards. The discount factor is a critical factor in determining how well the agent learns in RL.
+
+An agent learns by taking actions in an environment and receiving rewards. The agent's goal is to maximize the sum of all the rewards it receives over time. The discount factor is a value between 0 and 1 that determines how much the agent values future rewards.
+
+So if this value equals 0, that means the agent only cares about the first reward it receives, and if this value is 1, then it means the agent cares about all the future rewards equally. So the discount factor is very important. The choice of the discount factor can significantly affect the agent's learning performance on finding a balance between exploration and exploitation.
+
+The next keyword is trajectory. It means a sequence of states and actions in the world. So trajectories can be discrete or continuous.
+
+As you can see in this graph, there are categories of RL algorithms: there's model-free, model-based, and there are many algorithms down here. Today, I'm going to talk about policy gradients and PPO, and I'm going to talk about DPO and GRPO, which are not here, but they all belong to policy optimization.
+
+Let's talk about policy gradients first. This part is very math-heavy. If you can't follow all the mathematics, don't worry about it. This should not affect your ability to practically try out reinforcement learning.
+
+We want to maximize the total reward over sample trajectories from a parameterized policy network, as depicted in this formula. We can do so by gradient ascent. If you're familiar with machine learning, you should be familiar with gradient descent. Gradient descent is basically the same concept — it's just minimizing versus maximizing. You can consider this gradient descent; it's the same.
+
+So the gradient term in the above equation is the policy gradient right here. The probability of the trajectory coming from a given policy is this formula right here, and then if you want the derivative of this, you need to use the log derivative trick, and then you can get the derivative of this probability.
+
+After you do a derivative, since the initial state rewards and state transitions don't have the policy network parameter, you can just cross those out; you just have this formula left. Since this is an expectation right here, it means that we can estimate it with the sample mean.
+
+This is the sampling formula, where D is the sample set of trajectories, and the absolute is the number of trajectories. It basically means we have a formula here, and we want to use gradient ascent or descent to find the global optimum. In order to do that, we can get a sampling function to get that result.
+
+The next one I want to talk about is PPO, proximal policy optimization. This is the graph of how PPO workflow looks like. In this graph, you can see there's a policy model — this is basically the L we are training to generate better content — and we have a value model right here. It's a critic. It's another AI model that acts like a critic; it estimates how good each state is. This helps PPO make smarter updates.
+
+So as you can see, both the policy model and value model need to be trained. The reward model here is the AI judge that scores text based on human preferences. This one is a frozen model; we're not updating it. It's the same with the reference model here — it's a baseline or frozen copy of the initial language model, helping to ensure the fine-tuned model stays reasonably aligned and does not deviate too much during training. This one is often the supervised fine-tuning model.
+
+And there's the KL regularization. This one is to prevent a new model from deviating too drastically from the previously established model by penalizing large differences between their probability distributions, measured by the KL divergence.
+
+So the steps of training are pretty complex.
+
+The first step is the policy. The model creates a bunch of text samples from different prompts.
+
+The second step is the reward model scores each text sample.
+
+The third step is to calculate advantage using GAE, which is generalized advantage estimation. So this is a typo; this is giving reward.
+
+If you give reward after the whole sentence is complete in a text generation task, it's high variance and low bias — you basically can only know the total reward after everything is done. But if you give reward after each token is generated, then it's low variance and high bias, because with local optima you never know what the final reward will be; the last token can be totally out of place.
+
+So GAE balances between the above two — it balances between variance and bias.
+
+The fourth step is to update policy to maximize the PPO objective function. The objective function contains volumes: the first one encourages higher rewards, because that's our goal, and then it limits policy changes, and then it also encourages the LM to be more exploratory by adding an entropy bonus.
+
+And then we update the value, which is the critic, to be more accurate in predicting the goodness of different text generations.
+
+So this is basically how PPO works. Again, I'm going to flash this workflow: policy model, a bunch of generated outputs, it goes to the reference model. The reward model computes the KL divergence, then it gets the rewards, and then the value model is going to get the value, and based on the reward and value, we're going to compare the G and get the advantage.
+
+So the advantage is basically value minus reward, and then this advantage is going to be sent to the policy model to update the policy. And the value model is also going to take the G weights to update its ability to better judge what is good and what is bad.
+
+The next one I want to talk about is GRPO, group relative policy optimization. PPO suffers from high variance due to token-level sampling and its reliance on the value model. GRPO improves upon PPO by calculating the relative advantage of each completion within a small group of generated responses, effectively eliminating the need for a separate critic or value model.
+
+So you can see that in GRPO, there is no value model. There is only a policy model, which is the LM, and there is the reward model, which is a frozen model. So there are no more critics here, and this approach focuses on comparing outputs directly rather than relying on an external critic to estimate their value.
+
+So in a GRPO workflow, a prompt is sent to the language model. The language model generates multiple outputs, and all of these outputs are fed into the reward model to get reward values. And then, based on those reward values, the relative advantage is calculated among these group outputs. And then, based on those advantages, the language model updates its policy.
+
+So, as you can see, the difference is that there is no value model, and that makes it much simpler and more efficient.
+
+Now I want to talk about DPO, direct preference optimization. DPO simplifies RLHF training by removing the need for explicit reinforcement learning and value models altogether.
+
+So PPO and GRPO are both reinforcement learning methods. They both involve sampling, optimization, and value estimation, but DPO is not a reinforcement learning approach. It's actually a direct optimization approach.
+
+So what DPO does is that, instead of training a reward model and a policy model separately, it trains directly on human preference pairs.
+
+The model is given two responses — one preferred (chosen) and one less preferred (rejected) — and it learns to increase the likelihood of the preferred one compared to the rejected one, based on their log probabilities.
+
+So the DPO objective encourages the model to assign higher probabilities to chosen responses while keeping it close to the reference model through KL regularization.
+
+So as you can see here, the workflow is much simpler. There's a policy model, which is our fine-tuned language model; there's a reward model, which can be implicit; and there is the reference model.
+
+So DPO learns from pairs of chosen and rejected responses directly, without requiring an explicit reward model or critic, making it faster and more stable.
+
+In summary, SFT is supervised fine-tuning, RLHF is reinforcement learning from human feedback, and DPO is direct preference optimization.
+
+SFT gives the model a foundation to follow human instructions. RLHF fine-tunes it using reinforcement learning and a reward model to align better with human preferences. DPO directly aligns the model with human preferences without needing reinforcement learning or a value model.
+
+So DPO is much more efficient, and that’s why many companies, like Anthropic and OpenAI, are now moving from RLHF to DPO-like methods.
+
+Finally, I want to talk a little about GRPO+. GRPO+ builds on GRPO and introduces more stability by normalizing group-level advantages and adding adaptive weighting. It’s an experimental enhancement used by OpenAI and others to further stabilize training.
+
+That concludes the policy optimization algorithm. Thank you everyone. If you like my video, please subscribe, comment, or like. See you in the next episode.

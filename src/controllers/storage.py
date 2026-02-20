@@ -378,3 +378,215 @@ def transcribe_video_with_deepgram_url(media_url: str) -> str:
         return transcript_text or ""
     except Exception as e:
         raise Exception(f"Deepgram transcription failed: {str(e)}")
+
+
+def transcribe_video_with_deepgram_timed(local_video_path: str, video_title: str = "Video") -> dict:
+    """
+    Transcribe a local video/audio file using Deepgram and return timed segments.
+
+    Returns format compatible with RapidAPI:
+    {
+        "title": "Video Title",
+        "lengthInSeconds": 500,
+        "transcription": [
+            {"start": 0.0, "dur": 2.5, "text": "Hello world"},
+            {"start": 2.5, "dur": 1.8, "text": "This is a test"}
+        ]
+    }
+    """
+    if not deepgram_client:
+        raise Exception("Deepgram is not configured on server")
+
+    temp_audio_path: Optional[str] = None
+
+    try:
+        suffix = os.path.splitext(local_video_path)[1].lower()
+        is_video = suffix in [".mp4", ".mov", ".mkv", ".webm", ".avi"]
+        source_path = local_video_path
+        mimetype = (
+            mimetypes.guess_type(local_video_path)[0] or "application/octet-stream"
+        )
+
+        if is_video:
+            # Extract audio to reduce payload size
+            extracted = _extract_audio_with_ffmpeg(local_video_path)
+            if extracted and os.path.exists(extracted):
+                temp_audio_path = extracted
+                source_path = extracted
+                mimetype = "audio/wav"
+
+        # Import Deepgram options
+        try:
+            from deepgram import PrerecordedOptions
+        except Exception:
+            PrerecordedOptions = None
+
+        # Request word-level timestamps
+        options = None
+        if PrerecordedOptions is not None:
+            options = PrerecordedOptions(
+                model="nova-2",
+                smart_format=True,
+                punctuate=True,
+                utterances=True,  # Get utterance-level timestamps
+                utt_split=3.0,    # Split utterances every ~3 seconds
+            )
+
+        # Transcribe
+        with open(source_path, "rb") as f:
+            data = f.read()
+
+        payload = {"buffer": data}
+        if mimetype:
+            payload["mimetype"] = mimetype
+
+        # Use extended timeout for large files (up to 5 minutes)
+        try:
+            import httpx
+            response = deepgram_client.listen.rest.v("1").transcribe_file(
+                payload, options, timeout=httpx.Timeout(300.0)
+            )
+        except Exception:
+            # Fallback without timeout if httpx not available
+            response = deepgram_client.listen.rest.v("1").transcribe_file(payload, options)
+
+        # Extract utterances with timing
+        transcription_segments = []
+        total_duration = 0
+
+        try:
+            results = (
+                response.get("results")
+                if isinstance(response, dict)
+                else getattr(response, "results", None)
+            )
+
+            if results:
+                # Try to get utterances first (better for timing)
+                utterances = (
+                    results.get("utterances")
+                    if isinstance(results, dict)
+                    else getattr(results, "utterances", None)
+                )
+
+                if utterances:
+                    for utt in utterances:
+                        start = (
+                            utt.get("start")
+                            if isinstance(utt, dict)
+                            else getattr(utt, "start", 0)
+                        )
+                        end = (
+                            utt.get("end")
+                            if isinstance(utt, dict)
+                            else getattr(utt, "end", 0)
+                        )
+                        text = (
+                            utt.get("transcript")
+                            if isinstance(utt, dict)
+                            else getattr(utt, "transcript", "")
+                        )
+
+                        if text:
+                            transcription_segments.append({
+                                "start": start,
+                                "dur": end - start,
+                                "text": text
+                            })
+                            total_duration = max(total_duration, end)
+
+                # Fallback to channels if no utterances
+                if not transcription_segments:
+                    channels = (
+                        results.get("channels")
+                        if isinstance(results, dict)
+                        else getattr(results, "channels", None)
+                    )
+
+                    if channels and len(channels) > 0:
+                        alternatives = (
+                            channels[0].get("alternatives")
+                            if isinstance(channels[0], dict)
+                            else getattr(channels[0], "alternatives", None)
+                        )
+
+                        if alternatives and len(alternatives) > 0:
+                            words = (
+                                alternatives[0].get("words")
+                                if isinstance(alternatives[0], dict)
+                                else getattr(alternatives[0], "words", None)
+                            )
+
+                            if words:
+                                # Group words into ~3 second segments
+                                current_segment = {"start": 0, "words": []}
+
+                                for word in words:
+                                    word_start = (
+                                        word.get("start")
+                                        if isinstance(word, dict)
+                                        else getattr(word, "start", 0)
+                                    )
+                                    word_end = (
+                                        word.get("end")
+                                        if isinstance(word, dict)
+                                        else getattr(word, "end", 0)
+                                    )
+                                    word_text = (
+                                        word.get("word") or word.get("punctuated_word")
+                                        if isinstance(word, dict)
+                                        else getattr(word, "word", "") or getattr(word, "punctuated_word", "")
+                                    )
+
+                                    if not current_segment["words"]:
+                                        current_segment["start"] = word_start
+
+                                    current_segment["words"].append(word_text)
+
+                                    # Split segment every ~3 seconds
+                                    if word_end - current_segment["start"] >= 3.0:
+                                        text = " ".join(current_segment["words"])
+                                        transcription_segments.append({
+                                            "start": current_segment["start"],
+                                            "dur": word_end - current_segment["start"],
+                                            "text": text
+                                        })
+                                        current_segment = {"start": 0, "words": []}
+                                        total_duration = max(total_duration, word_end)
+
+                                # Add remaining words
+                                if current_segment["words"]:
+                                    last_word = words[-1]
+                                    last_end = (
+                                        last_word.get("end")
+                                        if isinstance(last_word, dict)
+                                        else getattr(last_word, "end", 0)
+                                    )
+                                    text = " ".join(current_segment["words"])
+                                    transcription_segments.append({
+                                        "start": current_segment["start"],
+                                        "dur": last_end - current_segment["start"],
+                                        "text": text
+                                    })
+                                    total_duration = max(total_duration, last_end)
+
+        except Exception as parse_error:
+            logger.error(f"Failed to parse Deepgram timing data: {parse_error}")
+            # Return empty segments if parsing fails
+            pass
+
+        # Return in RapidAPI-compatible format
+        return {
+            "title": video_title,
+            "lengthInSeconds": int(total_duration),
+            "transcription": transcription_segments
+        }
+
+    except Exception as e:
+        raise Exception(f"Deepgram timed transcription failed: {str(e)}")
+    finally:
+        try:
+            if temp_audio_path and os.path.exists(temp_audio_path):
+                os.remove(temp_audio_path)
+        except Exception:
+            pass
