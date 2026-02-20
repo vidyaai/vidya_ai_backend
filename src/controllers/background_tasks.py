@@ -195,7 +195,7 @@ def format_transcript_background(video_id: str, json_data: dict):
 def download_transcript_background(video_id: str, user_id: str):
     """
     Background task to download/transcribe YouTube video when captions aren't available.
-    Uses RapidAPI audio download + Deepgram transcription with word-level timing.
+    Uses RapidAPI video download + FFmpeg audio extraction + Deepgram transcription with word-level timing + GPT-4o cleaning.
     """
     logger.info(f"Starting background transcript generation for video ID: {video_id}")
     db = SessionLocal()
@@ -206,6 +206,7 @@ def download_transcript_background(video_id: str, user_id: str):
         from utils.youtube_utils import download_youtube_audio_rapidapi
         from controllers.storage import transcribe_video_with_deepgram_timed
         from controllers.video_service import get_video_title
+        from controllers.config import openai_client
 
         # Get video title
         video_title = "YouTube Video"
@@ -218,26 +219,37 @@ def download_transcript_background(video_id: str, user_id: str):
         except Exception as title_error:
             logger.warning(f"Failed to get video title: {title_error}")
 
-        # Update status to processing
+        # Update status: Downloading video
         status = {
             "status": "processing",
-            "message": "Downloading audio from YouTube...",
+            "message": "Downloading video from YouTube...",
             "progress": 10,
+            "stage": "download"
         }
         update_transcript_status(db, video_id, status)
 
-        # Download audio using RapidAPI
-        logger.info(f"Downloading audio for video {video_id} via RapidAPI...")
+        # Download and extract audio using RapidAPI
+        logger.info(f"Downloading video for {video_id} via RapidAPI...")
         temp_audio_file = download_youtube_audio_rapidapi(video_id)
 
         if not temp_audio_file:
             raise Exception("Failed to download audio from YouTube")
 
-        # Update status to transcribing
+        # Update status: Extracting audio (FFmpeg already did this in download function)
         status = {
             "status": "processing",
-            "message": "Transcribing audio with AI (generating timed segments)...",
-            "progress": 50,
+            "message": "Audio extracted successfully, preparing for transcription...",
+            "progress": 30,
+            "stage": "extract"
+        }
+        update_transcript_status(db, video_id, status)
+
+        # Update status: Transcribing
+        status = {
+            "status": "processing",
+            "message": "Transcribing with AI (this may take a few minutes for long videos)...",
+            "progress": 40,
+            "stage": "transcribe"
         }
         update_transcript_status(db, video_id, status)
 
@@ -258,12 +270,52 @@ def download_transcript_background(video_id: str, user_id: str):
             raise Exception("Deepgram returned empty transcript")
 
         # Extract plain text from timed segments
-        transcript_text = " ".join([seg["text"] for seg in timed_data["transcription"]])
+        raw_transcript = " ".join([seg["text"] for seg in timed_data["transcription"]])
+
+        # Update status: Cleaning transcript
+        status = {
+            "status": "processing",
+            "message": "Cleaning transcript with AI for better readability...",
+            "progress": 75,
+            "stage": "clean"
+        }
+        update_transcript_status(db, video_id, status)
+
+        # Clean transcript with GPT-4o
+        logger.info(f"Cleaning transcript with GPT-4o for video {video_id}...")
+        cleaned_transcript = raw_transcript  # Default to raw if cleaning fails
+        try:
+            if openai_client:
+                response = openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    temperature=0.3,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": """You are an expert transcript editor. Clean this transcript by:
+1. Removing timestamps and metadata
+2. Fixing grammar and punctuation
+3. Adding paragraph breaks every 3-5 sentences
+4. Removing excessive filler words (um, uh)
+5. Keeping original meaning intact - DO NOT paraphrase
+
+Output only the cleaned text."""
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Clean this transcript:\n\n{raw_transcript[:15000]}"  # Limit to prevent token overflow
+                        },
+                    ],
+                )
+                cleaned_transcript = response.choices[0].message.content.strip()
+                logger.info(f"Transcript cleaned successfully")
+        except Exception as clean_error:
+            logger.warning(f"GPT-4o cleaning failed, using raw transcript: {clean_error}")
 
         # Save transcript to video record in RapidAPI-compatible format
         video = db.query(Video).filter(Video.id == video_id).first()
         if video:
-            video.transcript_text = transcript_text
+            video.transcript_text = cleaned_transcript
             # Save in RapidAPI-compatible format with timing
             json_data = [timed_data]  # Wrap in array to match RapidAPI format
             video.transcript_json = json_data
@@ -273,9 +325,10 @@ def download_transcript_background(video_id: str, user_id: str):
         # Update status to completed
         status = {
             "status": "completed",
-            "message": "Transcript generated successfully with timing",
+            "message": "Timed transcript generated and cleaned successfully! Ready to use.",
             "progress": 100,
-            "transcript_length": len(transcript_text),
+            "stage": "done",
+            "transcript_length": len(cleaned_transcript),
             "segments_count": len(timed_data["transcription"]),
         }
         update_transcript_status(db, video_id, status)
@@ -285,8 +338,9 @@ def download_transcript_background(video_id: str, user_id: str):
         logger.error(f"Transcript generation failed for video ID {video_id}: {e}")
         status = {
             "status": "failed",
-            "message": f"Transcript generation failed: {str(e)}",
+            "message": f"Failed: {str(e)[:100]}",
             "progress": 0,
+            "stage": "error",
             "error": str(e),
         }
         update_transcript_status(db, video_id, status)

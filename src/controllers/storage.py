@@ -440,7 +440,15 @@ def transcribe_video_with_deepgram_timed(local_video_path: str, video_title: str
         if mimetype:
             payload["mimetype"] = mimetype
 
-        response = deepgram_client.listen.rest.v("1").transcribe_file(payload, options)
+        # Use extended timeout for large files (up to 5 minutes)
+        try:
+            import httpx
+            response = deepgram_client.listen.rest.v("1").transcribe_file(
+                payload, options, timeout=httpx.Timeout(300.0)
+            )
+        except Exception:
+            # Fallback without timeout if httpx not available
+            response = deepgram_client.listen.rest.v("1").transcribe_file(payload, options)
 
         # Extract utterances with timing
         transcription_segments = []

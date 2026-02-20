@@ -619,32 +619,37 @@ def download_transcript_api1(video_id):
 
 def download_youtube_audio_rapidapi(video_id):
     """
-    Download audio-only from YouTube using RapidAPI and save to temp file.
+    Download audio from YouTube using RapidAPI (downloads video then extracts audio).
+
+    Uses 360p video format since format=audio is not always available.
+    Extracts audio using FFmpeg to reduce file size for transcription.
 
     Args:
         video_id: YouTube video ID
 
     Returns:
-        str: Path to temporary audio file, or None if download failed
+        str: Path to temporary audio file (MP3), or None if download failed
     """
     import tempfile
+    import subprocess
+    import time
 
     try:
         youtube_url = f"https://www.youtube.com/watch?v={video_id}"
         encoded_url = quote(youtube_url, safe="")
 
-        # Use RapidAPI to get audio download URL (same API you use for videos)
+        # Use RapidAPI to get video download URL
         api_key = "87cb804577msh2f08e931a0d9bacp19e810jsn4f8fd6ff742b"
 
-        # Request audio-only format (format=audio or use low video quality to prioritize audio)
-        url = f"https://youtube-info-download-api.p.rapidapi.com/ajax/download.php?format=audio&add_info=1&url={encoded_url}&audio_quality=128&allow_extended_duration=true"
+        # Use 360p format (smaller file, has audio) - format=audio doesn't work for all videos
+        url = f"https://youtube-info-download-api.p.rapidapi.com/ajax/download.php?format=360&add_info=1&url={encoded_url}&audio_quality=128&allow_extended_duration=true&no_merge=false"
 
         headers = {
             "x-rapidapi-key": api_key,
             "x-rapidapi-host": "youtube-info-download-api.p.rapidapi.com",
         }
 
-        logger.info(f"Requesting audio download URL from RapidAPI for {video_id}...")
+        logger.info(f"Requesting video download URL from RapidAPI for {video_id}...")
         response = requests.get(url, headers=headers, timeout=30)
 
         if response.status_code != 200:
@@ -653,43 +658,104 @@ def download_youtube_audio_rapidapi(video_id):
 
         data = response.json()
 
-        # Get direct download URL
+        # Check for direct download URL
         download_url = data.get("url") or data.get("download_url") or data.get("link")
 
+        # If no direct URL, poll progress URL
+        if not download_url and "progress_url" in data:
+            progress_url = data["progress_url"]
+            logger.info(f"Polling progress URL for download link...")
+
+            # Poll up to 6 times (60 seconds)
+            for attempt in range(6):
+                if attempt > 0:
+                    time.sleep(10)
+
+                try:
+                    progress_response = requests.get(progress_url, timeout=30)
+                    if progress_response.status_code == 200:
+                        progress_data = progress_response.json()
+                        download_url = (
+                            progress_data.get("url")
+                            or progress_data.get("download_url")
+                            or progress_data.get("download_link")
+                        )
+                        if download_url:
+                            logger.info(f"Got download URL after {attempt * 10}s")
+                            break
+                except Exception as poll_error:
+                    logger.warning(f"Progress poll error: {poll_error}")
+
         if not download_url:
-            logger.error(f"No download URL in RapidAPI response for {video_id}")
+            logger.error(f"No download URL found for {video_id}")
             return None
 
-        # Download audio file to temp location
-        logger.info(f"Downloading audio from RapidAPI URL...")
-
-        temp_fd, temp_path = tempfile.mkstemp(suffix='.m4a', prefix=f'yt_audio_{video_id}_')
+        # Download video file
+        logger.info(f"Downloading video file...")
+        temp_fd, video_temp_path = tempfile.mkstemp(suffix='.mp4', prefix=f'yt_video_{video_id}_')
         os.close(temp_fd)
 
-        audio_response = requests.get(download_url, stream=True, timeout=120)
-
-        if audio_response.status_code != 200:
-            logger.error(f"Failed to download audio file: {audio_response.status_code}")
-            os.remove(temp_path)
+        video_response = requests.get(download_url, stream=True, timeout=120)
+        if video_response.status_code != 200:
+            logger.error(f"Failed to download video: {video_response.status_code}")
+            os.remove(video_temp_path)
             return None
 
-        # Write audio to temp file
-        with open(temp_path, 'wb') as f:
-            for chunk in audio_response.iter_content(chunk_size=8192):
+        # Write video to temp file
+        total_size = 0
+        with open(video_temp_path, 'wb') as f:
+            for chunk in video_response.iter_content(chunk_size=8192):
                 if chunk:
                     f.write(chunk)
+                    total_size += len(chunk)
 
-        file_size_mb = os.path.getsize(temp_path) / (1024 * 1024)
-        logger.info(f"Audio downloaded successfully: {temp_path} ({file_size_mb:.2f} MB)")
+        logger.info(f"Video downloaded: {total_size / (1024*1024):.2f} MB")
 
-        return temp_path
+        # Extract audio using FFmpeg to reduce file size
+        logger.info(f"Extracting audio from video...")
+        audio_fd, audio_temp_path = tempfile.mkstemp(suffix='.mp3', prefix=f'yt_audio_{video_id}_')
+        os.close(audio_fd)
+
+        try:
+            cmd = [
+                'ffmpeg', '-i', video_temp_path,
+                '-vn',  # No video
+                '-acodec', 'libmp3lame',  # MP3 codec
+                '-b:a', '128k',  # 128kbps bitrate
+                '-y',  # Overwrite output
+                audio_temp_path
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+
+            if result.returncode != 0:
+                logger.warning(f"FFmpeg extraction failed: {result.stderr[:200]}")
+                # Fall back to using video file
+                os.remove(audio_temp_path)
+                logger.info(f"Using video file directly for transcription")
+                return video_temp_path
+            else:
+                audio_size = os.path.getsize(audio_temp_path) / (1024*1024)
+                logger.info(f"Audio extracted: {audio_size:.2f} MB")
+                # Clean up video file
+                os.remove(video_temp_path)
+                return audio_temp_path
+
+        except Exception as ffmpeg_error:
+            logger.warning(f"Audio extraction error: {ffmpeg_error}")
+            # Fall back to video file
+            if os.path.exists(audio_temp_path):
+                os.remove(audio_temp_path)
+            logger.info(f"Using video file directly for transcription")
+            return video_temp_path
 
     except Exception as e:
         logger.error(f"Failed to download YouTube audio via RapidAPI for {video_id}: {e}")
-        # Clean up temp file on error
+        # Clean up temp files on error
         try:
-            if 'temp_path' in locals() and os.path.exists(temp_path):
-                os.remove(temp_path)
+            if 'video_temp_path' in locals() and os.path.exists(video_temp_path):
+                os.remove(video_temp_path)
+            if 'audio_temp_path' in locals() and os.path.exists(audio_temp_path):
+                os.remove(audio_temp_path)
         except Exception:
             pass
         return None
