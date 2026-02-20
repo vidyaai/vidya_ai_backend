@@ -258,9 +258,9 @@ class AssignmentGenerator:
                 # Prepare lecture notes content for review
                 lecture_content = ""
                 if content_sources.get("document_texts"):
-                    lecture_content += "\n\n".join(content_sources["document_texts"])
+                    lecture_content += "\n\n".join([doc["content"] for doc in content_sources["document_texts"]])
                 if content_sources.get("video_transcripts"):
-                    lecture_content += "\n\n".join(content_sources["video_transcripts"])
+                    lecture_content += "\n\n".join([vid["transcript"] for vid in content_sources["video_transcripts"]])
 
                 # Review questions
                 review_results = reviewer.review_questions(

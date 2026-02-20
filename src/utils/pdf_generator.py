@@ -1367,20 +1367,55 @@ class AssignmentPDFGenerator:
             <div class="solution-content">{rubric_html}</div>
         </div>"""
 
-        # Handle subquestion answers
+        # Handle subquestion answers — show full question text + answer + rubric for each part
         if question.get("subquestions"):
             for i, subq in enumerate(question["subquestions"]):
                 subq_equations = subq.get("equations", equations)
+                part_label = chr(97 + i)  # a, b, c, ...
+
+                raw_subq_q = subq.get("question", "")
                 raw_subq_answer = subq.get("correctAnswer") or subq.get("correct_answer", "")
-                if raw_subq_answer:
-                    if subq_equations:
-                        subq_ans_html = self.process_question_text_with_equations(raw_subq_answer, subq_equations)
-                    else:
-                        subq_ans_html = self.process_question_text(raw_subq_answer)
+                subq_rubric = subq.get("rubric", "")
+
+                if raw_subq_q or raw_subq_answer:
                     html += f"""
-        <div class="solution-answer" style="margin-left:20px">
-            <div class="solution-label">Part ({chr(97 + i)}) Answer</div>
-            <div class="solution-content">{subq_ans_html}</div>
+        <div style="margin-left:20px; margin-top:10px; padding:8px 12px; background:#f8fafc; border-left:3px solid #94a3b8; border-radius:4px;">
+            <div class="solution-label">Part ({part_label})</div>"""
+
+                    # Full subquestion text
+                    if raw_subq_q:
+                        if subq_equations:
+                            subq_q_html = self.process_question_text_with_equations(raw_subq_q, subq_equations)
+                        else:
+                            subq_q_html = self.process_question_text(raw_subq_q)
+                        html += f"""
+            <div style="font-size:0.92em; color:#1f2937; margin-bottom:6px;">{subq_q_html}</div>"""
+
+                    # Answer
+                    if raw_subq_answer:
+                        if subq_equations:
+                            subq_ans_html = self.process_question_text_with_equations(raw_subq_answer, subq_equations)
+                        else:
+                            subq_ans_html = self.process_question_text(raw_subq_answer)
+                        html += f"""
+            <div class="solution-answer" style="margin-top:6px;">
+                <div class="solution-label">Answer</div>
+                <div class="solution-content">{subq_ans_html}</div>
+            </div>"""
+
+                    # Rubric
+                    if subq_rubric:
+                        if subq_equations:
+                            subq_rub_html = self.process_question_text_with_equations(subq_rubric, subq_equations)
+                        else:
+                            subq_rub_html = self.process_question_text(subq_rubric)
+                        html += f"""
+            <div class="solution-rubric" style="margin-top:6px;">
+                <div class="solution-label">Grading Rubric</div>
+                <div class="solution-content">{subq_rub_html}</div>
+            </div>"""
+
+                    html += """
         </div>"""
 
         # Close the question div

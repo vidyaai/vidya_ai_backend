@@ -10,6 +10,7 @@ Same interface as DiagramReviewer but powered by Gemini.
 import base64
 import os
 import json
+import traceback
 from typing import Dict, Any, Optional
 
 from controllers.config import logger
@@ -101,41 +102,88 @@ class GeminiDiagramReviewer:
                 "fixable": False,
             }
 
-        try:
-            from vertexai.generative_models import Part, Image
+        last_error = None  # Track last error for final fallback
 
-            # Build the review prompt
-            review_prompt = self._build_review_prompt(
-                question_text, diagram_description, user_prompt_context,
-                domain=domain, diagram_type=diagram_type,
-            )
+        for attempt in range(2):
+            try:
+                from vertexai.generative_models import Part, Image
+                import google.api_core.exceptions
 
-            # Create image part from bytes
-            image_part = Part.from_image(Image.from_bytes(image_bytes))
+                # Build the review prompt
+                review_prompt = self._build_review_prompt(
+                    question_text, diagram_description, user_prompt_context,
+                    domain=domain, diagram_type=diagram_type,
+                )
 
-            # Call Gemini 2.5 Pro with vision
-            response = self._model.generate_content(
-                [review_prompt, image_part],
-                generation_config={
-                    "temperature": 0.1,
-                    "max_output_tokens": 800,
-                },
-            )
+                # Create image part from bytes
+                image_part = Part.from_image(Image.from_bytes(image_bytes))
 
-            result_text = response.text.strip()
-            return self._parse_review_result(result_text)
+                # Call Gemini 2.5 Pro with vision with timeout
+                response = self._model.generate_content(
+                    [review_prompt, image_part],
+                    generation_config={
+                        "temperature": 0.1,
+                        "max_output_tokens": 800,
+                    },
+                    request_options={
+                        "timeout": 60  # 60 second timeout
+                    },
+                )
 
-        except Exception as e:
-            logger.error(f"Gemini diagram review failed: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            return {
-                "passed": True,
-                "reason": f"Review skipped due to error: {str(e)}",
-                "corrected_description": None,
-                "issues": [],
-                "fixable": False,
-            }
+                result_text = response.text.strip()
+                return self._parse_review_result(result_text)
+
+            except google.api_core.exceptions.Cancelled as e:
+                # Handle cancelled/timeout errors specifically
+                last_error = e
+                logger.error(f"Gemini diagram review cancelled (timeout): {e}")
+                logger.error(f"Traceback: {traceback.format_exc()}")
+
+                # Don't retry on timeout - just fail fast
+                return {
+                    "passed": True,
+                    "reason": f"Review skipped due to timeout after {attempt + 1} attempt(s)",
+                    "corrected_description": None,
+                    "issues": [],
+                    "fixable": False,
+                }
+
+            except Exception as e:
+                last_error = e
+                err_str = str(e)
+
+                # gRPC broken pipe / UNAVAILABLE — drop the channel and retry once
+                is_connection_error = (
+                    "Broken pipe" in err_str
+                    or "503" in err_str
+                    or "UNAVAILABLE" in err_str
+                    or "StatusCode.UNAVAILABLE" in err_str
+                )
+
+                if is_connection_error and attempt == 0:
+                    logger.warning(
+                        f"Gemini reviewer gRPC connection dropped (broken pipe) — "
+                        f"reinitializing and retrying..."
+                    )
+                    self._initialized = False
+                    self._model = None
+                    if not self._ensure_initialized():
+                        break
+                    continue
+
+                logger.error(f"Gemini diagram review failed: {e}")
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                break
+
+        # Fallback return with proper error reference
+        error_msg = str(last_error) if last_error else "Unknown error"
+        return {
+            "passed": True,
+            "reason": f"Review skipped due to error: {error_msg}",
+            "corrected_description": None,
+            "issues": [],
+            "fixable": False,
+        }
 
     def _build_review_prompt(
         self,
@@ -254,6 +302,19 @@ CHECK ONLY THE FOLLOWING — DO NOT check topology, circuit correctness, or doma
    When FAILING for data mismatch, list EVERY mismatch in ISSUES, e.g.:
      "Question says node sequence 3→5→7→9 but diagram shows 3→5→7→8"
      "Question says state S2 transitions to S0 on input 1 but diagram shows S2→S3"
+
+5. **DIAGRAM SOLVABILITY CHECK**: Can a student actually answer the question using only what
+   the diagram shows, combined with the question text?
+   - If the diagram contains a generic unlabeled block (e.g., "Combo Logic", "Logic Block",
+     "CL", "?", or any unnamed black box) AND the question requires knowing what that block
+     DOES in order to compute the answer → FAIL, fixable=NO.
+   - The principle: any component that is structurally essential to answering the question
+     must be shown with enough detail for the student to work with it. A placeholder or
+     black box is only acceptable if the question explicitly asks students to DESIGN or FILL IN
+     that component themselves.
+   - This check is domain-generic: applies equally to circuit logic blocks, mechanical
+     subsystems drawn as boxes, software modules, or any other unspecified element whose
+     function is needed to answer the question.
 
 ⛔ DO NOT verify circuit topology correctness or domain-specific design rules.
 ⛔ DO NOT fail a diagram because you think a component is "wired incorrectly" or "in the wrong position".

@@ -16,10 +16,12 @@ from controllers.db_helpers import (
     get_download_status,
     get_transcript_cache,
     get_formatting_status,
+    get_transcript_status,
 )
 from controllers.background_tasks import (
     download_video_background,
     format_transcript_background,
+    download_transcript_background,
 )
 from controllers.storage import s3_presign_url
 from controllers.video_service import get_video_title
@@ -57,6 +59,32 @@ async def get_download_status_endpoint(
             "path": video_path,
         }
     return get_download_status(db, video_id)
+
+
+@router.get("/transcript-status/{video_id}")
+async def get_transcript_status_endpoint(
+    video_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
+    """Get transcript generation status for polling"""
+    # Check if video belongs to current user or allow access for any user
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    # Check if transcript already exists
+    if video.transcript_text:
+        return {
+            "status": "completed",
+            "message": "Transcript available",
+            "progress": 100,
+            "transcript_length": len(video.transcript_text),
+            "has_transcript": True,
+        }
+
+    # Return current generation status
+    status = get_transcript_status(db, video_id)
+    status["has_transcript"] = False
+    return status
 
 
 @router.get("/formatting-status/{video_id}")
@@ -200,37 +228,68 @@ async def get_youtube_info(
                 download_video_background, video_id, url, current_user["uid"]
             )
             download_message = "Video download, thumbnail generation, and cloud upload started in background"
+    # Check if transcript exists in cache/database
     transcript_info = get_transcript_cache(db, video_id)
+    transcript_data = None
+    json_data = None
+    transcript_message = "No transcript available"
+
     if transcript_info and transcript_info.get("transcript_data"):
+        # Transcript already exists in database
         transcript_data = transcript_info["transcript_data"]
         json_data = transcript_info["json_data"]
+        transcript_message = "Transcript loaded from cache"
     else:
-        transcript_data, json_data = download_transcript_api(video_id)
-        try:
-            v = db.query(Video).filter(Video.id == video_id).first()
-            if v is None:
-                v = Video(
-                    id=video_id,
-                    user_id=current_user["uid"],
-                    source_type="youtube",
-                    title=title,
-                    youtube_id=video_id,
-                    youtube_url=url,
-                    transcript_text=transcript_data,
-                    transcript_json=json_data,
-                )
-                db.add(v)
-            else:
-                v.user_id = v.user_id or current_user["uid"]
-                v.source_type = "youtube"
-                v.title = title or v.title
-                v.youtube_id = video_id
-                v.youtube_url = url
-                v.transcript_text = transcript_data or v.transcript_text
-                v.transcript_json = json_data or v.transcript_json
-            db.commit()
-        except Exception:
-            pass
+        # Check transcript generation status
+        t_status = get_transcript_status(db, video_id)
+
+        if t_status["status"] in ["processing"]:
+            # Already being generated in background
+            transcript_message = f"Transcript generation in progress: {t_status.get('message', 'Processing...')}"
+        elif t_status["status"] == "failed":
+            # Previous attempt failed, retry
+            download_executor.submit(download_transcript_background, video_id, current_user["uid"])
+            transcript_message = "Retrying transcript generation in background"
+        else:
+            # Try to get transcript (RapidAPI captions - quick)
+            try:
+                transcript_data, json_data = download_transcript_api(video_id)
+
+                # Save to database
+                v = db.query(Video).filter(Video.id == video_id).first()
+                if v is None:
+                    v = Video(
+                        id=video_id,
+                        user_id=current_user["uid"],
+                        source_type="youtube",
+                        title=title,
+                        youtube_id=video_id,
+                        youtube_url=url,
+                        transcript_text=transcript_data,
+                        transcript_json=json_data,
+                    )
+                    db.add(v)
+                else:
+                    v.user_id = v.user_id or current_user["uid"]
+                    v.source_type = "youtube"
+                    v.title = title or v.title
+                    v.youtube_id = video_id
+                    v.youtube_url = url
+                    v.transcript_text = transcript_data or v.transcript_text
+                    v.transcript_json = json_data or v.transcript_json
+                db.commit()
+                transcript_message = "Transcript downloaded successfully"
+
+            except Exception as e:
+                # Failed to get captions - start background transcription
+                error_msg = str(e).lower()
+                if "no subtitles" in error_msg or "no captions" in error_msg or "transcription" in error_msg:
+                    # Start background task to download audio + transcribe
+                    download_executor.submit(download_transcript_background, video_id, current_user["uid"])
+                    transcript_message = "Video has no captions. Generating transcript with AI in background - you can start watching now!"
+                else:
+                    # Other error
+                    transcript_message = f"Transcript unavailable: {str(e)}"
     formatting_message = "Transcript not formatted"
     status = get_formatting_status(db, video_id)
     if status["status"] == "not_found":
@@ -282,6 +341,9 @@ async def get_youtube_info(
                 )
             except Exception:
                 pass
+    # Get current transcript status for frontend polling
+    t_status = get_transcript_status(db, video_id)
+
     return {
         "video_id": video_id,
         "title": title,
@@ -289,6 +351,8 @@ async def get_youtube_info(
         "transcript": transcript_data,
         "embed_url": f"https://www.youtube.com/embed/{video_id}?enablejsapi=1",
         "download_status": download_message,
+        "transcript_status": transcript_message,
+        "transcript_generation_status": t_status,  # For polling progress
         "formatting_status": formatting_message,
         "video_url": video_url,
         "thumbnail_url": thumbnail_url,

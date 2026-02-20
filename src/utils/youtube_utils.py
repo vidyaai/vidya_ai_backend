@@ -617,61 +617,204 @@ def download_transcript_api1(video_id):
         return None
 
 
+def download_youtube_audio_rapidapi(video_id):
+    """
+    Download audio-only from YouTube using RapidAPI and save to temp file.
+
+    Args:
+        video_id: YouTube video ID
+
+    Returns:
+        str: Path to temporary audio file, or None if download failed
+    """
+    import tempfile
+
+    try:
+        youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+        encoded_url = quote(youtube_url, safe="")
+
+        # Use RapidAPI to get audio download URL (same API you use for videos)
+        api_key = "87cb804577msh2f08e931a0d9bacp19e810jsn4f8fd6ff742b"
+
+        # Request audio-only format (format=audio or use low video quality to prioritize audio)
+        url = f"https://youtube-info-download-api.p.rapidapi.com/ajax/download.php?format=audio&add_info=1&url={encoded_url}&audio_quality=128&allow_extended_duration=true"
+
+        headers = {
+            "x-rapidapi-key": api_key,
+            "x-rapidapi-host": "youtube-info-download-api.p.rapidapi.com",
+        }
+
+        logger.info(f"Requesting audio download URL from RapidAPI for {video_id}...")
+        response = requests.get(url, headers=headers, timeout=30)
+
+        if response.status_code != 200:
+            logger.error(f"RapidAPI returned status {response.status_code}")
+            return None
+
+        data = response.json()
+
+        # Get direct download URL
+        download_url = data.get("url") or data.get("download_url") or data.get("link")
+
+        if not download_url:
+            logger.error(f"No download URL in RapidAPI response for {video_id}")
+            return None
+
+        # Download audio file to temp location
+        logger.info(f"Downloading audio from RapidAPI URL...")
+
+        temp_fd, temp_path = tempfile.mkstemp(suffix='.m4a', prefix=f'yt_audio_{video_id}_')
+        os.close(temp_fd)
+
+        audio_response = requests.get(download_url, stream=True, timeout=120)
+
+        if audio_response.status_code != 200:
+            logger.error(f"Failed to download audio file: {audio_response.status_code}")
+            os.remove(temp_path)
+            return None
+
+        # Write audio to temp file
+        with open(temp_path, 'wb') as f:
+            for chunk in audio_response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+
+        file_size_mb = os.path.getsize(temp_path) / (1024 * 1024)
+        logger.info(f"Audio downloaded successfully: {temp_path} ({file_size_mb:.2f} MB)")
+
+        return temp_path
+
+    except Exception as e:
+        logger.error(f"Failed to download YouTube audio via RapidAPI for {video_id}: {e}")
+        # Clean up temp file on error
+        try:
+            if 'temp_path' in locals() and os.path.exists(temp_path):
+                os.remove(temp_path)
+        except Exception:
+            pass
+        return None
+
+
 def download_transcript_api(video_id):
-    conn = http.client.HTTPSConnection("youtube-transcriptor.p.rapidapi.com/transcript")
+    """
+    Download transcript using RapidAPI. Falls back to Deepgram if no captions available.
 
-    headers = {
-        "x-rapidapi-key": "87cb804577msh2f08e931a0d9bacp19e810jsn4f8fd6ff742b",
-        "x-rapidapi-host": "youtube-transcriptor.p.rapidapi.com",
-    }
+    Args:
+        video_id: YouTube video ID
 
-    url = "https://youtube-transcriptor.p.rapidapi.com/transcript"
-    querystring = {"video_id": video_id, "lang": "en"}
-    response = requests.get(url, headers=headers, params=querystring)
+    Returns:
+        tuple: (transcript_text, json_data)
+    """
+    try:
+        headers = {
+            "x-rapidapi-key": "87cb804577msh2f08e931a0d9bacp19e810jsn4f8fd6ff742b",
+            "x-rapidapi-host": "youtube-transcriptor.p.rapidapi.com",
+        }
 
-    if response.status_code == 200:
-        transcript_data = response.json()
-        # print("-----transcript data--------", transcript_data)
+        url = "https://youtube-transcriptor.p.rapidapi.com/transcript"
+        querystring = {"video_id": video_id, "lang": "en"}
+        response = requests.get(url, headers=headers, params=querystring)
 
-        if not "error" in transcript_data:
-            # RapidAPI usually returns the transcript in a specific format
-            # Check if we have transcript entries to process
-            if (
-                "transcriptionAsText" in transcript_data[0]
-                and transcript_data[0]["transcriptionAsText"]
-            ):
-                return transcript_data[0]["transcriptionAsText"], response.json()
+        if response.status_code == 200:
+            transcript_data = response.json()
+            # print("-----transcript data--------", transcript_data)
+
+            if not "error" in transcript_data:
+                # RapidAPI usually returns the transcript in a specific format
+                # Check if we have transcript entries to process
+                if (
+                    "transcriptionAsText" in transcript_data[0]
+                    and transcript_data[0]["transcriptionAsText"]
+                ):
+                    return transcript_data[0]["transcriptionAsText"], response.json()
+                else:
+                    logger.warning("No transcript data in the response")
+                    raise Exception("No transcript data in the response")
             else:
-                logger.warning("No transcript data in the response")
-                raise Exception("No transcript data in the response")
+                if "availableLangs" in transcript_data:
+                    for lang in transcript_data["availableLangs"]:
+                        if "en" in lang:
+                            querystring["lang"] = lang
+                            response = requests.get(
+                                url, headers=headers, params=querystring
+                            )
+                            if response.status_code == 200:
+                                transcript_data = response.json()
+                                if (
+                                    "transcriptionAsText" in transcript_data[0]
+                                    and transcript_data[0]["transcriptionAsText"]
+                                ):
+                                    return (
+                                        transcript_data[0]["transcriptionAsText"],
+                                        response.json(),
+                                    )
+                                else:
+                                    logger.warning("No transcript data in the response")
+                                    raise Exception("No transcript data in the response")
+                logger.error(f"Transcript error: {transcript_data['error']}")
+                raise Exception("Transcription Error: ", transcript_data["error"])
         else:
-            if "availableLangs" in transcript_data:
-                for lang in transcript_data["availableLangs"]:
-                    if "en" in lang:
-                        querystring["lang"] = lang
-                        response = requests.get(
-                            url, headers=headers, params=querystring
-                        )
-                        if response.status_code == 200:
-                            transcript_data = response.json()
-                            if (
-                                "transcriptionAsText" in transcript_data[0]
-                                and transcript_data[0]["transcriptionAsText"]
-                            ):
-                                return (
-                                    transcript_data[0]["transcriptionAsText"],
-                                    response.json(),
-                                )
-                            else:
-                                logger.warning("No transcript data in the response")
-                                raise Exception("No transcript data in the response")
-            logger.error(f"Transcript error: {transcript_data['error']}")
-            raise Exception("Transcription Error: ", transcript_data["error"])
-    else:
-        logger.error(f"Transcript API error: {response.status_code} - {response.text}")
-        raise Exception(
-            f"Transcription Error: {response.status_code} - {response.text}"
-        )
+            logger.error(f"Transcript API error: {response.status_code} - {response.text}")
+            raise Exception(
+                f"Transcription Error: {response.status_code} - {response.text}"
+            )
+
+    except Exception as e:
+        error_msg = str(e).lower()
+
+        # Check if error is due to missing captions/subtitles
+        if "no subtitles" in error_msg or "transcription error" in error_msg or "no transcript" in error_msg:
+            logger.warning(f"No captions found for video {video_id}, falling back to Deepgram transcription")
+
+            temp_audio_file = None
+            try:
+                # Import Deepgram transcription function (file-based)
+                from controllers.storage import transcribe_video_with_deepgram
+
+                logger.info(f"Downloading audio for {video_id} to transcribe with Deepgram...")
+
+                # Download audio to temporary file using RapidAPI
+                temp_audio_file = download_youtube_audio_rapidapi(video_id)
+
+                if not temp_audio_file:
+                    raise Exception("Failed to download YouTube audio")
+
+                logger.info(f"Starting Deepgram transcription for {video_id} (this may take a few minutes)")
+
+                # Transcribe using Deepgram with the local audio file
+                transcript_text = transcribe_video_with_deepgram(temp_audio_file)
+
+                if not transcript_text or not transcript_text.strip():
+                    raise Exception("Deepgram returned empty transcript")
+
+                # Format response to match RapidAPI structure
+                json_data = [{
+                    "transcriptionAsText": transcript_text,
+                    "source": "deepgram",
+                    "video_id": video_id,
+                    "lang": "en"
+                }]
+
+                logger.info(f"Successfully transcribed video {video_id} using Deepgram ({len(transcript_text)} chars)")
+
+                return transcript_text, json_data
+
+            except Exception as deepgram_error:
+                logger.error(f"Deepgram transcription failed for {video_id}: {deepgram_error}")
+                raise Exception(
+                    f"No captions available and Deepgram transcription failed: {str(deepgram_error)}"
+                )
+            finally:
+                # Clean up temporary audio file
+                if temp_audio_file and os.path.exists(temp_audio_file):
+                    try:
+                        os.remove(temp_audio_file)
+                        logger.info(f"Cleaned up temporary audio file: {temp_audio_file}")
+                    except Exception as cleanup_error:
+                        logger.warning(f"Failed to clean up temp file {temp_audio_file}: {cleanup_error}")
+        else:
+            # Re-raise non-caption-related errors
+            raise
 
 
 def format_transcript_data(transcript_data):

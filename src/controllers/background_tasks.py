@@ -18,6 +18,8 @@ from .db_helpers import (
     update_download_status,
     update_formatting_status,
     get_formatting_status,
+    update_transcript_status,
+    get_transcript_status,
 )
 
 
@@ -187,6 +189,114 @@ def format_transcript_background(video_id: str, json_data: dict):
         }
         update_formatting_status(db, video_id, status)
     finally:
+        db.close()
+
+
+def download_transcript_background(video_id: str, user_id: str):
+    """
+    Background task to download/transcribe YouTube video when captions aren't available.
+    Uses RapidAPI audio download + Deepgram transcription with word-level timing.
+    """
+    logger.info(f"Starting background transcript generation for video ID: {video_id}")
+    db = SessionLocal()
+    temp_audio_file = None
+
+    try:
+        # Import here to avoid circular dependency
+        from utils.youtube_utils import download_youtube_audio_rapidapi
+        from controllers.storage import transcribe_video_with_deepgram_timed
+        from controllers.video_service import get_video_title
+
+        # Get video title
+        video_title = "YouTube Video"
+        try:
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            video_title = loop.run_until_complete(get_video_title(video_id))
+            loop.close()
+        except Exception as title_error:
+            logger.warning(f"Failed to get video title: {title_error}")
+
+        # Update status to processing
+        status = {
+            "status": "processing",
+            "message": "Downloading audio from YouTube...",
+            "progress": 10,
+        }
+        update_transcript_status(db, video_id, status)
+
+        # Download audio using RapidAPI
+        logger.info(f"Downloading audio for video {video_id} via RapidAPI...")
+        temp_audio_file = download_youtube_audio_rapidapi(video_id)
+
+        if not temp_audio_file:
+            raise Exception("Failed to download audio from YouTube")
+
+        # Update status to transcribing
+        status = {
+            "status": "processing",
+            "message": "Transcribing audio with AI (generating timed segments)...",
+            "progress": 50,
+        }
+        update_transcript_status(db, video_id, status)
+
+        # Transcribe with Deepgram (with word-level timing)
+        logger.info(f"Transcribing audio for video {video_id} with Deepgram (timed)...")
+        timed_data = transcribe_video_with_deepgram_timed(temp_audio_file, video_title)
+
+        # Clean up temp file
+        if temp_audio_file and os.path.exists(temp_audio_file):
+            try:
+                os.remove(temp_audio_file)
+                logger.info(f"Cleaned up temporary audio file: {temp_audio_file}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up temp file: {cleanup_error}")
+            temp_audio_file = None
+
+        if not timed_data or not timed_data.get("transcription"):
+            raise Exception("Deepgram returned empty transcript")
+
+        # Extract plain text from timed segments
+        transcript_text = " ".join([seg["text"] for seg in timed_data["transcription"]])
+
+        # Save transcript to video record in RapidAPI-compatible format
+        video = db.query(Video).filter(Video.id == video_id).first()
+        if video:
+            video.transcript_text = transcript_text
+            # Save in RapidAPI-compatible format with timing
+            json_data = [timed_data]  # Wrap in array to match RapidAPI format
+            video.transcript_json = json_data
+            db.commit()
+            logger.info(f"Transcript with {len(timed_data['transcription'])} timed segments saved to database for video {video_id}")
+
+        # Update status to completed
+        status = {
+            "status": "completed",
+            "message": "Transcript generated successfully with timing",
+            "progress": 100,
+            "transcript_length": len(transcript_text),
+            "segments_count": len(timed_data["transcription"]),
+        }
+        update_transcript_status(db, video_id, status)
+        logger.info(f"Transcript generation completed for video ID: {video_id}")
+
+    except Exception as e:
+        logger.error(f"Transcript generation failed for video ID {video_id}: {e}")
+        status = {
+            "status": "failed",
+            "message": f"Transcript generation failed: {str(e)}",
+            "progress": 0,
+            "error": str(e),
+        }
+        update_transcript_status(db, video_id, status)
+    finally:
+        # Ensure cleanup
+        if temp_audio_file and os.path.exists(temp_audio_file):
+            try:
+                os.remove(temp_audio_file)
+            except Exception:
+                pass
         db.close()
 
 

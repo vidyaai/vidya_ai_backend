@@ -1810,14 +1810,23 @@ async def generate_assignment_stream(
     thread.start()
 
     import asyncio
+    import time
 
     async def _event_stream():
+        last_ping = time.monotonic()
         while True:
             try:
                 item = log_queue.get_nowait()
             except queue.Empty:
+                # Send a heartbeat comment every 15 s to prevent ngrok / proxy
+                # from killing the idle SSE connection.
+                if time.monotonic() - last_ping >= 15:
+                    yield ": heartbeat\n\n"
+                    last_ping = time.monotonic()
                 await asyncio.sleep(0.15)
                 continue
+
+            last_ping = time.monotonic()
 
             if item is _DONE:
                 yield "data: [DONE]\n\n"
