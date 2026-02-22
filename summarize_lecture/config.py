@@ -6,8 +6,7 @@ load_dotenv()
 
 # API Keys
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-GOOGLE_CSE_API_KEY = os.getenv("GOOGLE_CSE_API_KEY")
-GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
 
 # Model Configuration
@@ -33,10 +32,12 @@ TEMP_DIR = "temp"
 # Validate required keys
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY not found in environment variables")
-if not GOOGLE_CSE_API_KEY:
-    raise ValueError("GOOGLE_CSE_API_KEY not found in environment variables")
-if not GOOGLE_CSE_ID:
-    raise ValueError("GOOGLE_CSE_ID not found in environment variables")
+
+# Tavily key is optional - web search will be skipped if not available
+if not TAVILY_API_KEY:
+    print(
+        "⚠️  Warning: TAVILY_API_KEY not found - web search augmentation will not be available"
+    )
 
 # Deepgram key is optional - only required if using video transcription
 if not DEEPGRAM_API_KEY:

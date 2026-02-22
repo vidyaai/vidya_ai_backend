@@ -1,43 +1,53 @@
-# Google CSE integration
-from googleapiclient.discovery import build
+# Tavily Web Search integration
+import requests
 from typing import List, Dict
 import logging
-from ..config import GOOGLE_CSE_API_KEY, GOOGLE_CSE_ID
+from ..config import TAVILY_API_KEY
 
 logger = logging.getLogger(__name__)
 
 
 def search_google(query: str, num_results: int = 4) -> List[Dict[str, str]]:
     """
-    Search Google using Custom Search API
+    Search web using Tavily API (optimized for AI/LLM applications)
 
     Args:
         query: Search query string
-        num_results: Number of results to return (max 10)
+        num_results: Number of results to return
 
     Returns:
         List of dicts with 'title', 'url', 'snippet'
     """
     try:
-        service = build("customsearch", "v1", developerKey=GOOGLE_CSE_API_KEY)
+        if not TAVILY_API_KEY:
+            logger.warning("TAVILY_API_KEY not set, skipping web search")
+            print(f'   ⚠️  No API key configured for: "{query}"')
+            return []
 
-        result = (
-            service.cse().list(q=query, cx=GOOGLE_CSE_ID, num=num_results).execute()
-        )
+        url = "https://api.tavily.com/search"
+        payload = {
+            "api_key": TAVILY_API_KEY,
+            "query": query,
+            "search_depth": "basic",
+            "max_results": num_results,
+            "include_answer": False,
+            "include_raw_content": False,
+            "include_images": False,
+        }
+
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+        data = response.json()
 
         search_results = []
-
-        if "items" in result:
-            for item in result["items"]:
-                search_results.append(
-                    {
-                        "title": item.get("title", "No title"),
-                        "url": item.get("link", ""),
-                        "snippet": item.get("snippet", "No description available"),
-                    }
-                )
-        else:
-            logger.warning(f"No search results found for query: {query}")
+        for result in data.get("results", []):
+            search_results.append(
+                {
+                    "title": result.get("title", "No title"),
+                    "url": result.get("url", ""),
+                    "snippet": result.get("content", "No description available"),
+                }
+            )
 
         logger.info(f'Found {len(search_results)} results for query: "{query}"')
 
@@ -45,13 +55,17 @@ def search_google(query: str, num_results: int = 4) -> List[Dict[str, str]]:
         if search_results:
             print(f'   ✅ Found {len(search_results)} results for: "{query}"')
         else:
-            print(f'   ❌ No results for: "{query}"')
+            print(f'   ⚠️  No results for: "{query}"')
 
         return search_results
 
-    except Exception as e:
-        logger.error(f"Google search failed for query '{query}': {str(e)}")
+    except requests.RequestException as e:
+        logger.error(f"Tavily search failed for query '{query}': {str(e)}")
         print(f'   ❌ Search failed for: "{query}" - {str(e)}')
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error in search for query '{query}': {str(e)}")
+        print(f'   ❌ Search error for: "{query}" - {str(e)}')
         return []
 
 
