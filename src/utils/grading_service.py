@@ -158,6 +158,8 @@ class LLMGrader:
                     print(f"Failed to presign S3 key: {s3_key}")
                     pass
 
+            print("user_content", user_content)
+
             # Make single LLM call
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -803,39 +805,6 @@ class LLMGrader:
                 }
 
         return feedback_by_question, overall_feedback
-
-    def _build_prompt(
-        self,
-        question_text: Optional[str],
-        q_type: Optional[str],
-        rubric: Optional[str],
-        correct_answer: Optional[str],
-        text_answer: Optional[str],
-        max_points: float,
-    ) -> str:
-        parts: List[str] = []
-        if question_text:
-            parts.append(f"Question ({q_type or 'text'}):\n{question_text}")
-        if correct_answer:
-            parts.append(f"Sample/Reference Answer:\n{correct_answer}")
-        if rubric:
-            parts.append(f"Rubric:\n{rubric}")
-        parts.append(f"Max Points: {max_points}")
-        if text_answer is not None:
-            parts.append(f"Student Answer (text):\n{text_answer}")
-        else:
-            parts.append("Student Answer (text): <none>")
-        parts.append(
-            (
-                "If an image is attached, evaluate correctness, completeness, labels, and alignment "
-                "with the rubric. Respond with this exact format:\n"
-                "SCORE: <float in [0,max_points]>\n"
-                "Strengths: ...\n"
-                "AreasForImprovement: ...\n"
-                "Breakdown: ...\n"
-            )
-        )
-        return "\n\n".join(parts)
 
     def _parse_score_and_feedback(
         self, text: str, default_max: float
