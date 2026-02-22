@@ -1,8 +1,8 @@
-"""11 migration Add course organization system
+"""12 migration Add course organization system
 
-Revision ID: b1a2c3d4e5f6
-Revises: 988d09ba0571
-Create Date: 2026-02-08 10:00:00.000000
+Revision ID: f452b6cb5374
+Revises: 61ae8bccbbc8
+Create Date: 2026-02-22 13:52:29.727395
 
 """
 from typing import Sequence, Union
@@ -12,15 +12,14 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "b1a2c3d4e5f6"
-down_revision: Union[str, Sequence[str], None] = "988d09ba0571"
+revision: str = "f452b6cb5374"
+down_revision: Union[str, Sequence[str], None] = "61ae8bccbbc8"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Create courses, course_enrollments, course_materials tables and add course_id to assignments."""
-
+    """Upgrade schema."""
     # 1. courses table
     op.create_table(
         "courses",
@@ -133,6 +132,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade schema."""
     """Remove course system tables and column."""
     op.drop_index(op.f("ix_assignments_course_id"), table_name="assignments")
     op.drop_constraint("fk_assignments_course_id", "assignments", type_="foreignkey")
@@ -141,9 +141,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_course_materials_course_id"), table_name="course_materials")
     op.drop_table("course_materials")
 
-    op.drop_index(
-        op.f("ix_course_enrollments_email"), table_name="course_enrollments"
-    )
+    op.drop_index(op.f("ix_course_enrollments_email"), table_name="course_enrollments")
     op.drop_index(
         op.f("ix_course_enrollments_user_id"), table_name="course_enrollments"
     )
