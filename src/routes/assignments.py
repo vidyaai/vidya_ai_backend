@@ -106,7 +106,6 @@ def process_pdf_in_background(
             s3_client=s3_client,
             s3_bucket=AWS_S3_BUCKET,
             s3_upload_func=s3_upload_file,
-            logger=logger,
         )
 
         # Update submission with extracted answers and set status to submitted
@@ -2263,7 +2262,6 @@ async def submit_assignment(
                     s3_client=s3_client,
                     s3_bucket=AWS_S3_BUCKET,
                     s3_upload_func=s3_upload_file,
-                    logger=logger,
                 )
                 # Update submission with extracted diagram s3_keys
                 # Use flag_modified to ensure SQLAlchemy detects the JSON change
@@ -2312,7 +2310,6 @@ async def submit_assignment(
                     s3_client=s3_client,
                     s3_bucket=AWS_S3_BUCKET,
                     s3_upload_func=s3_upload_file,
-                    logger=logger,
                 )
                 # Update submission with extracted diagram s3_keys
                 # Use flag_modified to ensure SQLAlchemy detects the JSON change
