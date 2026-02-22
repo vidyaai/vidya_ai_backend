@@ -20,11 +20,7 @@ from utils.pdf_answer_processor import PDFAnswerProcessor
 
 
 # Test PDF file path
-TEST_PDF_PATH = (
-    Path(__file__).parent
-    / "test_files"
-    / "057c3ec997b62a8a87423296fded99c3_test1sol.pdf"
-)
+TEST_PDF_PATH = Path(__file__).parent / "test_files" / "3.pdf"
 
 
 def test_process_pdf_to_json():
@@ -82,43 +78,43 @@ def test_extract_diagram_from_pdf():
     print(f"\n[Test] Found {len(diagrams_found)} diagrams in PDF")
 
     if diagrams_found:
-        # Test extracting the first diagram
-        q_num, diagram_info = diagrams_found[0]
-        bounding_box = diagram_info.get("bounding_box")
-        page_num = diagram_info.get("page_number", None)
+        # Test extracting all the diagrams found
+        for q_num, diagram_info in diagrams_found:
+            bounding_box = diagram_info.get("bounding_box")
+            page_num = diagram_info.get("page_number", None)
 
-        print(
-            f"[Test] Extracting diagram for Q{q_num} with bounding box: {bounding_box}"
-        )
-
-        # Create temp file for output
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-            output_path = tmp.name
-
-        try:
-            # Extract diagram
-            success = processor.extract_diagram_from_pdf(
-                str(TEST_PDF_PATH), bounding_box, page_num, output_path
+            print(
+                f"[Test] Extracting diagram for Q{q_num} with bounding box: {bounding_box}"
             )
 
-            print(f"[Test] Extraction success: {success}")
+            # Create temp file for output
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                output_path = tmp.name
 
-            if success:
-                # Verify file was created and has content
-                assert os.path.exists(output_path), "Output file should exist"
-                assert (
-                    os.path.getsize(output_path) > 0
-                ), "Output file should have content"
-                print(
-                    f"[Test] Diagram saved to: {output_path} (size: {os.path.getsize(output_path)} bytes)"
+            try:
+                # Extract diagram
+                success = processor._extract_diagram_from_pdf(
+                    str(TEST_PDF_PATH), bounding_box, page_num, output_path
                 )
 
-            return success
-        finally:
-            pass
-            # Cleanup
-            # if os.path.exists(output_path):
-            #     os.unlink(output_path)
+                print(f"[Test] Extraction success: {success}")
+
+                if success:
+                    # Verify file was created and has content
+                    assert os.path.exists(output_path), "Output file should exist"
+                    assert (
+                        os.path.getsize(output_path) > 0
+                    ), "Output file should have content"
+                    print(
+                        f"[Test] Diagram saved to: {output_path} (size: {os.path.getsize(output_path)} bytes)"
+                    )
+
+                # return success
+            finally:
+                pass
+                # Cleanup
+                # if os.path.exists(output_path):
+                #     os.unlink(output_path)
     else:
         print("[Test] No diagrams found in PDF - skipping extraction test")
         return True
