@@ -16,6 +16,8 @@ from openai import OpenAI
 from pdf2image import convert_from_path
 from PIL import Image
 
+from controllers.config import logger
+
 
 class PDFAnswerProcessor:
     """Process PDF answer sheets into structured JSON format."""
@@ -48,14 +50,12 @@ class PDFAnswerProcessor:
         poppler_path = os.getenv("POPPLER_PATH", None)
 
         try:
-            print(f"[PDF Processor] Converting PDF: {pdf_path}")
-            print(
-                f"[PDF Processor] Poppler path: {poppler_path or 'Using system PATH'}"
-            )
+            logger.info(f"Converting PDF: {pdf_path}")
+            logger.info(f"Poppler path: {poppler_path or 'Using system PATH'}")
             pages = convert_from_path(pdf_path, dpi=200, poppler_path=poppler_path)
-            print(f"[PDF Processor] Successfully converted {len(pages)} pages")
+            logger.info(f"Successfully converted {len(pages)} pages")
         except Exception as e:
-            print(f"[PDF Processor] ERROR: Failed to convert PDF - {str(e)}")
+            logger.error(f"Failed to convert PDF: {str(e)}")
             raise RuntimeError(
                 f"Failed to convert PDF to images. Ensure Poppler is installed. Error: {e}"
             )
@@ -196,13 +196,13 @@ class PDFAnswerProcessor:
         result = json.loads(completion.choices[0].message.content)
 
         # Debug: Log the raw result
-        print(f"[PDF Processor] Raw LLM result: {json.dumps(result, indent=2)[:50]}...")
+        logger.debug(f"Raw LLM result: {json.dumps(result, indent=2)}...")
 
         # Check if answer_sheet exists
         answer_sheet = result.get("answer_sheet", [])
         if not answer_sheet:
-            print(f"[PDF Processor] WARNING: Empty answer_sheet in LLM response!")
-            print(f"[PDF Processor] Full result: {json.dumps(result, indent=2)}")
+            logger.warning(f"Empty answer_sheet in LLM response!")
+            logger.warning(f"Full result: {json.dumps(result, indent=2)}")
             return {}
 
         # Convert to our internal format: question_id -> answer
@@ -235,14 +235,124 @@ class PDFAnswerProcessor:
                 # Text-only answer
                 answers_dict[q_num] = answer_normalized
 
-        print(f"[PDF Processor] Extracted {len(answers_dict)} answers")
+        logger.info(f"Extracted {len(answers_dict)} answers")
 
         # Enrich answers with YOLO-detected bounding boxes for diagrams
         answers_dict = self._enrich_answers_with_yolo_bounding_box(answers_dict, pages)
 
         return answers_dict
 
-    def extract_diagram_from_pdf(
+    def extract_and_upload_diagrams(
+        self,
+        submission_id: str,
+        pdf_s3_key: str,
+        answers: Dict[str, Any],
+        s3_client,
+        s3_bucket: str,
+        s3_upload_func,
+    ) -> Dict[str, Any]:
+        """
+        Extract diagram images from PDF submission using bounding boxes and upload to S3.
+
+        This is a synchronous/foreground operation that:
+        1. Downloads the PDF from S3
+        2. For each answer with a diagram bounding_box but no s3_key, extracts the image
+        3. Uploads to S3 and updates the answer dict with s3_key, file_id, filename
+
+        Args:
+            submission_id: The submission ID
+            pdf_s3_key: S3 key of the PDF file
+            answers: Dict of question_id -> answer data (may include diagrams)
+            s3_client: boto3 S3 client
+            s3_bucket: S3 bucket name
+            s3_upload_func: Function to upload file to S3 (path, key, content_type)
+
+        Returns:
+            Updated answers dict with diagram s3_keys populated
+        """
+        logger.info(f"Starting PDF diagram extraction for submission {submission_id}")
+
+        if not answers:
+            logger.warning(f"Submission {submission_id} has no answers")
+            return answers
+
+        # Download PDF from S3 to temp file
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                s3_client.download_fileobj(s3_bucket, pdf_s3_key, tmp)
+                tmp_pdf_path = tmp.name
+        except Exception as e:
+            logger.error(f"Failed to download PDF from S3: {str(e)}")
+            return answers
+
+        updated = False
+
+        try:
+            for question_id, answer in answers.items():
+                # Check if answer has diagram with bounding_box but no s3_key
+                if isinstance(answer, dict) and answer.get("diagram"):
+                    diagram = answer["diagram"]
+                    bounding_box = diagram.get("bounding_box")
+                    page_number = diagram.get("page_number", None)
+
+                    if bounding_box and not diagram.get("s3_key"):
+                        try:
+                            # Extract diagram image from PDF
+                            with tempfile.NamedTemporaryFile(
+                                delete=False, suffix=".jpg"
+                            ) as img_tmp:
+                                img_output_path = img_tmp.name
+
+                            success = self._extract_diagram_from_pdf(
+                                tmp_pdf_path, bounding_box, page_number, img_output_path
+                            )
+
+                            if success and os.path.exists(img_output_path):
+                                # Upload to S3
+                                file_id = str(uuid.uuid4())
+                                s3_key = f"submissions/{submission_id}/diagrams/q{question_id}_{file_id}.jpg"
+
+                                s3_upload_func(
+                                    img_output_path, s3_key, content_type="image/jpeg"
+                                )
+
+                                # Update answer with s3_key
+                                answers[question_id]["diagram"]["s3_key"] = s3_key
+                                answers[question_id]["diagram"]["file_id"] = file_id
+                                answers[question_id]["diagram"][
+                                    "filename"
+                                ] = f"diagram_q{question_id}.jpg"
+                                updated = True
+
+                                logger.info(
+                                    f"Extracted and uploaded diagram for Q{question_id} to {s3_key}"
+                                )
+
+                                # Clean up temp image
+                                os.unlink(img_output_path)
+
+                        except Exception as e:
+                            logger.error(
+                                f"Error extracting diagram for Q{question_id}: {str(e)}"
+                            )
+                            continue
+
+        finally:
+            # Clean up temp PDF
+            try:
+                os.unlink(tmp_pdf_path)
+            except Exception:
+                pass
+
+        if updated:
+            logger.info(f"Completed diagram extraction for submission {submission_id}")
+
+        logger.info(f"Diagram extraction process finished")
+        logger.debug(f"Final answers: {json.dumps(answers, indent=2)}...")
+
+        return answers
+
+    def _extract_diagram_from_pdf(
         self, pdf_path: str, bounding_box: List[int], page_num: int, output_path: str
     ) -> bool:
         """Extract a single diagram from PDF using bounding box coordinates."""
@@ -283,7 +393,7 @@ class PDFAnswerProcessor:
             return True
 
         except Exception as e:
-            print(f"Error extracting diagram: {e}")
+            logger.error(f"Error extracting diagram: {e}")
             return False
 
     def _get_question_numbers(
@@ -338,9 +448,7 @@ class PDFAnswerProcessor:
         try:
             from ultralytics import YOLO
         except ImportError:
-            print(
-                "[PDF Processor] WARNING: ultralytics not installed, skipping YOLO enrichment"
-            )
+            logger.warning("ultralytics not installed, skipping YOLO enrichment")
             return answers
 
         # Model path should be configurable
@@ -352,7 +460,7 @@ class PDFAnswerProcessor:
         try:
             yolo_model = YOLO(model_path)
         except Exception as e:
-            print(f"[PDF Processor] WARNING: Failed to load YOLO model: {e}")
+            logger.warning(f"Failed to load YOLO model: {e}")
             return answers
 
         # Map: page_number -> [(question_id, answer_dict)]
@@ -368,21 +476,15 @@ class PDFAnswerProcessor:
                     )
 
         if not page_to_answers:
-            print(
-                "[PDF Processor] No diagrams with page numbers found, skipping YOLO enrichment"
-            )
+            logger.info("No diagrams with page numbers found, skipping YOLO enrichment")
             return answers
 
-        print(
-            f"[PDF Processor] Running YOLO on {len(page_to_answers)} pages with diagrams"
-        )
+        logger.info(f"Running YOLO on {len(page_to_answers)} pages with diagrams")
 
         # For each relevant page, run YOLO and assign bounding boxes
         for page_number, answer_items in page_to_answers.items():
             if not (1 <= page_number <= len(pages)):
-                print(
-                    f"[PDF Processor] WARNING: Page {page_number} out of range (1-{len(pages)})"
-                )
+                logger.warning(f"Page {page_number} out of range (1-{len(pages)})")
                 continue
 
             page_img = pages[page_number - 1]
@@ -417,8 +519,8 @@ class PDFAnswerProcessor:
                 n_answers = len(answer_items)
                 n_diagrams = len(detections)
 
-                print(
-                    f"[PDF Processor] Page {page_number}: {n_diagrams} diagrams detected for {n_answers} answers"
+                logger.info(
+                    f"Page {page_number}: {n_diagrams} diagrams detected for {n_answers} answers"
                 )
 
                 # Assignment logic (matching assignment_document_parser.py)
@@ -447,7 +549,7 @@ class PDFAnswerProcessor:
                     # Remaining answers without diagrams keep bounding_box as None
 
             except Exception as e:
-                print(f"[PDF Processor] ERROR running YOLO on page {page_number}: {e}")
+                logger.error(f"Error running YOLO on page {page_number}: {e}")
             finally:
                 # Clean up temp image
                 try:
@@ -474,8 +576,8 @@ class PDFAnswerProcessor:
             }
         )
 
-        print(
-            f"[PDF Processor] Diagram bbox assigned: {[x1, y1, x2, y2]} (conf: {det['confidence']:.2f})"
+        logger.info(
+            f"Diagram bbox assigned: {[x1, y1, x2, y2]} (conf: {det['confidence']:.2f})"
         )
 
     @staticmethod
@@ -577,145 +679,3 @@ class PDFAnswerProcessor:
         img.save(buffered, format="JPEG")
         encoded = base64.b64encode(buffered.getvalue()).decode("utf-8")
         return f"data:image/jpeg;base64,{encoded}"
-
-    def extract_and_upload_diagrams(
-        self,
-        submission_id: str,
-        pdf_s3_key: str,
-        answers: Dict[str, Any],
-        s3_client,
-        s3_bucket: str,
-        s3_upload_func,
-        logger=None,
-    ) -> Dict[str, Any]:
-        """
-        Extract diagram images from PDF submission using bounding boxes and upload to S3.
-
-        This is a synchronous/foreground operation that:
-        1. Downloads the PDF from S3
-        2. For each answer with a diagram bounding_box but no s3_key, extracts the image
-        3. Uploads to S3 and updates the answer dict with s3_key, file_id, filename
-
-        Args:
-            submission_id: The submission ID
-            pdf_s3_key: S3 key of the PDF file
-            answers: Dict of question_id -> answer data (may include diagrams)
-            s3_client: boto3 S3 client
-            s3_bucket: S3 bucket name
-            s3_upload_func: Function to upload file to S3 (path, key, content_type)
-            logger: Optional logger
-
-        Returns:
-            Updated answers dict with diagram s3_keys populated
-        """
-        if logger:
-            logger.info(
-                f"Starting PDF diagram extraction for submission {submission_id}"
-            )
-        else:
-            print(
-                f"[PDF Processor] Starting diagram extraction for submission {submission_id}"
-            )
-
-        if not answers:
-            if logger:
-                logger.warning(f"Submission {submission_id} has no answers")
-            return answers
-
-        # Download PDF from S3 to temp file
-        try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                s3_client.download_fileobj(s3_bucket, pdf_s3_key, tmp)
-                tmp_pdf_path = tmp.name
-        except Exception as e:
-            if logger:
-                logger.error(f"Failed to download PDF from S3: {str(e)}")
-            else:
-                print(
-                    f"[PDF Processor] ERROR: Failed to download PDF from S3: {str(e)}"
-                )
-            return answers
-
-        updated = False
-
-        try:
-            for question_id, answer in answers.items():
-                # Check if answer has diagram with bounding_box but no s3_key
-                if isinstance(answer, dict) and answer.get("diagram"):
-                    diagram = answer["diagram"]
-                    bounding_box = diagram.get("bounding_box")
-                    page_number = diagram.get("page_number", None)
-
-                    if bounding_box and not diagram.get("s3_key"):
-                        try:
-                            # Extract diagram image from PDF
-                            with tempfile.NamedTemporaryFile(
-                                delete=False, suffix=".jpg"
-                            ) as img_tmp:
-                                img_output_path = img_tmp.name
-
-                            success = self.extract_diagram_from_pdf(
-                                tmp_pdf_path, bounding_box, page_number, img_output_path
-                            )
-
-                            if success and os.path.exists(img_output_path):
-                                # Upload to S3
-                                file_id = str(uuid.uuid4())
-                                s3_key = f"submissions/{submission_id}/diagrams/q{question_id}_{file_id}.jpg"
-
-                                s3_upload_func(
-                                    img_output_path, s3_key, content_type="image/jpeg"
-                                )
-
-                                # Update answer with s3_key
-                                answers[question_id]["diagram"]["s3_key"] = s3_key
-                                answers[question_id]["diagram"]["file_id"] = file_id
-                                answers[question_id]["diagram"][
-                                    "filename"
-                                ] = f"diagram_q{question_id}.jpg"
-                                updated = True
-
-                                if logger:
-                                    logger.info(
-                                        f"Extracted and uploaded diagram for Q{question_id} to {s3_key}"
-                                    )
-                                else:
-                                    print(
-                                        f"[PDF Processor] Extracted and uploaded diagram for Q{question_id} to {s3_key}"
-                                    )
-
-                                # Clean up temp image
-                                os.unlink(img_output_path)
-
-                        except Exception as e:
-                            if logger:
-                                logger.error(
-                                    f"Error extracting diagram for Q{question_id}: {str(e)}"
-                                )
-                            else:
-                                print(
-                                    f"[PDF Processor] ERROR extracting diagram for Q{question_id}: {str(e)}"
-                                )
-                            continue
-
-        finally:
-            # Clean up temp PDF
-            try:
-                os.unlink(tmp_pdf_path)
-            except Exception:
-                pass
-
-        if updated:
-            if logger:
-                logger.info(
-                    f"Completed diagram extraction for submission {submission_id}"
-                )
-            else:
-                print(
-                    f"[PDF Processor] Completed diagram extraction for submission {submission_id}"
-                )
-
-        print(f"[PDF Processor] Diagram extraction process finished")
-        print(f"[PDF Processor] Final answers: {json.dumps(answers, indent=2)}...")
-
-        return answers

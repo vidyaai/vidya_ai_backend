@@ -229,6 +229,9 @@ class AssignmentSubmission(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     assignment_id = Column(String, ForeignKey("assignments.id"), nullable=False)
     user_id = Column(String, nullable=False, index=True)  # Firebase UID of submitter
+    submitted_by_user_id = Column(
+        String, nullable=True, index=True
+    )  # Firebase UID of who submitted on behalf (for bulk uploads)
 
     # Submission data
     answers = Column(JSONB, nullable=False, default=dict)  # User's answers to questions
