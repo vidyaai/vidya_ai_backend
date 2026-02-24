@@ -467,9 +467,7 @@ def list_enrollments(
     current_user: dict = Depends(get_current_user),
 ):
     _verify_course_access(course_id, current_user["uid"], db)
-    query = db.query(CourseEnrollment).filter(
-        CourseEnrollment.course_id == course_id
-    )
+    query = db.query(CourseEnrollment).filter(CourseEnrollment.course_id == course_id)
     if status:
         query = query.filter(CourseEnrollment.status == status)
     if role:
@@ -489,9 +487,7 @@ def list_enrollments(
     ]
 
 
-@router.delete(
-    "/api/courses/{course_id}/enrollments/{enrollment_id}", status_code=204
-)
+@router.delete("/api/courses/{course_id}/enrollments/{enrollment_id}", status_code=204)
 def remove_enrollment(
     course_id: str,
     enrollment_id: str,
@@ -536,11 +532,17 @@ async def upload_course_material(
 
     if material_type == "video":
         video_types = [
-            "video/mp4", "video/webm", "video/quicktime", "video/x-msvideo",
-            "video/x-matroska", "video/ogg",
+            "video/mp4",
+            "video/webm",
+            "video/quicktime",
+            "video/x-msvideo",
+            "video/x-matroska",
+            "video/ogg",
         ]
         video_extensions = (".mp4", ".webm", ".mov", ".avi", ".mkv", ".ogg")
-        if file.content_type not in video_types and not fname.endswith(video_extensions):
+        if file.content_type not in video_types and not fname.endswith(
+            video_extensions
+        ):
             raise HTTPException(
                 status_code=400,
                 detail="Only MP4, WebM, MOV, AVI, MKV, and OGG video files are supported",
@@ -553,7 +555,9 @@ async def upload_course_material(
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         ]
         allowed_extensions = (".pdf", ".docx", ".pptx")
-        if file.content_type not in allowed_types and not fname.endswith(allowed_extensions):
+        if file.content_type not in allowed_types and not fname.endswith(
+            allowed_extensions
+        ):
             raise HTTPException(
                 status_code=400, detail="Only PDF, DOCX, and PPTX files are supported"
             )
@@ -562,7 +566,9 @@ async def upload_course_material(
     file_content = await file.read()
     if len(file_content) > max_size:
         limit_mb = max_size // (1024 * 1024)
-        raise HTTPException(status_code=400, detail=f"File too large (max {limit_mb} MB)")
+        raise HTTPException(
+            status_code=400, detail=f"File too large (max {limit_mb} MB)"
+        )
 
     file_uuid = str(uuid.uuid4())
     s3_key = f"courses/{course_id}/materials/{file_uuid}_{file.filename}"
@@ -626,9 +632,7 @@ def link_video_to_course(
 
     video = (
         db.query(Video)
-        .filter(
-            and_(Video.id == data.video_id, Video.user_id == current_user["uid"])
-        )
+        .filter(and_(Video.id == data.video_id, Video.user_id == current_user["uid"]))
         .first()
     )
     if not video:
@@ -735,9 +739,7 @@ def download_material(
     return {"download_url": url, "expires_in": 3600}
 
 
-@router.delete(
-    "/api/courses/{course_id}/materials/{material_id}", status_code=204
-)
+@router.delete("/api/courses/{course_id}/materials/{material_id}", status_code=204)
 def delete_material(
     course_id: str,
     material_id: str,
@@ -776,16 +778,26 @@ def delete_material(
 @router.get("/api/courses/{course_id}/assignments")
 def list_course_assignments(
     course_id: str,
+    status: str = Query(None, description="Filter by assignment status"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     course = _verify_course_access(course_id, current_user["uid"], db)
-    assignments = (
-        db.query(Assignment)
-        .filter(Assignment.course_id == course_id)
-        .order_by(Assignment.created_at.desc())
-        .all()
-    )
+    if not status:
+        assignments = (
+            db.query(Assignment)
+            .filter(Assignment.course_id == course_id)
+            .order_by(Assignment.created_at.desc())
+            .all()
+        )
+    else:
+        assignments = (
+            db.query(Assignment)
+            .filter(Assignment.course_id == course_id)
+            .filter(Assignment.status == status)
+            .order_by(Assignment.created_at.desc())
+            .all()
+        )
 
     from routes.assignments import filter_sensitive_data_for_students
 
