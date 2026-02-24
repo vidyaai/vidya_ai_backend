@@ -28,7 +28,14 @@ from controllers.config import logger, s3_client, AWS_S3_BUCKET
 from controllers.storage import s3_upload_file, s3_presign_url
 from utils.firebase_auth import get_current_user
 from utils.firebase_users import get_users_by_emails
-from models import Assignment, SharedLink, SharedLinkAccess, AssignmentSubmission, Video, CourseEnrollment
+from models import (
+    Assignment,
+    SharedLink,
+    SharedLinkAccess,
+    AssignmentSubmission,
+    Video,
+    CourseEnrollment,
+)
 from schemas import (
     AssignmentCreate,
     AssignmentUpdate,
@@ -975,8 +982,15 @@ async def update_assignment(
                 detail="Assignment not found or access denied",
             )
 
-        # Update fields
+        # Prevent reverting a published assignment back to draft
         update_data = assignment_data.dict(exclude_unset=True)
+        if assignment.status == "published" and update_data.get("status") == "draft":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot revert a published assignment to draft",
+            )
+
+        # Update fields
         for field, value in update_data.items():
             setattr(assignment, field, value)
 
@@ -1715,8 +1729,12 @@ async def generate_assignment(
         # Extract diagram generation options
         diagram_engine = generate_data.generation_options.get("diagramEngine", "nonai")
         diagram_model = generate_data.generation_options.get("diagramModel", "flash")
-        diagram_subject = generate_data.generation_options.get("engineeringDiscipline", "electrical")
-        logger.info(f"Diagram options - engine: {diagram_engine}, model: {diagram_model}, subject: {diagram_subject}")
+        diagram_subject = generate_data.generation_options.get(
+            "engineeringDiscipline", "electrical"
+        )
+        logger.info(
+            f"Diagram options - engine: {diagram_engine}, model: {diagram_model}, subject: {diagram_subject}"
+        )
 
         # Generate assignment using AI (pass assignment_id for diagram S3 upload)
         generated_data = generator.generate_assignment(
@@ -1791,15 +1809,21 @@ async def generate_assignment_stream(
     from utils.assignment_generator import AssignmentGenerator
 
     question_types = [
-        qt for qt, en in generate_data.generation_options.get("questionTypes", {}).items() if en
+        qt
+        for qt, en in generate_data.generation_options.get("questionTypes", {}).items()
+        if en
     ]
 
     assignment = Assignment(
         user_id=user_id,
         title=generate_data.title or "AI Generated Assignment",
         description=generate_data.description or "Generating...",
-        engineering_level=generate_data.generation_options.get("engineeringLevel", "undergraduate"),
-        engineering_discipline=generate_data.generation_options.get("engineeringDiscipline", "general"),
+        engineering_level=generate_data.generation_options.get(
+            "engineeringLevel", "undergraduate"
+        ),
+        engineering_discipline=generate_data.generation_options.get(
+            "engineeringDiscipline", "general"
+        ),
         question_types=question_types,
         linked_videos=generate_data.linked_videos,
         uploaded_files=generate_data.uploaded_files,
@@ -1831,14 +1855,23 @@ async def generate_assignment_stream(
         try:
             generator = AssignmentGenerator()
 
-            diagram_engine = generate_data.generation_options.get("diagramEngine", "nonai")
-            diagram_model_opt = generate_data.generation_options.get("diagramModel", "flash")
-            diagram_subject = generate_data.generation_options.get("engineeringDiscipline", "electrical")
+            diagram_engine = generate_data.generation_options.get(
+                "diagramEngine", "nonai"
+            )
+            diagram_model_opt = generate_data.generation_options.get(
+                "diagramModel", "flash"
+            )
+            diagram_subject = generate_data.generation_options.get(
+                "engineeringDiscipline", "electrical"
+            )
 
-            log_queue.put({
-                "type": "log", "level": "info",
-                "message": f"Engine: {diagram_engine} | Subject: {diagram_subject} | Model: {diagram_model_opt}",
-            })
+            log_queue.put(
+                {
+                    "type": "log",
+                    "level": "info",
+                    "message": f"Engine: {diagram_engine} | Subject: {diagram_subject} | Model: {diagram_model_opt}",
+                }
+            )
 
             generated_data = generator.generate_assignment(
                 generation_options=generate_data.generation_options,
@@ -1855,9 +1888,14 @@ async def generate_assignment_stream(
 
             # Persist using a fresh DB session for this thread
             from utils.db import SessionLocal
+
             thread_db = SessionLocal()
             try:
-                a = thread_db.query(Assignment).filter(Assignment.id == assignment_id).first()
+                a = (
+                    thread_db.query(Assignment)
+                    .filter(Assignment.id == assignment_id)
+                    .first()
+                )
                 if a:
                     a.title = generated_data["title"]
                     a.description = generated_data["description"]
@@ -1865,32 +1903,43 @@ async def generate_assignment_stream(
                     a = calculate_assignment_stats(a)
                     thread_db.commit()
                     thread_db.refresh(a)
-                    log_queue.put({"type": "result", "data": {
-                        "id": a.id,
-                        "user_id": a.user_id,
-                        "title": a.title,
-                        "description": a.description,
-                        "course_id": a.course_id,
-                        "due_date": a.due_date.isoformat() if a.due_date else None,
-                        "total_points": a.total_points,
-                        "total_questions": a.total_questions,
-                        "status": a.status,
-                        "engineering_level": a.engineering_level,
-                        "engineering_discipline": a.engineering_discipline,
-                        "question_types": a.question_types,
-                        "linked_videos": a.linked_videos,
-                        "uploaded_files": a.uploaded_files,
-                        "generation_prompt": a.generation_prompt,
-                        "generation_options": a.generation_options,
-                        "questions": a.questions,
-                        "is_template": a.is_template,
-                        "ai_penalty_percentage": a.ai_penalty_percentage,
-                        "shared_count": a.shared_count,
-                        "created_at": a.created_at.isoformat() if a.created_at else None,
-                        "updated_at": a.updated_at.isoformat() if a.updated_at else None,
-                        "google_form_url": a.google_form_url,
-                        "google_form_response_url": a.google_form_response_url,
-                    }})
+                    log_queue.put(
+                        {
+                            "type": "result",
+                            "data": {
+                                "id": a.id,
+                                "user_id": a.user_id,
+                                "title": a.title,
+                                "description": a.description,
+                                "course_id": a.course_id,
+                                "due_date": a.due_date.isoformat()
+                                if a.due_date
+                                else None,
+                                "total_points": a.total_points,
+                                "total_questions": a.total_questions,
+                                "status": a.status,
+                                "engineering_level": a.engineering_level,
+                                "engineering_discipline": a.engineering_discipline,
+                                "question_types": a.question_types,
+                                "linked_videos": a.linked_videos,
+                                "uploaded_files": a.uploaded_files,
+                                "generation_prompt": a.generation_prompt,
+                                "generation_options": a.generation_options,
+                                "questions": a.questions,
+                                "is_template": a.is_template,
+                                "ai_penalty_percentage": a.ai_penalty_percentage,
+                                "shared_count": a.shared_count,
+                                "created_at": a.created_at.isoformat()
+                                if a.created_at
+                                else None,
+                                "updated_at": a.updated_at.isoformat()
+                                if a.updated_at
+                                else None,
+                                "google_form_url": a.google_form_url,
+                                "google_form_response_url": a.google_form_response_url,
+                            },
+                        }
+                    )
             finally:
                 thread_db.close()
 
@@ -3848,7 +3897,9 @@ async def download_solution_pdf(
                             )
                             subq["diagram"]["url"] = presigned_url
                         except Exception as e:
-                            logger.warning(f"Could not generate presigned URL for subq diagram: {e}")
+                            logger.warning(
+                                f"Could not generate presigned URL for subq diagram: {e}"
+                            )
                             subq["diagram"] = None
 
         pdf_generator = AssignmentPDFGenerator()
@@ -3882,7 +3933,9 @@ async def download_solution_pdf(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error generating solution PDF for assignment {assignment_id}: {str(e)}")
+        logger.error(
+            f"Error generating solution PDF for assignment {assignment_id}: {str(e)}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate solution PDF",
