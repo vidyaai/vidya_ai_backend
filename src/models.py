@@ -416,13 +416,17 @@ class Course(Base):
     __tablename__ = "courses"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    user_id = Column(String, nullable=False, index=True)  # Firebase UID of the creator/professor
+    user_id = Column(
+        String, nullable=False, index=True
+    )  # Firebase UID of the creator/professor
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     course_code = Column(String, nullable=True)  # e.g. "CS101"
     semester = Column(String, nullable=True)  # e.g. "Fall 2026"
     is_active = Column(Boolean, default=True, nullable=False)
-    enrollment_code = Column(String, nullable=True, unique=True)  # Optional self-enrollment code
+    enrollment_code = Column(
+        String, nullable=True, unique=True
+    )  # Optional self-enrollment code
 
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
@@ -445,8 +449,12 @@ class CourseEnrollment(Base):
     __tablename__ = "course_enrollments"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    course_id = Column(String, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(String, nullable=False, index=True)  # Firebase UID or "pending_<email>"
+    course_id = Column(
+        String, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id = Column(
+        String, nullable=False, index=True
+    )  # Firebase UID or "pending_<email>"
     email = Column(String, nullable=True, index=True)  # Email for pending enrollments
     role = Column(String, default="student")  # "student", "ta", "instructor"
     status = Column(String, default="active")  # "active", "dropped", "pending"
@@ -466,14 +474,20 @@ class CourseMaterial(Base):
     __tablename__ = "course_materials"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    course_id = Column(String, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    course_id = Column(
+        String, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    material_type = Column(String, default="lecture_notes")  # "lecture_notes", "video", "reading", "other"
+    material_type = Column(
+        String, default="lecture_notes"
+    )  # "lecture_notes", "video", "reading", "other"
 
     # Storage – exactly one of these will be set
     s3_key = Column(String, nullable=True)  # For uploaded files
-    video_id = Column(String, ForeignKey("videos.id"), nullable=True)  # For linked videos
+    video_id = Column(
+        String, ForeignKey("videos.id"), nullable=True
+    )  # For linked videos
     external_url = Column(String, nullable=True)  # For external links
 
     # File metadata (for uploaded files)
@@ -484,6 +498,12 @@ class CourseMaterial(Base):
     # Organization
     order = Column(Integer, default=0)
     folder = Column(String, nullable=True)  # Optional folder/section name e.g. "Week 1"
+
+    # Transcription (for directly uploaded video materials)
+    transcript_text = Column(Text, nullable=True)
+    transcript_status = Column(
+        String, nullable=True
+    )  # "pending", "processing", "completed", "failed"
 
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     updated_at = Column(

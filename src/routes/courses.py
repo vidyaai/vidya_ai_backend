@@ -10,9 +10,11 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy import and_, func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from controllers.config import AWS_S3_BUCKET, logger, s3_client
+from controllers.config import AWS_S3_BUCKET, logger, s3_client, upload_executor
+from controllers.storage import s3_presign_url, transcribe_video_with_deepgram_url
+from utils.db import get_db, SessionLocal
 from models import (
     Assignment,
     Course,
@@ -30,7 +32,6 @@ from schemas import (
     EnrollmentResultOut,
     EnrollStudentsRequest,
 )
-from utils.db import get_db
 from utils.firebase_auth import get_current_user
 
 router = APIRouter()
@@ -120,6 +121,50 @@ def _lookup_firebase_user(email: str):
         return user_record.uid, True
     except Exception:
         return f"pending_{email}", False
+
+
+def _transcribe_course_material_background(material_id: str, s3_key: str) -> None:
+    """Background job: transcribe a directly-uploaded course video and store the result."""
+    db = SessionLocal()
+    try:
+        # Generate presigned URL so Deepgram can pull from S3 directly
+        try:
+            presigned = s3_presign_url(s3_key, expires_in=60 * 60 * 12)
+            transcript_text = transcribe_video_with_deepgram_url(presigned)
+        except Exception as e:
+            logger.error(
+                f"Deepgram URL transcription failed for material {material_id}: {e}"
+            )
+            transcript_text = ""
+
+        material = (
+            db.query(CourseMaterial).filter(CourseMaterial.id == material_id).first()
+        )
+        if material:
+            material.transcript_text = transcript_text or None
+            material.transcript_status = "completed" if transcript_text else "failed"
+            material.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            logger.info(
+                f"Transcription {'completed' if transcript_text else 'failed'} "
+                f"for course material {material_id}"
+            )
+    except Exception as e:
+        logger.error(f"Background transcription error for material {material_id}: {e}")
+        try:
+            mat = (
+                db.query(CourseMaterial)
+                .filter(CourseMaterial.id == material_id)
+                .first()
+            )
+            if mat:
+                mat.transcript_status = "failed"
+                mat.updated_at = datetime.now(timezone.utc)
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
 
 
 # ── Course CRUD ──────────────────────────────────────────────────────────
@@ -599,11 +644,19 @@ async def upload_course_material(
         file_size=str(len(file_content)),
         mime_type=file.content_type,
         folder=folder,
+        transcript_status="processing" if material_type == "video" else None,
     )
     db.add(material)
     db.commit()
     db.refresh(material)
     logger.info(f"Material uploaded: {material.id} to course {course_id}")
+
+    # Kick off background transcription for video uploads
+    if material_type == "video":
+        upload_executor.submit(
+            _transcribe_course_material_background, material.id, s3_key
+        )
+
     return {
         "id": material.id,
         "course_id": material.course_id,
@@ -616,6 +669,8 @@ async def upload_course_material(
         "mime_type": material.mime_type,
         "folder": material.folder,
         "order": material.order,
+        "transcript_status": material.transcript_status,
+        "transcript_text": material.transcript_text,
         "created_at": material.created_at,
         "updated_at": material.updated_at,
     }
@@ -672,32 +727,51 @@ def list_materials(
     current_user: dict = Depends(get_current_user),
 ):
     _verify_course_access(course_id, current_user["uid"], db)
-    query = db.query(CourseMaterial).filter(CourseMaterial.course_id == course_id)
+    query = (
+        db.query(CourseMaterial)
+        .options(joinedload(CourseMaterial.video))
+        .filter(CourseMaterial.course_id == course_id)
+    )
     if material_type:
         query = query.filter(CourseMaterial.material_type == material_type)
     if folder:
         query = query.filter(CourseMaterial.folder == folder)
     materials = query.order_by(CourseMaterial.order, CourseMaterial.created_at).all()
-    return [
-        {
-            "id": m.id,
-            "course_id": m.course_id,
-            "title": m.title,
-            "description": m.description,
-            "material_type": m.material_type,
-            "s3_key": m.s3_key,
-            "video_id": m.video_id,
-            "external_url": m.external_url,
-            "file_name": m.file_name,
-            "file_size": m.file_size,
-            "mime_type": m.mime_type,
-            "order": m.order,
-            "folder": m.folder,
-            "created_at": m.created_at,
-            "updated_at": m.updated_at,
-        }
-        for m in materials
-    ]
+
+    result = []
+    for m in materials:
+        # Resolve transcript from linked Gallery video when video_id is present
+        if m.video_id and m.video:
+            eff_transcript_text = m.video.transcript_text
+            eff_transcript_status = (
+                "completed" if m.video.transcript_text else "not_available"
+            )
+        else:
+            eff_transcript_text = m.transcript_text
+            eff_transcript_status = m.transcript_status
+
+        result.append(
+            {
+                "id": m.id,
+                "course_id": m.course_id,
+                "title": m.title,
+                "description": m.description,
+                "material_type": m.material_type,
+                "s3_key": m.s3_key,
+                "video_id": m.video_id,
+                "external_url": m.external_url,
+                "file_name": m.file_name,
+                "file_size": m.file_size,
+                "mime_type": m.mime_type,
+                "order": m.order,
+                "folder": m.folder,
+                "transcript_text": eff_transcript_text,
+                "transcript_status": eff_transcript_status,
+                "created_at": m.created_at,
+                "updated_at": m.updated_at,
+            }
+        )
+    return result
 
 
 @router.get("/api/courses/{course_id}/materials/{material_id}/download")

@@ -753,6 +753,8 @@ class CourseMaterialOut(BaseModel):
     mime_type: Optional[str] = None
     order: int = 0
     folder: Optional[str] = None
+    transcript_text: Optional[str] = None
+    transcript_status: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
