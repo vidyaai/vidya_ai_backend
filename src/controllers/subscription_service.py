@@ -245,7 +245,12 @@ def check_usage_limits(
     # Developer accounts have unlimited access
     if is_developer_account(db, user_id):
         logger.info(f"Developer account {user_id} - unlimited access granted")
-        return {"allowed": True, "limit": "unlimited", "current": 0, "is_developer": True}
+        return {
+            "allowed": True,
+            "limit": "unlimited",
+            "current": 0,
+            "is_developer": True,
+        }
 
     subscription = get_user_subscription(db, user_id)
     if not subscription or not subscription.plan:

@@ -21,7 +21,7 @@ def get_schemdraw_elements() -> Set[str]:
         elements = set()
         for name, obj in inspect.getmembers(elm):
             # Only include classes, exclude private/internal ones
-            if inspect.isclass(obj) and not name.startswith('_'):
+            if inspect.isclass(obj) and not name.startswith("_"):
                 elements.add(name)
 
         return elements
@@ -40,35 +40,40 @@ def get_element_categories() -> dict:
     all_elements = get_schemdraw_elements()
 
     categories = {
-        'passive': [],
-        'transistors': [],
-        'opamps': [],
-        'sources': [],
-        'power': [],
-        'logic': [],
-        'connections': [],
-        'other': []
+        "passive": [],
+        "transistors": [],
+        "opamps": [],
+        "sources": [],
+        "power": [],
+        "logic": [],
+        "connections": [],
+        "other": [],
     }
 
     for elem in sorted(all_elements):
         elem_lower = elem.lower()
 
-        if any(x in elem_lower for x in ['resistor', 'capacitor', 'inductor', 'diode', 'zener', 'led']):
-            categories['passive'].append(elem)
-        elif any(x in elem_lower for x in ['bjt', 'fet', 'jfet', 'mos']):
-            categories['transistors'].append(elem)
-        elif 'opamp' in elem_lower:
-            categories['opamps'].append(elem)
-        elif 'source' in elem_lower:
-            categories['sources'].append(elem)
-        elif any(x in elem_lower for x in ['ground', 'vdd', 'vss', 'antenna']):
-            categories['power'].append(elem)
-        elif any(x in elem_lower for x in ['and', 'or', 'not', 'nand', 'nor', 'xor', 'buf']):
-            categories['logic'].append(elem)
-        elif any(x in elem_lower for x in ['line', 'dot', 'gap', 'arrow', 'label']):
-            categories['connections'].append(elem)
+        if any(
+            x in elem_lower
+            for x in ["resistor", "capacitor", "inductor", "diode", "zener", "led"]
+        ):
+            categories["passive"].append(elem)
+        elif any(x in elem_lower for x in ["bjt", "fet", "jfet", "mos"]):
+            categories["transistors"].append(elem)
+        elif "opamp" in elem_lower:
+            categories["opamps"].append(elem)
+        elif "source" in elem_lower:
+            categories["sources"].append(elem)
+        elif any(x in elem_lower for x in ["ground", "vdd", "vss", "antenna"]):
+            categories["power"].append(elem)
+        elif any(
+            x in elem_lower for x in ["and", "or", "not", "nand", "nor", "xor", "buf"]
+        ):
+            categories["logic"].append(elem)
+        elif any(x in elem_lower for x in ["line", "dot", "gap", "arrow", "label"]):
+            categories["connections"].append(elem)
         else:
-            categories['other'].append(elem)
+            categories["other"].append(elem)
 
     return categories
 
@@ -86,25 +91,25 @@ def format_elements_for_prompt() -> str:
     lines.append("VALID SCHEMDRAW ELEMENTS (dynamically verified):")
     lines.append("")
 
-    if categories['passive']:
+    if categories["passive"]:
         lines.append(f"Passive: {', '.join(sorted(categories['passive']))}")
 
-    if categories['transistors']:
+    if categories["transistors"]:
         lines.append(f"Transistors: {', '.join(sorted(categories['transistors']))}")
 
-    if categories['opamps']:
+    if categories["opamps"]:
         lines.append(f"OpAmps: {', '.join(sorted(categories['opamps']))}")
 
-    if categories['sources']:
+    if categories["sources"]:
         lines.append(f"Sources: {', '.join(sorted(categories['sources']))}")
 
-    if categories['power']:
+    if categories["power"]:
         lines.append(f"Power/Ground: {', '.join(sorted(categories['power']))}")
 
-    if categories['logic']:
+    if categories["logic"]:
         lines.append(f"Logic Gates: {', '.join(sorted(categories['logic']))}")
 
-    if categories['connections']:
+    if categories["connections"]:
         lines.append(f"Connections: {', '.join(sorted(categories['connections']))}")
 
     return "\n".join(lines)
@@ -121,8 +126,11 @@ def get_common_mistakes() -> List[str]:
 
     # Common mistakes people make
     potential_mistakes = [
-        'Mosfet', 'MOSFET', 'PTrans', 'NTrans',
-        'Transistor',  # Too generic
+        "Mosfet",
+        "MOSFET",
+        "PTrans",
+        "NTrans",
+        "Transistor",  # Too generic
         # Note: NMos, PMos, NFet, PFet all exist in schemdraw 0.19+
         # Note: Nand, Nor, And, Or, Not exist in schemdraw.logic (not schemdraw.elements)
     ]
