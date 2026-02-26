@@ -80,7 +80,7 @@ STRICT RULE:
         questions: List[Dict[str, Any]],
         lecture_notes_content: str,
         user_prompt: str,
-        generation_options: Dict[str, Any]
+        generation_options: Dict[str, Any],
     ) -> Dict[str, Any]:
         """
         Review generated questions for quality and alignment.
@@ -119,7 +119,9 @@ QUESTIONS TO REVIEW:
                 model=self.model,
                 messages=[
                     {"role": "system", "content": self._get_review_prompt()},
-                    {"role": "user", "content": f"""{context}
+                    {
+                        "role": "user",
+                        "content": f"""{context}
 
 Please review each question and provide:
 1. Alignment score (0-10)
@@ -149,21 +151,24 @@ Format your response as JSON:
         "avg_quality": number
     }}
 }}
-"""}
+""",
+                    },
                 ],
                 temperature=0.3,  # Lower for more consistent evaluation
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
 
             review_result = response.choices[0].message.content
             logger.info("Question review complete")
 
             import json
+
             return json.loads(review_result)
 
         except Exception as e:
             logger.error(f"Error in question review: {str(e)}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             # Return default passing review on error
             return {
@@ -174,20 +179,22 @@ Format your response as JSON:
                     "recommended_keep": len(questions),
                     "recommended_remove": 0,
                     "avg_alignment": 7.0,
-                    "avg_quality": 7.0
-                }
+                    "avg_quality": 7.0,
+                },
             }
 
     def _format_questions_for_review(self, questions: List[Dict[str, Any]]) -> str:
         """Format questions for review prompt"""
         formatted = []
         for i, q in enumerate(questions, 1):
-            formatted.append(f"""
+            formatted.append(
+                f"""
 Question {i}:
 Type: {q.get('type', 'unknown')}
 Points: {q.get('points', 0)}
 Has Diagram: {q.get('hasDiagram', False)}
 Question Text: {q.get('question', 'N/A')}
 Correct Answer: {q.get('correctAnswer', 'N/A')[:200]}...
-""")
+"""
+            )
         return "\n".join(formatted)

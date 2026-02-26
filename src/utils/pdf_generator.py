@@ -777,7 +777,10 @@ class AssignmentPDFGenerator:
                     diagram_url = s3_presign_url(subq["diagram"]["s3_key"])
                     diagram_base64 = self.download_image_as_base64(diagram_url)
                     if diagram_base64:
-                        sub_caption = subq.get("diagram", {}).get("description", f"Circuit diagram for Part {question_num}.{i+1}")
+                        sub_caption = subq.get("diagram", {}).get(
+                            "description",
+                            f"Circuit diagram for Part {question_num}.{i+1}",
+                        )
                         html += f"""
                         <div class="figure-container">
                             <img src="{diagram_base64}" alt="Subquestion diagram">
@@ -1330,7 +1333,9 @@ class AssignmentPDFGenerator:
             logger.error(f"Error generating assignment PDF: {e}")
             raise
 
-    def generate_solution_question_html(self, question: Dict[str, Any], question_num: int) -> str:
+    def generate_solution_question_html(
+        self, question: Dict[str, Any], question_num: int
+    ) -> str:
         """Generate HTML for a single question including answer and rubric (solution key)."""
         # Reuse the standard question HTML but strip its closing </div> so we can
         # append answer/rubric sections before re-closing.
@@ -1345,7 +1350,9 @@ class AssignmentPDFGenerator:
         raw_answer = question.get("correctAnswer") or question.get("correct_answer", "")
         if raw_answer:
             if equations:
-                answer_html = self.process_question_text_with_equations(raw_answer, equations)
+                answer_html = self.process_question_text_with_equations(
+                    raw_answer, equations
+                )
             else:
                 answer_html = self.process_question_text(raw_answer)
             html += f"""
@@ -1358,7 +1365,9 @@ class AssignmentPDFGenerator:
         rubric = question.get("rubric", "")
         if rubric:
             if equations:
-                rubric_html = self.process_question_text_with_equations(rubric, equations)
+                rubric_html = self.process_question_text_with_equations(
+                    rubric, equations
+                )
             else:
                 rubric_html = self.process_question_text(rubric)
             html += f"""
@@ -1374,7 +1383,9 @@ class AssignmentPDFGenerator:
                 part_label = chr(97 + i)  # a, b, c, ...
 
                 raw_subq_q = subq.get("question", "")
-                raw_subq_answer = subq.get("correctAnswer") or subq.get("correct_answer", "")
+                raw_subq_answer = subq.get("correctAnswer") or subq.get(
+                    "correct_answer", ""
+                )
                 subq_rubric = subq.get("rubric", "")
 
                 if raw_subq_q or raw_subq_answer:
@@ -1385,7 +1396,9 @@ class AssignmentPDFGenerator:
                     # Full subquestion text
                     if raw_subq_q:
                         if subq_equations:
-                            subq_q_html = self.process_question_text_with_equations(raw_subq_q, subq_equations)
+                            subq_q_html = self.process_question_text_with_equations(
+                                raw_subq_q, subq_equations
+                            )
                         else:
                             subq_q_html = self.process_question_text(raw_subq_q)
                         html += f"""
@@ -1394,7 +1407,9 @@ class AssignmentPDFGenerator:
                     # Answer
                     if raw_subq_answer:
                         if subq_equations:
-                            subq_ans_html = self.process_question_text_with_equations(raw_subq_answer, subq_equations)
+                            subq_ans_html = self.process_question_text_with_equations(
+                                raw_subq_answer, subq_equations
+                            )
                         else:
                             subq_ans_html = self.process_question_text(raw_subq_answer)
                         html += f"""
@@ -1406,7 +1421,9 @@ class AssignmentPDFGenerator:
                     # Rubric
                     if subq_rubric:
                         if subq_equations:
-                            subq_rub_html = self.process_question_text_with_equations(subq_rubric, subq_equations)
+                            subq_rub_html = self.process_question_text_with_equations(
+                                subq_rubric, subq_equations
+                            )
                         else:
                             subq_rub_html = self.process_question_text(subq_rubric)
                         html += f"""

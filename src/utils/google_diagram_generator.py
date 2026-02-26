@@ -35,7 +35,7 @@ class GoogleDiagramGenerator:
 
     MODELS = {
         "flash": "gemini-2.5-flash-image",
-        "pro":   "gemini-3-pro-image-preview",
+        "pro": "gemini-3-pro-image-preview",
     }
 
     def __init__(self, diagram_model: str = "flash"):
@@ -54,7 +54,7 @@ class GoogleDiagramGenerator:
         self._credentials_path = None
 
         # Find the service account credentials file (needed for flash/Vertex AI)
-        backend_root = os.path.join(os.path.dirname(__file__), '..', '..')
+        backend_root = os.path.join(os.path.dirname(__file__), "..", "..")
         for f in os.listdir(backend_root):
             if f.startswith("vidyaai-forms-integrations") and f.endswith(".json"):
                 self._credentials_path = os.path.join(backend_root, f)
@@ -81,11 +81,15 @@ class GoogleDiagramGenerator:
                 # Google AI Studio API key auth — no Vertex AI allowlist needed
                 api_key = os.getenv("GEMINI_API_KEY")
                 if not api_key:
-                    logger.error("GEMINI_API_KEY not set in environment — pro model disabled")
+                    logger.error(
+                        "GEMINI_API_KEY not set in environment — pro model disabled"
+                    )
                     return False
                 self._client = genai.Client(api_key=api_key)
                 self._initialized = True
-                logger.info(f"Gemini image gen initialized: model={self.MODEL_NAME} (Google AI Studio)")
+                logger.info(
+                    f"Gemini image gen initialized: model={self.MODEL_NAME} (Google AI Studio)"
+                )
                 return True
 
             else:
@@ -94,11 +98,12 @@ class GoogleDiagramGenerator:
                     logger.error("No Google service account credentials file found")
                     return False
 
-                with open(self._credentials_path, 'r') as f:
+                with open(self._credentials_path, "r") as f:
                     creds_data = json.load(f)
                 self.project_id = creds_data.get("project_id")
 
                 from google.oauth2 import service_account
+
                 credentials = service_account.Credentials.from_service_account_file(
                     self._credentials_path,
                     scopes=["https://www.googleapis.com/auth/cloud-platform"],
@@ -119,6 +124,7 @@ class GoogleDiagramGenerator:
         except Exception as e:
             logger.error(f"Failed to initialize Gemini image gen: {e}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             return False
 
@@ -166,11 +172,11 @@ class GoogleDiagramGenerator:
             # Extract image from response parts
             if response and response.candidates:
                 for part in response.candidates[0].content.parts:
-                    if part.inline_data and part.inline_data.mime_type.startswith("image/"):
+                    if part.inline_data and part.inline_data.mime_type.startswith(
+                        "image/"
+                    ):
                         image_bytes = part.inline_data.data
-                        logger.info(
-                            f"Gemini generated image: {len(image_bytes)} bytes"
-                        )
+                        logger.info(f"Gemini generated image: {len(image_bytes)} bytes")
                         return {
                             "image_bytes": image_bytes,
                             "format": "png",
@@ -188,6 +194,7 @@ class GoogleDiagramGenerator:
         except Exception as e:
             logger.error(f"Gemini image generation failed: {e}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
@@ -348,7 +355,9 @@ CORRECTION INSTRUCTIONS:
             # Load the image for sending to the model
             pil_image = PILImage.open(io.BytesIO(image_bytes))
 
-            logger.info(f"Sending diagram for fix (preserving layout, correcting labels)...")
+            logger.info(
+                f"Sending diagram for fix (preserving layout, correcting labels)..."
+            )
             logger.debug(f"Fix issues: {issues_text}")
 
             response = self._client.models.generate_content(
@@ -365,7 +374,9 @@ CORRECTION INSTRUCTIONS:
             # Extract fixed image from response
             if response and response.candidates:
                 for part in response.candidates[0].content.parts:
-                    if part.inline_data and part.inline_data.mime_type.startswith("image/"):
+                    if part.inline_data and part.inline_data.mime_type.startswith(
+                        "image/"
+                    ):
                         fixed_bytes = part.inline_data.data
                         logger.info(
                             f"Gemini fixed image: {len(fixed_bytes)} bytes "
@@ -381,13 +392,14 @@ CORRECTION INSTRUCTIONS:
             # Log what we got for debugging
             if response and response.candidates:
                 for part in response.candidates[0].content.parts:
-                    if hasattr(part, 'text') and part.text:
+                    if hasattr(part, "text") and part.text:
                         logger.debug(f"Gemini fix text response: {part.text[:300]}")
             return None
 
         except Exception as e:
             logger.error(f"Gemini diagram fix failed: {e}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 

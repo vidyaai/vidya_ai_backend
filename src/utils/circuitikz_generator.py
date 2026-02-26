@@ -34,6 +34,7 @@ from controllers.config import logger
 
 try:
     from pdf2image import convert_from_path
+
     PDF2IMAGE_AVAILABLE = True
 except ImportError:
     PDF2IMAGE_AVAILABLE = False
@@ -1096,7 +1097,10 @@ Return ONLY the complete LaTeX document starting with \\documentclass."""
 
             # Run pdflatex (twice to resolve cross-references, once is usually enough
             # for circuitikz but two passes eliminates any label warnings)
-            pdflatex_env = {**os.environ, "PATH": f"/Library/TeX/texbin:{os.environ.get('PATH', '')}"}
+            pdflatex_env = {
+                **os.environ,
+                "PATH": f"/Library/TeX/texbin:{os.environ.get('PATH', '')}",
+            }
 
             for _pass in range(2):
                 result = subprocess.run(
@@ -1104,7 +1108,8 @@ Return ONLY the complete LaTeX document starting with \\documentclass."""
                         PDFLATEX_PATH,
                         "-interaction=nonstopmode",
                         "-halt-on-error",
-                        "-output-directory", tmpdir,
+                        "-output-directory",
+                        tmpdir,
                         tex_file,
                     ],
                     capture_output=True,
@@ -1115,7 +1120,8 @@ Return ONLY the complete LaTeX document starting with \\documentclass."""
                 if result.returncode != 0:
                     # Extract the useful error lines from pdflatex output
                     error_lines = [
-                        l for l in result.stdout.splitlines()
+                        l
+                        for l in result.stdout.splitlines()
                         if l.startswith("!") or "Error" in l or "error" in l
                     ]
                     error_summary = "\n".join(error_lines[:10]) or result.stdout[-500:]
@@ -1128,9 +1134,7 @@ Return ONLY the complete LaTeX document starting with \\documentclass."""
                     with open(debug_tex, "w") as f:
                         f.write(latex_src)
                     logger.info(f"Debug LaTeX saved to {debug_tex}")
-                    raise RuntimeError(
-                        f"pdflatex compilation failed:\n{error_summary}"
-                    )
+                    raise RuntimeError(f"pdflatex compilation failed:\n{error_summary}")
 
             if not os.path.isfile(pdf_file):
                 raise RuntimeError("pdflatex ran successfully but no PDF produced")

@@ -32,18 +32,23 @@ VENV_PYTHON = (
 
 # ── Helper ────────────────────────────────────────────────────────────────────
 
+
 def pdf_to_png(pdf_path: str, png_path: str, dpi: int = 300) -> None:
     """Convert PDF → PNG using the youtube_fetcher venv's pdf2image."""
-    script = "\n".join([
-        "import sys, base64",
-        "from pdf2image import convert_from_path",
-        "from io import BytesIO",
-        f"imgs = convert_from_path({pdf_path!r}, dpi={dpi}, fmt='png', single_file=True)",
-        "buf = BytesIO()",
-        "imgs[0].save(buf, format='PNG', optimize=True)",
-        "sys.stdout.buffer.write(base64.b64encode(buf.getvalue()))",
-    ])
-    result = subprocess.run([VENV_PYTHON, "-c", script], capture_output=True, timeout=120)
+    script = "\n".join(
+        [
+            "import sys, base64",
+            "from pdf2image import convert_from_path",
+            "from io import BytesIO",
+            f"imgs = convert_from_path({pdf_path!r}, dpi={dpi}, fmt='png', single_file=True)",
+            "buf = BytesIO()",
+            "imgs[0].save(buf, format='PNG', optimize=True)",
+            "sys.stdout.buffer.write(base64.b64encode(buf.getvalue()))",
+        ]
+    )
+    result = subprocess.run(
+        [VENV_PYTHON, "-c", script], capture_output=True, timeout=120
+    )
     if result.returncode != 0:
         raise RuntimeError(
             f"pdf2image subprocess failed:\n{result.stderr.decode(errors='replace')[-800:]}"
@@ -68,18 +73,34 @@ def compile_latex(name: str, latex_src: str, dpi: int = 300) -> str:
         with open(tex_path, "w", encoding="utf-8") as f:
             f.write(latex_src)
 
-        env = {**os.environ, "PATH": f"/Library/TeX/texbin:{os.environ.get('PATH', '')}"}
+        env = {
+            **os.environ,
+            "PATH": f"/Library/TeX/texbin:{os.environ.get('PATH', '')}",
+        }
         for _pass in range(2):
             r = subprocess.run(
-                [PDFLATEX, "-interaction=nonstopmode", "-halt-on-error",
-                 "-output-directory", tmpdir, tex_path],
-                capture_output=True, text=True, timeout=60, env=env,
+                [
+                    PDFLATEX,
+                    "-interaction=nonstopmode",
+                    "-halt-on-error",
+                    "-output-directory",
+                    tmpdir,
+                    tex_path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=env,
             )
             if r.returncode != 0:
-                errors = "\n".join(
-                    l for l in r.stdout.splitlines()
-                    if l.startswith("!") or "Error" in l
-                ) or r.stdout[-600:]
+                errors = (
+                    "\n".join(
+                        l
+                        for l in r.stdout.splitlines()
+                        if l.startswith("!") or "Error" in l
+                    )
+                    or r.stdout[-600:]
+                )
                 raise RuntimeError(f"pdflatex failed on pass {_pass+1}:\n{errors}")
 
         if not os.path.isfile(pdf_path):
@@ -258,15 +279,20 @@ CS_CURRENT_SOURCE = r"""
 
 # ── Run tests ─────────────────────────────────────────────────────────────────
 
+
 def run_all():
     assert os.path.isfile(PDFLATEX), f"pdflatex not found at {PDFLATEX}"
     assert os.path.isfile(VENV_PYTHON), f"venv Python not found at {VENV_PYTHON}"
 
     tests = [
-        ("nmos_vgs_vds",      NMOS_VGS_VDS,     "NMOS with Vgs=3V, Vds=4V (assignment diagram)"),
-        ("cmos_inverter",     CMOS_INVERTER,    "CMOS inverter (PMOS + NMOS)"),
-        ("cs_amplifier",      CS_AMPLIFIER,     "Common-source amplifier with RD"),
-        ("cs_current_source", CS_CURRENT_SOURCE, "CS amplifier with current source load"),
+        ("nmos_vgs_vds", NMOS_VGS_VDS, "NMOS with Vgs=3V, Vds=4V (assignment diagram)"),
+        ("cmos_inverter", CMOS_INVERTER, "CMOS inverter (PMOS + NMOS)"),
+        ("cs_amplifier", CS_AMPLIFIER, "Common-source amplifier with RD"),
+        (
+            "cs_current_source",
+            CS_CURRENT_SOURCE,
+            "CS amplifier with current source load",
+        ),
     ]
 
     passed = 0

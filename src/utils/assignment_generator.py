@@ -124,7 +124,9 @@ class AssignmentGenerator:
             # Graceful degradation - return original questions without equations
             return questions
 
-    def _cleanup_diagram_metadata(self, questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _cleanup_diagram_metadata(
+        self, questions: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Clean up diagram metadata for questions that don't have actual diagrams.
 
@@ -137,6 +139,7 @@ class AssignmentGenerator:
         Returns:
             Questions list with cleaned up diagram metadata
         """
+
         def cleanup_question(q: Dict[str, Any]) -> Dict[str, Any]:
             """Recursively clean up a question and its subquestions"""
             # Check if question has diagram metadata but no actual S3 URL
@@ -145,7 +148,9 @@ class AssignmentGenerator:
                     # No actual diagram was generated, remove the metadata
                     q["hasDiagram"] = False
                     q["diagram"] = None
-                    logger.debug(f"Cleaned up diagram metadata for question {q.get('id')}")
+                    logger.debug(
+                        f"Cleaned up diagram metadata for question {q.get('id')}"
+                    )
             elif q.get("hasDiagram") and not q.get("diagram"):
                 # hasDiagram is True but no diagram object at all
                 q["hasDiagram"] = False
@@ -164,16 +169,24 @@ class AssignmentGenerator:
         def count_cleaned(qs):
             count = 0
             for q in qs:
-                if not q.get("hasDiagram") or (q.get("diagram") and q["diagram"].get("s3_url")):
+                if not q.get("hasDiagram") or (
+                    q.get("diagram") and q["diagram"].get("s3_url")
+                ):
                     # This is OK
                     pass
                 if q.get("subquestions"):
                     count += count_cleaned(q["subquestions"])
             return count
 
-        cleaned_count = len(questions) - sum(1 for q in cleaned_questions if q.get("hasDiagram") and q.get("diagram") and q["diagram"].get("s3_url"))
+        cleaned_count = len(questions) - sum(
+            1
+            for q in cleaned_questions
+            if q.get("hasDiagram") and q.get("diagram") and q["diagram"].get("s3_url")
+        )
         if cleaned_count > 0:
-            logger.info(f"Cleaned up diagram metadata from {cleaned_count} questions without actual diagrams")
+            logger.info(
+                f"Cleaned up diagram metadata from {cleaned_count} questions without actual diagrams"
+            )
 
         return cleaned_questions
 
@@ -230,10 +243,16 @@ class AssignmentGenerator:
             if assignment_id:
                 from utils.diagram_agent import DiagramAnalysisAgent
 
-                has_diagram_analysis = generation_options.get("questionTypes", {}).get("diagram-analysis", False)
+                has_diagram_analysis = generation_options.get("questionTypes", {}).get(
+                    "diagram-analysis", False
+                )
 
-                logger.info(f"Starting multi-agent diagram analysis (diagram-analysis: {has_diagram_analysis}, engine: {engine})...")
-                agent = DiagramAnalysisAgent(engine=engine, subject=subject, diagram_model=diagram_model)
+                logger.info(
+                    f"Starting multi-agent diagram analysis (diagram-analysis: {has_diagram_analysis}, engine: {engine})..."
+                )
+                agent = DiagramAnalysisAgent(
+                    engine=engine, subject=subject, diagram_model=diagram_model
+                )
                 questions = agent.analyze_and_generate_diagrams(
                     questions=questions,
                     assignment_id=assignment_id,
@@ -246,10 +265,14 @@ class AssignmentGenerator:
                 questions = self._cleanup_diagram_metadata(questions)
                 logger.info("Diagram metadata cleanup complete")
             else:
-                logger.warning("Skipping diagram generation: assignment_id not provided")
+                logger.warning(
+                    "Skipping diagram generation: assignment_id not provided"
+                )
 
             # Review questions for quality and alignment with lecture notes
-            if content_sources.get("document_texts") or content_sources.get("video_transcripts"):
+            if content_sources.get("document_texts") or content_sources.get(
+                "video_transcripts"
+            ):
                 from utils.question_review_agent import QuestionReviewAgent
 
                 logger.info("Starting question review and validation...")
@@ -258,19 +281,30 @@ class AssignmentGenerator:
                 # Prepare lecture notes content for review
                 lecture_content = ""
                 if content_sources.get("document_texts"):
-                    lecture_content += "\n\n".join([doc["content"] for doc in content_sources["document_texts"]])
+                    lecture_content += "\n\n".join(
+                        [doc["content"] for doc in content_sources["document_texts"]]
+                    )
                 if content_sources.get("video_transcripts"):
-                    lecture_content += "\n\n".join([vid["transcript"] for vid in content_sources["video_transcripts"]])
+                    lecture_content += "\n\n".join(
+                        [
+                            vid["transcript"]
+                            for vid in content_sources["video_transcripts"]
+                        ]
+                    )
 
                 # Review questions
                 review_results = reviewer.review_questions(
                     questions=questions,
-                    lecture_notes_content=lecture_content[:5000],  # Send first 5000 chars
+                    lecture_notes_content=lecture_content[
+                        :5000
+                    ],  # Send first 5000 chars
                     user_prompt=generation_prompt or "Generate assignment",
-                    generation_options=generation_options
+                    generation_options=generation_options,
                 )
 
-                logger.info(f"Review complete: {review_results.get('overall_assessment', 'No assessment')}")
+                logger.info(
+                    f"Review complete: {review_results.get('overall_assessment', 'No assessment')}"
+                )
                 logger.info(f"Statistics: {review_results.get('statistics', {})}")
 
                 # Filter out low-quality questions if review recommends removal
@@ -281,10 +315,14 @@ class AssignmentGenerator:
                         if review.get("keep", True):  # Keep by default if no review
                             filtered_questions.append(question)
                         else:
-                            logger.warning(f"Removing question {i} based on review: {review.get('issues', [])}")
+                            logger.warning(
+                                f"Removing question {i} based on review: {review.get('issues', [])}"
+                            )
 
                     if len(filtered_questions) < len(questions):
-                        logger.info(f"Filtered {len(questions) - len(filtered_questions)} questions after review")
+                        logger.info(
+                            f"Filtered {len(questions) - len(filtered_questions)} questions after review"
+                        )
                         questions = filtered_questions
             else:
                 logger.info("No lecture notes provided - skipping quality review")

@@ -380,7 +380,9 @@ def transcribe_video_with_deepgram_url(media_url: str) -> str:
         raise Exception(f"Deepgram transcription failed: {str(e)}")
 
 
-def transcribe_video_with_deepgram_timed(local_video_path: str, video_title: str = "Video") -> dict:
+def transcribe_video_with_deepgram_timed(
+    local_video_path: str, video_title: str = "Video"
+) -> dict:
     """
     Transcribe a local video/audio file using Deepgram and return timed segments.
 
@@ -429,7 +431,7 @@ def transcribe_video_with_deepgram_timed(local_video_path: str, video_title: str
                 smart_format=True,
                 punctuate=True,
                 utterances=True,  # Get utterance-level timestamps
-                utt_split=3.0,    # Split utterances every ~3 seconds
+                utt_split=3.0,  # Split utterances every ~3 seconds
             )
 
         # Transcribe
@@ -443,12 +445,15 @@ def transcribe_video_with_deepgram_timed(local_video_path: str, video_title: str
         # Use extended timeout for large files (up to 5 minutes)
         try:
             import httpx
+
             response = deepgram_client.listen.rest.v("1").transcribe_file(
                 payload, options, timeout=httpx.Timeout(300.0)
             )
         except Exception:
             # Fallback without timeout if httpx not available
-            response = deepgram_client.listen.rest.v("1").transcribe_file(payload, options)
+            response = deepgram_client.listen.rest.v("1").transcribe_file(
+                payload, options
+            )
 
         # Extract utterances with timing
         transcription_segments = []
@@ -488,11 +493,9 @@ def transcribe_video_with_deepgram_timed(local_video_path: str, video_title: str
                         )
 
                         if text:
-                            transcription_segments.append({
-                                "start": start,
-                                "dur": end - start,
-                                "text": text
-                            })
+                            transcription_segments.append(
+                                {"start": start, "dur": end - start, "text": text}
+                            )
                             total_duration = max(total_duration, end)
 
                 # Fallback to channels if no utterances
@@ -535,7 +538,8 @@ def transcribe_video_with_deepgram_timed(local_video_path: str, video_title: str
                                     word_text = (
                                         word.get("word") or word.get("punctuated_word")
                                         if isinstance(word, dict)
-                                        else getattr(word, "word", "") or getattr(word, "punctuated_word", "")
+                                        else getattr(word, "word", "")
+                                        or getattr(word, "punctuated_word", "")
                                     )
 
                                     if not current_segment["words"]:
@@ -546,11 +550,14 @@ def transcribe_video_with_deepgram_timed(local_video_path: str, video_title: str
                                     # Split segment every ~3 seconds
                                     if word_end - current_segment["start"] >= 3.0:
                                         text = " ".join(current_segment["words"])
-                                        transcription_segments.append({
-                                            "start": current_segment["start"],
-                                            "dur": word_end - current_segment["start"],
-                                            "text": text
-                                        })
+                                        transcription_segments.append(
+                                            {
+                                                "start": current_segment["start"],
+                                                "dur": word_end
+                                                - current_segment["start"],
+                                                "text": text,
+                                            }
+                                        )
                                         current_segment = {"start": 0, "words": []}
                                         total_duration = max(total_duration, word_end)
 
@@ -563,11 +570,13 @@ def transcribe_video_with_deepgram_timed(local_video_path: str, video_title: str
                                         else getattr(last_word, "end", 0)
                                     )
                                     text = " ".join(current_segment["words"])
-                                    transcription_segments.append({
-                                        "start": current_segment["start"],
-                                        "dur": last_end - current_segment["start"],
-                                        "text": text
-                                    })
+                                    transcription_segments.append(
+                                        {
+                                            "start": current_segment["start"],
+                                            "dur": last_end - current_segment["start"],
+                                            "text": text,
+                                        }
+                                    )
                                     total_duration = max(total_duration, last_end)
 
         except Exception as parse_error:
@@ -579,7 +588,7 @@ def transcribe_video_with_deepgram_timed(local_video_path: str, video_title: str
         return {
             "title": video_title,
             "lengthInSeconds": int(total_duration),
-            "transcription": transcription_segments
+            "transcription": transcription_segments,
         }
 
     except Exception as e:

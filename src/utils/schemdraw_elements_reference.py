@@ -18,7 +18,6 @@ VALID_SCHEMDRAW_ELEMENTS = {
     "Inductor": "Standard inductor",
     "Inductor2": "Inductor with core",
     "Crystal": "Crystal oscillator",
-
     # DIODES
     "Diode": "Standard diode",
     "DiodeShockley": "Shockley diode",
@@ -27,25 +26,20 @@ VALID_SCHEMDRAW_ELEMENTS = {
     "Zener": "Zener diode (alias)",
     "LED": "Light emitting diode",
     "Photodiode": "Photodiode",
-
     # TRANSISTORS - BJT
     "Bjt": "Generic BJT",
     "BjtNpn": "NPN BJT",
     "BjtPnp": "PNP BJT",
-
     # TRANSISTORS - FET/MOSFET
     "NFet": "N-channel FET (enhancement mode)",
     "PFet": "P-channel FET (enhancement mode)",
     "JFet": "Junction FET",
     "JFetN": "N-channel JFET",
     "JFetP": "P-channel JFET",
-
     # IMPORTANT: There is NO "Mosfet", "MOSFET", "Pmos", "Nmos", "NMos", "PMos"!
     # For CMOS, use NFet and PFet or draw custom with basic shapes
-
     # OPERATIONAL AMPLIFIERS
     "Opamp": "Operational amplifier",
-
     # SOURCES
     "Source": "Generic source",
     "SourceV": "Voltage source",
@@ -56,20 +50,17 @@ VALID_SCHEMDRAW_ELEMENTS = {
     "SourceControlled": "Controlled source",
     "SourceControlledV": "Voltage controlled voltage source",
     "SourceControlledI": "Current controlled current source",
-
     # SWITCHES
     "Switch": "Generic switch",
     "SwitchSpdt": "Single pole double throw",
     "SwitchSpdt2": "SPDT variant",
     "Button": "Push button",
-
     # METERS
     "Meter": "Generic meter",
     "MeterV": "Voltmeter",
     "MeterI": "Ammeter",
     "MeterA": "Ammeter (alias)",
     "MeterOhm": "Ohmmeter",
-
     # LOGIC GATES
     "And": "AND gate",
     "Or": "OR gate",
@@ -79,7 +70,6 @@ VALID_SCHEMDRAW_ELEMENTS = {
     "Xor": "XOR gate",
     "Xnor": "XNOR gate",
     "Buf": "Buffer",
-
     # POWER/GROUND
     "Ground": "Ground symbol",
     "GroundSignal": "Signal ground",
@@ -87,7 +77,6 @@ VALID_SCHEMDRAW_ELEMENTS = {
     "Vdd": "Positive supply",
     "Vss": "Negative supply",
     "Antenna": "Antenna",
-
     # CONNECTIONS
     "Line": "Straight line",
     "Gap": "Gap in line",
@@ -95,10 +84,8 @@ VALID_SCHEMDRAW_ELEMENTS = {
     "Arrowhead": "Arrow head",
     "Arrow": "Arrow",
     "Label": "Text label",
-
     # TRANSFORMERS
     "Transformer": "Two-winding transformer",
-
     # MISC
     "Fuse": "Fuse",
     "Lamp": "Lamp",
@@ -111,10 +98,10 @@ VALID_SCHEMDRAW_ELEMENTS = {
 INVALID_ELEMENTS = [
     "Mosfet",  # DOES NOT EXIST - use NFet or PFet
     "MOSFET",  # DOES NOT EXIST - use NFet or PFet
-    "Nmos",    # DOES NOT EXIST - use NFet
-    "NMos",    # DOES NOT EXIST - use NFet
-    "Pmos",    # DOES NOT EXIST - use PFet
-    "PMos",    # DOES NOT EXIST - use PFet
+    "Nmos",  # DOES NOT EXIST - use NFet
+    "NMos",  # DOES NOT EXIST - use NFet
+    "Pmos",  # DOES NOT EXIST - use PFet
+    "PMos",  # DOES NOT EXIST - use PFet
     "Transistor",  # Too generic - use BjtNpn, BjtPnp, NFet, or PFet
 ]
 
@@ -146,17 +133,32 @@ with schemdraw.Drawing(show=False) as d:
 ```
 """
 
+
 def get_valid_elements_list():
     """Returns formatted list of valid elements"""
     return ", ".join(sorted(VALID_SCHEMDRAW_ELEMENTS.keys()))
 
+
 def get_common_elements():
     """Returns the most commonly used elements"""
     common = [
-        "Resistor", "Capacitor", "Inductor", "Diode",
-        "BjtNpn", "BjtPnp", "NFet", "PFet",
-        "Opamp", "SourceV", "SourceI",
-        "Ground", "Vdd",
-        "And", "Or", "Not", "Nand", "Nor",
+        "Resistor",
+        "Capacitor",
+        "Inductor",
+        "Diode",
+        "BjtNpn",
+        "BjtPnp",
+        "NFet",
+        "PFet",
+        "Opamp",
+        "SourceV",
+        "SourceI",
+        "Ground",
+        "Vdd",
+        "And",
+        "Or",
+        "Not",
+        "Nand",
+        "Nor",
     ]
     return ", ".join(common)
