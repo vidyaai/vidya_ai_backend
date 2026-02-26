@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 from typing import List, Optional
 from fastapi import HTTPException
-from .config import s3_client, AWS_S3_BUCKET, deepgram_client
+from .config import s3_client, AWS_S3_BUCKET, deepgram_client, logger
 
 
 def s3_upload_file(
