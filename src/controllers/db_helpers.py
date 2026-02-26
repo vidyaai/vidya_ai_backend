@@ -85,6 +85,33 @@ def get_formatting_status(db: Session, video_id: str) -> dict:
     }
 
 
+def update_transcript_status(db: Session, video_id: str, status: dict):
+    """Update the transcript generation status for a video"""
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        video = get_or_create_video(db, video_id, source_type="youtube")
+    # Use getattr with default to handle if column doesn't exist yet
+    if hasattr(video, 'transcript_status'):
+        video.transcript_status = status
+        db.add(video)
+        db.commit()
+
+
+def get_transcript_status(db: Session, video_id: str) -> dict:
+    """Get the transcript generation status for a video"""
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if video:
+        # Use getattr with default to handle if column doesn't exist yet
+        transcript_status = getattr(video, 'transcript_status', None)
+        if transcript_status:
+            return transcript_status
+    return {
+        "status": "not_found",
+        "message": "No transcript generation record found",
+        "progress": 0,
+    }
+
+
 def get_transcript_cache(db: Session, video_id: str) -> dict:
     video = db.query(Video).filter(Video.id == video_id).first()
     if video:

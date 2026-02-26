@@ -28,7 +28,14 @@ from controllers.config import logger, s3_client, AWS_S3_BUCKET
 from controllers.storage import s3_upload_file, s3_presign_url
 from utils.firebase_auth import get_current_user
 from utils.firebase_users import get_users_by_emails
-from models import Assignment, SharedLink, SharedLinkAccess, AssignmentSubmission, Video
+from models import (
+    Assignment,
+    SharedLink,
+    SharedLinkAccess,
+    AssignmentSubmission,
+    Video,
+    CourseEnrollment,
+)
 from schemas import (
     AssignmentCreate,
     AssignmentUpdate,
@@ -50,9 +57,8 @@ from schemas import (
     BatchGradeRequest,
     BatchGradeResponse,
 )
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from utils.pdf_generator import AssignmentPDFGenerator
-from utils.google_forms_service import get_google_forms_service
 
 router = APIRouter()
 
@@ -546,6 +552,7 @@ async def get_user_assignments(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
     status_filter: Optional[str] = None,
+    course_id: Optional[str] = None,
     sort_by: str = "created_at",
     sort_order: str = "desc",
 ):
@@ -560,6 +567,13 @@ async def get_user_assignments(
         # Apply status filter
         if status_filter:
             query = query.filter(Assignment.status == status_filter)
+
+        # Apply course_id filter (use "null" string to mean open assignments)
+        if course_id is not None:
+            if course_id.lower() == "null":
+                query = query.filter(Assignment.course_id == None)
+            else:
+                query = query.filter(Assignment.course_id == course_id)
 
         # Apply sorting
         if sort_by == "created_at":
@@ -803,21 +817,37 @@ async def get_assignment(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
 
-        # Check access permissions
-        has_access = (
-            assignment.user_id == user_id
-            or db.query(SharedLinkAccess)  # Owner
-            .join(SharedLink)
-            .filter(
-                and_(
-                    SharedLink.assignment_id == assignment_id,
-                    SharedLink.share_type == "assignment",
-                    SharedLinkAccess.user_id == user_id,
+        # Check access permissions (owner, shared, or enrolled in course)
+        has_access = assignment.user_id == user_id
+
+        if not has_access:
+            has_access = (
+                db.query(SharedLinkAccess)
+                .join(SharedLink)
+                .filter(
+                    and_(
+                        SharedLink.assignment_id == assignment_id,
+                        SharedLink.share_type == "assignment",
+                        SharedLinkAccess.user_id == user_id,
+                    )
                 )
+                .first()
+                is not None
             )
-            .first()
-            is not None  # Shared with user
-        )
+
+        if not has_access and assignment.course_id:
+            has_access = (
+                db.query(CourseEnrollment)
+                .filter(
+                    and_(
+                        CourseEnrollment.course_id == assignment.course_id,
+                        CourseEnrollment.user_id == user_id,
+                        CourseEnrollment.status == "active",
+                    )
+                )
+                .first()
+                is not None
+            )
 
         if not has_access:
             raise HTTPException(
@@ -834,6 +864,7 @@ async def get_assignment(
             "user_id": assignment.user_id,
             "title": assignment.title,
             "description": assignment.description,
+            "course_id": assignment.course_id,
             "due_date": assignment.due_date,
             "total_points": assignment.total_points,
             "total_questions": assignment.total_questions,
@@ -851,6 +882,8 @@ async def get_assignment(
             "shared_count": assignment.shared_count,
             "created_at": assignment.created_at,
             "updated_at": assignment.updated_at,
+            "google_form_url": assignment.google_form_url,
+            "google_form_response_url": assignment.google_form_response_url,
         }
 
         # Filter sensitive data for students
@@ -888,6 +921,7 @@ async def create_assignment(
             user_id=user_id,
             title=assignment_data.title,
             description=assignment_data.description,
+            course_id=assignment_data.course_id,
             due_date=assignment_data.due_date,
             status=assignment_data.status,
             engineering_level=assignment_data.engineering_level,
@@ -947,8 +981,15 @@ async def update_assignment(
                 detail="Assignment not found or access denied",
             )
 
-        # Update fields
+        # Prevent reverting a published assignment back to draft
         update_data = assignment_data.dict(exclude_unset=True)
+        if assignment.status == "published" and update_data.get("status") == "draft":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot revert a published assignment to draft",
+            )
+
+        # Update fields
         for field, value in update_data.items():
             setattr(assignment, field, value)
 
@@ -1647,19 +1688,6 @@ async def generate_assignment(
         # Import the assignment generator
         from utils.assignment_generator import AssignmentGenerator
 
-        # Initialize the generator
-        generator = AssignmentGenerator()
-
-        # Generate assignment using AI
-        generated_data = generator.generate_assignment(
-            generation_options=generate_data.generation_options,
-            linked_videos=generate_data.linked_videos,
-            uploaded_files=generate_data.uploaded_files,
-            generation_prompt=generate_data.generation_prompt,
-            title=generate_data.title,
-            description=generate_data.description,
-        )
-
         # Extract question types for database storage
         question_types = []
         for q_type, enabled in generate_data.generation_options.get(
@@ -1668,11 +1696,11 @@ async def generate_assignment(
             if enabled:
                 question_types.append(q_type)
 
-        # Create assignment
+        # Create placeholder assignment to get an ID (needed for S3 diagram upload)
         assignment = Assignment(
             user_id=user_id,
-            title=generated_data["title"],
-            description=generated_data["description"],
+            title=generate_data.title or "AI Generated Assignment",
+            description=generate_data.description or "Generating...",
             engineering_level=generate_data.generation_options.get(
                 "engineeringLevel", "undergraduate"
             ),
@@ -1684,14 +1712,51 @@ async def generate_assignment(
             uploaded_files=generate_data.uploaded_files,
             generation_prompt=generate_data.generation_prompt,
             generation_options=generate_data.generation_options,
-            questions=generated_data["questions"],
+            questions=[],  # Will be populated after generation
             status="draft",
         )
+
+        db.add(assignment)
+        db.commit()
+        db.refresh(assignment)
+
+        logger.info(f"Created placeholder assignment with ID: {assignment.id}")
+
+        # Initialize the generator
+        generator = AssignmentGenerator()
+
+        # Extract diagram generation options
+        diagram_engine = generate_data.generation_options.get("diagramEngine", "nonai")
+        diagram_model = generate_data.generation_options.get("diagramModel", "flash")
+        diagram_subject = generate_data.generation_options.get(
+            "engineeringDiscipline", "electrical"
+        )
+        logger.info(
+            f"Diagram options - engine: {diagram_engine}, model: {diagram_model}, subject: {diagram_subject}"
+        )
+
+        # Generate assignment using AI (pass assignment_id for diagram S3 upload)
+        generated_data = generator.generate_assignment(
+            generation_options=generate_data.generation_options,
+            linked_videos=generate_data.linked_videos,
+            uploaded_files=generate_data.uploaded_files,
+            generation_prompt=generate_data.generation_prompt,
+            title=generate_data.title,
+            description=generate_data.description,
+            assignment_id=str(assignment.id),  # Pass ID for diagram upload
+            engine=diagram_engine,
+            subject=diagram_subject,
+            diagram_model=diagram_model,
+        )
+
+        # Update assignment with generated data
+        assignment.title = generated_data["title"]
+        assignment.description = generated_data["description"]
+        assignment.questions = generated_data["questions"]
 
         # Calculate stats
         assignment = calculate_assignment_stats(assignment)
 
-        db.add(assignment)
         db.commit()
         db.refresh(assignment)
 
@@ -1705,6 +1770,222 @@ async def generate_assignment(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate assignment:" + str(e),
         )
+
+
+# ─── SSE streaming generation endpoint ────────────────────────────────
+import logging
+import queue
+import threading
+
+
+class _QueueLogHandler(logging.Handler):
+    """Captures log records into a thread-safe queue for SSE streaming."""
+
+    def __init__(self, q: queue.Queue):
+        super().__init__()
+        self.q = q
+
+    def emit(self, record: logging.LogRecord):
+        try:
+            msg = record.getMessage()
+            level = record.levelname.lower()
+            self.q.put({"type": "log", "level": level, "message": msg})
+        except Exception:
+            pass
+
+
+@router.post("/api/assignments/generate-stream")
+async def generate_assignment_stream(
+    generate_data: AssignmentGenerateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate an assignment with real-time SSE progress streaming."""
+    user_id = current_user["uid"]
+    logger.info(f"[stream] Generating assignment for user: {user_id}")
+
+    from utils.assignment_generator import AssignmentGenerator
+
+    question_types = [
+        qt
+        for qt, en in generate_data.generation_options.get("questionTypes", {}).items()
+        if en
+    ]
+
+    assignment = Assignment(
+        user_id=user_id,
+        title=generate_data.title or "AI Generated Assignment",
+        description=generate_data.description or "Generating...",
+        engineering_level=generate_data.generation_options.get(
+            "engineeringLevel", "undergraduate"
+        ),
+        engineering_discipline=generate_data.generation_options.get(
+            "engineeringDiscipline", "general"
+        ),
+        question_types=question_types,
+        linked_videos=generate_data.linked_videos,
+        uploaded_files=generate_data.uploaded_files,
+        generation_prompt=generate_data.generation_prompt,
+        generation_options=generate_data.generation_options,
+        questions=[],
+        status="draft",
+    )
+    db.add(assignment)
+    db.commit()
+    db.refresh(assignment)
+    assignment_id = str(assignment.id)
+
+    log_queue: queue.Queue = queue.Queue()
+    _DONE = object()
+
+    def _run_generation():
+        handler = _QueueLogHandler(log_queue)
+        handler.setLevel(logging.INFO)
+
+        target_loggers = [
+            logging.getLogger("controllers.config"),
+            logging.getLogger("utils.assignment_generator"),
+            logging.getLogger("utils.diagram_agent"),
+        ]
+        for lg in target_loggers:
+            lg.addHandler(handler)
+
+        try:
+            generator = AssignmentGenerator()
+
+            diagram_engine = generate_data.generation_options.get(
+                "diagramEngine", "nonai"
+            )
+            diagram_model_opt = generate_data.generation_options.get(
+                "diagramModel", "flash"
+            )
+            diagram_subject = generate_data.generation_options.get(
+                "engineeringDiscipline", "electrical"
+            )
+
+            log_queue.put(
+                {
+                    "type": "log",
+                    "level": "info",
+                    "message": f"Engine: {diagram_engine} | Subject: {diagram_subject} | Model: {diagram_model_opt}",
+                }
+            )
+
+            generated_data = generator.generate_assignment(
+                generation_options=generate_data.generation_options,
+                linked_videos=generate_data.linked_videos,
+                uploaded_files=generate_data.uploaded_files,
+                generation_prompt=generate_data.generation_prompt,
+                title=generate_data.title,
+                description=generate_data.description,
+                assignment_id=assignment_id,
+                engine=diagram_engine,
+                subject=diagram_subject,
+                diagram_model=diagram_model_opt,
+            )
+
+            # Persist using a fresh DB session for this thread
+            from utils.db import SessionLocal
+
+            thread_db = SessionLocal()
+            try:
+                a = (
+                    thread_db.query(Assignment)
+                    .filter(Assignment.id == assignment_id)
+                    .first()
+                )
+                if a:
+                    a.title = generated_data["title"]
+                    a.description = generated_data["description"]
+                    a.questions = generated_data["questions"]
+                    a = calculate_assignment_stats(a)
+                    thread_db.commit()
+                    thread_db.refresh(a)
+                    log_queue.put(
+                        {
+                            "type": "result",
+                            "data": {
+                                "id": a.id,
+                                "user_id": a.user_id,
+                                "title": a.title,
+                                "description": a.description,
+                                "course_id": a.course_id,
+                                "due_date": a.due_date.isoformat()
+                                if a.due_date
+                                else None,
+                                "total_points": a.total_points,
+                                "total_questions": a.total_questions,
+                                "status": a.status,
+                                "engineering_level": a.engineering_level,
+                                "engineering_discipline": a.engineering_discipline,
+                                "question_types": a.question_types,
+                                "linked_videos": a.linked_videos,
+                                "uploaded_files": a.uploaded_files,
+                                "generation_prompt": a.generation_prompt,
+                                "generation_options": a.generation_options,
+                                "questions": a.questions,
+                                "is_template": a.is_template,
+                                "ai_penalty_percentage": a.ai_penalty_percentage,
+                                "shared_count": a.shared_count,
+                                "created_at": a.created_at.isoformat()
+                                if a.created_at
+                                else None,
+                                "updated_at": a.updated_at.isoformat()
+                                if a.updated_at
+                                else None,
+                                "google_form_url": a.google_form_url,
+                                "google_form_response_url": a.google_form_response_url,
+                            },
+                        }
+                    )
+            finally:
+                thread_db.close()
+
+        except Exception as exc:
+            log_queue.put({"type": "error", "message": str(exc)})
+        finally:
+            for lg in target_loggers:
+                lg.removeHandler(handler)
+            log_queue.put(_DONE)
+
+    thread = threading.Thread(target=_run_generation, daemon=True)
+    thread.start()
+
+    import asyncio
+    import time
+
+    async def _event_stream():
+        last_ping = time.monotonic()
+        while True:
+            try:
+                item = log_queue.get_nowait()
+            except queue.Empty:
+                # Send a heartbeat comment every 15 s to prevent ngrok / proxy
+                # from killing the idle SSE connection.
+                if time.monotonic() - last_ping >= 15:
+                    yield ": heartbeat\n\n"
+                    last_ping = time.monotonic()
+                await asyncio.sleep(0.15)
+                continue
+
+            last_ping = time.monotonic()
+
+            if item is _DONE:
+                yield "data: [DONE]\n\n"
+                break
+
+            yield f"data: {json.dumps(item)}\n\n"
+
+    return StreamingResponse(
+        _event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/api/assignments/import-document", response_model=DocumentImportResponse)
@@ -2001,22 +2282,38 @@ async def submit_assignment(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
 
-        # Check if user has access to submit
-        has_access = (
-            assignment.user_id == user_id
-            or db.query(SharedLinkAccess)  # Owner can submit (for testing)
-            .join(SharedLink)
-            .filter(
-                and_(
-                    SharedLink.assignment_id == assignment_id,
-                    SharedLink.share_type == "assignment",
-                    SharedLinkAccess.user_id == user_id,
-                    SharedLinkAccess.permission.in_(["complete", "edit"]),
+        # Check if user has access to submit (owner, shared, or enrolled in course)
+        has_access = assignment.user_id == user_id
+
+        if not has_access:
+            has_access = (
+                db.query(SharedLinkAccess)
+                .join(SharedLink)
+                .filter(
+                    and_(
+                        SharedLink.assignment_id == assignment_id,
+                        SharedLink.share_type == "assignment",
+                        SharedLinkAccess.user_id == user_id,
+                        SharedLinkAccess.permission.in_(["complete", "edit"]),
+                    )
                 )
+                .first()
+                is not None
             )
-            .first()
-            is not None
-        )
+
+        if not has_access and assignment.course_id:
+            has_access = (
+                db.query(CourseEnrollment)
+                .filter(
+                    and_(
+                        CourseEnrollment.course_id == assignment.course_id,
+                        CourseEnrollment.user_id == user_id,
+                        CourseEnrollment.status == "active",
+                    )
+                )
+                .first()
+                is not None
+            )
 
         if not has_access:
             raise HTTPException(
@@ -2409,22 +2706,38 @@ async def save_assignment_draft(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
 
-        # Check if user has access
-        has_access = (
-            assignment.user_id == user_id
-            or db.query(SharedLinkAccess)
-            .join(SharedLink)
-            .filter(
-                and_(
-                    SharedLink.assignment_id == assignment_id,
-                    SharedLink.share_type == "assignment",
-                    SharedLinkAccess.user_id == user_id,
-                    SharedLinkAccess.permission.in_(["complete", "edit"]),
+        # Check if user has access (owner, shared, or enrolled in course)
+        has_access = assignment.user_id == user_id
+
+        if not has_access:
+            has_access = (
+                db.query(SharedLinkAccess)
+                .join(SharedLink)
+                .filter(
+                    and_(
+                        SharedLink.assignment_id == assignment_id,
+                        SharedLink.share_type == "assignment",
+                        SharedLinkAccess.user_id == user_id,
+                        SharedLinkAccess.permission.in_(["complete", "edit"]),
+                    )
                 )
+                .first()
+                is not None
             )
-            .first()
-            is not None
-        )
+
+        if not has_access and assignment.course_id:
+            has_access = (
+                db.query(CourseEnrollment)
+                .filter(
+                    and_(
+                        CourseEnrollment.course_id == assignment.course_id,
+                        CourseEnrollment.user_id == user_id,
+                        CourseEnrollment.status == "active",
+                    )
+                )
+                .first()
+                is not None
+            )
 
         if not has_access:
             raise HTTPException(
@@ -2822,21 +3135,37 @@ async def get_assignment_status(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
 
-        # Check if user has access
-        has_access = (
-            assignment.user_id == user_id
-            or db.query(SharedLinkAccess)
-            .join(SharedLink)
-            .filter(
-                and_(
-                    SharedLink.assignment_id == assignment_id,
-                    SharedLink.share_type == "assignment",
-                    SharedLinkAccess.user_id == user_id,
+        # Check if user has access (owner, shared link, or enrolled in the course)
+        has_access = assignment.user_id == user_id
+
+        if not has_access:
+            has_access = (
+                db.query(SharedLinkAccess)
+                .join(SharedLink)
+                .filter(
+                    and_(
+                        SharedLink.assignment_id == assignment_id,
+                        SharedLink.share_type == "assignment",
+                        SharedLinkAccess.user_id == user_id,
+                    )
                 )
+                .first()
+                is not None
             )
-            .first()
-            is not None
-        )
+
+        if not has_access and assignment.course_id:
+            has_access = (
+                db.query(CourseEnrollment)
+                .filter(
+                    and_(
+                        CourseEnrollment.course_id == assignment.course_id,
+                        CourseEnrollment.user_id == user_id,
+                        CourseEnrollment.status == "active",
+                    )
+                )
+                .first()
+                is not None
+            )
 
         if not has_access:
             raise HTTPException(
@@ -3364,7 +3693,7 @@ async def download_assignment_pdf(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
 
-        # Verify user has access (owner or shared access)
+        # Verify user has access (owner, shared access, or enrolled in course)
         has_access = assignment.user_id == user_id
 
         if not has_access:
@@ -3382,6 +3711,21 @@ async def download_assignment_pdf(
                 .first()
             )
             has_access = shared_access is not None
+
+        if not has_access and assignment.course_id:
+            # Check if user is enrolled in the course
+            has_access = (
+                db.query(CourseEnrollment)
+                .filter(
+                    and_(
+                        CourseEnrollment.course_id == assignment.course_id,
+                        CourseEnrollment.user_id == user_id,
+                        CourseEnrollment.status == "active",
+                    )
+                )
+                .first()
+                is not None
+            )
 
         if not has_access:
             raise HTTPException(
@@ -3492,353 +3836,106 @@ async def download_assignment_pdf(
         )
 
 
-@router.get("/api/assignments/test-google-forms")
-async def test_google_forms_connection(current_user=Depends(get_current_user)):
-    """Test Google Forms service connection and domain-wide delegation."""
-    try:
-        # Get Google Forms service
-        google_forms_service = get_google_forms_service()
-
-        # Test the connection
-        result = google_forms_service.test_connection()
-
-        if result["success"]:
-            return {
-                "success": True,
-                "message": "Google Forms service is working correctly with domain-wide delegation",
-                "form_id": result["form_id"],
-                "edit_url": result["edit_url"],
-                "response_url": result["response_url"],
-                "service_available": google_forms_service.is_available(),
-            }
-        else:
-            return {
-                "success": False,
-                "message": "Google Forms service test failed",
-                "error": result.get("error", "Unknown error"),
-                "service_available": google_forms_service.is_available(),
-            }
-
-    except Exception as e:
-        logger.error(f"Error testing Google Forms service: {str(e)}")
-        return {
-            "success": False,
-            "message": "Google Forms service test failed with exception",
-            "error": str(e),
-            "service_available": False,
-        }
-
-
-@router.post("/api/assignments/{assignment_id}/generate-google-form")
-async def generate_google_form(
+@router.get("/api/assignments/{assignment_id}/download-solution-pdf")
+async def download_solution_pdf(
     assignment_id: str,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """Generate a Google Form from an existing assignment."""
+    """
+    Generate and download a solution/answer-key PDF for an assignment.
+    Only the assignment owner (professor) can access this endpoint.
+    """
     try:
-        # Get the assignment
-        assignment = (
-            db.query(Assignment)
-            .filter(
-                and_(
-                    Assignment.id == assignment_id,
-                    Assignment.user_id == current_user["uid"],
-                )
-            )
-            .first()
-        )
+        user_id = current_user["uid"]
 
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
         if not assignment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
             )
 
-        # Get Google Forms service
-        google_forms_service = get_google_forms_service()
-
-        if not google_forms_service.is_available():
+        # Strictly owner-only — students must never access this
+        if assignment.user_id != user_id:
             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Google Forms service not available. Please contact administrator to configure Google Cloud credentials.",
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the assignment owner can download the solution PDF",
             )
 
-        # Prepare assignment data for form creation
+        # Prepare assignment data (include correctAnswer and rubric — do NOT strip them)
         assignment_data = {
+            "id": assignment.id,
             "title": assignment.title,
             "description": assignment.description,
             "questions": assignment.questions or [],
+            "total_points": assignment.total_points,
+            "total_questions": assignment.total_questions,
+            "engineering_level": assignment.engineering_level,
+            "engineering_discipline": assignment.engineering_discipline,
+            "created_at": assignment.created_at,
         }
 
-        # Create Google Form
-        result = google_forms_service.create_form_from_assignment(assignment_data)
+        # Process diagram presigned URLs
+        for question in assignment_data["questions"]:
+            if question.get("diagram") and question["diagram"].get("s3_key"):
+                try:
+                    presigned_url = s3_presign_url(
+                        question["diagram"]["s3_key"], expires_in=3600
+                    )
+                    question["diagram"]["url"] = presigned_url
+                except Exception as e:
+                    logger.warning(f"Could not generate presigned URL for diagram: {e}")
+                    question["diagram"] = None
 
-        if result["success"]:
-            # Update assignment with Google Form URLs
-            assignment.google_form_url = result["edit_url"]
-            assignment.google_form_response_url = result["response_url"]
-            db.commit()
+            if question.get("subquestions"):
+                for subq in question["subquestions"]:
+                    if subq.get("diagram") and subq["diagram"].get("s3_key"):
+                        try:
+                            presigned_url = s3_presign_url(
+                                subq["diagram"]["s3_key"], expires_in=3600
+                            )
+                            subq["diagram"]["url"] = presigned_url
+                        except Exception as e:
+                            logger.warning(
+                                f"Could not generate presigned URL for subq diagram: {e}"
+                            )
+                            subq["diagram"] = None
+
+        pdf_generator = AssignmentPDFGenerator()
+        try:
+            pdf_content = pdf_generator.generate_solution_pdf(assignment_data)
+
+            safe_title = "".join(
+                c for c in assignment.title if c.isalnum() or c in (" ", "-", "_")
+            ).strip()
+            safe_title = safe_title.replace(" ", "_")[:50]
+            filename = f"{safe_title}_Solution_Key.pdf"
 
             logger.info(
-                f"Created Google Form for assignment {assignment_id}: {result['form_id']}"
+                f"Solution PDF generated for assignment {assignment_id}, size: {len(pdf_content)} bytes"
             )
 
-            return {
-                "success": True,
-                "form_id": result["form_id"],
-                "edit_url": result["edit_url"],
-                "response_url": result["response_url"],
-                "google_resource_url": result[
-                    "edit_url"
-                ],  # Frontend expects this field
-                "message": "Google Form created successfully",
-            }
-        else:
-            error_message = result.get("error", "Unknown error")
-            logger.error(
-                f"Failed to create Google Form for assignment {assignment_id}: {error_message}"
+            return Response(
+                content=pdf_content,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"attachment; filename={filename}",
+                    "Content-Length": str(len(pdf_content)),
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                },
             )
-
-            # Provide user-friendly error messages
-            if "Permission denied" in error_message or "403" in str(
-                result.get("api_error", "")
-            ):
-                user_message = "Google Forms integration is not properly configured. Please contact your administrator."
-            elif "internal error" in error_message.lower() or "500" in str(
-                result.get("api_error", "")
-            ):
-                user_message = "Google Forms service is temporarily unavailable. Please try again later."
-            else:
-                user_message = (
-                    "Failed to create Google Form. Please try again or contact support."
-                )
-
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=user_message
-            )
+        finally:
+            pdf_generator.cleanup()
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(
-            f"Error generating Google Form for assignment {assignment_id}: {str(e)}"
+            f"Error generating solution PDF for assignment {assignment_id}: {str(e)}"
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate Google Form",
-        )
-
-
-@router.get("/api/assignments/{assignment_id}/google-form-url")
-async def get_google_form_url(
-    assignment_id: str,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """Get the Google Form URL for an existing assignment."""
-    try:
-        # Get the assignment
-        assignment = (
-            db.query(Assignment)
-            .filter(
-                and_(
-                    Assignment.id == assignment_id,
-                    Assignment.user_id == current_user["uid"],
-                )
-            )
-            .first()
-        )
-
-        if not assignment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
-            )
-
-        # Check if Google Form URL exists
-        if not assignment.google_form_url:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No Google Form exists for this assignment",
-            )
-
-        return {
-            "google_resource_url": assignment.google_form_url,
-            "google_form_response_url": assignment.google_form_response_url,
-            "message": "Google Form URL retrieved successfully",
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            f"Error getting Google Form URL for assignment {assignment_id}: {str(e)}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve Google Form URL",
-        )
-
-
-@router.post("/api/assignments/{assignment_id}/make-google-form-public")
-async def make_google_form_public(
-    assignment_id: str,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """Make an existing Google Form publicly accessible."""
-    try:
-        # Get the assignment
-        assignment = (
-            db.query(Assignment)
-            .filter(
-                and_(
-                    Assignment.id == assignment_id,
-                    Assignment.user_id == current_user["uid"],
-                )
-            )
-            .first()
-        )
-
-        if not assignment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
-            )
-
-        # Check if Google Form exists
-        if not assignment.google_form_url:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No Google Form exists for this assignment",
-            )
-
-        # Extract form ID from URL
-        try:
-            # URL format: https://docs.google.com/forms/d/{form_id}/edit
-            form_id = assignment.google_form_url.split("/d/")[1].split("/")[0]
-        except (IndexError, AttributeError):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid Google Form URL format",
-            )
-
-        # Get Google Forms service and make form public
-        google_forms_service = get_google_forms_service()
-
-        if not google_forms_service.is_available():
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Google Forms service not available",
-            )
-
-        # Make the form public
-        google_forms_service._make_form_public(form_id)
-
-        logger.info(
-            f"Made existing Google Form {form_id} public for assignment {assignment_id}"
-        )
-
-        return {
-            "success": True,
-            "form_id": form_id,
-            "message": "Google Form is now publicly accessible",
-            "google_resource_url": assignment.google_form_url,
-            "google_form_response_url": assignment.google_form_response_url,
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            f"Error making Google Form public for assignment {assignment_id}: {str(e)}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to make Google Form public",
-        )
-
-
-@router.post("/api/assignments/make-all-google-forms-public")
-async def make_all_google_forms_public(
-    db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
-):
-    """Make all existing Google Forms for the current user publicly accessible."""
-    try:
-        # Get all assignments with Google Forms for this user
-        assignments = (
-            db.query(Assignment)
-            .filter(
-                and_(
-                    Assignment.user_id == current_user["uid"],
-                    Assignment.google_form_url.isnot(None),
-                    Assignment.google_form_url != "",
-                )
-            )
-            .all()
-        )
-
-        if not assignments:
-            return {
-                "success": True,
-                "message": "No Google Forms found to make public",
-                "processed_count": 0,
-                "successful_count": 0,
-                "failed_count": 0,
-            }
-
-        google_forms_service = get_google_forms_service()
-
-        if not google_forms_service.is_available():
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Google Forms service not available",
-            )
-
-        successful_count = 0
-        failed_count = 0
-        failed_assignments = []
-
-        for assignment in assignments:
-            try:
-                # Extract form ID from URL
-                form_id = assignment.google_form_url.split("/d/")[1].split("/")[0]
-
-                # Make the form public
-                google_forms_service._make_form_public(form_id)
-                successful_count += 1
-
-                logger.info(
-                    f"Made Google Form {form_id} public for assignment {assignment.id}"
-                )
-
-            except Exception as e:
-                failed_count += 1
-                failed_assignments.append(
-                    {
-                        "assignment_id": assignment.id,
-                        "assignment_title": assignment.title,
-                        "error": str(e),
-                    }
-                )
-                logger.error(
-                    f"Failed to make form public for assignment {assignment.id}: {e}"
-                )
-
-        return {
-            "success": True,
-            "message": f"Processed {len(assignments)} Google Forms",
-            "processed_count": len(assignments),
-            "successful_count": successful_count,
-            "failed_count": failed_count,
-            "failed_assignments": failed_assignments if failed_assignments else None,
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            f"Error making all Google Forms public for user {current_user['uid']}: {str(e)}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to make Google Forms public",
+            detail="Failed to generate solution PDF",
         )

@@ -124,6 +124,59 @@ class AssignmentGenerator:
             # Graceful degradation - return original questions without equations
             return questions
 
+    def _cleanup_diagram_metadata(self, questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Clean up diagram metadata for questions that don't have actual diagrams.
+
+        Removes hasDiagram flags and diagram metadata from questions where the diagram
+        agent decided not to generate a diagram (no s3_url present).
+
+        Args:
+            questions: List of questions (may contain nested subquestions)
+
+        Returns:
+            Questions list with cleaned up diagram metadata
+        """
+        def cleanup_question(q: Dict[str, Any]) -> Dict[str, Any]:
+            """Recursively clean up a question and its subquestions"""
+            # Check if question has diagram metadata but no actual S3 URL
+            if q.get("hasDiagram") and q.get("diagram"):
+                if not q["diagram"].get("s3_url"):
+                    # No actual diagram was generated, remove the metadata
+                    q["hasDiagram"] = False
+                    q["diagram"] = None
+                    logger.debug(f"Cleaned up diagram metadata for question {q.get('id')}")
+            elif q.get("hasDiagram") and not q.get("diagram"):
+                # hasDiagram is True but no diagram object at all
+                q["hasDiagram"] = False
+                logger.debug(f"Cleaned up hasDiagram flag for question {q.get('id')}")
+
+            # Recursively clean up subquestions
+            if q.get("subquestions"):
+                q["subquestions"] = [cleanup_question(sq) for sq in q["subquestions"]]
+
+            return q
+
+        # Clean up all questions
+        cleaned_questions = [cleanup_question(q) for q in questions]
+
+        # Count how many were cleaned
+        def count_cleaned(qs):
+            count = 0
+            for q in qs:
+                if not q.get("hasDiagram") or (q.get("diagram") and q["diagram"].get("s3_url")):
+                    # This is OK
+                    pass
+                if q.get("subquestions"):
+                    count += count_cleaned(q["subquestions"])
+            return count
+
+        cleaned_count = len(questions) - sum(1 for q in cleaned_questions if q.get("hasDiagram") and q.get("diagram") and q["diagram"].get("s3_url"))
+        if cleaned_count > 0:
+            logger.info(f"Cleaned up diagram metadata from {cleaned_count} questions without actual diagrams")
+
+        return cleaned_questions
+
     def generate_assignment(
         self,
         generation_options: Dict[str, Any],
@@ -132,6 +185,10 @@ class AssignmentGenerator:
         generation_prompt: Optional[str] = None,
         title: Optional[str] = None,
         description: Optional[str] = None,
+        assignment_id: Optional[str] = None,
+        engine: str = "nonai",
+        subject: str = "electrical",
+        diagram_model: str = "flash",
     ) -> Dict[str, Any]:
         """
         Generate an assignment using AI based on provided content and options.
@@ -143,6 +200,10 @@ class AssignmentGenerator:
             generation_prompt: Custom prompt for generation
             title: Assignment title
             description: Assignment description
+            assignment_id: Unique assignment ID
+            engine: "ai" for Gemini image gen, "nonai" for current flow, "both" for comparison
+            subject: Subject domain for diagram routing
+            diagram_model: "flash" for gemini-2.5-flash-image, "pro" for gemini-3-pro-image-preview
 
         Returns:
             Generated assignment data
@@ -164,6 +225,69 @@ class AssignmentGenerator:
             # Generate questions based on content and options
             questions = self._generate_questions(content_sources, generation_options)
             logger.info(f"Generated {len(questions)} questions")
+
+            # Use multi-agent diagram analysis to generate diagrams
+            if assignment_id:
+                from utils.diagram_agent import DiagramAnalysisAgent
+
+                has_diagram_analysis = generation_options.get("questionTypes", {}).get("diagram-analysis", False)
+
+                logger.info(f"Starting multi-agent diagram analysis (diagram-analysis: {has_diagram_analysis}, engine: {engine})...")
+                agent = DiagramAnalysisAgent(engine=engine, subject=subject, diagram_model=diagram_model)
+                questions = agent.analyze_and_generate_diagrams(
+                    questions=questions,
+                    assignment_id=assignment_id,
+                    has_diagram_analysis=has_diagram_analysis,
+                    generation_prompt=generation_prompt or "",
+                )
+                logger.info("Multi-agent diagram analysis complete")
+
+                # Clean up diagram metadata for questions without actual diagrams
+                questions = self._cleanup_diagram_metadata(questions)
+                logger.info("Diagram metadata cleanup complete")
+            else:
+                logger.warning("Skipping diagram generation: assignment_id not provided")
+
+            # Review questions for quality and alignment with lecture notes
+            if content_sources.get("document_texts") or content_sources.get("video_transcripts"):
+                from utils.question_review_agent import QuestionReviewAgent
+
+                logger.info("Starting question review and validation...")
+                reviewer = QuestionReviewAgent()
+
+                # Prepare lecture notes content for review
+                lecture_content = ""
+                if content_sources.get("document_texts"):
+                    lecture_content += "\n\n".join([doc["content"] for doc in content_sources["document_texts"]])
+                if content_sources.get("video_transcripts"):
+                    lecture_content += "\n\n".join([vid["transcript"] for vid in content_sources["video_transcripts"]])
+
+                # Review questions
+                review_results = reviewer.review_questions(
+                    questions=questions,
+                    lecture_notes_content=lecture_content[:5000],  # Send first 5000 chars
+                    user_prompt=generation_prompt or "Generate assignment",
+                    generation_options=generation_options
+                )
+
+                logger.info(f"Review complete: {review_results.get('overall_assessment', 'No assessment')}")
+                logger.info(f"Statistics: {review_results.get('statistics', {})}")
+
+                # Filter out low-quality questions if review recommends removal
+                if review_results.get("questions_reviewed"):
+                    filtered_questions = []
+                    for i, question in enumerate(questions, 1):
+                        review = review_results["questions_reviewed"].get(str(i), {})
+                        if review.get("keep", True):  # Keep by default if no review
+                            filtered_questions.append(question)
+                        else:
+                            logger.warning(f"Removing question {i} based on review: {review.get('issues', [])}")
+
+                    if len(filtered_questions) < len(questions):
+                        logger.info(f"Filtered {len(questions) - len(filtered_questions)} questions after review")
+                        questions = filtered_questions
+            else:
+                logger.info("No lecture notes provided - skipping quality review")
 
             # Create assignment metadata
             assignment_data = {
@@ -710,6 +834,16 @@ class AssignmentGenerator:
             - Include code examples and diagrams when appropriate
             - Follow academic integrity standards
 
+            SELF-CONTAINED QUESTION RULES (CRITICAL):
+            - Every question MUST explicitly state ALL values, parameters, states, and conditions in the question text itself.
+            - NEVER write vague references like "as shown in the diagram", "see the figure", "from the circuit above" or "given the values in the table".
+            - If a question involves state transitions, truth tables, or specific input/output values, list them ALL explicitly in the question text.
+            - Example of WRONG: "Calculate the output for the states shown in the diagram."
+            - Example of RIGHT: "Calculate the output Z when Q1=1, Q0=0, I=1 using the formula Z = (Q1 XOR I) AND (Q0 OR I)."
+            - Diagrams may be added later by a separate system — the question text must be independently comprehensible without any diagram.
+            - For FSM/state machine questions: always include the complete state transition table or explicit transition rules in the question text.
+            - For circuit analysis: always specify ALL component values, node labels, and connection topology in the question text.
+
             MANDATORY FOR MULTI-PART QUESTIONS:
             - EVERY subquestion at ALL nesting levels MUST have:
               * A complete correctAnswer
@@ -744,6 +878,15 @@ class AssignmentGenerator:
             - Ensure questions are self-contained and don't require external resources
             - Use proper terminology and notation appropriate to the subject
             - Follow academic integrity standards
+
+            SELF-CONTAINED QUESTION RULES (CRITICAL):
+            - Every question MUST explicitly state ALL values, parameters, states, and conditions in the question text itself.
+            - NEVER write vague references like "as shown in the diagram", "see the figure", "from the circuit above" or "given the values in the table".
+            - If a question involves state transitions, truth tables, or specific input/output values, list them ALL explicitly in the question text.
+            - Example of WRONG: "Calculate the output for the states shown in the diagram."
+            - Example of RIGHT: "Calculate the output Z when Q1=1, Q0=0, I=1 using the formula Z = (Q1 XOR I) AND (Q0 OR I)."
+            - Diagrams may be added later by a separate system — the question text must be independently comprehensible without any diagram.
+            - For FSM/state machine questions: always include the complete state transition table or explicit transition rules in the question text.
 
             MANDATORY FOR MULTI-PART QUESTIONS:
             - EVERY subquestion at ALL nesting levels MUST have:

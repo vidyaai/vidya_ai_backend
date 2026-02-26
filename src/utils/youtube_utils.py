@@ -221,8 +221,8 @@ def download_video(
     # Create output directory if needed
     os.makedirs(output_path, exist_ok=True)
 
-    # Your RapidAPI key
-    api_key = "87cb804577msh2f08e931a0d9bacp19e810jsn4f8fd6ff742b"
+    # RapidAPI key for youtube-info-download-api
+    api_key = "b5991074f0msh65fd576fb8cf7bfp171744jsn8e583d842289"
 
     # Encode the YouTube URL
     encoded_url = quote(youtube_url, safe="")
