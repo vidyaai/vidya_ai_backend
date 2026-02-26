@@ -4,7 +4,7 @@
 Currently, the assignment generator produces text-only questions. For technical topics across all domains (computer science, engineering, physics, electronics), students need visual diagrams to comprehend concepts. Whether it's a data structure like a binary tree, a neural network architecture, an RF circuit, CPU internals, or a physics diagram, visual representations dramatically improve understanding.
 
 ## Scope: Generate ANY Technical Image
-This system should be capable of generating diagrams for:
+This system should be capable of generating diagrams for:`
 
 ### Computer Science Concepts
 - **Data Structures**: Graphs (directed/undirected), linked lists (singly/doubly/circular), trees (binary, BST, AVL, red-black), arrays, stacks, queues, heaps, hash tables

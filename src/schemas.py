@@ -224,6 +224,7 @@ class MultiPartQuestion(QuestionBase):
 class AssignmentCreate(BaseModel):
     title: str
     description: Optional[str] = None
+    course_id: Optional[str] = None
     due_date: Optional[datetime] = None
     status: str = "draft"
     engineering_level: str = "undergraduate"
@@ -241,6 +242,7 @@ class AssignmentCreate(BaseModel):
 class AssignmentUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    course_id: Optional[str] = None
     due_date: Optional[datetime] = None
     status: Optional[str] = None
     engineering_level: Optional[str] = None
@@ -256,6 +258,7 @@ class AssignmentOut(BaseModel):
     user_id: str
     title: str
     description: Optional[str] = None
+    course_id: Optional[str] = None
     due_date: Optional[datetime] = None
     total_points: str
     total_questions: str
@@ -286,6 +289,7 @@ class AssignmentSummary(BaseModel):
     id: str
     title: str
     description: Optional[str] = None
+    course_id: Optional[str] = None
     due_date: Optional[datetime] = None
     total_points: str
     total_questions: str
@@ -655,6 +659,104 @@ class LectureSummaryResponse(BaseModel):
     video_id: str
     created_at: datetime
     summary_metadata: Optional[dict] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ── Course Organization Schemas ──────────────────────────────────────────
+
+
+class CourseCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    course_code: Optional[str] = None
+    semester: Optional[str] = None
+
+
+class CourseUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    course_code: Optional[str] = None
+    semester: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class CourseOut(BaseModel):
+    id: str
+    user_id: str
+    title: str
+    description: Optional[str] = None
+    course_code: Optional[str] = None
+    semester: Optional[str] = None
+    is_active: bool
+    enrollment_code: Optional[str] = None
+    enrollment_count: int = 0
+    assignment_count: int = 0
+    material_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EnrollStudentItem(BaseModel):
+    email: str
+
+
+class EnrollStudentsRequest(BaseModel):
+    students: List[EnrollStudentItem]
+    role: str = "student"
+    send_email: bool = False
+
+
+class EnrollmentOut(BaseModel):
+    id: str
+    course_id: str
+    user_id: str
+    email: Optional[str] = None
+    role: str
+    status: str
+    enrolled_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EnrollmentResultOut(BaseModel):
+    enrolled: int
+    pending: int
+    failed: List[str]
+    enrollments: List[EnrollmentOut]
+
+
+class CourseMaterialLinkVideo(BaseModel):
+    video_id: str
+    title: str
+    description: Optional[str] = None
+    folder: Optional[str] = None
+
+
+class CourseMaterialOut(BaseModel):
+    id: str
+    course_id: str
+    title: str
+    description: Optional[str] = None
+    material_type: str
+    s3_key: Optional[str] = None
+    video_id: Optional[str] = None
+    external_url: Optional[str] = None
+    file_name: Optional[str] = None
+    file_size: Optional[str] = None
+    mime_type: Optional[str] = None
+    order: int = 0
+    folder: Optional[str] = None
+    transcript_text: Optional[str] = None
+    transcript_status: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
