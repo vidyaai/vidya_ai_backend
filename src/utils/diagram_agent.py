@@ -9,6 +9,8 @@ import json
 import os
 import re
 import asyncio
+import shutil
+import tempfile
 from typing import Dict, List, Any, Optional
 from openai import OpenAI
 from controllers.config import logger
@@ -38,10 +40,10 @@ def _repair_truncated_json(s: str) -> dict:
         repaired += '"'
 
     # 3. Balance braces / brackets
-    open_braces = repaired.count('{') - repaired.count('}')
-    open_brackets = repaired.count('[') - repaired.count(']')
-    repaired += ']' * max(0, open_brackets)
-    repaired += '}' * max(0, open_braces)
+    open_braces = repaired.count("{") - repaired.count("}")
+    open_brackets = repaired.count("[") - repaired.count("]")
+    repaired += "]" * max(0, open_brackets)
+    repaired += "}" * max(0, open_braces)
 
     try:
         return json.loads(repaired)
@@ -49,7 +51,7 @@ def _repair_truncated_json(s: str) -> dict:
         pass
 
     # 4. Last resort – try to extract a JSON object with regex
-    match = re.search(r'\{[^{}]*\}', s)
+    match = re.search(r"\{[^{}]*\}", s)
     if match:
         try:
             return json.loads(match.group(0))
@@ -62,7 +64,12 @@ def _repair_truncated_json(s: str) -> dict:
 class DiagramAnalysisAgent:
     """AI agent that analyzes questions and generates diagrams via tool calls"""
 
-    def __init__(self, engine: str = "nonai", subject: str = "electrical", diagram_model: str = "flash"):
+    def __init__(
+        self,
+        engine: str = "nonai",
+        subject: str = "electrical",
+        diagram_model: str = "flash",
+    ):
         """
         Initialize the diagram analysis agent.
 
@@ -89,6 +96,7 @@ class DiagramAnalysisAgent:
         # Always use Gemini 2.5 Pro as the diagram reviewer (best vision
         # accuracy for semantic consistency checks across all subjects).
         from utils.gemini_diagram_reviewer import GeminiDiagramReviewer
+
         self.reviewer = GeminiDiagramReviewer()
         logger.info(
             f"DiagramAnalysisAgent: engine={self.engine}, diagram_model={self.diagram_model} "
@@ -112,8 +120,16 @@ class DiagramAnalysisAgent:
         Returns:
             System prompt string
         """
-        target_guidance = "Aim for ~33-40% total" if has_diagram_analysis else "Use good judgment - quality over quantity"
-        mode_name = "GENEROUS (33%+ target)" if has_diagram_analysis else "INTELLIGENT (quality-focused)"
+        target_guidance = (
+            "Aim for ~33-40% total"
+            if has_diagram_analysis
+            else "Use good judgment - quality over quantity"
+        )
+        mode_name = (
+            "GENEROUS (33%+ target)"
+            if has_diagram_analysis
+            else "INTELLIGENT (quality-focused)"
+        )
 
         base_prompt = f"""You are a diagram analysis agent for educational assignments. Your role: add diagrams whenever they genuinely help students visualize and understand the problem.
 
@@ -252,13 +268,17 @@ If you detect such a question, note this in your response so the system can upda
 
         # Append subject-specific prompt additions from registry
         if domain:
-            subject_section = self.prompt_registry.get_agent_system_prompt(domain, diagram_type)
+            subject_section = self.prompt_registry.get_agent_system_prompt(
+                domain, diagram_type
+            )
             if subject_section:
                 base_prompt += f"\n{subject_section}"
 
         return base_prompt
 
-    def _resolve_equation_placeholders(self, question: Dict[str, Any], text: str) -> str:
+    def _resolve_equation_placeholders(
+        self, question: Dict[str, Any], text: str
+    ) -> str:
         """
         Replace <eq ID> placeholders with their LaTeX values so the diagram
         agent and downstream tools see actual values instead of opaque tokens.
@@ -277,7 +297,7 @@ If you detect such a question, note this in your response so the system can upda
             eq_id = m.group(1)
             return eq_map.get(eq_id, m.group(0))  # keep original if ID not found
 
-        resolved = re.sub(r'<eq\s+(\S+)>', _replacer, text)
+        resolved = re.sub(r"<eq\s+(\S+)>", _replacer, text)
         if resolved != text:
             logger.info(
                 f"Resolved {len(eq_map)} equation placeholders in question text"
@@ -307,7 +327,9 @@ If you detect such a question, note this in your response so the system can upda
             # Prepare question text for analysis
             question_text = question.get("question") or question.get("text", "")
             question_type = question.get("type", "")
-            existing_diagram_hint = question.get("diagram")  # Check if original LLM suggested a diagram
+            existing_diagram_hint = question.get(
+                "diagram"
+            )  # Check if original LLM suggested a diagram
 
             # ── Resolve <eq> placeholders so diagram tools see actual values ──
             # The equation extractor runs BEFORE the diagram agent, replacing
@@ -315,9 +337,7 @@ If you detect such a question, note this in your response so the system can upda
             # the LaTeX values back so the diagram description is precise.
             question_text = self._resolve_equation_placeholders(question, question_text)
 
-            logger.info(
-                f"Analyzing question {question_idx}: {question_text[:100]}..."
-            )
+            logger.info(f"Analyzing question {question_idx}: {question_text[:100]}...")
 
             # ── Step 1: DomainRouter classification ──────────────────────────
             classification = self.domain_router.classify(
@@ -358,7 +378,11 @@ IMPORTANT: The original question generator suggested this question would benefit
 This is a STRONG HINT that a diagram would add educational value. Consider generating one unless it's clearly unnecessary."""
 
             # Create analysis prompt
-            mode_description = "GENEROUS mode (aim for 33%+ diagrams)" if has_diagram_analysis else "INTELLIGENT mode (generate when helpful)"
+            mode_description = (
+                "GENEROUS mode (aim for 33%+ diagrams)"
+                if has_diagram_analysis
+                else "INTELLIGENT mode (generate when helpful)"
+            )
 
             analysis_prompt = f"""Analyze this question and decide if a diagram would help students visualize and understand the problem:
 
@@ -379,7 +403,12 @@ Mode: {mode_description}
 
             # Call agent with tool access — use subject-specific system prompt
             messages = [
-                {"role": "system", "content": self._get_agent_prompt(has_diagram_analysis, q_domain, q_diagram_type)},
+                {
+                    "role": "system",
+                    "content": self._get_agent_prompt(
+                        has_diagram_analysis, q_domain, q_diagram_type
+                    ),
+                },
                 {"role": "user", "content": analysis_prompt},
             ]
 
@@ -426,14 +455,20 @@ Mode: {mode_description}
                         f"JSON parse error for question {question_idx} tool args, attempting repair: {json_err}"
                     )
                     try:
-                        tool_arguments = _repair_truncated_json(tool_call.function.arguments)
-                        logger.info(f"JSON repair succeeded for question {question_idx}")
+                        tool_arguments = _repair_truncated_json(
+                            tool_call.function.arguments
+                        )
+                        logger.info(
+                            f"JSON repair succeeded for question {question_idx}"
+                        )
                     except json.JSONDecodeError:
                         logger.error(
                             f"JSON repair failed for question {question_idx}. Raw args: {tool_call.function.arguments[:200]}"
                         )
                         # Fallback: if the agent wanted a diagram, try claude_code_tool with description from question
-                        logger.info(f"Falling back to claude_code_tool for question {question_idx} after JSON error")
+                        logger.info(
+                            f"Falling back to claude_code_tool for question {question_idx} after JSON error"
+                        )
                         tool_name = "claude_code_tool"
                         tool_arguments = {
                             "domain": "general",
@@ -446,7 +481,9 @@ Mode: {mode_description}
                     f"Agent decided to use {tool_name} for question {question_idx}"
                 )
 
-                imagen_accepted = False  # Track whether Imagen retry loop accepted a diagram
+                imagen_accepted = (
+                    False  # Track whether Imagen retry loop accepted a diagram
+                )
 
                 # ── ENGINE=AI or BOTH: Route to Gemini native image gen with retry loop ──
                 if effective_engine in ("ai", "both"):
@@ -455,7 +492,9 @@ Mode: {mode_description}
                         "description", tool_arguments.get("prompt", question_text[:300])
                     )
                     # Strip <eq qN_eqM> placeholders — they confuse Gemini image gen
-                    imagen_description = re.sub(r'<eq\s+\S+>', '', imagen_description).strip()
+                    imagen_description = re.sub(
+                        r"<eq\s+\S+>", "", imagen_description
+                    ).strip()
 
                     # ── Phase 3: Prepend subject-specific imagen style guidance ──
                     style_guidance = self.prompt_registry.get_imagen_description_prompt(
@@ -479,9 +518,11 @@ Mode: {mode_description}
                     dimension_failures = 0  # Track dimension/label related failures
 
                     # Determine local save directory for AI-generated images
-                    # Saves to the current working directory under assignment_id subfolder
-                    _ai_save_dir = os.path.join(os.getcwd(), f"ai_diagrams_{assignment_id}")
-                    os.makedirs(_ai_save_dir, exist_ok=True)
+                    # Uses a temporary directory that is cleaned up after all attempts
+                    _ai_save_dir = tempfile.mkdtemp(
+                        prefix=f"ai_diagrams_{assignment_id}_"
+                    )
+                    logger.info(f"AI diagrams temp dir: {_ai_save_dir}")
 
                     for attempt in range(1, max_imagen_attempts + 1):
                         logger.info(
@@ -542,7 +583,9 @@ Mode: {mode_description}
                             logger.warning(
                                 f"Gemini image gen failed on attempt {attempt} for Q{question_idx}"
                             )
-                            last_image_bytes = None  # Reset so next attempt regenerates from scratch
+                            last_image_bytes = (
+                                None  # Reset so next attempt regenerates from scratch
+                            )
                             last_review_result = None
                             continue
 
@@ -554,20 +597,27 @@ Mode: {mode_description}
                             try:
                                 with open(_local_path, "wb") as _f:
                                     _f.write(_attempt_bytes)
-                                logger.info(f"Saved AI diagram locally: {_local_path} ({len(_attempt_bytes)} bytes)")
+                                logger.info(
+                                    f"Saved AI diagram locally: {_local_path} ({len(_attempt_bytes)} bytes)"
+                                )
                             except Exception as _save_err:
-                                logger.warning(f"Could not save AI diagram locally: {_save_err}")
+                                logger.warning(
+                                    f"Could not save AI diagram locally: {_save_err}"
+                                )
 
                         # Review the generated image immediately
                         image_bytes_for_review = _attempt_bytes
                         if image_bytes_for_review is None:
                             try:
                                 import requests as _req
+
                                 resp = _req.get(diagram_data["s3_url"], timeout=15)
                                 if resp.status_code == 200:
                                     image_bytes_for_review = resp.content
                             except Exception as dl_err:
-                                logger.warning(f"Could not download Gemini diagram for review: {dl_err}")
+                                logger.warning(
+                                    f"Could not download Gemini diagram for review: {dl_err}"
+                                )
 
                         if image_bytes_for_review:
                             # Use current_description (may be updated corrected description),
@@ -577,13 +627,15 @@ Mode: {mode_description}
                             # passing to reviewer — they cause false label-mismatch failures
                             # because the reviewer sees "<eq" as a label name.
                             clean_question_for_review = re.sub(
-                                r'<eq\s+\S+>', '', question_text
+                                r"<eq\s+\S+>", "", question_text
                             ).strip()
                             review_result = await self.reviewer.review_diagram(
                                 image_bytes=image_bytes_for_review,
                                 question_text=clean_question_for_review,
                                 diagram_description=description_for_review,
-                                user_prompt_context=getattr(self, "_generation_prompt", ""),
+                                user_prompt_context=getattr(
+                                    self, "_generation_prompt", ""
+                                ),
                                 domain=q_domain,
                                 diagram_type=q_diagram_type,
                             )
@@ -602,17 +654,34 @@ Mode: {mode_description}
                                 break
                             else:
                                 is_fixable = review_result.get("fixable", False)
-                                last_review_issues = ", ".join(review_result.get("issues", []))
+                                last_review_issues = ", ".join(
+                                    review_result.get("issues", [])
+                                )
                                 last_review_result = review_result
 
                                 # Check if failure is dimension/label related
                                 _reason_lower = review_result.get("reason", "").lower()
                                 _issues_lower = last_review_issues.lower()
-                                _dim_keywords = ["dimension", "label", "unit", "thickness", "width",
-                                                 "conflicting", "duplicate", "wrong axis", "mm", "cm"]
-                                if any(kw in _reason_lower or kw in _issues_lower for kw in _dim_keywords):
+                                _dim_keywords = [
+                                    "dimension",
+                                    "label",
+                                    "unit",
+                                    "thickness",
+                                    "width",
+                                    "conflicting",
+                                    "duplicate",
+                                    "wrong axis",
+                                    "mm",
+                                    "cm",
+                                ]
+                                if any(
+                                    kw in _reason_lower or kw in _issues_lower
+                                    for kw in _dim_keywords
+                                ):
                                     dimension_failures += 1
-                                    logger.info(f"Dimension-related failure #{dimension_failures} for Q{question_idx}")
+                                    logger.info(
+                                        f"Dimension-related failure #{dimension_failures} for Q{question_idx}"
+                                    )
 
                                 logger.warning(
                                     f"Gemini diagram FAILED review on attempt {attempt}/{max_imagen_attempts} "
@@ -631,7 +700,9 @@ Mode: {mode_description}
                                 else:
                                     # Structural issue -- regenerate from scratch
                                     last_image_bytes = None
-                                    corrected = review_result.get("corrected_description")
+                                    corrected = review_result.get(
+                                        "corrected_description"
+                                    )
                                     if corrected:
                                         imagen_description = corrected
                                         logger.info(
@@ -641,9 +712,13 @@ Mode: {mode_description}
                                 diagram_data = None  # Reset so we retry
                         else:
                             # Can't review -- accept it and move on
-                            logger.warning(f"No image bytes for review on attempt {attempt}, accepting as-is")
+                            logger.warning(
+                                f"No image bytes for review on attempt {attempt}, accepting as-is"
+                            )
                             if self.engine == "both":
-                                _ai_image_bytes_for_stitch = diagram_data.get("_image_bytes")
+                                _ai_image_bytes_for_stitch = diagram_data.get(
+                                    "_image_bytes"
+                                )
                             diagram_data.pop("_image_bytes", None)
                             imagen_accepted = True
                             break
@@ -655,16 +730,31 @@ Mode: {mode_description}
                         )
                         diagram_data = None  # Force nonai fallback
 
+                    # Clean up the temp directory used for AI-generated images
+                    try:
+                        shutil.rmtree(_ai_save_dir, ignore_errors=True)
+                        logger.info(f"Cleaned up AI diagrams temp dir: {_ai_save_dir}")
+                    except Exception as _cleanup_err:
+                        logger.warning(
+                            f"Could not clean up AI diagrams temp dir: {_cleanup_err}"
+                        )
+
                 # ── ENGINE=NONAI / BOTH (or Gemini fallback): Use the code-based flow ──
                 # For engine=both we always run nonai even when AI succeeded.
                 # For engine=ai we only run nonai as a fallback when Gemini failed.
                 # For engine=both: save the AI result before running nonai
-                _ai_diagram_data = diagram_data if effective_engine == "both" and imagen_accepted else None
+                _ai_diagram_data = (
+                    diagram_data
+                    if effective_engine == "both" and imagen_accepted
+                    else None
+                )
 
                 # ── Inject subject_guidance into primary tool call ────────────
                 # The GPT-4o agent doesn't know about our registry, so we inject
                 # subject-specific code generation guidance here for quality/style.
-                if tool_name == "claude_code_tool" and not tool_arguments.get("subject_guidance"):
+                if tool_name == "claude_code_tool" and not tool_arguments.get(
+                    "subject_guidance"
+                ):
                     injected_guidance = self.prompt_registry.get_nonai_tool_prompt(
                         q_domain, q_diagram_type, "matplotlib"
                     )
@@ -675,7 +765,9 @@ Mode: {mode_description}
                             f"Q{question_idx}: Injected {q_domain}/{q_diagram_type} subject_guidance "
                             f"into claude_code_tool ({len(injected_guidance)} chars)"
                         )
-                elif tool_name == "svg_circuit_tool" and not tool_arguments.get("subject_context"):
+                elif tool_name == "svg_circuit_tool" and not tool_arguments.get(
+                    "subject_context"
+                ):
                     injected_ctx = self.prompt_registry.get_nonai_tool_prompt(
                         q_domain, q_diagram_type, "svg"
                     )
@@ -695,15 +787,24 @@ Mode: {mode_description}
 
                 # ── Phase 4: Subject-specific fallback routing ─────────────────
                 # If primary tool failed, use FallbackRouter to pick the right tool
-                if diagram_data is None and tool_name not in ("circuitikz_tool", "svg_circuit_tool", "claude_code_tool"):
+                if diagram_data is None and tool_name not in (
+                    "circuitikz_tool",
+                    "svg_circuit_tool",
+                    "claude_code_tool",
+                ):
                     logger.warning(
                         f"Primary tool '{tool_name}' failed for Q{question_idx}. "
                         f"Using subject-specific fallback router..."
                     )
-                    fallback_tool, fallback_args = self.fallback_router.build_tool_arguments(
+                    (
+                        fallback_tool,
+                        fallback_args,
+                    ) = self.fallback_router.build_tool_arguments(
                         domain=q_domain,
                         diagram_type=q_diagram_type,
-                        description=tool_arguments.get("description", question_text[:300]),
+                        description=tool_arguments.get(
+                            "description", question_text[:300]
+                        ),
                         question_text=question_text,
                     )
                     logger.info(f"FallbackRouter selected: {fallback_tool}")
@@ -716,10 +817,15 @@ Mode: {mode_description}
                         question_text=question_text,
                     )
                     if diagram_data:
-                        logger.info(f"Subject-specific fallback succeeded for Q{question_idx}")
+                        logger.info(
+                            f"Subject-specific fallback succeeded for Q{question_idx}"
+                        )
 
                 # If circuitikz_tool failed, retry with enriched description
-                if diagram_data is None and tool_name in ("circuitikz_tool", "svg_circuit_tool"):
+                if diagram_data is None and tool_name in (
+                    "circuitikz_tool",
+                    "svg_circuit_tool",
+                ):
                     logger.warning(
                         f"circuit tool failed for question {question_idx}. "
                         f"Retrying circuitikz_tool with enriched description..."
@@ -744,18 +850,32 @@ Mode: {mode_description}
                         question_text=question_text,
                     )
                     if diagram_data:
-                        logger.info(f"circuitikz_tool retry succeeded for question {question_idx}")
+                        logger.info(
+                            f"circuitikz_tool retry succeeded for question {question_idx}"
+                        )
                     else:
-                        logger.error(f"All fallbacks failed for question {question_idx}")
+                        logger.error(
+                            f"All fallbacks failed for question {question_idx}"
+                        )
 
                 # --- Final fallback: GPT-4o direct code generation if all tools unavailable ---
                 if diagram_data is None:
                     # Use the classified domain (not keyword inference) for the final fallback
-                    if q_domain in ("electrical", "computer_eng") and q_diagram_type in (
-                        "circuit_schematic", "analog_circuit", "mosfet_circuit",
-                        "logic_circuit", "alu_circuit",
-                        "sequential_circuit", "flip_flop_circuit", "counter_circuit",
-                        "shift_register", "cdc_diagram", "block_diagram",
+                    if q_domain in (
+                        "electrical",
+                        "computer_eng",
+                    ) and q_diagram_type in (
+                        "circuit_schematic",
+                        "analog_circuit",
+                        "mosfet_circuit",
+                        "logic_circuit",
+                        "alu_circuit",
+                        "sequential_circuit",
+                        "flip_flop_circuit",
+                        "counter_circuit",
+                        "shift_register",
+                        "cdc_diagram",
+                        "block_diagram",
                         "circuit_with_timing",
                     ):
                         # For circuit types, try circuitikz_tool one more time with simplified description
@@ -777,10 +897,14 @@ Mode: {mode_description}
                             question_text=question_text,
                         )
                         if not diagram_data:
-                            logger.warning(f"Final circuitikz_tool retry failed. Trying GPT-4o fallback...")
+                            logger.warning(
+                                f"Final circuitikz_tool retry failed. Trying GPT-4o fallback..."
+                            )
                             diagram_data = await self._gpt_direct_code_fallback(
                                 question_text=question_text,
-                                description=tool_arguments.get("description", question_text[:300]),
+                                description=tool_arguments.get(
+                                    "description", question_text[:300]
+                                ),
                                 assignment_id=assignment_id,
                                 question_idx=question_idx,
                                 domain=q_domain,
@@ -792,7 +916,9 @@ Mode: {mode_description}
                         )
                         diagram_data = await self._gpt_direct_code_fallback(
                             question_text=question_text,
-                            description=tool_arguments.get("description", question_text[:300]),
+                            description=tool_arguments.get(
+                                "description", question_text[:300]
+                            ),
                             assignment_id=assignment_id,
                             question_idx=question_idx,
                             domain=q_domain,
@@ -805,6 +931,7 @@ Mode: {mode_description}
                         ai_bytes = _ai_image_bytes_for_stitch
                         if ai_bytes is None:
                             import requests as _req
+
                             resp = _req.get(_ai_diagram_data["s3_url"], timeout=15)
                             ai_bytes = resp.content if resp.status_code == 200 else None
 
@@ -812,25 +939,40 @@ Mode: {mode_description}
                         nonai_bytes = diagram_data.pop("_image_bytes", None)
                         if nonai_bytes is None:
                             import requests as _req
+
                             resp = _req.get(diagram_data["s3_url"], timeout=15)
-                            nonai_bytes = resp.content if resp.status_code == 200 else None
+                            nonai_bytes = (
+                                resp.content if resp.status_code == 200 else None
+                            )
 
                         if ai_bytes and nonai_bytes:
-                            logger.info(f"Stitching AI + Claude diagrams for Q{question_idx}")
-                            stitched_bytes = self._stitch_side_by_side(ai_bytes, nonai_bytes)
+                            logger.info(
+                                f"Stitching AI + Claude diagrams for Q{question_idx}"
+                            )
+                            stitched_bytes = self._stitch_side_by_side(
+                                ai_bytes, nonai_bytes
+                            )
                             # Upload stitched image to S3
-                            stitched_data = await self.diagram_tools.diagram_gen.upload_to_s3(
-                                image_bytes=stitched_bytes,
-                                assignment_id=assignment_id,
-                                question_index=question_idx,
+                            stitched_data = (
+                                await self.diagram_tools.diagram_gen.upload_to_s3(
+                                    image_bytes=stitched_bytes,
+                                    assignment_id=assignment_id,
+                                    question_index=question_idx,
+                                )
                             )
                             stitched_data.pop("_image_bytes", None)
                             diagram_data = stitched_data
-                            logger.info(f"Stitched comparison diagram uploaded for Q{question_idx}")
+                            logger.info(
+                                f"Stitched comparison diagram uploaded for Q{question_idx}"
+                            )
                         else:
-                            logger.warning(f"Could not get both image bytes for stitching Q{question_idx}, using nonai only")
+                            logger.warning(
+                                f"Could not get both image bytes for stitching Q{question_idx}, using nonai only"
+                            )
                     except Exception as _stitch_err:
-                        logger.error(f"Stitch failed for Q{question_idx}: {_stitch_err} — using nonai diagram")
+                        logger.error(
+                            f"Stitch failed for Q{question_idx}: {_stitch_err} — using nonai diagram"
+                        )
 
                 # ── Multi-diagram stitching (circuit + timing/waveform) ────────
                 # If the agent made secondary tool calls, execute them and
@@ -840,6 +982,7 @@ Mode: {mode_description}
                     if primary_bytes is None:
                         try:
                             import requests as _req
+
                             resp = _req.get(diagram_data["s3_url"], timeout=15)
                             if resp.status_code == 200:
                                 primary_bytes = resp.content
@@ -852,9 +995,16 @@ Mode: {mode_description}
 
                         for sec_tool_name, sec_tool_args in secondary_tool_calls:
                             # Inject subject_guidance for secondary claude_code_tool calls
-                            if sec_tool_name == "claude_code_tool" and not sec_tool_args.get("subject_guidance"):
-                                sec_guidance = self.prompt_registry.get_nonai_tool_prompt(
-                                    q_domain, q_diagram_type, sec_tool_args.get("tool_type", "matplotlib")
+                            if (
+                                sec_tool_name == "claude_code_tool"
+                                and not sec_tool_args.get("subject_guidance")
+                            ):
+                                sec_guidance = (
+                                    self.prompt_registry.get_nonai_tool_prompt(
+                                        q_domain,
+                                        q_diagram_type,
+                                        sec_tool_args.get("tool_type", "matplotlib"),
+                                    )
                                 )
                                 if sec_guidance:
                                     sec_tool_args = dict(sec_tool_args)
@@ -875,6 +1025,7 @@ Mode: {mode_description}
                                 if sec_bytes is None:
                                     try:
                                         import requests as _req
+
                                         resp = _req.get(sec_data["s3_url"], timeout=15)
                                         if resp.status_code == 200:
                                             sec_bytes = resp.content
@@ -882,7 +1033,11 @@ Mode: {mode_description}
                                         pass
                                 if sec_bytes:
                                     all_image_bytes.append(sec_bytes)
-                                    all_labels.append(self._label_for_tool(sec_tool_name, q_diagram_type))
+                                    all_labels.append(
+                                        self._label_for_tool(
+                                            sec_tool_name, q_diagram_type
+                                        )
+                                    )
                                     logger.info(
                                         f"Q{question_idx}: Secondary diagram from {sec_tool_name} ready"
                                     )
@@ -894,11 +1049,15 @@ Mode: {mode_description}
                         # Stitch all diagrams vertically if we have more than one
                         if len(all_image_bytes) > 1:
                             try:
-                                stitched = self._stitch_vertical(all_image_bytes, all_labels)
-                                stitched_data = await self.diagram_tools.diagram_gen.upload_to_s3(
-                                    image_bytes=stitched,
-                                    assignment_id=assignment_id,
-                                    question_index=question_idx,
+                                stitched = self._stitch_vertical(
+                                    all_image_bytes, all_labels
+                                )
+                                stitched_data = (
+                                    await self.diagram_tools.diagram_gen.upload_to_s3(
+                                        image_bytes=stitched,
+                                        assignment_id=assignment_id,
+                                        question_index=question_idx,
+                                    )
                                 )
                                 stitched_data.pop("_image_bytes", None)
                                 diagram_data = stitched_data
@@ -929,23 +1088,30 @@ Mode: {mode_description}
                             # Fallback: download from S3 presigned URL
                             try:
                                 import requests as _req
+
                                 resp = _req.get(diagram_data["s3_url"], timeout=15)
                                 if resp.status_code == 200:
                                     image_bytes_for_review = resp.content
                             except Exception as dl_err:
-                                logger.warning(f"Could not download diagram for review: {dl_err}")
+                                logger.warning(
+                                    f"Could not download diagram for review: {dl_err}"
+                                )
 
                         if image_bytes_for_review:
-                            description_for_review = tool_arguments.get("description", question_text[:300])
+                            description_for_review = tool_arguments.get(
+                                "description", question_text[:300]
+                            )
                             # Strip <eq> placeholders to prevent false label-mismatch failures
                             clean_question_for_review = re.sub(
-                                r'<eq\s+\S+>', '', question_text
+                                r"<eq\s+\S+>", "", question_text
                             ).strip()
                             review_result = await self.reviewer.review_diagram(
                                 image_bytes=image_bytes_for_review,
                                 question_text=clean_question_for_review,
                                 diagram_description=description_for_review,
-                                user_prompt_context=getattr(self, "_generation_prompt", ""),
+                                user_prompt_context=getattr(
+                                    self, "_generation_prompt", ""
+                                ),
                                 domain=q_domain,
                                 diagram_type=q_diagram_type,
                             )
@@ -955,7 +1121,9 @@ Mode: {mode_description}
                                     f"Diagram review FAILED for Q{question_idx}: {review_result['reason']}  "
                                     f"Issues: {review_result['issues']}"
                                 )
-                                corrected_desc = review_result.get("corrected_description")
+                                corrected_desc = review_result.get(
+                                    "corrected_description"
+                                )
                                 if corrected_desc:
                                     logger.info(
                                         f"Regenerating Q{question_idx} with corrected description: "
@@ -980,18 +1148,22 @@ Mode: {mode_description}
                                         f"Regenerating Q{question_idx} using {regen_tool} "
                                         f"(original tool preserved)"
                                     )
-                                    regen_data = await self.diagram_tools.execute_tool_call(
-                                        tool_name=regen_tool,
-                                        tool_arguments=regen_args,
-                                        assignment_id=assignment_id,
-                                        question_idx=question_idx,
-                                        question_text=question_text,
+                                    regen_data = (
+                                        await self.diagram_tools.execute_tool_call(
+                                            tool_name=regen_tool,
+                                            tool_arguments=regen_args,
+                                            assignment_id=assignment_id,
+                                            question_idx=question_idx,
+                                            question_text=question_text,
+                                        )
                                     )
                                     if regen_data:
                                         # Pop transient key before attaching
                                         regen_data.pop("_image_bytes", None)
                                         diagram_data = regen_data
-                                        logger.info(f"Regenerated diagram accepted for Q{question_idx}")
+                                        logger.info(
+                                            f"Regenerated diagram accepted for Q{question_idx}"
+                                        )
                                     else:
                                         logger.warning(
                                             f"Regeneration failed for Q{question_idx}; keeping original diagram"
@@ -1037,19 +1209,26 @@ Examples:
                     rephrase_response = self.client.chat.completions.create(
                         model=self.model,
                         messages=[
-                            {"role": "system", "content": "You are a helpful assistant that rephrases questions to reference diagrams naturally."},
+                            {
+                                "role": "system",
+                                "content": "You are a helpful assistant that rephrases questions to reference diagrams naturally.",
+                            },
                             {"role": "user", "content": rephrase_prompt},
                         ],
                         temperature=0.3,
                     )
 
-                    rephrased_text = rephrase_response.choices[0].message.content.strip()
+                    rephrased_text = rephrase_response.choices[
+                        0
+                    ].message.content.strip()
 
                     # Update question
                     if rephrased_text != "KEEP_ORIGINAL":
                         question["question"] = rephrased_text
                         question["text"] = rephrased_text
-                        logger.info(f"Question {question_idx} rephrased to: {rephrased_text[:100]}...")
+                        logger.info(
+                            f"Question {question_idx} rephrased to: {rephrased_text[:100]}..."
+                        )
 
                     # Attach diagram data
                     question["diagram"] = {
@@ -1069,39 +1248,63 @@ Examples:
                     _qt_lower = question_text.lower()
 
                     # Electrical/CompEng: waveform, timing, counter, sequential circuit questions
-                    _is_waveform_or_counter_q = (
-                        q_diagram_type in (
-                            "waveform", "timing_diagram", "circuit_with_timing",
-                            "flip_flop_circuit", "sequential_circuit",
-                            "counter_circuit", "shift_register",
-                            "isa_timing",
-                        )
-                        and any(kw in _qt_lower for kw in [
-                            "output waveform", "draw the waveform", "sketch the waveform",
-                            "determine the output", "describe the output",
-                            "find the output", "complete the timing",
-                            "state after", "clock pulse", "clock cycle",
-                            "state of the counter", "state transition",
-                        ])
+                    _is_waveform_or_counter_q = q_diagram_type in (
+                        "waveform",
+                        "timing_diagram",
+                        "circuit_with_timing",
+                        "flip_flop_circuit",
+                        "sequential_circuit",
+                        "counter_circuit",
+                        "shift_register",
+                        "isa_timing",
+                    ) and any(
+                        kw in _qt_lower
+                        for kw in [
+                            "output waveform",
+                            "draw the waveform",
+                            "sketch the waveform",
+                            "determine the output",
+                            "describe the output",
+                            "find the output",
+                            "complete the timing",
+                            "state after",
+                            "clock pulse",
+                            "clock cycle",
+                            "state of the counter",
+                            "state transition",
+                        ]
                     )
 
                     # Generic across all domains: questions that ask students to
                     # draw, sketch, trace, or complete something on the diagram
-                    _is_draw_or_trace_q = (
-                        question.get("hasDiagram", False)
-                        and any(kw in _qt_lower for kw in [
-                            "draw the", "sketch the", "complete the diagram",
-                            "trace the", "fill in the", "plot the",
-                            "draw a free body", "draw the shear",
-                            "draw the bending moment", "draw the ray diagram",
-                            "draw the mechanism", "draw the state diagram",
-                            "complete the truth table", "complete the timing diagram",
-                            "draw the output", "construct the",
-                        ])
+                    _is_draw_or_trace_q = question.get("hasDiagram", False) and any(
+                        kw in _qt_lower
+                        for kw in [
+                            "draw the",
+                            "sketch the",
+                            "complete the diagram",
+                            "trace the",
+                            "fill in the",
+                            "plot the",
+                            "draw a free body",
+                            "draw the shear",
+                            "draw the bending moment",
+                            "draw the ray diagram",
+                            "draw the mechanism",
+                            "draw the state diagram",
+                            "complete the truth table",
+                            "complete the timing diagram",
+                            "draw the output",
+                            "construct the",
+                        ]
                     )
 
-                    if (_is_waveform_or_counter_q or _is_draw_or_trace_q) and question.get("type") in (
-                        "short-answer", "numerical", "fill-in-blanks",
+                    if (
+                        _is_waveform_or_counter_q or _is_draw_or_trace_q
+                    ) and question.get("type") in (
+                        "short-answer",
+                        "numerical",
+                        "fill-in-blanks",
                     ):
                         old_type = question["type"]
                         question["type"] = "diagram-analysis"
@@ -1127,10 +1330,9 @@ Examples:
             return question
 
         except Exception as e:
-            logger.error(
-                f"Error analyzing question {question_idx}: {str(e)}"
-            )
+            logger.error(f"Error analyzing question {question_idx}: {str(e)}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             return question  # Return unchanged on error
 
@@ -1157,20 +1359,20 @@ Examples:
         from PIL import Image, ImageDraw, ImageFont
         import io
 
-        AI_COLOR    = (25,  100, 210)   # blue  — AI Generated header
-        NONAI_COLOR = (20,  145,  65)   # green — Schematic Generated header
-        HEADER_TEXT = (255, 255, 255)   # white text in header
-        BOX_BORDER  = (200, 200, 200)   # light grey outer border
-        BG          = (245, 246, 248)   # off-white canvas background
+        AI_COLOR = (25, 100, 210)  # blue  — AI Generated header
+        NONAI_COLOR = (20, 145, 65)  # green — Schematic Generated header
+        HEADER_TEXT = (255, 255, 255)  # white text in header
+        BOX_BORDER = (200, 200, 200)  # light grey outer border
+        BG = (245, 246, 248)  # off-white canvas background
 
-        HEADER_H  = 38    # header bar height
-        IMG_PAD   = 16    # padding around image inside box
-        BOX_GAP   = 28    # horizontal gap between the two boxes
-        OUTER_PAD = 20    # canvas margin on all sides
-        BORDER_W  = 2     # box border width
+        HEADER_H = 38  # header bar height
+        IMG_PAD = 16  # padding around image inside box
+        BOX_GAP = 28  # horizontal gap between the two boxes
+        OUTER_PAD = 20  # canvas margin on all sides
+        BORDER_W = 2  # box border width
 
         # ── Load & normalise images ──────────────────────────────────────
-        img_ai    = Image.open(io.BytesIO(ai_bytes)).convert("RGB")
+        img_ai = Image.open(io.BytesIO(ai_bytes)).convert("RGB")
         img_nonai = Image.open(io.BytesIO(nonai_bytes)).convert("RGB")
 
         # Scale both to the same width (use the larger width as target)
@@ -1182,28 +1384,36 @@ Examples:
             ratio = w / img.width
             return img.resize((w, int(img.height * ratio)), Image.LANCZOS)
 
-        img_ai    = scale_to_width(img_ai,    target_w)
+        img_ai = scale_to_width(img_ai, target_w)
         img_nonai = scale_to_width(img_nonai, target_w)
 
         # ── Compute box dimensions ───────────────────────────────────────
         box_inner_w = target_w + IMG_PAD * 2
 
-        ai_box_h    = HEADER_H + IMG_PAD + img_ai.height    + IMG_PAD
+        ai_box_h = HEADER_H + IMG_PAD + img_ai.height + IMG_PAD
         nonai_box_h = HEADER_H + IMG_PAD + img_nonai.height + IMG_PAD
-        max_box_h   = max(ai_box_h, nonai_box_h)
+        max_box_h = max(ai_box_h, nonai_box_h)
 
-        total_w = OUTER_PAD + box_inner_w + BORDER_W * 2 + BOX_GAP + box_inner_w + BORDER_W * 2 + OUTER_PAD
+        total_w = (
+            OUTER_PAD
+            + box_inner_w
+            + BORDER_W * 2
+            + BOX_GAP
+            + box_inner_w
+            + BORDER_W * 2
+            + OUTER_PAD
+        )
         total_h = OUTER_PAD + max_box_h + BORDER_W * 2 + OUTER_PAD
 
         canvas = Image.new("RGB", (total_w, total_h), BG)
-        draw   = ImageDraw.Draw(canvas)
+        draw = ImageDraw.Draw(canvas)
 
         # ── Font ─────────────────────────────────────────────────────────
         try:
-            font_bold   = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 17)
+            font_bold = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 17)
             font_normal = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 14)
         except Exception:
-            font_bold   = ImageFont.load_default()
+            font_bold = ImageFont.load_default()
             font_normal = font_bold
 
         # ── Draw one box ─────────────────────────────────────────────────
@@ -1223,11 +1433,11 @@ Examples:
             draw.rectangle([hx0, hy0, hx1, hy1], fill=header_color)
 
             # ■ icon + label text centred vertically in header
-            icon_x  = hx0 + 12
-            icon_y  = hy0 + (HEADER_H - 14) // 2
+            icon_x = hx0 + 12
+            icon_y = hy0 + (HEADER_H - 14) // 2
             draw.rectangle([icon_x, icon_y, icon_x + 12, icon_y + 12], fill=HEADER_TEXT)
-            text_x  = icon_x + 20
-            text_y  = hy0 + (HEADER_H - 17) // 2
+            text_x = icon_x + 20
+            text_y = hy0 + (HEADER_H - 17) // 2
             draw.text((text_x, text_y), label, fill=HEADER_TEXT, font=font_bold)
 
             # Divider line between header and image area
@@ -1255,7 +1465,7 @@ Examples:
     @staticmethod
     def _label_for_tool(tool_name: str, diagram_type: str = "") -> str:
         """Return a human-readable label for a tool name.
-        
+
         For multi-diagram stitching, uses diagram_type to produce
         context-aware labels. When a secondary diagram is stitched
         below a primary one, we label it generically ('Given Information')
@@ -1266,10 +1476,16 @@ Examples:
         # The primary diagram gets its own label (Circuit Diagram, etc.);
         # the secondary one is labeled generically so it works for any domain.
         _multi_diagram_secondary_types = {
-            "circuit_with_timing", "sequential_circuit",
-            "flip_flop_circuit", "counter_circuit", "shift_register",
+            "circuit_with_timing",
+            "sequential_circuit",
+            "flip_flop_circuit",
+            "counter_circuit",
+            "shift_register",
         }
-        if tool_name in ("claude_code_tool", "matplotlib_tool") and diagram_type in _multi_diagram_secondary_types:
+        if (
+            tool_name in ("claude_code_tool", "matplotlib_tool")
+            and diagram_type in _multi_diagram_secondary_types
+        ):
             return "Given Information"
 
         _labels = {
@@ -1310,20 +1526,20 @@ Examples:
             raise ValueError("No images to stitch")
 
         COLORS = [
-            (25,  100, 210),   # blue
-            (20,  145,  65),   # green
-            (180,  70,  20),   # orange
-            (120,  50, 160),   # purple
+            (25, 100, 210),  # blue
+            (20, 145, 65),  # green
+            (180, 70, 20),  # orange
+            (120, 50, 160),  # purple
         ]
         HEADER_TEXT = (255, 255, 255)
-        BG          = (245, 246, 248)
-        BOX_BORDER  = (200, 200, 200)
+        BG = (245, 246, 248)
+        BOX_BORDER = (200, 200, 200)
 
-        HEADER_H  = 34
-        IMG_PAD   = 12
+        HEADER_H = 34
+        IMG_PAD = 12
         OUTER_PAD = 16
-        BORDER_W  = 2
-        BOX_GAP   = 12  # vertical gap between boxes
+        BORDER_W = 2
+        BOX_GAP = 12  # vertical gap between boxes
 
         # ── Load images ──────────────────────────────────────────────────
         images = []
@@ -1350,11 +1566,13 @@ Examples:
 
         total_h = OUTER_PAD
         for img in images:
-            total_h += BORDER_W * 2 + HEADER_H + IMG_PAD + img.height + IMG_PAD + BOX_GAP
+            total_h += (
+                BORDER_W * 2 + HEADER_H + IMG_PAD + img.height + IMG_PAD + BOX_GAP
+            )
         total_h += OUTER_PAD - BOX_GAP  # remove last gap, add bottom pad
 
         canvas = Image.new("RGB", (total_w, total_h), BG)
-        draw   = ImageDraw.Draw(canvas)
+        draw = ImageDraw.Draw(canvas)
 
         # ── Font ─────────────────────────────────────────────────────────
         try:
@@ -1408,18 +1626,72 @@ Examples:
     def _infer_domain(self, question_text: str) -> str:
         """Infer the domain from question text for diagram generation."""
         q_lower = question_text.lower()
-        if any(kw in q_lower for kw in ["circuit", "cmos", "mosfet", "nmos", "pmos", "transistor",
-                                         "amplifier", "resistor", "capacitor", "voltage", "current",
-                                         "inverter", "nand", "nor", "logic gate", "vdd", "drain", "source"]):
+        if any(
+            kw in q_lower
+            for kw in [
+                "circuit",
+                "cmos",
+                "mosfet",
+                "nmos",
+                "pmos",
+                "transistor",
+                "amplifier",
+                "resistor",
+                "capacitor",
+                "voltage",
+                "current",
+                "inverter",
+                "nand",
+                "nor",
+                "logic gate",
+                "vdd",
+                "drain",
+                "source",
+            ]
+        ):
             return "electrical"
-        elif any(kw in q_lower for kw in ["force", "pressure", "velocity", "fluid", "manometer",
-                                           "beam", "torque", "moment", "friction"]):
+        elif any(
+            kw in q_lower
+            for kw in [
+                "force",
+                "pressure",
+                "velocity",
+                "fluid",
+                "manometer",
+                "beam",
+                "torque",
+                "moment",
+                "friction",
+            ]
+        ):
             return "physics"
-        elif any(kw in q_lower for kw in ["tree", "graph", "node", "linked list", "binary",
-                                           "stack", "queue", "hash", "algorithm"]):
+        elif any(
+            kw in q_lower
+            for kw in [
+                "tree",
+                "graph",
+                "node",
+                "linked list",
+                "binary",
+                "stack",
+                "queue",
+                "hash",
+                "algorithm",
+            ]
+        ):
             return "computer_science"
-        elif any(kw in q_lower for kw in ["integral", "derivative", "matrix", "equation",
-                                           "polynomial", "eigenvalue", "vector"]):
+        elif any(
+            kw in q_lower
+            for kw in [
+                "integral",
+                "derivative",
+                "matrix",
+                "equation",
+                "polynomial",
+                "eigenvalue",
+                "vector",
+            ]
+        ):
             return "mathematics"
         return "general"
 
@@ -1427,7 +1699,7 @@ Examples:
         """Strip markdown code fences from generated code."""
         code = code.strip()
         if code.startswith("```python"):
-            code = code[len("```python"):]
+            code = code[len("```python") :]
         elif code.startswith("```"):
             code = code[3:]
         if code.endswith("```"):
@@ -1550,10 +1822,15 @@ Library: {lib}
 CRITICAL: Keep the code SHORT and SIMPLE (under 60 lines). A simple, correct diagram is better than a complex, broken one.
 Return ONLY Python code. No explanations. The code must be immediately executable and produce output.png."""
 
-            logger.info(f"GPT-4o direct code fallback for question {question_idx} (domain={domain}, lib={lib})")
+            logger.info(
+                f"GPT-4o direct code fallback for question {question_idx} (domain={domain}, lib={lib})"
+            )
 
             messages = [
-                {"role": "system", "content": "You are an expert code generator. Return ONLY executable Python code. No markdown, no explanations. Keep code SHORT and SIMPLE — under 60 lines. Simple correct diagrams beat complex broken ones."},
+                {
+                    "role": "system",
+                    "content": "You are an expert code generator. Return ONLY executable Python code. No markdown, no explanations. Keep code SHORT and SIMPLE — under 60 lines. Simple correct diagrams beat complex broken ones.",
+                },
                 {"role": "user", "content": code_gen_prompt},
             ]
 
@@ -1562,44 +1839,65 @@ Return ONLY Python code. No explanations. The code must be immediately executabl
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
-                    temperature=0.2 + (attempt * 0.1),  # Slightly increase creativity on retries
+                    temperature=0.2
+                    + (attempt * 0.1),  # Slightly increase creativity on retries
                     max_tokens=2000,  # Hard cap to prevent 40K+ char code blobs
                 )
 
                 code = self._strip_code_fences(response.choices[0].message.content)
 
-                logger.info(f"GPT-4o generated {len(code)} chars of {lib} code for question {question_idx} (attempt {attempt + 1}/{MAX_ATTEMPTS})")
+                logger.info(
+                    f"GPT-4o generated {len(code)} chars of {lib} code for question {question_idx} (attempt {attempt + 1}/{MAX_ATTEMPTS})"
+                )
 
                 # Guard: reject absurdly long code (likely garbage)
                 if len(code) > 5000:
-                    logger.warning(f"GPT-4o generated excessively long code ({len(code)} chars) for question {question_idx} — requesting simpler version")
+                    logger.warning(
+                        f"GPT-4o generated excessively long code ({len(code)} chars) for question {question_idx} — requesting simpler version"
+                    )
                     messages.append({"role": "assistant", "content": code})
-                    messages.append({"role": "user", "content": f"That code is {len(code)} characters — way too long and complex. Generate a MUCH SIMPLER version. A basic {lib} diagram should be 20-40 lines of code. Strip it down to essentials."})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": f"That code is {len(code)} characters — way too long and complex. Generate a MUCH SIMPLER version. A basic {lib} diagram should be 20-40 lines of code. Strip it down to essentials.",
+                        }
+                    )
                     continue
 
                 # Try to render
                 try:
                     if lib == "schemdraw":
-                        image_bytes = await self.diagram_tools.diagram_gen.render_schemdraw(code)
+                        image_bytes = (
+                            await self.diagram_tools.diagram_gen.render_schemdraw(code)
+                        )
                     else:
-                        image_bytes = await self.diagram_tools.diagram_gen.render_matplotlib(code)
+                        image_bytes = (
+                            await self.diagram_tools.diagram_gen.render_matplotlib(code)
+                        )
 
                     # Upload to S3
                     diagram_data = await self.diagram_tools.diagram_gen.upload_to_s3(
                         image_bytes, assignment_id, question_idx
                     )
 
-                    logger.info(f"GPT-4o direct code fallback succeeded for question {question_idx} (attempt {attempt + 1})")
+                    logger.info(
+                        f"GPT-4o direct code fallback succeeded for question {question_idx} (attempt {attempt + 1})"
+                    )
                     return diagram_data
 
                 except Exception as render_err:
                     last_error = str(render_err)
-                    logger.warning(f"GPT-4o code render failed (attempt {attempt + 1}/{MAX_ATTEMPTS}): {last_error[:200]}")
+                    logger.warning(
+                        f"GPT-4o code render failed (attempt {attempt + 1}/{MAX_ATTEMPTS}): {last_error[:200]}"
+                    )
 
                     if attempt < MAX_ATTEMPTS - 1:
                         # Feed the error back so GPT-4o can fix it
                         messages.append({"role": "assistant", "content": code})
-                        messages.append({"role": "user", "content": f"""The code above failed with this error:
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": f"""The code above failed with this error:
 
 {last_error[:500]}
 
@@ -1611,13 +1909,19 @@ Fix the code. Common schemdraw 0.19 issues:
 - Overlapping transistors → chain with .at(prev.drain).anchor('drain')
 - Missing 'from schemdraw.util import Point' when using Point()
 
-Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines."""})
+Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines.""",
+                            }
+                        )
 
-            logger.error(f"GPT-4o direct code fallback failed after {MAX_ATTEMPTS} attempts for question {question_idx}: {last_error}")
+            logger.error(
+                f"GPT-4o direct code fallback failed after {MAX_ATTEMPTS} attempts for question {question_idx}: {last_error}"
+            )
             return None
 
         except Exception as e:
-            logger.error(f"GPT-4o direct code fallback failed for question {question_idx}: {str(e)}")
+            logger.error(
+                f"GPT-4o direct code fallback failed for question {question_idx}: {str(e)}"
+            )
             return None
 
     async def _process_questions_batch(
@@ -1646,9 +1950,7 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines."""})
                     q, assignment_id, idx, has_diagram_analysis
                 )
 
-        tasks = [
-            process_with_semaphore(q, i) for i, q in enumerate(questions)
-        ]
+        tasks = [process_with_semaphore(q, i) for i, q in enumerate(questions)]
 
         results = await asyncio.gather(*tasks, return_exceptions=False)
         return results
@@ -1699,9 +2001,7 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines."""})
 
         # Find questions without diagrams that would benefit from them
         candidates = [
-            (i, q)
-            for i, q in enumerate(questions)
-            if not q.get("hasDiagram", False)
+            (i, q) for i, q in enumerate(questions) if not q.get("hasDiagram", False)
         ]
 
         # TODO: In a future iteration, we could re-run agent analysis on candidates
@@ -1757,14 +2057,17 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines."""})
                 )
             except RuntimeError as e:
                 # If there's already a running loop, process synchronously in thread
-                logger.warning(f"Event loop conflict, using thread-based processing: {e}")
+                logger.warning(
+                    f"Event loop conflict, using thread-based processing: {e}"
+                )
                 import concurrent.futures
+
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                     future = executor.submit(
                         asyncio.run,
                         self._process_questions_batch(
                             questions, assignment_id, has_diagram_analysis
-                        )
+                        ),
                     )
                     questions = future.result()
 
@@ -1775,9 +2078,7 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines."""})
                 )
 
             # Log final statistics
-            final_count = sum(
-                1 for q in questions if q.get("hasDiagram", False)
-            )
+            final_count = sum(1 for q in questions if q.get("hasDiagram", False))
             final_percentage = final_count / len(questions) if questions else 0
 
             logger.info(
@@ -1789,5 +2090,6 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines."""})
         except Exception as e:
             logger.error(f"Error in diagram analysis: {str(e)}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             return questions  # Return unchanged on error
