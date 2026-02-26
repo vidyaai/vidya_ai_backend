@@ -18,6 +18,7 @@ from controllers.config import logger
 
 try:
     import cairosvg
+
     CAIROSVG_AVAILABLE = True
 except ImportError:
     CAIROSVG_AVAILABLE = False
@@ -50,7 +51,7 @@ class SVGCircuitGenerator:
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.environ.get('ANTHROPIC_API_KEY')
+        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         if not self.api_key:
             raise ValueError("Anthropic API key required")
 
@@ -405,10 +406,14 @@ Return ONLY the SVG markup. No explanations."""
                 max_tokens=8000,  # SVG can be longer than code
                 temperature=0.1,
                 system=self._build_system_prompt(),
-                messages=[{
-                    "role": "user",
-                    "content": self._build_user_prompt(question_text, diagram_description, subject_context)
-                }]
+                messages=[
+                    {
+                        "role": "user",
+                        "content": self._build_user_prompt(
+                            question_text, diagram_description, subject_context
+                        ),
+                    }
+                ],
             )
 
             self._api_key_valid = True
@@ -418,11 +423,18 @@ Return ONLY the SVG markup. No explanations."""
             svg_content = self._extract_svg(svg_content)
 
             # Validate it's actually SVG
-            if not svg_content.strip().startswith('<svg') and not svg_content.strip().startswith('<?xml'):
-                logger.warning("Claude response doesn't look like SVG, attempting extraction")
+            if not svg_content.strip().startswith(
+                "<svg"
+            ) and not svg_content.strip().startswith("<?xml"):
+                logger.warning(
+                    "Claude response doesn't look like SVG, attempting extraction"
+                )
                 # Try to find SVG tags in the response
                 import re
-                svg_match = re.search(r'(<svg[\s\S]*?</svg>)', svg_content, re.IGNORECASE)
+
+                svg_match = re.search(
+                    r"(<svg[\s\S]*?</svg>)", svg_content, re.IGNORECASE
+                )
                 if svg_match:
                     svg_content = svg_match.group(1)
                 else:
@@ -433,7 +445,7 @@ Return ONLY the SVG markup. No explanations."""
 
         except Exception as e:
             error_str = str(e)
-            if '401' in error_str or 'authentication_error' in error_str:
+            if "401" in error_str or "authentication_error" in error_str:
                 self._api_key_valid = False
                 logger.error(f"Claude API key is INVALID: {error_str}")
             logger.error(f"SVG circuit generation failed: {error_str}")
@@ -444,24 +456,24 @@ Return ONLY the SVG markup. No explanations."""
         import re
 
         # Remove markdown code fences
-        if '```svg' in response:
-            start = response.find('```svg') + len('```svg')
-            end = response.find('```', start)
+        if "```svg" in response:
+            start = response.find("```svg") + len("```svg")
+            end = response.find("```", start)
             if end != -1:
                 return response[start:end].strip()
 
-        if '```xml' in response:
-            start = response.find('```xml') + len('```xml')
-            end = response.find('```', start)
+        if "```xml" in response:
+            start = response.find("```xml") + len("```xml")
+            end = response.find("```", start)
             if end != -1:
                 return response[start:end].strip()
 
-        if '```' in response:
-            start = response.find('```') + 3
-            end = response.find('```', start)
+        if "```" in response:
+            start = response.find("```") + 3
+            end = response.find("```", start)
             if end != -1:
                 candidate = response[start:end].strip()
-                if '<svg' in candidate:
+                if "<svg" in candidate:
                     return candidate
 
         return response.strip()
@@ -489,22 +501,28 @@ Return ONLY the SVG markup. No explanations."""
             PNG image bytes
         """
         if not CAIROSVG_AVAILABLE:
-            raise RuntimeError("cairosvg is required for SVG→PNG conversion. Install with: pip install cairosvg")
+            raise RuntimeError(
+                "cairosvg is required for SVG→PNG conversion. Install with: pip install cairosvg"
+            )
 
         # Generate SVG
-        svg_content = await self.generate_circuit_svg(question_text, diagram_description, subject_context)
+        svg_content = await self.generate_circuit_svg(
+            question_text, diagram_description, subject_context
+        )
 
         # Convert SVG → PNG
         try:
             png_bytes = cairosvg.svg2png(
-                bytestring=svg_content.encode('utf-8'),
+                bytestring=svg_content.encode("utf-8"),
                 output_width=output_width,
                 dpi=dpi,
                 background_color="white",
             )
 
             if not png_bytes or len(png_bytes) < 1000:
-                raise ValueError(f"SVG→PNG conversion produced empty/tiny output ({len(png_bytes) if png_bytes else 0} bytes)")
+                raise ValueError(
+                    f"SVG→PNG conversion produced empty/tiny output ({len(png_bytes) if png_bytes else 0} bytes)"
+                )
 
             logger.info(f"SVG→PNG conversion successful: {len(png_bytes)} bytes")
             return png_bytes
@@ -514,7 +532,7 @@ Return ONLY the SVG markup. No explanations."""
             # Save SVG for debugging
             try:
                 debug_path = os.path.join(tempfile.gettempdir(), "debug_circuit.svg")
-                with open(debug_path, 'w') as f:
+                with open(debug_path, "w") as f:
                     f.write(svg_content)
                 logger.info(f"Debug SVG saved to {debug_path}")
             except Exception:

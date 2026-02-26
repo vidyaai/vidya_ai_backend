@@ -23,10 +23,11 @@ from pathlib import Path
 
 # Load .env file from backend root (override=True to override stale shell vars)
 from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'), override=True)
+
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
 # Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from utils.assignment_generator import AssignmentGenerator
 from utils.pdf_generator import AssignmentPDFGenerator
@@ -35,14 +36,16 @@ from controllers.config import logger
 
 def get_next_run_number(base_dir: Path) -> int:
     """Get the next run number by checking existing run folders"""
-    existing_runs = [d for d in base_dir.iterdir() if d.is_dir() and d.name.startswith('run')]
+    existing_runs = [
+        d for d in base_dir.iterdir() if d.is_dir() and d.name.startswith("run")
+    ]
     if not existing_runs:
         return 1
 
     run_numbers = []
     for run_dir in existing_runs:
         try:
-            num = int(run_dir.name.replace('run', ''))
+            num = int(run_dir.name.replace("run", ""))
             run_numbers.append(num)
         except ValueError:
             continue
@@ -60,37 +63,46 @@ def save_images_to_folder(questions: list, output_dir: Path):
     def process_question(q, parent_num=""):
         nonlocal images_saved
 
-        question_num = f"{parent_num}{q.get('questionNumber', '')}" if parent_num else str(q.get('questionNumber', ''))
+        question_num = (
+            f"{parent_num}{q.get('questionNumber', '')}"
+            if parent_num
+            else str(q.get("questionNumber", ""))
+        )
 
         # Check if question has a diagram
-        if q.get('hasDiagram') and q.get('diagram'):
-            diagram = q['diagram']
-            s3_url = diagram.get('s3_url')
+        if q.get("hasDiagram") and q.get("diagram"):
+            diagram = q["diagram"]
+            s3_url = diagram.get("s3_url")
 
             if s3_url:
                 try:
                     # Download image from S3
                     import requests
+
                     response = requests.get(s3_url, timeout=10)
                     if response.status_code == 200:
                         # Save image locally
                         image_filename = f"question_{question_num}_diagram.png"
                         image_path = output_dir / image_filename
 
-                        with open(image_path, 'wb') as f:
+                        with open(image_path, "wb") as f:
                             f.write(response.content)
 
                         # Update diagram with local path
-                        diagram['local_path'] = str(image_path)
+                        diagram["local_path"] = str(image_path)
                         images_saved += 1
 
-                        logger.info(f"Saved diagram for question {question_num}: {image_filename}")
+                        logger.info(
+                            f"Saved diagram for question {question_num}: {image_filename}"
+                        )
                 except Exception as e:
-                    logger.error(f"Failed to download image for question {question_num}: {str(e)}")
+                    logger.error(
+                        f"Failed to download image for question {question_num}: {str(e)}"
+                    )
 
         # Process subquestions recursively
-        if q.get('subquestions'):
-            for subq in q['subquestions']:
+        if q.get("subquestions"):
+            for subq in q["subquestions"]:
                 process_question(subq, f"{question_num}.")
 
     # Process all questions
@@ -101,21 +113,59 @@ def save_images_to_folder(questions: list, output_dir: Path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Generate assignment questions programmatically')
-    parser.add_argument('-input', '--input', required=True, help='Path to input prompt file')
-    parser.add_argument('-subject', '--subject', required=True,
-                       choices=['electrical', 'mechanical', 'cs', 'civil', 'math', 'physics', 'chemistry', 'computer_eng'],
-                       help='Subject area: electrical, mechanical, cs, civil, math, physics, chemistry, computer_eng')
-    parser.add_argument('-level', '--level', required=True, choices=['undergrad', 'grad'],
-                       help='Education level: undergrad or grad')
-    parser.add_argument('-pdf_gen', '--pdf_gen', type=str, choices=['True', 'False'],
-                       default='False', help='Generate PDF: True or False')
-    parser.add_argument('-engine', '--engine', type=str, choices=['ai', 'nonai', 'both'],
-                       default='nonai',
-                       help='Diagram engine: ai (Gemini image gen), nonai (Claude SVG/code), or both (side-by-side comparison)')
-    parser.add_argument('-model', '--model', type=str, choices=['flash', 'pro'],
-                       default='flash',
-                       help='Gemini model: flash (gemini-2.5-flash-image via Vertex AI) or pro (gemini-3-pro-image-preview via Google AI Studio)')
+    parser = argparse.ArgumentParser(
+        description="Generate assignment questions programmatically"
+    )
+    parser.add_argument(
+        "-input", "--input", required=True, help="Path to input prompt file"
+    )
+    parser.add_argument(
+        "-subject",
+        "--subject",
+        required=True,
+        choices=[
+            "electrical",
+            "mechanical",
+            "cs",
+            "civil",
+            "math",
+            "physics",
+            "chemistry",
+            "computer_eng",
+        ],
+        help="Subject area: electrical, mechanical, cs, civil, math, physics, chemistry, computer_eng",
+    )
+    parser.add_argument(
+        "-level",
+        "--level",
+        required=True,
+        choices=["undergrad", "grad"],
+        help="Education level: undergrad or grad",
+    )
+    parser.add_argument(
+        "-pdf_gen",
+        "--pdf_gen",
+        type=str,
+        choices=["True", "False"],
+        default="False",
+        help="Generate PDF: True or False",
+    )
+    parser.add_argument(
+        "-engine",
+        "--engine",
+        type=str,
+        choices=["ai", "nonai", "both"],
+        default="nonai",
+        help="Diagram engine: ai (Gemini image gen), nonai (Claude SVG/code), or both (side-by-side comparison)",
+    )
+    parser.add_argument(
+        "-model",
+        "--model",
+        type=str,
+        choices=["flash", "pro"],
+        default="flash",
+        help="Gemini model: flash (gemini-2.5-flash-image via Vertex AI) or pro (gemini-3-pro-image-preview via Google AI Studio)",
+    )
 
     args = parser.parse_args()
 
@@ -125,7 +175,7 @@ def main():
         print(f"❌ Error: Input file not found: {args.input}")
         return 1
 
-    with open(input_path, 'r') as f:
+    with open(input_path, "r") as f:
         generation_prompt = f.read().strip()
 
     if not generation_prompt:
@@ -145,7 +195,9 @@ def main():
     print(f"Input prompt: {input_path.name}")
     print(f"Level: {args.level}")
     print(f"Engine: {args.engine}")
-    print(f"Model: {args.model} ({'gemini-3-pro-image-preview via AI Studio' if args.model == 'pro' else 'gemini-2.5-flash-image via Vertex AI'})")
+    print(
+        f"Model: {args.model} ({'gemini-3-pro-image-preview via AI Studio' if args.model == 'pro' else 'gemini-2.5-flash-image via Vertex AI'})"
+    )
     print(f"PDF generation: {args.pdf_gen}")
     print(f"Output directory: {output_dir}")
     print(f"{'='*60}\n")
@@ -172,7 +224,11 @@ def main():
 
     try:
         print("⏳ Generating assignment...")
-        print(f"   Prompt: {generation_prompt[:100]}..." if len(generation_prompt) > 100 else f"   Prompt: {generation_prompt}")
+        print(
+            f"   Prompt: {generation_prompt[:100]}..."
+            if len(generation_prompt) > 100
+            else f"   Prompt: {generation_prompt}"
+        )
 
         # Initialize generator
         generator = AssignmentGenerator()
@@ -191,16 +247,16 @@ def main():
             diagram_model=args.model,
         )
 
-        questions = assignment_data.get('questions', [])
+        questions = assignment_data.get("questions", [])
 
         print(f"\n✅ Generated {len(questions)} questions")
 
         # Count multipart questions
-        multipart_count = sum(1 for q in questions if q.get('subquestions'))
+        multipart_count = sum(1 for q in questions if q.get("subquestions"))
         print(f"   Multipart questions: {multipart_count}")
 
         # Count questions with diagrams
-        diagram_count = sum(1 for q in questions if q.get('hasDiagram'))
+        diagram_count = sum(1 for q in questions if q.get("hasDiagram"))
         print(f"   Questions with diagrams: {diagram_count}")
 
         # Save images to output folder
@@ -222,35 +278,35 @@ def main():
                 "assignment_id": assignment_id,
             },
             "assignment": {
-                "title": assignment_data.get('title'),
-                "description": assignment_data.get('description'),
-                "total_points": assignment_data.get('total_points'),
+                "title": assignment_data.get("title"),
+                "description": assignment_data.get("description"),
+                "total_points": assignment_data.get("total_points"),
                 "questions": questions,
             },
             "statistics": {
                 "total_questions": len(questions),
                 "multipart_questions": multipart_count,
                 "questions_with_diagrams": diagram_count,
-            }
+            },
         }
 
         # Save JSON
         json_path = output_dir / "assignment.json"
-        with open(json_path, 'w') as f:
+        with open(json_path, "w") as f:
             json.dump(output_data, f, indent=2)
         print(f"\n✅ Saved JSON: {json_path}")
 
         # Generate PDF if requested
-        if args.pdf_gen == 'True':
+        if args.pdf_gen == "True":
             print(f"\n⏳ Generating PDF...")
             try:
                 pdf_generator = AssignmentPDFGenerator()
 
                 # Prepare assignment data for PDF generation
                 pdf_assignment = {
-                    "title": assignment_data.get('title'),
-                    "description": assignment_data.get('description'),
-                    "total_points": assignment_data.get('total_points'),
+                    "title": assignment_data.get("title"),
+                    "description": assignment_data.get("description"),
+                    "total_points": assignment_data.get("total_points"),
                     "questions": questions,
                 }
 
@@ -258,7 +314,7 @@ def main():
 
                 # Save PDF
                 pdf_path = output_dir / "assignment.pdf"
-                with open(pdf_path, 'wb') as f:
+                with open(pdf_path, "wb") as f:
                     f.write(pdf_bytes)
 
                 print(f"✅ Generated PDF: {pdf_path}")
@@ -270,7 +326,7 @@ def main():
 
         # Save summary
         summary_path = output_dir / "summary.txt"
-        with open(summary_path, 'w') as f:
+        with open(summary_path, "w") as f:
             f.write(f"ASSIGNMENT GENERATION SUMMARY - RUN {run_number}\n")
             f.write(f"{'='*60}\n\n")
             f.write(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -288,7 +344,7 @@ def main():
             f.write(f"Total points: {assignment_data.get('total_points', 0)}\n\n")
             f.write(f"FILES GENERATED:\n{'-'*60}\n")
             f.write(f"- assignment.json\n")
-            if args.pdf_gen == 'True':
+            if args.pdf_gen == "True":
                 f.write(f"- assignment.pdf\n")
             if diagram_count > 0:
                 f.write(f"- {diagram_count} diagram images\n")
@@ -301,7 +357,7 @@ def main():
         print(f"Output location: {output_dir}")
         print(f"\nGenerated files:")
         print(f"  - assignment.json (questions data)")
-        if args.pdf_gen == 'True':
+        if args.pdf_gen == "True":
             print(f"  - assignment.pdf (formatted assignment)")
         if diagram_count > 0:
             print(f"  - {diagram_count} diagram image(s)")
@@ -316,11 +372,12 @@ def main():
 
         # Save error log
         error_path = output_dir / "error.log"
-        with open(error_path, 'w') as f:
+        with open(error_path, "w") as f:
             f.write(f"Assignment generation failed\n")
             f.write(f"Timestamp: {datetime.now().isoformat()}\n")
             f.write(f"Error: {str(e)}\n\n")
             import traceback
+
             f.write(traceback.format_exc())
 
         print(f"Error log saved: {error_path}")

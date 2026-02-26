@@ -13,18 +13,39 @@ from controllers.config import logger
 
 # Diagram types that work better with code tools than AI image generation.
 # These will override engine=ai → engine=nonai at the per-question level.
-_CODE_BETTER_TYPES = frozenset({
-    "bode_plot", "iv_curve", "waveform", "timing_diagram",
-    "stress_strain_curve", "pv_diagram",
-    "binary_tree", "linked_list", "graph_network", "sorting_visualization",
-    "stack_queue", "hash_table", "automata_fsm", "flowchart",
-    "function_plot", "3d_surface", "number_line", "matrix_visualization",
-    "titration_curve", "chromatography",
-    "isa_timing", "cache_organization",
-    "sequential_circuit", "flip_flop_circuit", "counter_circuit",
-    "shift_register", "fsm_diagram", "cdc_diagram",
-    "circuit_with_timing",
-})
+_CODE_BETTER_TYPES = frozenset(
+    {
+        "bode_plot",
+        "iv_curve",
+        "waveform",
+        "timing_diagram",
+        "stress_strain_curve",
+        "pv_diagram",
+        "binary_tree",
+        "linked_list",
+        "graph_network",
+        "sorting_visualization",
+        "stack_queue",
+        "hash_table",
+        "automata_fsm",
+        "flowchart",
+        "function_plot",
+        "3d_surface",
+        "number_line",
+        "matrix_visualization",
+        "titration_curve",
+        "chromatography",
+        "isa_timing",
+        "cache_organization",
+        "sequential_circuit",
+        "flip_flop_circuit",
+        "counter_circuit",
+        "shift_register",
+        "fsm_diagram",
+        "cdc_diagram",
+        "circuit_with_timing",
+    }
+)
 
 _CLASSIFICATION_PROMPT = """You are a subject-domain classifier for educational diagrams.
 
@@ -130,7 +151,9 @@ class DomainRouter:
             result = json.loads(raw)
 
             # Validate required keys with fallbacks
-            domain = result.get("domain", self._infer_domain(question_text, subject_hint))
+            domain = result.get(
+                "domain", self._infer_domain(question_text, subject_hint)
+            )
             diagram_type = result.get("diagram_type", "block_diagram")
             complexity = result.get("complexity", "moderate")
             ai_suitable = result.get("ai_suitable", True)
@@ -165,57 +188,174 @@ class DomainRouter:
         q = question_text.lower()
         hint = subject_hint.lower()
 
-        if "electrical" in hint or any(kw in q for kw in [
-            "circuit", "cmos", "mosfet", "transistor", "amplifier", "resistor",
-            "capacitor", "voltage", "current", "inverter", "nand", "nor",
-            "vdd", "drain", "source", "op-amp", "bode", "iv curve",
-            "flip-flop", "flip flop", "d flip", "jk flip", "sr latch",
-            "shift register", "counter", "sequential", "clock edge",
-            "rising edge", "falling edge", "timing diagram", "waveform",
-            "combinational logic", "and gate", "or gate", "xor gate",
-            "mux", "demux", "decoder", "encoder", "alu", "register file"
-        ]):
+        if "electrical" in hint or any(
+            kw in q
+            for kw in [
+                "circuit",
+                "cmos",
+                "mosfet",
+                "transistor",
+                "amplifier",
+                "resistor",
+                "capacitor",
+                "voltage",
+                "current",
+                "inverter",
+                "nand",
+                "nor",
+                "vdd",
+                "drain",
+                "source",
+                "op-amp",
+                "bode",
+                "iv curve",
+                "flip-flop",
+                "flip flop",
+                "d flip",
+                "jk flip",
+                "sr latch",
+                "shift register",
+                "counter",
+                "sequential",
+                "clock edge",
+                "rising edge",
+                "falling edge",
+                "timing diagram",
+                "waveform",
+                "combinational logic",
+                "and gate",
+                "or gate",
+                "xor gate",
+                "mux",
+                "demux",
+                "decoder",
+                "encoder",
+                "alu",
+                "register file",
+            ]
+        ):
             return "electrical"
-        if "computer" in hint or any(kw in q for kw in [
-            "cpu", "alu", "pipeline", "cache", "register", "instruction",
-            "logic gate", "memory hierarchy", "isa", "risc"
-        ]):
+        if "computer" in hint or any(
+            kw in q
+            for kw in [
+                "cpu",
+                "alu",
+                "pipeline",
+                "cache",
+                "register",
+                "instruction",
+                "logic gate",
+                "memory hierarchy",
+                "isa",
+                "risc",
+            ]
+        ):
             return "computer_eng"
-        if "cs" in hint or "computer science" in hint or any(kw in q for kw in [
-            "binary tree", "linked list", "graph", "bst", "sorting", "algorithm",
-            "stack", "queue", "hash", "automata", "fsm", "flowchart"
-        ]):
+        if (
+            "cs" in hint
+            or "computer science" in hint
+            or any(
+                kw in q
+                for kw in [
+                    "binary tree",
+                    "linked list",
+                    "graph",
+                    "bst",
+                    "sorting",
+                    "algorithm",
+                    "stack",
+                    "queue",
+                    "hash",
+                    "automata",
+                    "fsm",
+                    "flowchart",
+                ]
+            )
+        ):
             return "cs"
-        if "mechanical" in hint or any(kw in q for kw in [
-            "force", "beam", "truss", "free body", "stress", "strain",
-            "moment", "torque", "mechanism", "fluid flow"
-        ]):
+        if "mechanical" in hint or any(
+            kw in q
+            for kw in [
+                "force",
+                "beam",
+                "truss",
+                "free body",
+                "stress",
+                "strain",
+                "moment",
+                "torque",
+                "mechanism",
+                "fluid flow",
+            ]
+        ):
             return "mechanical"
-        if "civil" in hint or any(kw in q for kw in [
-            "retaining wall", "cross section", "contour", "soil",
-            "structural frame", "reinforced concrete"
-        ]):
+        if "civil" in hint or any(
+            kw in q
+            for kw in [
+                "retaining wall",
+                "cross section",
+                "contour",
+                "soil",
+                "structural frame",
+                "reinforced concrete",
+            ]
+        ):
             return "civil"
-        if "math" in hint or any(kw in q for kw in [
-            "function plot", "integral", "derivative", "matrix",
-            "polynomial", "eigenvalue", "vector field", "3d surface",
-            "geometric construction", "number line"
-        ]):
+        if "math" in hint or any(
+            kw in q
+            for kw in [
+                "function plot",
+                "integral",
+                "derivative",
+                "matrix",
+                "polynomial",
+                "eigenvalue",
+                "vector field",
+                "3d surface",
+                "geometric construction",
+                "number line",
+            ]
+        ):
             return "math"
-        if "physics" in hint or any(kw in q for kw in [
-            "ray diagram", "optics", "lens", "mirror", "field lines",
-            "wave", "energy level", "phase diagram", "spring", "pendulum",
-            "refraction", "reflection"
-        ]):
+        if "physics" in hint or any(
+            kw in q
+            for kw in [
+                "ray diagram",
+                "optics",
+                "lens",
+                "mirror",
+                "field lines",
+                "wave",
+                "energy level",
+                "phase diagram",
+                "spring",
+                "pendulum",
+                "refraction",
+                "reflection",
+            ]
+        ):
             return "physics"
-        if "chemistry" in hint or any(kw in q for kw in [
-            "molecular", "molecule", "atom", "bond", "reaction mechanism",
-            "lab apparatus", "titration", "orbital", "smiles", "rdkit"
-        ]):
+        if "chemistry" in hint or any(
+            kw in q
+            for kw in [
+                "molecular",
+                "molecule",
+                "atom",
+                "bond",
+                "reaction mechanism",
+                "lab apparatus",
+                "titration",
+                "orbital",
+                "smiles",
+                "rdkit",
+            ]
+        ):
             return "chemistry"
         return "electrical"  # safe default for STEM assignments
 
-    def _fallback_classification(self, question_text: str, subject_hint: str) -> Dict[str, Any]:
+    def _fallback_classification(
+        self, question_text: str, subject_hint: str
+    ) -> Dict[str, Any]:
         """Returns a safe fallback classification."""
         domain = self._infer_domain(question_text, subject_hint)
         q = question_text.lower()
@@ -227,9 +367,22 @@ class DomainRouter:
 
         if domain == "electrical":
             # Check for sequential / flip-flop circuits
-            _seq_kws = ["flip-flop", "flip flop", "shift register", "counter",
-                        "d flip", "jk flip", "sr latch", "sequential"]
-            _timing_kws = ["timing diagram", "waveform", "clock cycle", "input waveform"]
+            _seq_kws = [
+                "flip-flop",
+                "flip flop",
+                "shift register",
+                "counter",
+                "d flip",
+                "jk flip",
+                "sr latch",
+                "sequential",
+            ]
+            _timing_kws = [
+                "timing diagram",
+                "waveform",
+                "clock cycle",
+                "input waveform",
+            ]
             has_circuit = any(kw in q for kw in _seq_kws + ["circuit", "gate", "logic"])
             has_timing = any(kw in q for kw in _timing_kws)
 
@@ -241,8 +394,18 @@ class DomainRouter:
                 diagram_type = "sequential_circuit"
                 preferred_tool = "circuitikz"
                 ai_suitable = False
-            elif any(kw in q for kw in ["circuit", "mosfet", "cmos", "transistor",
-                                         "op-amp", "amplifier", "resistor"]):
+            elif any(
+                kw in q
+                for kw in [
+                    "circuit",
+                    "mosfet",
+                    "cmos",
+                    "transistor",
+                    "op-amp",
+                    "amplifier",
+                    "resistor",
+                ]
+            ):
                 diagram_type = "circuit_schematic"
                 preferred_tool = "circuitikz"
                 ai_suitable = False

@@ -25,7 +25,7 @@ class GeminiDiagramReviewer:
         self._credentials_path = None
 
         # Find the service account credentials file
-        backend_root = os.path.join(os.path.dirname(__file__), '..', '..')
+        backend_root = os.path.join(os.path.dirname(__file__), "..", "..")
         for f in os.listdir(backend_root):
             if f.startswith("vidyaai-forms-integrations") and f.endswith(".json"):
                 self._credentials_path = os.path.join(backend_root, f)
@@ -42,7 +42,8 @@ class GeminiDiagramReviewer:
 
         try:
             import json as _json
-            with open(self._credentials_path, 'r') as f:
+
+            with open(self._credentials_path, "r") as f:
                 creds_data = _json.load(f)
             project_id = creds_data.get("project_id")
             location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
@@ -51,6 +52,7 @@ class GeminiDiagramReviewer:
 
             import vertexai
             from vertexai.generative_models import GenerativeModel
+
             vertexai.init(project=project_id, location=location)
 
             self._model = GenerativeModel("gemini-2.5-pro")
@@ -111,8 +113,11 @@ class GeminiDiagramReviewer:
 
                 # Build the review prompt
                 review_prompt = self._build_review_prompt(
-                    question_text, diagram_description, user_prompt_context,
-                    domain=domain, diagram_type=diagram_type,
+                    question_text,
+                    diagram_description,
+                    user_prompt_context,
+                    domain=domain,
+                    diagram_type=diagram_type,
                 )
 
                 # Create image part from bytes
@@ -125,9 +130,7 @@ class GeminiDiagramReviewer:
                         "temperature": 0.1,
                         "max_output_tokens": 800,
                     },
-                    request_options={
-                        "timeout": 60  # 60 second timeout
-                    },
+                    request_options={"timeout": 60},  # 60 second timeout
                 )
 
                 result_text = response.text.strip()
@@ -198,7 +201,10 @@ class GeminiDiagramReviewer:
         if domain and diagram_type:
             try:
                 from utils.subject_prompt_registry import SubjectPromptRegistry
-                hint = SubjectPromptRegistry().get_reviewer_style_hint(domain, diagram_type)
+
+                hint = SubjectPromptRegistry().get_reviewer_style_hint(
+                    domain, diagram_type
+                )
                 if hint:
                     style_hint_section = f"\nDIAGRAM STYLE HINT: {hint}\n"
             except Exception:

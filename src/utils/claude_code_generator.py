@@ -13,7 +13,11 @@ from controllers.config import logger
 
 # Import dynamic element detection
 try:
-    from utils.get_schemdraw_elements import format_elements_for_prompt, get_common_mistakes
+    from utils.get_schemdraw_elements import (
+        format_elements_for_prompt,
+        get_common_mistakes,
+    )
+
     SCHEMDRAW_AVAILABLE = True
 except ImportError:
     SCHEMDRAW_AVAILABLE = False
@@ -29,13 +33,17 @@ class ClaudeCodeGenerator:
         Args:
             api_key: Anthropic API key (or use ANTHROPIC_API_KEY env var)
         """
-        self.api_key = api_key or os.environ.get('ANTHROPIC_API_KEY')
+        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         if not self.api_key:
-            raise ValueError("Anthropic API key required. Set ANTHROPIC_API_KEY env var or pass api_key parameter")
+            raise ValueError(
+                "Anthropic API key required. Set ANTHROPIC_API_KEY env var or pass api_key parameter"
+            )
 
         # Validate key format early
-        if not self.api_key.startswith('sk-ant-'):
-            logger.warning(f"ANTHROPIC_API_KEY doesn't start with 'sk-ant-' — may be invalid (first 12 chars: {self.api_key[:12]}...)")
+        if not self.api_key.startswith("sk-ant-"):
+            logger.warning(
+                f"ANTHROPIC_API_KEY doesn't start with 'sk-ant-' — may be invalid (first 12 chars: {self.api_key[:12]}...)"
+            )
 
         self.client = Anthropic(api_key=self.api_key)
         self.model = "claude-sonnet-4-20250514"
@@ -51,7 +59,9 @@ class ClaudeCodeGenerator:
                 logger.info("Dynamically loaded schemdraw elements for validation")
             except Exception as e:
                 logger.warning(f"Could not load schemdraw elements dynamically: {e}")
-                self.valid_elements_text = "Unable to load elements - use basic ones only"
+                self.valid_elements_text = (
+                    "Unable to load elements - use basic ones only"
+                )
 
     async def generate_diagram_code(
         self,
@@ -83,7 +93,9 @@ class ClaudeCodeGenerator:
 
         # Skip entirely if we already know the key is invalid
         if self._api_key_valid is False:
-            raise RuntimeError("Claude API key previously failed authentication — skipping to avoid repeated 401 errors")
+            raise RuntimeError(
+                "Claude API key previously failed authentication — skipping to avoid repeated 401 errors"
+            )
 
         try:
             response = self.client.messages.create(
@@ -91,9 +103,7 @@ class ClaudeCodeGenerator:
                 max_tokens=4000,
                 temperature=0.1,  # Low temperature for consistent, accurate code
                 system=system_prompt,
-                messages=[
-                    {"role": "user", "content": user_prompt}
-                ]
+                messages=[{"role": "user", "content": user_prompt}],
             )
 
             self._api_key_valid = True  # Key works
@@ -108,7 +118,7 @@ class ClaudeCodeGenerator:
         except Exception as e:
             error_str = str(e)
             # Mark key as invalid on auth errors so we don't keep retrying
-            if '401' in error_str or 'authentication_error' in error_str:
+            if "401" in error_str or "authentication_error" in error_str:
                 self._api_key_valid = False
                 logger.error(
                     f"Claude API key is INVALID (401 auth error). "
@@ -123,7 +133,11 @@ class ClaudeCodeGenerator:
         """Build system prompt for Claude"""
 
         # Format invalid elements list
-        invalid_str = ", ".join([f"elm.{elem}()" for elem in self.invalid_elements]) if self.invalid_elements else "None detected"
+        invalid_str = (
+            ", ".join([f"elm.{elem}()" for elem in self.invalid_elements])
+            if self.invalid_elements
+            else "None detected"
+        )
 
         # Build the prompt with dynamically injected elements
         prompt_template = """You are an expert technical diagram code generator. Your task is to generate clean, executable Python code that creates educational-quality technical diagrams.
@@ -422,9 +436,7 @@ plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')
         # Replace placeholders with actual values
         return prompt_template.replace(
             "{SCHEMDRAW_ELEMENTS}", self.valid_elements_text
-        ).replace(
-            "{INVALID_ELEMENTS}", invalid_str
-        )
+        ).replace("{INVALID_ELEMENTS}", invalid_str)
 
     def _build_user_prompt(
         self,
@@ -436,7 +448,9 @@ plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')
     ) -> str:
         """Build user prompt"""
 
-        tool_guidance = self._get_tool_specific_guidance(tool_type, domain, diagram_type)
+        tool_guidance = self._get_tool_specific_guidance(
+            tool_type, domain, diagram_type
+        )
 
         subject_section = ""
         if subject_guidance:
@@ -474,16 +488,13 @@ plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')
 Return ONLY the Python code, ready to execute."""
 
     def _get_tool_specific_guidance(
-        self,
-        tool_type: str,
-        domain: str,
-        diagram_type: str
+        self, tool_type: str, domain: str, diagram_type: str
     ) -> str:
         """Get specific guidance based on tool and domain"""
 
         guidance = {
-            'matplotlib': {
-                'manometer': """
+            "matplotlib": {
+                "manometer": """
 **Manometer-Specific:**
 - For U-tube: Draw left tube, bottom connection, right tube
 - Use patches.Rectangle for tubes and fluid layers
@@ -500,7 +511,7 @@ left_fluid = patches.Rectangle((2, 2), 0.4, 3.5, fill=True, facecolor='silver', 
 # Add labels with heights
 ```
 """,
-                'free_body_diagram': """
+                "free_body_diagram": """
 **Free Body Diagram:**
 - Draw object (block, beam, etc.) using Rectangle
 - Show ALL forces as arrows (FancyArrowPatch)
@@ -509,24 +520,24 @@ left_fluid = patches.Rectangle((2, 2), 0.4, 3.5, fill=True, facecolor='silver', 
 - Show ground/surface with hatching
 - Mark center of mass
 """,
-                'circuit': """
+                "circuit": """
 **Circuit Diagram (using matplotlib patches):**
 - Use basic shapes for components
 - Connect with lines
 - Label all components
 - Show current flow with arrows
 """,
-                'default': """
+                "default": """
 **General matplotlib diagram:**
 - Use patches for shapes
 - Use ax.plot() for lines
 - Use ax.text() for labels
 - Use FancyArrowPatch for arrows
 - Set appropriate xlim, ylim
-"""
+""",
             },
-            'schemdraw': {
-                'default': """
+            "schemdraw": {
+                "default": """
 **SchemDraw 0.19 circuit — CRITICAL API RULES:**
 
 1. ALWAYS start with:
@@ -570,8 +581,8 @@ left_fluid = patches.Rectangle((2, 2), 0.4, 3.5, fill=True, facecolor='silver', 
 Follow the CMOS INVERTER and CMOS NAND examples in the system prompt EXACTLY.
 """
             },
-            'networkx': {
-                'default': """
+            "networkx": {
+                "default": """
 **NetworkX graph:**
 - Create graph: nx.Graph() or nx.DiGraph()
 - Add nodes: G.add_node(node_id, **attrs)
@@ -579,32 +590,32 @@ Follow the CMOS INVERTER and CMOS NAND examples in the system prompt EXACTLY.
 - Choose layout: spring, hierarchical, circular
 - Draw with labels and clear styling
 """
-            }
+            },
         }
 
         # Get specific guidance if available
         if tool_type in guidance:
             if diagram_type in guidance[tool_type]:
                 return guidance[tool_type][diagram_type]
-            return guidance[tool_type].get('default', '')
+            return guidance[tool_type].get("default", "")
 
-        return ''
+        return ""
 
     def _extract_code(self, response: str) -> str:
         """Extract code from response (handles markdown code blocks)"""
 
         # If response is wrapped in ```python ... ```, extract it
-        if '```python' in response:
-            start = response.find('```python') + len('```python')
-            end = response.find('```', start)
+        if "```python" in response:
+            start = response.find("```python") + len("```python")
+            end = response.find("```", start)
             if end != -1:
                 code = response[start:end].strip()
                 return code
 
         # If wrapped in ``` ... ```, extract it
-        if '```' in response:
-            start = response.find('```') + 3
-            end = response.find('```', start)
+        if "```" in response:
+            start = response.find("```") + 3
+            end = response.find("```", start)
             if end != -1:
                 code = response[start:end].strip()
                 return code
@@ -619,7 +630,7 @@ async def generate_code_with_claude(
     domain: str = "general",
     diagram_type: str = "diagram",
     tool_type: str = "matplotlib",
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
 ) -> str:
     """
     Convenience function to generate diagram code

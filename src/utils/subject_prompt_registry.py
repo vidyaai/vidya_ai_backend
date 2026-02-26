@@ -221,7 +221,6 @@ _IMAGEN_DESCRIPTION_PROMPTS = {
         "Draw an electrical block diagram. Show each functional block as a labeled rectangle. "
         "Connect blocks with directional arrows. Label signal names on connections."
     ),
-    
     # Electrical - Digital Circuits
     ("electrical", "logic_circuit"): (
         "Draw a digital logic circuit using standard IEEE gate symbols. "
@@ -318,7 +317,6 @@ _IMAGEN_DESCRIPTION_PROMPTS = {
         "Operation select input labeled (ALUOp or Func). "
         "For full datapath: show register file, ALU, muxes, and data paths between them."
     ),
-
     # Mechanical
     ("mechanical", "free_body_diagram"): (
         "Draw a free body diagram (FBD). Show the object as a simple shape (box, circle, or dot). "
@@ -345,7 +343,6 @@ _IMAGEN_DESCRIPTION_PROMPTS = {
         "Show process curves (isothermal = hyperbola, adiabatic = steeper curve, isobaric = horizontal, isochoric = vertical). "
         "Label all state points, process paths, and key values."
     ),
-
     # Computer Science
     ("cs", "binary_tree"): (
         "Draw a binary tree diagram. Root node at top. "
@@ -363,7 +360,6 @@ _IMAGEN_DESCRIPTION_PROMPTS = {
         "rounded rectangles for start/end. Connect with directed arrows. "
         "Label each shape with its step or condition."
     ),
-
     # Civil
     ("civil", "truss_frame"): (
         "Draw a truss structure diagram. Show each member as a line segment. "
@@ -375,7 +371,6 @@ _IMAGEN_DESCRIPTION_PROMPTS = {
         "Show the geometry of the cross-section with dimensions labeled. "
         "Label material types, reinforcement if present, and key measurements."
     ),
-
     # Math
     ("math", "function_plot"): (
         "Draw a mathematical function plot. Show x-axis and y-axis with labels and tick marks. "
@@ -393,7 +388,6 @@ _IMAGEN_DESCRIPTION_PROMPTS = {
         "the direction and relative magnitude of the vector at that point. "
         "Label the axes and show the coordinate system."
     ),
-
     # Physics
     ("physics", "ray_diagram"): (
         "Draw a ray diagram for an optical system. "
@@ -425,7 +419,6 @@ _IMAGEN_DESCRIPTION_PROMPTS = {
         "Label each level with its quantum number and energy value. "
         "Show transitions as vertical arrows with wavelength or energy labels."
     ),
-
     # Chemistry
     ("chemistry", "molecular_structure"): (
         "Draw a chemical molecular structure using skeletal/line-angle formula. "
@@ -448,7 +441,6 @@ _IMAGEN_DESCRIPTION_PROMPTS = {
         "Show all intermediates and transition states. "
         "Label all relevant atoms and charges."
     ),
-
     # Computer Engineering
     ("computer_eng", "cpu_block_diagram"): (
         "Draw a CPU/computer architecture block diagram. "
@@ -507,7 +499,6 @@ _NONAI_TOOL_PROMPTS = {
         "Use ax.annotate() with arrowprops for signal flow arrows. "
         "figsize=(7, 4)."
     ),
-    
     # Electrical - Digital Circuits (matplotlib-based)
     ("electrical", "timing_diagram", "matplotlib"): (
         "Draw a digital timing diagram using matplotlib. figsize=(10, 6), dpi=150. "
@@ -525,7 +516,6 @@ _NONAI_TOOL_PROMPTS = {
         "For rising-edge triggered D-FF: Q changes only at rising CLK edges (low→high). "
         "plt.rcParams({'font.size':10,'font.family':'serif'}), ax.set_xlim(0, T_total), dpi=150."
     ),
-
     # ── Circuit-with-timing: secondary matplotlib call for the timing portion ──
     ("electrical", "circuit_with_timing", "matplotlib"): (
         "Draw a DIGITAL TIMING DIAGRAM using matplotlib. figsize=(10, 6), dpi=150. "
@@ -609,7 +599,6 @@ _NONAI_TOOL_PROMPTS = {
         "ANSWER HIDING: Any OUTPUT signal the student must determine → BLANK row with '?'. "
         "plt.rcParams({'font.size':10,'font.family':'serif'}), dpi=150."
     ),
-
     ("electrical", "setup_hold_timing", "matplotlib"): (
         "Draw setup/hold timing diagram using matplotlib. figsize=(8, 5), dpi=150. "
         "Top row: CLK signal with clear rising edge transition. "
@@ -709,7 +698,6 @@ _NONAI_TOOL_PROMPTS = {
         "Data paths as arrows connecting components. Control signals as thin dashed lines. "
         "Label all signals and bus widths. dpi=150."
     ),
-
     # Mechanical
     ("mechanical", "free_body_diagram", "matplotlib"): (
         "Draw a free body diagram using matplotlib. figsize=(8, 6), dpi=150. "
@@ -779,7 +767,6 @@ _NONAI_TOOL_PROMPTS = {
         "Annotate all key points with ax.annotate(). "
         "plt.rcParams({'font.size':11, 'font.family':'serif'}). dpi=150."
     ),
-
     # CS
     ("cs", "binary_tree", "networkx"): (
         "Use networkx to draw a binary tree. Create nx.DiGraph(). "
@@ -827,7 +814,6 @@ _NONAI_TOOL_PROMPTS = {
         "For chaining: show linked list chains extending to the right from each bucket. "
         "Label buckets with index numbers and cells with key-value pairs. figsize=(7, 6)."
     ),
-
     # Civil
     ("civil", "truss_frame", "matplotlib"): (
         "Draw a truss frame diagram using matplotlib. "
@@ -841,7 +827,6 @@ _NONAI_TOOL_PROMPTS = {
         "Add dimension lines with double-headed arrows. "
         "Label dimensions and material types. figsize=(5, 6)."
     ),
-
     # Math
     ("math", "function_plot", "matplotlib"): (
         "Use numpy linspace for x values. Use ax.plot() for the curve. "
@@ -874,7 +859,6 @@ _NONAI_TOOL_PROMPTS = {
         "Label points and intervals. Use ax.annotate for labels above/below line. "
         "Hide y-axis. figsize=(8, 2)."
     ),
-
     # Physics
     ("physics", "ray_diagram", "matplotlib"): (
         "Draw a ray diagram using matplotlib. "
@@ -911,7 +895,6 @@ _NONAI_TOOL_PROMPTS = {
         "Draw vertical arrows for transitions. Label arrow with photon energy or wavelength. "
         "figsize=(5, 7)."
     ),
-
     # Chemistry
     ("chemistry", "molecular_structure", "matplotlib"): (
         "Draw a molecular structural formula using matplotlib. "
@@ -935,7 +918,6 @@ _NONAI_TOOL_PROMPTS = {
         "Mark equivalence point with vertical dashed line and annotation. "
         "figsize=(6, 4). Include grid."
     ),
-
     # Computer Engineering
     ("computer_eng", "cpu_block_diagram", "matplotlib"): (
         "Draw a CPU architecture block diagram using matplotlib.patches.FancyBboxPatch. "
@@ -1273,7 +1255,6 @@ DIGITAL CIRCUITS — EXTENDED RULES
   • Students must determine state transitions themselves
   • For ring/Johnson counters: show the register circuit with feedback, NOT the sequence of states
 """,
-
     "mechanical": r"""
 ═══════════════════════════════════════════════════════════════════════════════
 MECHANICAL ENGINEERING DIAGRAM REVIEW RULES
@@ -1363,7 +1344,6 @@ MECHANICAL ENGINEERING DIAGRAM REVIEW RULES
   • Ground/fixed links shown with hatching
   • Degrees of freedom should be correct for the mechanism type
 """,
-
     "cs": r"""
 ═══════════════════════════════════════════════════════════════════════════════
 COMPUTER SCIENCE DIAGRAM REVIEW RULES
@@ -1468,7 +1448,6 @@ COMPUTER SCIENCE DIAGRAM REVIEW RULES
   • Data encapsulation shown at each layer
   • Protocol names labeled at each layer
 """,
-
     "civil": r"""
 ═══════════════════════════════════════════════════════════════════════════════
 CIVIL ENGINEERING DIAGRAM REVIEW RULES
@@ -1528,7 +1507,6 @@ CIVIL ENGINEERING DIAGRAM REVIEW RULES
   • Water table if present
   • Factor of safety notation
 """,
-
     "math": r"""
 ═══════════════════════════════════════════════════════════════════════════════
 MATHEMATICS DIAGRAM REVIEW RULES
@@ -1605,7 +1583,6 @@ MATHEMATICS DIAGRAM REVIEW RULES
   • Outcomes labeled at terminal nodes
   • Events described along branches
 """,
-
     "physics": r"""
 ═══════════════════════════════════════════════════════════════════════════════
 PHYSICS DIAGRAM REVIEW RULES
@@ -1693,7 +1670,6 @@ PHYSICS DIAGRAM REVIEW RULES
   • Electrons shown on orbits
   • Atomic number (Z) and mass number (A) labeled if relevant
 """,
-
     "chemistry": r"""
 ═══════════════════════════════════════════════════════════════════════════════
 CHEMISTRY DIAGRAM REVIEW RULES
@@ -1774,7 +1750,6 @@ CHEMISTRY DIAGRAM REVIEW RULES
   • Coordination number visible from structure
   • Face-centered, body-centered, or simple cubic distinguished
 """,
-
     "computer_eng": r"""
 ═══════════════════════════════════════════════════════════════════════════════
 COMPUTER ENGINEERING DIAGRAM REVIEW RULES
@@ -1886,28 +1861,88 @@ COMPUTER ENGINEERING DIAGRAM REVIEW RULES
 # ─────────────────────────────────────────────────────────────────────────────
 
 _REVIEWER_STYLE_HINTS = {
-    ("electrical", "circuit_schematic"): "Expect a circuit schematic with component symbols and wires.",
-    ("electrical", "bode_plot"): "Expect two subplots: magnitude (dB) and phase (degrees) vs frequency.",
+    (
+        "electrical",
+        "circuit_schematic",
+    ): "Expect a circuit schematic with component symbols and wires.",
+    (
+        "electrical",
+        "bode_plot",
+    ): "Expect two subplots: magnitude (dB) and phase (degrees) vs frequency.",
     ("electrical", "iv_curve"): "Expect an I-V characteristic curve with labeled axes.",
-    ("mechanical", "free_body_diagram"): "Expect a free body diagram with labeled force arrows on an object.",
-    ("mechanical", "beam_diagram"): "Expect a beam with support symbols and load arrows.",
-    ("mechanical", "truss_diagram"): "Expect a truss structure with members, joints, and load arrows.",
-    ("mechanical", "fluid_flow"): "Expect a fluid flow diagram around a cylinder with streamlines, boundary layer, separation point, wake region, and U∞ velocity arrow. Two-panel layout (Laminar/Turbulent) is correct.",
-    ("mechanical", "pressure_distribution"): "Expect a Cp vs angle curve showing pressure coefficient distribution around a cylinder.",
-    ("mechanical", "stress_strain"): "Expect a stress-strain curve with labeled yield point, ultimate strength, and fracture.",
-    ("cs", "binary_tree"): "Expect a tree diagram with circular nodes and directed edges.",
+    (
+        "mechanical",
+        "free_body_diagram",
+    ): "Expect a free body diagram with labeled force arrows on an object.",
+    (
+        "mechanical",
+        "beam_diagram",
+    ): "Expect a beam with support symbols and load arrows.",
+    (
+        "mechanical",
+        "truss_diagram",
+    ): "Expect a truss structure with members, joints, and load arrows.",
+    (
+        "mechanical",
+        "fluid_flow",
+    ): "Expect a fluid flow diagram around a cylinder with streamlines, boundary layer, separation point, wake region, and U∞ velocity arrow. Two-panel layout (Laminar/Turbulent) is correct.",
+    (
+        "mechanical",
+        "pressure_distribution",
+    ): "Expect a Cp vs angle curve showing pressure coefficient distribution around a cylinder.",
+    (
+        "mechanical",
+        "stress_strain",
+    ): "Expect a stress-strain curve with labeled yield point, ultimate strength, and fracture.",
+    (
+        "cs",
+        "binary_tree",
+    ): "Expect a tree diagram with circular nodes and directed edges.",
     ("cs", "graph_network"): "Expect a graph with labeled nodes and edges.",
-    ("cs", "flowchart"): "Expect a flowchart with process boxes, decision diamonds, and flow arrows.",
-    ("civil", "truss_frame"): "Expect a truss structure with labeled members and support reactions.",
-    ("math", "function_plot"): "Expect a coordinate plot with labeled axes and a smooth curve.",
-    ("math", "geometric_construction"): "Expect a geometric figure with labeled vertices and dimensions.",
-    ("physics", "ray_diagram"): "Expect a ray diagram with optical axis, lens/mirror, and ray paths.",
-    ("physics", "spring_mass"): "Expect a spring-mass diagram with labeled spring and mass.",
-    ("chemistry", "molecular_structure"): "Expect a molecular structure diagram with atomic symbols and bonds.",
-    ("chemistry", "lab_apparatus"): "Expect labeled laboratory glassware and equipment.",
-    ("computer_eng", "cpu_block_diagram"): "Expect a block diagram with labeled functional units and data buses.",
-    ("computer_eng", "pipeline_diagram"): "Expect pipeline stages shown as labeled boxes in sequence.",
-    ("computer_eng", "logic_circuit"): "Expect a logic circuit with standard IEEE gate symbols.",
+    (
+        "cs",
+        "flowchart",
+    ): "Expect a flowchart with process boxes, decision diamonds, and flow arrows.",
+    (
+        "civil",
+        "truss_frame",
+    ): "Expect a truss structure with labeled members and support reactions.",
+    (
+        "math",
+        "function_plot",
+    ): "Expect a coordinate plot with labeled axes and a smooth curve.",
+    (
+        "math",
+        "geometric_construction",
+    ): "Expect a geometric figure with labeled vertices and dimensions.",
+    (
+        "physics",
+        "ray_diagram",
+    ): "Expect a ray diagram with optical axis, lens/mirror, and ray paths.",
+    (
+        "physics",
+        "spring_mass",
+    ): "Expect a spring-mass diagram with labeled spring and mass.",
+    (
+        "chemistry",
+        "molecular_structure",
+    ): "Expect a molecular structure diagram with atomic symbols and bonds.",
+    (
+        "chemistry",
+        "lab_apparatus",
+    ): "Expect labeled laboratory glassware and equipment.",
+    (
+        "computer_eng",
+        "cpu_block_diagram",
+    ): "Expect a block diagram with labeled functional units and data buses.",
+    (
+        "computer_eng",
+        "pipeline_diagram",
+    ): "Expect pipeline stages shown as labeled boxes in sequence.",
+    (
+        "computer_eng",
+        "logic_circuit",
+    ): "Expect a logic circuit with standard IEEE gate symbols.",
 }
 
 

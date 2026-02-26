@@ -58,8 +58,11 @@ class DiagramReviewer:
             img_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
             review_prompt = self._build_review_prompt(
-                question_text, diagram_description, user_prompt_context,
-                domain=domain, diagram_type=diagram_type,
+                question_text,
+                diagram_description,
+                user_prompt_context,
+                domain=domain,
+                diagram_type=diagram_type,
             )
 
             response = self.client.chat.completions.create(
@@ -88,7 +91,9 @@ class DiagramReviewer:
             )
 
             result_text = response.choices[0].message.content.strip()
-            return self._parse_review_result(result_text, question_text, user_prompt_context)
+            return self._parse_review_result(
+                result_text, question_text, user_prompt_context
+            )
 
         except Exception as e:
             logger.error(f"Diagram review failed: {e}")
@@ -168,18 +173,19 @@ Be STRICT about these failure criteria:
     ) -> str:
         style_hint_section = ""
         domain_rules_section = ""
-        
+
         if domain:
             try:
                 from utils.subject_prompt_registry import SubjectPromptRegistry
+
                 registry = SubjectPromptRegistry()
-                
+
                 # Get style hint for the specific diagram type
                 if diagram_type:
                     hint = registry.get_reviewer_style_hint(domain, diagram_type)
                     if hint:
                         style_hint_section = f"\nDIAGRAM STYLE HINT: {hint}\n"
-                
+
                 # Get comprehensive domain-specific review rules
                 domain_rules = registry.get_reviewer_domain_rules(domain)
                 if domain_rules:
@@ -216,26 +222,26 @@ REVIEW CHECKLIST — Verify each item against the image
 1. **STRUCTURAL CORRECTNESS**: Does the diagram correctly represent what was described?
    - All components present and correctly connected
    - Topology matches the described function
-   
+
 2. **STYLE APPROPRIATENESS**: Is the diagram style correct for the domain?
    - For digital logic: IEEE gate symbols (not transistor-level) unless CMOS asked
    - For circuits: correct symbol conventions for the region/style
-   
+
 3. **VISUAL CLARITY**: Are all elements clearly visible?
    - No overlapping labels or wires
    - All text readable
    - No rendering artifacts
-   
+
 4. **WIRING/CONNECTION RULES**: Are connections drawn correctly?
    - Wires horizontal/vertical where required (e.g., circuit schematics)
    - No floating nodes (unless intentional open circuit)
    - Junction dots where wires connect
-   
+
 5. **LABELING COMPLETENESS**: Are all components properly labeled?
    - Every named entity in question appears in diagram with EXACT same name
    - All numerical values from question shown on corresponding elements
    - No duplicate/overlapping labels on same element
-   
+
 6. **ANSWER LEAK CHECK**: Does the diagram reveal the answer? FAIL if:
    - Output values shown ("Output = 0", "Y = 1")
    - Boolean expressions on output
@@ -247,7 +253,7 @@ REVIEW CHECKLIST — Verify each item against the image
 7. **SEMANTIC DATA CONSISTENCY CHECK** (CRITICAL — applies to ALL subjects):
    Extract EVERY specific data value, number, sequence, label, or transition from the
    QUESTION text. Verify each one appears CORRECTLY in the diagram image.
-   
+
    What to compare (domain-generic examples):
    • Electrical/FSM: state names (S0,S1…), transition labels, reset state
    • CS linked-list/tree/graph: node values AND their order/structure
@@ -255,7 +261,7 @@ REVIEW CHECKLIST — Verify each item against the image
    • Math: axis labels, function names, point coordinates
    • Chemistry: atom labels, bond types, reaction formulas
    • Mech/Civil: force values, beam lengths, support types/positions
-   
+
    HOW TO CHECK:
    a) Read the QUESTION and list every specific value, name, or sequence.
    b) For each item, locate it in the diagram.
@@ -263,7 +269,7 @@ REVIEW CHECKLIST — Verify each item against the image
    d) If a sequence/order is DIFFERENT (e.g., nodes in wrong order) → FAIL.
    e) If a structural relationship is WRONG (e.g., wrong parent in tree) → FAIL.
    List EVERY mismatch in ISSUES.
-   
+
 8. **DOMAIN-SPECIFIC RULES**: Apply ALL rules from the subject-specific section above.
 
 Respond in the EXACT format:
@@ -304,9 +310,7 @@ CORRECTED_DESCRIPTION: <if FAIL, provide a better description for regeneration, 
 
         passed = "PASS" in verdict
 
-        logger.info(
-            f"Diagram review: {'PASSED' if passed else 'FAILED'} — {reason}"
-        )
+        logger.info(f"Diagram review: {'PASSED' if passed else 'FAILED'} — {reason}")
         if issues:
             logger.info(f"  Issues: {issues}")
 

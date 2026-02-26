@@ -319,6 +319,7 @@ class DiagramTools:
             # Lazy load Claude generator
             if self.claude_generator is None:
                 from utils.claude_code_generator import ClaudeCodeGenerator
+
                 self.claude_generator = ClaudeCodeGenerator()
 
             # Generate code using Claude
@@ -354,6 +355,7 @@ class DiagramTools:
         except Exception as e:
             logger.error(f"Error in claude_code_tool: {str(e)}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
@@ -392,8 +394,9 @@ class DiagramTools:
             )
 
             # Lazy load generator
-            if not hasattr(self, '_circuitikz_gen') or self._circuitikz_gen is None:
+            if not hasattr(self, "_circuitikz_gen") or self._circuitikz_gen is None:
                 from utils.circuitikz_generator import CircuiTikZGenerator
+
                 self._circuitikz_gen = CircuiTikZGenerator()
 
             # Generate PNG via CircuiTikZ pipeline (300 DPI = print quality)
@@ -410,7 +413,7 @@ class DiagramTools:
             )
 
             # Attach image_bytes for downstream review
-            diagram_data['_image_bytes'] = image_bytes
+            diagram_data["_image_bytes"] = image_bytes
 
             logger.info(
                 f"Successfully generated CircuiTikZ diagram: {description[:80]}"
@@ -420,6 +423,7 @@ class DiagramTools:
         except Exception as e:
             logger.error(f"Error in circuitikz_tool: {str(e)}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
@@ -451,8 +455,9 @@ class DiagramTools:
             )
 
             # Lazy load SVG circuit generator
-            if not hasattr(self, '_svg_circuit_gen') or self._svg_circuit_gen is None:
+            if not hasattr(self, "_svg_circuit_gen") or self._svg_circuit_gen is None:
                 from utils.svg_circuit_generator import SVGCircuitGenerator
+
                 self._svg_circuit_gen = SVGCircuitGenerator()
 
             # Generate PNG via SVG pipeline (HD: 800px wide at 200 DPI)
@@ -470,7 +475,7 @@ class DiagramTools:
             )
 
             # Attach image_bytes for downstream review (not serialized to JSON)
-            diagram_data['_image_bytes'] = image_bytes
+            diagram_data["_image_bytes"] = image_bytes
 
             logger.info(f"Successfully generated SVG circuit diagram: {description}")
             return diagram_data
@@ -478,6 +483,7 @@ class DiagramTools:
         except Exception as e:
             logger.error(f"Error in svg_circuit_tool: {str(e)}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
@@ -545,7 +551,10 @@ class DiagramTools:
             # Lazy load Google generator
             if self._google_generator is None:
                 from utils.google_diagram_generator import GoogleDiagramGenerator
-                self._google_generator = GoogleDiagramGenerator(diagram_model=self.diagram_model)
+
+                self._google_generator = GoogleDiagramGenerator(
+                    diagram_model=self.diagram_model
+                )
 
             result = await self._google_generator.generate_diagram(
                 description=description,
@@ -565,7 +574,7 @@ class DiagramTools:
             )
 
             # Attach image_bytes for downstream review
-            diagram_data['_image_bytes'] = image_bytes
+            diagram_data["_image_bytes"] = image_bytes
 
             logger.info(
                 f"Successfully generated Gemini diagram for question {question_idx}: "
@@ -576,6 +585,7 @@ class DiagramTools:
         except Exception as e:
             logger.error(f"Error in imagen_tool: {str(e)}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
@@ -616,7 +626,10 @@ class DiagramTools:
             # Lazy load Google generator
             if self._google_generator is None:
                 from utils.google_diagram_generator import GoogleDiagramGenerator
-                self._google_generator = GoogleDiagramGenerator(diagram_model=self.diagram_model)
+
+                self._google_generator = GoogleDiagramGenerator(
+                    diagram_model=self.diagram_model
+                )
 
             result = await self._google_generator.fix_diagram(
                 image_bytes=image_bytes,
@@ -627,7 +640,9 @@ class DiagramTools:
             )
 
             if not result or not result.get("image_bytes"):
-                logger.warning(f"Gemini fix returned no image for question {question_idx}")
+                logger.warning(
+                    f"Gemini fix returned no image for question {question_idx}"
+                )
                 return None
 
             fixed_bytes = result["image_bytes"]
@@ -638,7 +653,7 @@ class DiagramTools:
             )
 
             # Attach image_bytes for downstream review
-            diagram_data['_image_bytes'] = fixed_bytes
+            diagram_data["_image_bytes"] = fixed_bytes
 
             logger.info(
                 f"Successfully fixed Gemini diagram for question {question_idx}: "
@@ -649,6 +664,7 @@ class DiagramTools:
         except Exception as e:
             logger.error(f"Error in imagen_fix_tool: {str(e)}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
@@ -658,7 +674,7 @@ class DiagramTools:
         tool_arguments: Dict[str, Any],
         assignment_id: str,
         question_idx: int,
-        question_text: str = ""
+        question_text: str = "",
     ) -> Dict[str, Any]:
         """
         Execute a tool call from the agent.
