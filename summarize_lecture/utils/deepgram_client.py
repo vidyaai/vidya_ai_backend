@@ -2,13 +2,7 @@ import logging
 import os
 import httpx
 from pathlib import Path
-from deepgram import (
-    DeepgramClient,
-    PrerecordedOptions,
-    FileSource,
-    DeepgramClientOptions,
-)
-from deepgram.clients.listen import ListenRESTOptions
+from deepgram import DeepgramClient, PrerecordedOptions, FileSource
 from config import (
     DEEPGRAM_API_KEY,
     DEEPGRAM_MODEL,

@@ -1,6 +1,6 @@
 # Summary creation agent
 from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 import logging
 from ..config import OPENAI_API_KEY, MODEL_NAME, TEMPERATURE
 from ..prompts.agent_prompts import SYNTHESIS_PROMPT

@@ -1,6 +1,6 @@
 # Topic extraction agent
 from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from typing import List
 import logging
 from ..config import OPENAI_API_KEY, MODEL_NAME, TEMPERATURE
