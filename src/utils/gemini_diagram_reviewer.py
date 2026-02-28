@@ -123,7 +123,7 @@ class GeminiDiagramReviewer:
                         "temperature": 0.1,
                         "max_output_tokens": 800,
                     },
-                    request_options={"timeout": 60},  # 60 second timeout
+                    # request_options={"timeout": 60},  # 60 second timeout
                 )
 
                 result_text = response.text.strip()
