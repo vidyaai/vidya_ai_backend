@@ -237,7 +237,9 @@ class AssignmentGenerator:
 
             # Generate questions based on content and options
             questions = self._generate_questions(content_sources, generation_options)
-            logger.info(f"Generated {len(questions)} questions")
+            logger.info(
+                f"Generated questions before multi-agent diagram analysis: {questions}"
+            )
 
             # Use multi-agent diagram analysis to generate diagrams
             if assignment_id:
@@ -268,6 +270,10 @@ class AssignmentGenerator:
                 logger.warning(
                     "Skipping diagram generation: assignment_id not provided"
                 )
+
+            logger.info(
+                f"Generated questions after multi-agent diagram analysis: {questions}"
+            )
 
             # Review questions for quality and alignment with lecture notes
             if content_sources.get("document_texts") or content_sources.get(
@@ -459,9 +465,7 @@ class AssignmentGenerator:
             questions = self._extract_equations_from_questions(questions)
 
             # Debug: Log questions after equation extraction
-            logger.info(
-                f"Questions after equation extraction: {len(questions)} questions"
-            )
+            logger.info(f"Questions after equation extraction: {questions} questions")
 
             # Sanitize questions to remove null bytes and problematic characters
             questions = self._sanitize_questions(questions)
