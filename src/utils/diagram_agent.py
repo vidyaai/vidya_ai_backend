@@ -1205,7 +1205,7 @@ CRITICAL RULES:
    The diagram is a visual aid, NOT a replacement for the given data.
    For example, if the original says "10 mm x 10 mm x 1 mm" and "thermal conductivity of 149 W/m·K",
    the rephrased question MUST still include those exact values.
-6. Preserve all equation place holders (e.g., <eq_xxx>) in the rephrased question so they can be resolved later.
+6. Preserve all equation place holders (like <eq_q_1>, <eq_q_2>, etc.) in the rephrased question so they can be resolved later.
 
 Examples:
 - "What is a binary tree?" → "Analyze the binary tree shown in the diagram below."
