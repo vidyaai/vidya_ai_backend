@@ -65,10 +65,9 @@ jobs:
             STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
-
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
             DIAGRAM_YOLO_MODEL_PATH=${{ secrets.DIAGRAM_YOLO_MODEL_PATH }}
             POPPLER_PATH=/usr/bin/
-
             TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}
             GOOGLE_CSE_API_KEY=${{ secrets.GOOGLE_CSE_API_KEY }}
             GOOGLE_CSE_ID=${{ secrets.GOOGLE_CSE_ID }}
