@@ -22,14 +22,7 @@ class GeminiDiagramReviewer:
     def __init__(self):
         self._model = None
         self._initialized = False
-        self._credentials_path = None
-
-        # Find the service account credentials file
-        backend_root = os.path.join(os.path.dirname(__file__), "..", "..")
-        for f in os.listdir(backend_root):
-            if f.startswith("vidyaai-forms-integrations") and f.endswith(".json"):
-                self._credentials_path = os.path.join(backend_root, f)
-                break
+        self._credentials_path = os.getenv("GOOGLE_CLOUD_CREDENTIALS_FILE")
 
     def _ensure_initialized(self):
         """Lazy-initialize Vertex AI and the Gemini model."""
