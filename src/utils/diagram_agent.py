@@ -335,13 +335,17 @@ If you detect such a question, note this in your response so the system can upda
             # The equation extractor runs BEFORE the diagram agent, replacing
             # math expressions with tokens like <eq q2_eq1>.  We substitute
             # the LaTeX values back so the diagram description is precise.
-            question_text = self._resolve_equation_placeholders(question, question_text)
+            equation_resolved_question_text = self._resolve_equation_placeholders(
+                question, question_text
+            )
 
-            logger.info(f"Analyzing question {question_idx}: {question_text[:100]}...")
+            logger.info(
+                f"Analyzing question {question_idx}: {equation_resolved_question_text[:100]}..."
+            )
 
             # ── Step 1: DomainRouter classification ──────────────────────────
             classification = self.domain_router.classify(
-                question_text=question_text,
+                question_text=equation_resolved_question_text,
                 subject_hint=self.subject,
             )
             q_domain = classification["domain"]
@@ -387,7 +391,7 @@ This is a STRONG HINT that a diagram would add educational value. Consider gener
             analysis_prompt = f"""Analyze this question and decide if a diagram would help students visualize and understand the problem:
 
 Question Type: {question_type}
-Question Text: {question_text}
+Question Text: {equation_resolved_question_text}
 Domain classification: {q_domain} / {q_diagram_type}{llm_diagram_hint}
 
 If a diagram would genuinely enhance understanding:
@@ -474,7 +478,7 @@ Mode: {mode_description}
                             "domain": "general",
                             "diagram_type": "diagram",
                             "tool_type": "matplotlib",
-                            "description": question_text[:300],
+                            "description": equation_resolved_question_text[:300],
                         }
 
                 logger.info(
@@ -489,7 +493,10 @@ Mode: {mode_description}
                 if effective_engine in ("ai", "both"):
                     # Extract description from whatever tool the agent picked
                     imagen_description = tool_arguments.get(
-                        "description", tool_arguments.get("prompt", question_text[:300])
+                        "description",
+                        tool_arguments.get(
+                            "prompt", equation_resolved_question_text[:300]
+                        ),
                     )
                     # Strip <eq qN_eqM> placeholders — they confuse Gemini image gen
                     imagen_description = re.sub(
@@ -561,7 +568,7 @@ Mode: {mode_description}
                                 },
                                 assignment_id=assignment_id,
                                 question_idx=question_idx,
-                                question_text=question_text,
+                                question_text=equation_resolved_question_text,
                             )
                         else:
                             # We have a fixable image -- send it back for correction
@@ -576,7 +583,7 @@ Mode: {mode_description}
                                 original_description=current_description,
                                 assignment_id=assignment_id,
                                 question_idx=question_idx,
-                                question_text=question_text,
+                                question_text=equation_resolved_question_text,
                             )
 
                         if diagram_data is None:
@@ -627,7 +634,7 @@ Mode: {mode_description}
                             # passing to reviewer — they cause false label-mismatch failures
                             # because the reviewer sees "<eq" as a label name.
                             clean_question_for_review = re.sub(
-                                r"<eq\s+\S+>", "", question_text
+                                r"<eq\s+\S+>", "", equation_resolved_question_text
                             ).strip()
                             review_result = await self.reviewer.review_diagram(
                                 image_bytes=image_bytes_for_review,
@@ -782,7 +789,7 @@ Mode: {mode_description}
                         tool_arguments=tool_arguments,
                         assignment_id=assignment_id,
                         question_idx=question_idx,
-                        question_text=question_text,
+                        question_text=equation_resolved_question_text,
                     )
 
                 # ── Phase 4: Subject-specific fallback routing ─────────────────
@@ -803,9 +810,9 @@ Mode: {mode_description}
                         domain=q_domain,
                         diagram_type=q_diagram_type,
                         description=tool_arguments.get(
-                            "description", question_text[:300]
+                            "description", equation_resolved_question_text[:300]
                         ),
-                        question_text=question_text,
+                        question_text=equation_resolved_question_text,
                     )
                     logger.info(f"FallbackRouter selected: {fallback_tool}")
 
@@ -814,7 +821,7 @@ Mode: {mode_description}
                         tool_arguments=fallback_args,
                         assignment_id=assignment_id,
                         question_idx=question_idx,
-                        question_text=question_text,
+                        question_text=equation_resolved_question_text,
                     )
                     if diagram_data:
                         logger.info(
@@ -831,7 +838,7 @@ Mode: {mode_description}
                         f"Retrying circuitikz_tool with enriched description..."
                     )
                     enriched_desc = (
-                        f"Draw a professional circuit diagram for: {question_text[:200]}. "
+                        f"Draw a professional circuit diagram for: {equation_resolved_question_text[:200]}. "
                         f"Original description: {tool_arguments.get('description', '')}. "
                         f"Use standard MOSFET symbols for transistor circuits. "
                         f"Use IEEE gate symbols (AND, OR, NOT shapes) for digital logic gates. "
@@ -847,7 +854,7 @@ Mode: {mode_description}
                         tool_arguments=fallback_args,
                         assignment_id=assignment_id,
                         question_idx=question_idx,
-                        question_text=question_text,
+                        question_text=equation_resolved_question_text,
                     )
                     if diagram_data:
                         logger.info(
@@ -884,7 +891,7 @@ Mode: {mode_description}
                             f"Final retry with circuitikz_tool (simplified)..."
                         )
                         final_desc = (
-                            f"SIMPLE circuit diagram for: {question_text[:200]}. "
+                            f"SIMPLE circuit diagram for: {equation_resolved_question_text[:200]}. "
                             f"Use standard MOSFET symbols for transistor circuits. "
                             f"Use standard IEEE gate symbols for digital gates. "
                             f"Keep it minimal and clean."
@@ -894,16 +901,16 @@ Mode: {mode_description}
                             tool_arguments={"description": final_desc},
                             assignment_id=assignment_id,
                             question_idx=question_idx,
-                            question_text=question_text,
+                            question_text=equation_resolved_question_text,
                         )
                         if not diagram_data:
                             logger.warning(
                                 f"Final circuitikz_tool retry failed. Trying GPT-4o fallback..."
                             )
                             diagram_data = await self._gpt_direct_code_fallback(
-                                question_text=question_text,
+                                question_text=equation_resolved_question_text,
                                 description=tool_arguments.get(
-                                    "description", question_text[:300]
+                                    "description", equation_resolved_question_text[:300]
                                 ),
                                 assignment_id=assignment_id,
                                 question_idx=question_idx,
@@ -915,9 +922,9 @@ Mode: {mode_description}
                             f"Trying GPT-4o direct code generation fallback..."
                         )
                         diagram_data = await self._gpt_direct_code_fallback(
-                            question_text=question_text,
+                            question_text=equation_resolved_question_text,
                             description=tool_arguments.get(
-                                "description", question_text[:300]
+                                "description", equation_resolved_question_text[:300]
                             ),
                             assignment_id=assignment_id,
                             question_idx=question_idx,
@@ -1018,7 +1025,7 @@ Mode: {mode_description}
                                 tool_arguments=sec_tool_args,
                                 assignment_id=assignment_id,
                                 question_idx=question_idx,
-                                question_text=question_text,
+                                question_text=equation_resolved_question_text,
                             )
                             if sec_data:
                                 sec_bytes = sec_data.pop("_image_bytes", None)
@@ -1099,11 +1106,11 @@ Mode: {mode_description}
 
                         if image_bytes_for_review:
                             description_for_review = tool_arguments.get(
-                                "description", question_text[:300]
+                                "description", equation_resolved_question_text[:300]
                             )
                             # Strip <eq> placeholders to prevent false label-mismatch failures
                             clean_question_for_review = re.sub(
-                                r"<eq\s+\S+>", "", question_text
+                                r"<eq\s+\S+>", "", equation_resolved_question_text
                             ).strip()
                             review_result = await self.reviewer.review_diagram(
                                 image_bytes=image_bytes_for_review,
@@ -1148,14 +1155,12 @@ Mode: {mode_description}
                                         f"Regenerating Q{question_idx} using {regen_tool} "
                                         f"(original tool preserved)"
                                     )
-                                    regen_data = (
-                                        await self.diagram_tools.execute_tool_call(
-                                            tool_name=regen_tool,
-                                            tool_arguments=regen_args,
-                                            assignment_id=assignment_id,
-                                            question_idx=question_idx,
-                                            question_text=question_text,
-                                        )
+                                    regen_data = await self.diagram_tools.execute_tool_call(
+                                        tool_name=regen_tool,
+                                        tool_arguments=regen_args,
+                                        assignment_id=assignment_id,
+                                        question_idx=question_idx,
+                                        question_text=equation_resolved_question_text,
                                     )
                                     if regen_data:
                                         # Pop transient key before attaching
@@ -1186,8 +1191,9 @@ Mode: {mode_description}
                     rephrase_prompt = f"""The diagram has been generated successfully.
 
 Original question: {question_text}
+Original question with equations resolved: {equation_resolved_question_text}
 
-Rephrase the question to reference "the diagram below" or "the circuit shown below". Respond with ONLY the rephrased question text.
+Rephrase the question to reference "the diagram below" or "the circuit shown below". Respond with ONLY the rephrased question text WITH EQUATION PLACEHOLDERS.
 
 CRITICAL RULES:
 1. NEVER mention page numbers, sources, or "taken from" references
@@ -1199,6 +1205,7 @@ CRITICAL RULES:
    The diagram is a visual aid, NOT a replacement for the given data.
    For example, if the original says "10 mm x 10 mm x 1 mm" and "thermal conductivity of 149 W/m·K",
    the rephrased question MUST still include those exact values.
+6. Preserve all equation place holders (e.g., <eq_xxx>) in the rephrased question so they can be resolved later.
 
 Examples:
 - "What is a binary tree?" → "Analyze the binary tree shown in the diagram below."
@@ -1245,7 +1252,7 @@ Examples:
                     # the question type should be "diagram-analysis" so students know
                     # they need to work with the diagram (e.g., draw waveforms, trace
                     # algorithms, complete diagrams).
-                    _qt_lower = question_text.lower()
+                    _qt_lower = equation_resolved_question_text.lower()
 
                     # Electrical/CompEng: waveform, timing, counter, sequential circuit questions
                     _is_waveform_or_counter_q = q_diagram_type in (
