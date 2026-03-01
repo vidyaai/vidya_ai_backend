@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import ast
+import base64
+import io
 import json
 import os
+import tempfile
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone
 
@@ -207,6 +210,170 @@ class LLMGrader:
         # Calculate totals
         total_points = sum(float(q.get("points", 0) or 0) for q in flattened_questions)
         total_score = sum(fb.get("score", 0.0) for fb in feedback_by_question.values())
+
+        return total_score, total_points, feedback_by_question, overall_feedback
+
+    def grade_pdf_direct(
+        self,
+        assignment: Dict[str, Any],
+        pdf_s3_key: str,
+        options: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[float, float, Dict[str, Any], str]:
+        """Grade a PDF submission by sending the raw PDF pages to the vision LLM.
+
+        This POC method bypasses the pre-extracted answer JSON entirely. The LLM
+        is shown every page of the student's answer sheet as an image alongside
+        the full question rubric and is asked to return grading feedback in the
+        same JSON format as grade_submission.
+
+        Args:
+            assignment: Assignment data with questions (same schema as grade_submission).
+            pdf_s3_key: S3 object key of the original PDF answer sheet.
+            options: Unused for now, reserved for future tuning options.
+
+        Returns:
+            (total_score, total_points, feedback_by_question, overall_feedback)
+            — identical return type to grade_submission so callers are compatible.
+        """
+        import requests
+
+        try:
+            from pdf2image import convert_from_path
+        except ImportError:
+            raise RuntimeError(
+                "pdf2image is required for grade_pdf_direct. "
+                "Install it with: pip install pdf2image"
+            )
+
+        # -------------------------------------------------------------------
+        # 1. Flatten questions (no optional-part filtering — LLM sees whole sheet)
+        # -------------------------------------------------------------------
+        flattened_questions = self._flatten_questions(
+            assignment.get("questions", []), "", {}
+        )
+        print(
+            "[grade_pdf_direct] flattened_questions",
+            json.dumps(flattened_questions, indent=2),
+        )
+
+        total_points = sum(float(q.get("points", 0) or 0) for q in flattened_questions)
+
+        # -------------------------------------------------------------------
+        # 2. Build the rubric prompt (no student answers — visible in PDF images)
+        # -------------------------------------------------------------------
+        prompt_parts = [
+            "You are an expert academic grader.\n"
+            "The student's answer sheet is attached below as one image per page.\n"
+            "Grade EVERY question listed below by locating the student's written answer "
+            "in the images.\n\n"
+            "Return ONLY a JSON object with this exact structure:\n"
+            "{\n"
+            '  "question_<id>": {\n'
+            '    "score": <float in [0, max_points]>,\n'
+            '    "strengths": "<brief strengths>",\n'
+            '    "areas_for_improvement": "<areas to improve>",\n'
+            '    "breakdown": "<detailed analysis>"\n'
+            "  },\n"
+            '  "overall_feedback": "<overall assessment>"\n'
+            "}\n\n"
+            "Grade strictly according to the rubric and max points for each question.\n"
+            "If a question is not answered in the PDF, assign 0 points.\n\n"
+            "--- QUESTIONS, REFERENCE ANSWERS & RUBRICS ---\n",
+        ]
+
+        for q in flattened_questions:
+            q_id = str(q.get("id"))
+            q_type = q.get("type", "text")
+            question_text = q.get("question", "")
+            rubric = q.get("rubric", "")
+            correct_answer = q.get("correctAnswer") or q.get("correct_answer", "")
+            max_pts = float(q.get("points", 0) or 0)
+
+            prompt_parts.append(f"QUESTION {q_id} ({q_type}):")
+            prompt_parts.append(question_text)
+            if correct_answer:
+                prompt_parts.append(f"REFERENCE ANSWER:\n{correct_answer}")
+            if rubric:
+                prompt_parts.append(f"RUBRIC:\n{rubric}")
+            prompt_parts.append(f"MAX POINTS: {max_pts}")
+            prompt_parts.append("")  # blank line between questions
+
+        prompt_text = "\n".join(prompt_parts)
+        print("[grade_pdf_direct] prompt_text", prompt_text)
+
+        # -------------------------------------------------------------------
+        # 3. Download PDF from S3 and convert pages to base64 JPEG data URLs
+        # -------------------------------------------------------------------
+        tmp_pdf_path: Optional[str] = None
+        try:
+            presigned_url = s3_presign_url(pdf_s3_key, expires_in=3600)
+            resp = requests.get(presigned_url, timeout=60)
+            resp.raise_for_status()
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+                tmp_pdf.write(resp.content)
+                tmp_pdf_path = tmp_pdf.name
+
+            pages = convert_from_path(tmp_pdf_path, dpi=200)
+            print(f"[grade_pdf_direct] converted {len(pages)} PDF pages to images")
+
+            page_image_parts: List[Dict[str, Any]] = []
+            for page_idx, page_img in enumerate(pages):
+                buf = io.BytesIO()
+                page_img.save(buf, format="JPEG", quality=85)
+                b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+                data_url = f"data:image/jpeg;base64,{b64}"
+                page_image_parts.append(
+                    {"type": "image_url", "image_url": {"url": data_url}}
+                )
+                print(f"[grade_pdf_direct] encoded page {page_idx + 1}")
+        finally:
+            if tmp_pdf_path and os.path.exists(tmp_pdf_path):
+                os.remove(tmp_pdf_path)
+
+        # -------------------------------------------------------------------
+        # 4. Build and make the single multimodal LLM call
+        # -------------------------------------------------------------------
+        system_msg = {
+            "role": "system",
+            "content": (
+                "You are an expert academic grader. "
+                "Grade strictly per rubric and points. "
+                "Always return concise, fair judgments in the exact JSON format requested."
+            ),
+        }
+
+        user_content: List[Dict[str, Any]] = [
+            {"type": "text", "text": prompt_text}
+        ] + page_image_parts
+
+        print(
+            f"[grade_pdf_direct] making LLM call with {len(page_image_parts)} page images"
+        )
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[system_msg, {"role": "user", "content": user_content}],
+            temperature=0.1,
+            max_tokens=4000,
+        )
+
+        result_text = (response.choices[0].message.content or "").strip()
+        print("[grade_pdf_direct] raw LLM response", result_text)
+
+        # -------------------------------------------------------------------
+        # 5. Parse response and compute totals
+        # -------------------------------------------------------------------
+        feedback_by_question, overall_feedback = self._parse_bulk_grading_response(
+            result_text, flattened_questions
+        )
+
+        total_score = sum(fb.get("score", 0.0) for fb in feedback_by_question.values())
+
+        print(
+            f"[grade_pdf_direct] result: {total_score}/{total_points}",
+            json.dumps(feedback_by_question, indent=2),
+        )
 
         return total_score, total_points, feedback_by_question, overall_feedback
 

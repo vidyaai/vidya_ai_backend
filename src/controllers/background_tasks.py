@@ -311,18 +311,47 @@ def grade_submission_background(
         model = options.get("model", "gpt-4o") if options else "gpt-4o"
         grader = LLMGrader(model=model)
 
-        (
-            total_score,
-            total_points,
-            feedback_by_question,
-            overall_feedback,
-        ) = grader.grade_submission(
-            assignment=assignment_dict,
-            submission_answers=submission.answers or {},
-            options=options,
-            telemetry_data=submission.telemetry_data,  # Pass telemetry for AI detection
-            submission_method=submission.submission_method or "in-app",
-        )
+        # for PDF submissions, grade directly from the raw PDF via vision LLM
+        pdf_s3_key: str | None = None
+        if (
+            submission.submission_method == "pdf"
+            or submission.submission_method == "on-behalf"
+        ) and submission.submitted_files:
+            first_file = (
+                submission.submitted_files[0]
+                if isinstance(submission.submitted_files, list)
+                else None
+            )
+            if first_file and isinstance(first_file, dict):
+                pdf_s3_key = first_file.get("s3_key")
+
+        if pdf_s3_key:
+            logger.info(
+                f"[grade_pdf_direct] Grading submission {submission_id} directly from PDF: {pdf_s3_key}"
+            )
+            (
+                total_score,
+                total_points,
+                feedback_by_question,
+                overall_feedback,
+            ) = grader.grade_pdf_direct(
+                assignment=assignment_dict,
+                pdf_s3_key=pdf_s3_key,
+                options=options,
+            )
+        else:
+            (
+                total_score,
+                total_points,
+                feedback_by_question,
+                overall_feedback,
+            ) = grader.grade_submission(
+                assignment=assignment_dict,
+                submission_answers=submission.answers or {},
+                options=options,
+                telemetry_data=submission.telemetry_data,  # Pass telemetry for AI detection
+                submission_method=submission.submission_method or "in-app",
+            )
 
         # Update submission with results
         submission.score = f"{total_score:.2f}"
