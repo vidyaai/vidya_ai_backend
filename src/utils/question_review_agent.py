@@ -102,8 +102,8 @@ STRICT RULE:
 USER PROMPT/TOPIC:
 {user_prompt}
 
-LECTURE NOTES CONTENT (excerpt):
-{lecture_notes_content[:3000]}...  # First 3000 chars for context
+LECTURE NOTES CONTENT:
+{lecture_notes_content[:30000]}{"..." if len(lecture_notes_content) > 30000 else ""}
 
 GENERATION OPTIONS:
 - Difficulty: {generation_options.get('difficulty', 'mixed')}

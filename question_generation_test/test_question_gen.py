@@ -9,6 +9,7 @@ Usage:
     python test_question_gen.py -input input_prompt.txt -subject physics -level grad -pdf_gen True -engine ai -model pro
     python test_question_gen.py -input input_prompt.txt -subject chemistry -level undergrad -pdf_gen True
     python test_question_gen.py -input input_prompt.txt -subject computer_eng -level grad -pdf_gen True -engine ai
+    python test_question_gen.py -input input_prompt.txt -subject computer_eng -level grad -pdf_gen True -lecture_notes placement.pdf
 
 Subjects: electrical, mechanical, cs, civil, math, physics, chemistry, computer_eng
 """
@@ -18,6 +19,7 @@ import os
 import json
 import argparse
 import shutil
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -31,7 +33,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from utils.assignment_generator import AssignmentGenerator
 from utils.pdf_generator import AssignmentPDFGenerator
+from utils.document_processor import DocumentProcessor
 from controllers.config import logger
+import base64
 
 
 def get_next_run_number(base_dir: Path) -> int:
@@ -166,6 +170,12 @@ def main():
         default="flash",
         help="Gemini model: flash (gemini-2.5-flash-image via Vertex AI) or pro (gemini-3-pro-image-preview via Google AI Studio)",
     )
+    parser.add_argument(
+        "-lecture_notes",
+        "--lecture_notes",
+        type=str,
+        help="Path to lecture notes PDF file (will be used as PRIMARY source for question generation)",
+    )
 
     args = parser.parse_args()
 
@@ -181,6 +191,47 @@ def main():
     if not generation_prompt:
         print("❌ Error: Input prompt is empty")
         return 1
+
+    # Process lecture notes if provided
+    uploaded_files = None
+    if args.lecture_notes:
+        lecture_notes_path = Path(args.lecture_notes)
+        if not lecture_notes_path.exists():
+            print(f"❌ Error: Lecture notes file not found: {args.lecture_notes}")
+            return 1
+
+        print(f"\n⏳ Processing lecture notes PDF: {lecture_notes_path.name}...")
+        try:
+            # Read PDF file
+            with open(lecture_notes_path, "rb") as f:
+                pdf_content = f.read()
+
+            # Encode to base64
+            pdf_base64 = base64.b64encode(pdf_content).decode("utf-8")
+
+            # Extract text using DocumentProcessor
+            doc_processor = DocumentProcessor()
+            extracted_text = doc_processor.extract_text_from_file(
+                file_content=pdf_base64,
+                file_name=lecture_notes_path.name,
+                file_type="application/pdf"
+            )
+
+            print(f"✅ Extracted {len(extracted_text)} characters from lecture notes")
+            print(f"   Preview: {extracted_text[:200]}...")
+
+            # Prepare uploaded files format for assignment generator
+            uploaded_files = [{
+                "name": lecture_notes_path.name,
+                "type": "application/pdf",
+                "content": pdf_base64,
+                "extracted_text": extracted_text
+            }]
+
+        except Exception as e:
+            print(f"❌ Failed to process lecture notes: {str(e)}")
+            logger.error(f"Lecture notes processing error: {str(e)}", exc_info=True)
+            return 1
 
     # Create output directory for this run
     base_dir = Path(__file__).parent
@@ -199,20 +250,22 @@ def main():
         f"Model: {args.model} ({'gemini-3-pro-image-preview via AI Studio' if args.model == 'pro' else 'gemini-2.5-flash-image via Vertex AI'})"
     )
     print(f"PDF generation: {args.pdf_gen}")
+    if uploaded_files:
+        print(f"Lecture notes: {uploaded_files[0]['name']} ({len(uploaded_files[0]['extracted_text'])} chars extracted)")
     print(f"Output directory: {output_dir}")
     print(f"{'='*60}\n")
 
     # Configure generation options
     generation_options = {
-        "numQuestions": 4,  # Test with 15 questions for robustness
-        "totalPoints": 40,  # 150 marks total (~10 marks per question)
+        "numQuestions": 8,  # Test with 5 questions
+        "totalPoints": 80,  # 50 marks total (~10 marks per question)
         "questionTypes": {
             "mcq": False,
             "short-answer": True,
             "numerical": True,
             "true-false": False,
             "fill-in-blanks": False,
-            "diagram-analysis": False,  # Off, but model decides intelligently
+            "diagram-analysis": True,  # Off, but model decides intelligently
         },
         "difficultyLevel": "graduate" if args.level == "grad" else "undergraduate",
         "includeRubric": True,
@@ -221,6 +274,9 @@ def main():
 
     # Generate unique assignment ID
     assignment_id = f"test_assignment_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    # Start timer
+    start_time = time.time()
 
     try:
         print("⏳ Generating assignment...")
@@ -237,7 +293,7 @@ def main():
         assignment_data = generator.generate_assignment(
             generation_options=generation_options,
             linked_videos=None,
-            uploaded_files=None,
+            uploaded_files=uploaded_files,
             generation_prompt=generation_prompt,
             title=f"Test Assignment - Run {run_number}",
             description=f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
@@ -324,17 +380,27 @@ def main():
                 print(f"❌ PDF generation failed: {str(e)}")
                 logger.error(f"PDF generation error: {str(e)}", exc_info=True)
 
+        # Calculate elapsed time for summary
+        elapsed_seconds_for_summary = int(time.time() - start_time)
+        minutes_summary = elapsed_seconds_for_summary // 60
+        seconds_summary = elapsed_seconds_for_summary % 60
+
         # Save summary
         summary_path = output_dir / "summary.txt"
         with open(summary_path, "w") as f:
             f.write(f"ASSIGNMENT GENERATION SUMMARY - RUN {run_number}\n")
             f.write(f"{'='*60}\n\n")
             f.write(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Generation Time: {minutes_summary:02d}:{seconds_summary:02d}\n")
             f.write(f"Subject: {args.subject}\n")
             f.write(f"Level: {args.level}\n")
             f.write(f"Engine: {args.engine}\n")
             f.write(f"Model: {args.model}\n")
-            f.write(f"Assignment ID: {assignment_id}\n\n")
+            f.write(f"Assignment ID: {assignment_id}\n")
+            if uploaded_files:
+                f.write(f"Lecture Notes: {uploaded_files[0]['name']}\n")
+                f.write(f"Extracted Text Length: {len(uploaded_files[0]['extracted_text'])} characters\n")
+            f.write(f"\n")
             f.write(f"INPUT PROMPT:\n{'-'*60}\n")
             f.write(f"{generation_prompt}\n\n")
             f.write(f"STATISTICS:\n{'-'*60}\n")
@@ -351,9 +417,16 @@ def main():
 
         print(f"✅ Saved summary: {summary_path}")
 
+        # Calculate elapsed time
+        end_time = time.time()
+        elapsed_seconds = int(end_time - start_time)
+        minutes = elapsed_seconds // 60
+        seconds = elapsed_seconds % 60
+
         print(f"\n{'='*60}")
         print(f"✅ GENERATION COMPLETE!")
         print(f"{'='*60}")
+        print(f"⏱️  Total time: {minutes:02d}:{seconds:02d}")
         print(f"Output location: {output_dir}")
         print(f"\nGenerated files:")
         print(f"  - assignment.json (questions data)")

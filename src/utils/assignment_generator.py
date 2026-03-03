@@ -235,8 +235,13 @@ class AssignmentGenerator:
             )
             logger.info(f"Content sources extracted: {list(content_sources.keys())}")
 
+            # Use PageIndex for semantic topic-based chunking (if large documents)
+            content_sources_with_topics = self._process_with_pageindex(
+                content_sources, generation_options
+            )
+
             # Generate questions based on content and options
-            questions = self._generate_questions(content_sources, generation_options)
+            questions = self._generate_questions(content_sources_with_topics, generation_options)
             logger.info(f"Generated {len(questions)} questions")
 
             # Use multi-agent diagram analysis to generate diagrams
@@ -296,7 +301,7 @@ class AssignmentGenerator:
                 review_results = reviewer.review_questions(
                     questions=questions,
                     lecture_notes_content=lecture_content[
-                        :5000
+                        :50000
                     ],  # Send first 5000 chars
                     user_prompt=generation_prompt or "Generate assignment",
                     generation_options=generation_options,
@@ -307,21 +312,47 @@ class AssignmentGenerator:
                 )
                 logger.info(f"Statistics: {review_results.get('statistics', {})}")
 
-                # Filter out low-quality questions if review recommends removal
+                # Filter and regenerate low-quality questions
                 if review_results.get("questions_reviewed"):
                     filtered_questions = []
+                    questions_to_regenerate = []
+
                     for i, question in enumerate(questions, 1):
                         review = review_results["questions_reviewed"].get(str(i), {})
+
                         if review.get("keep", True):  # Keep by default if no review
                             filtered_questions.append(question)
                         else:
+                            questions_to_regenerate.append({
+                                "original_question": question,
+                                "issues": review.get("issues", []),
+                                "alignment_score": review.get("alignment_score", 0)
+                            })
                             logger.warning(
-                                f"Removing question {i} based on review: {review.get('issues', [])}"
+                                f"Removing question {i} for regeneration: {review.get('issues', [])}"
                             )
 
-                    if len(filtered_questions) < len(questions):
+                    # Regenerate removed questions to meet requested count
+                    num_removed = len(questions_to_regenerate)
+                    if num_removed > 0:
+                        logger.info(f"Regenerating {num_removed} questions to maintain requested count...")
+
+                        regenerated = self._regenerate_questions(
+                            num_to_regenerate=num_removed,
+                            failed_questions=questions_to_regenerate,
+                            content_sources=content_sources,
+                            generation_options=generation_options
+                        )
+
+                        if regenerated:
+                            filtered_questions.extend(regenerated)
+                            logger.info(f"Successfully regenerated {len(regenerated)} questions. Total questions: {len(filtered_questions)}")
+                        else:
+                            logger.warning("Regeneration produced no questions. Proceeding with fewer questions than requested.")
+
+                    if len(filtered_questions) != len(questions):
                         logger.info(
-                            f"Filtered {len(questions) - len(filtered_questions)} questions after review"
+                            f"Question count changed: {len(questions)} → {len(filtered_questions)} (removed {num_removed}, regenerated {len(regenerated) if num_removed > 0 else 0})"
                         )
                         questions = filtered_questions
             else:
@@ -348,6 +379,71 @@ class AssignmentGenerator:
 
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise Exception(f"Error generating assignment: {str(e)}")
+
+    def _regenerate_questions(
+        self,
+        num_to_regenerate: int,
+        failed_questions: List[Dict[str, Any]],
+        content_sources: Dict[str, Any],
+        generation_options: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        Regenerate questions that failed review.
+        Uses insights from failed questions to avoid repeating mistakes.
+        """
+        try:
+            logger.info(f"Starting regeneration of {num_to_regenerate} questions...")
+
+            # Build context about what went wrong
+            failure_context = "PREVIOUS FAILED QUESTIONS (Learn from these mistakes):\n\n"
+            for i, failed in enumerate(failed_questions, 1):
+                failure_context += f"Failed Question {i}:\n"
+                failure_context += f"  Question: {failed['original_question'].get('question', '')[:200]}\n"
+                failure_context += f"  Issues: {', '.join(failed['issues'])}\n"
+                failure_context += f"  Alignment Score: {failed['alignment_score']}/10\n\n"
+
+            failure_context += """
+REGENERATION INSTRUCTIONS:
+1. Study the issues above to understand what went wrong
+2. Generate REPLACEMENT questions that avoid these mistakes
+3. Ensure questions are STRICTLY based on lecture content ONLY
+4. Focus on topics with clear coverage in the lecture material
+5. Do NOT repeat the same mistakes listed above
+6. Do NOT introduce topics not explicitly covered in the lecture material
+
+Generate high-quality replacement questions that fix the identified issues.
+"""
+
+            # Prepare modified generation options
+            regen_options = generation_options.copy()
+            regen_options["numQuestions"] = num_to_regenerate
+
+            # Prepare content context with failure warnings
+            content_context = self._prepare_content_context(content_sources)
+            enhanced_context = failure_context + "\n\n" + content_context
+
+            # Create temporary content sources with enhanced context
+            regen_content_sources = content_sources.copy()
+            if regen_content_sources.get("custom_prompt"):
+                regen_content_sources["custom_prompt"] = failure_context + "\n\n" + regen_content_sources["custom_prompt"]
+            else:
+                regen_content_sources["custom_prompt"] = failure_context
+
+            # Generate replacement questions
+            logger.info("Calling question generation with failure context...")
+            regenerated = self._generate_questions(
+                content_sources=regen_content_sources,
+                generation_options=regen_options
+            )
+
+            logger.info(f"Regeneration complete: {len(regenerated)} questions created")
+            return regenerated
+
+        except Exception as e:
+            logger.error(f"Error during question regeneration: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return []  # Return empty list on failure
 
     def _extract_content_sources(
         self,
@@ -402,11 +498,253 @@ class AssignmentGenerator:
 
         return content_sources
 
+    def _process_with_pageindex(
+        self,
+        content_sources: Dict[str, Any],
+        generation_options: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Process documents with PageIndex for semantic topic-based chunking.
+
+        For large documents (>100k chars), uses PageIndex to:
+        1. Extract semantic topic structure
+        2. Enable topic-based question generation
+        3. Distribute questions proportionally across topics
+
+        Args:
+            content_sources: Content from videos/documents/prompts
+            generation_options: Generation configuration
+
+        Returns:
+            Enhanced content_sources with pageindex_topics if applicable
+        """
+        from utils.pageindex_processor import PageIndexProcessor
+
+        # Check if we have documents for PageIndex processing
+        document_texts = content_sources.get("document_texts", [])
+        if not document_texts:
+            return content_sources  # No documents to process
+
+        # Calculate total document size for logging
+        total_chars = sum(len(doc.get("content", "")) for doc in document_texts)
+
+        # Always use PageIndex for uploaded lecture notes to enable semantic topic-based chunking
+        # PageIndex provides semantic boundaries regardless of document size
+        if total_chars > 0:
+            logger.info(f"Document content detected ({total_chars} chars). Using PageIndex for semantic topic extraction...")
+
+            try:
+                pageindex = PageIndexProcessor()
+                all_topics = []
+
+                # Process each document with PageIndex
+                for doc in document_texts:
+                    doc_name = doc.get("name", "document")
+                    doc_content = doc.get("content", "")
+
+                    if len(doc_content) > 0:
+                        logger.info(f"Processing {doc_name} with PageIndex ({len(doc_content)} chars)...")
+
+                        # Create semantic topic index
+                        index_result = pageindex.create_document_index(
+                            content=doc_content,
+                            doc_name=doc_name
+                        )
+
+                        topics = index_result.get("topics", [])
+                        logger.info(f"PageIndex identified {len(topics)} semantic topics in {doc_name}")
+
+                        # Tag topics with source document
+                        for topic in topics:
+                            topic["source_document"] = doc_name
+
+                        all_topics.extend(topics)
+
+                # If we have topics, add them to content_sources
+                if all_topics:
+                    # Distribute total questions across topics
+                    num_questions = generation_options.get("numQuestions", 5)
+                    topics_with_questions = pageindex.distribute_questions_across_topics(
+                        all_topics,
+                        num_questions
+                    )
+
+                    # Smart image handling: prepare topics with selective image descriptions
+                    try:
+                        from utils.smart_image_handler import prepare_topics_for_question_generation
+
+                        # Get the first document's content (assuming single PDF upload)
+                        # If multiple PDFs, this would need adjustment
+                        first_doc = document_texts[0]
+                        doc_content = first_doc.get("content", "")
+
+                        # Prepare topics with smart image handling
+                        # Budget: $0.05 per assignment (describes ~15-20 key images)
+                        enhanced_topics = prepare_topics_for_question_generation(
+                            docling_markdown=doc_content,
+                            pageindex_topics=topics_with_questions,
+                            budget=0.05  # Configurable budget for image descriptions
+                        )
+
+                        content_sources["pageindex_topics"] = enhanced_topics
+                        logger.info(
+                            f"Enhanced {len(enhanced_topics)} topics with smart image handling. "
+                            f"Images allocated: {[(t['name'], t.get('images_allocated', 0)) for t in enhanced_topics]}"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Smart image handler failed: {str(e)}. Using topics without image descriptions.")
+                        content_sources["pageindex_topics"] = topics_with_questions
+
+                    logger.info(f"Question distribution: {[(t['name'], t['num_questions']) for t in content_sources['pageindex_topics']]}")
+
+                    # Store original documents as backup
+                    content_sources["original_documents"] = document_texts
+                else:
+                    logger.warning("PageIndex did not extract any topics. Falling back to standard processing.")
+
+            except Exception as e:
+                logger.error(f"PageIndex processing failed: {str(e)}. Falling back to standard processing.")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+
+        return content_sources
+
+    def _generate_questions_by_topics(
+        self,
+        content_sources: Dict[str, Any],
+        generation_options: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate questions topic-by-topic using PageIndex semantic topics.
+
+        For each topic:
+        1. Creates focused context from topic content
+        2. Generates questions for that topic
+        3. Combines all topic questions into final list
+
+        Args:
+            content_sources: Content with pageindex_topics
+            generation_options: Generation configuration
+
+        Returns:
+            List of questions generated from all topics
+        """
+        topics = content_sources.get("pageindex_topics", [])
+        if not topics:
+            logger.warning("No PageIndex topics found. Falling back to standard generation.")
+            return self._generate_questions(content_sources, generation_options)
+
+        logger.info(f"Generating questions from {len(topics)} semantic topics...")
+
+        all_questions = []
+
+        for i, topic in enumerate(topics, 1):
+            topic_name = topic.get("name", f"Topic {i}")
+            num_questions = topic.get("num_questions", 1)
+
+            if num_questions <= 0:
+                logger.info(f"Skipping {topic_name}: {num_questions} questions allocated")
+                continue
+
+            logger.info(f"Generating {num_questions} questions from topic: {topic_name}")
+
+            try:
+                # Create focused content sources for this topic
+                # Use enhanced_text if available (from smart image handler), otherwise fall back to content
+                topic_text = topic.get("enhanced_text", topic.get("content", ""))
+
+                topic_content_sources = {
+                    "custom_prompt": content_sources.get("custom_prompt"),
+                    "document_texts": [{
+                        "name": f"{topic.get('source_document', 'document')} - {topic_name}",
+                        "content": topic_text,  # Use enhanced text with image context
+                        "topic_info": {
+                            "name": topic_name,
+                            "pages": f"{topic.get('start_page', '?')}-{topic.get('end_page', '?')}",
+                            "description": topic.get("description", ""),
+                            "type": topic.get("type", "topic"),
+                            "images_in_topic": topic.get("image_count", 0),
+                            "images_described": topic.get("images_allocated", 0)
+                        }
+                    }]
+                }
+
+                # Modify generation options for this topic
+                topic_gen_options = generation_options.copy()
+                topic_gen_options["numQuestions"] = num_questions
+
+                # Generate questions for this topic (standard single-pass)
+                # Temporarily remove pageindex_topics to avoid recursion
+                temp_content = content_sources.copy()
+                if "pageindex_topics" in temp_content:
+                    del temp_content["pageindex_topics"]
+
+                # Use standard generation with topic-focused content
+                content_context = self._prepare_content_context(topic_content_sources)
+                prompt = self._create_generation_prompt(
+                    content_context, topic_gen_options, topic_content_sources
+                )
+                system_prompt = self._get_system_prompt(topic_gen_options)
+
+                # Generate questions for this topic
+                question_types = topic_gen_options.get("questionTypes", {})
+                enabled_types = [k for k, v in question_types.items() if v]
+                response_model = create_dynamic_generation_response(enabled_types or [])
+
+                user_content = [{"type": "input_text", "text": dedent(prompt).strip()}]
+                input_data = [{"type": "message", "role": "user", "content": user_content}]
+
+                logger.info(f"Calling AI for topic: {topic_name}...")
+                response = self.client.responses.parse(
+                    model=self.model,
+                    instructions=dedent(system_prompt).strip(),
+                    input=input_data,
+                    text_format=response_model,
+                )
+
+                parsed_response = response.output_parsed
+                extracted_data = parsed_response.model_dump()
+                topic_questions = extracted_data.get("questions", [])
+
+                logger.info(f"Generated {len(topic_questions)} questions from {topic_name}")
+
+                # Extract equations
+                topic_questions = self._extract_equations_from_questions(topic_questions)
+
+                # Sanitize
+                topic_questions = self._sanitize_questions(topic_questions)
+
+                # Tag questions with source topic
+                for q in topic_questions:
+                    q["source_topic"] = topic_name
+                    q["source_topic_pages"] = f"{topic.get('start_page', '?')}-{topic.get('end_page', '?')}"
+
+                all_questions.extend(topic_questions)
+
+            except Exception as e:
+                logger.error(f"Error generating questions for topic '{topic_name}': {str(e)}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                # Continue with other topics even if one fails
+
+        logger.info(f"Topic-based generation complete: {len(all_questions)} total questions from {len(topics)} topics")
+
+        # Post-process all questions together
+        all_questions = self._post_process_questions(all_questions, generation_options)
+
+        return all_questions
+
     def _generate_questions(
         self, content_sources: Dict[str, Any], generation_options: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """Generate questions using AI based on content and options"""
 
+        # Check if we have PageIndex topics for semantic chunking
+        if content_sources.get("pageindex_topics"):
+            logger.info("Using PageIndex topic-based question generation")
+            return self._generate_questions_by_topics(content_sources, generation_options)
+
+        # Standard single-pass generation for small documents
         # Prepare the content context
         content_context = self._prepare_content_context(content_sources)
 
@@ -459,9 +797,7 @@ class AssignmentGenerator:
             questions = self._extract_equations_from_questions(questions)
 
             # Debug: Log questions after equation extraction
-            logger.info(
-                f"Questions after equation extraction: {len(questions)} questions"
-            )
+            logger.info(f"Questions after equation extraction: {questions} questions")
 
             # Sanitize questions to remove null bytes and problematic characters
             questions = self._sanitize_questions(questions)
@@ -483,39 +819,52 @@ class AssignmentGenerator:
             raise Exception(f"Failed to generate questions with AI: {str(e)}")
 
     def _prepare_content_context(self, content_sources: Dict[str, Any]) -> str:
-        """Prepare content context for AI generation"""
+        """Prepare content context with lecture notes as PRIMARY source"""
         context_parts = []
 
-        # Add custom prompt FIRST - this is the primary instruction
-        if content_sources.get("custom_prompt"):
-            context_parts.append("## PRIMARY TOPIC INSTRUCTIONS (MUST FOLLOW):")
-            context_parts.append(content_sources["custom_prompt"])
+        has_lecture_notes = content_sources.get("document_texts") or content_sources.get("video_transcripts")
+        has_custom_prompt = content_sources.get("custom_prompt")
+
+        # STRATEGY: Lecture notes are ALWAYS primary when they exist
+        # Custom prompts are ALWAYS secondary (style/focus guidance)
+
+        # PRIORITY 1: Lecture notes/videos are PRIMARY CONTENT SOURCE
+        if has_lecture_notes:
+            context_parts.append("## PRIMARY LECTURE CONTENT (MAIN SOURCE FOR QUESTIONS):")
+            context_parts.append("Generate questions EXCLUSIVELY from the concepts, topics, and material covered in this content.")
             context_parts.append("")
-            context_parts.append(
-                "IMPORTANT: Generate questions ONLY on the topic specified above. Do not deviate to other subjects."
-            )
 
-        # Add video transcripts as supporting material
-        if content_sources.get("video_transcripts"):
-            context_parts.append("## Supporting Video Content:")
-            for video in content_sources["video_transcripts"]:
-                context_parts.append(f"### {video['title']}")
-                context_parts.append(
-                    video["transcript"][:20000] + "..."
-                    if len(video["transcript"]) > 20000
-                    else video["transcript"]
-                )
+            # Add documents first (highest priority)
+            if content_sources.get("document_texts"):
+                for doc in content_sources["document_texts"]:
+                    context_parts.append(f"### Lecture Notes: {doc['name']}")
+                    content = doc["content"][:100000]  # INCREASED from 20000
+                    context_parts.append(content)
+                    if len(doc["content"]) > 100000:
+                        context_parts.append("\n[Document truncated at 100k characters for length - chunking may be needed]")
 
-        # Add document content as supporting material
-        if content_sources.get("document_texts"):
-            context_parts.append("## Supporting Document Content:")
-            for doc in content_sources["document_texts"]:
-                context_parts.append(f"### {doc['name']}")
-                context_parts.append(
-                    doc["content"][:20000] + "..."
-                    if len(doc["content"]) > 20000
-                    else doc["content"]
-                )
+            # Add video transcripts
+            if content_sources.get("video_transcripts"):
+                for video in content_sources["video_transcripts"]:
+                    context_parts.append(f"### Lecture Video: {video['title']}")
+                    transcript = video["transcript"][:100000]  # INCREASED from 20000
+                    context_parts.append(transcript)
+                    if len(video["transcript"]) > 100000:
+                        context_parts.append("\n[Transcript truncated at 100k characters for length - chunking may be needed]")
+
+            # PRIORITY 2: Custom prompt is STYLE GUIDANCE ONLY (when lecture notes exist)
+            if has_custom_prompt:
+                context_parts.append("")
+                context_parts.append("## ADDITIONAL INSTRUCTIONS (Style & Focus Preferences):")
+                context_parts.append("Use these to guide HOW to create questions from the lecture content above:")
+                context_parts.append(content_sources["custom_prompt"])
+                context_parts.append("")
+                context_parts.append("IMPORTANT: Do NOT introduce topics not in the lecture material above. These instructions are for style and emphasis only.")
+
+        # FALLBACK: If NO lecture notes, custom prompt becomes primary
+        elif has_custom_prompt:
+            context_parts.append("## PRIMARY TOPIC INSTRUCTIONS:")
+            context_parts.append(content_sources["custom_prompt"])
 
         return "\n\n".join(context_parts)
 
@@ -664,10 +1013,16 @@ class AssignmentGenerator:
                     {content_context}
 
                     Please generate questions that:
-                    1. Are appropriate for {engineering_level}-level {engineering_discipline} engineering students
-                    2. Test understanding of key concepts from the provided Content Context; DO NOT deviate to unrelated topics other than in the Content Context
-                    3. Include a mix of question types: {', '.join(enabled_types)}
-                    4. Include clear, unambiguous questions with proper answer keys and rubrics
+                    1. Are based EXCLUSIVELY on material explicitly covered in the PRIMARY LECTURE CONTENT section above
+                    2. DO NOT generate questions on topics not mentioned in the lecture material
+                    3. DO NOT generate generic {engineering_discipline} engineering questions unless they match lecture content
+                    4. DO NOT introduce concepts, algorithms, formulas, or examples not present in the lecture notes
+                    5. Quote or reference specific parts of the lecture material in questions when appropriate
+                    6. Are appropriate for {engineering_level}-level {engineering_discipline} engineering students
+                    7. Include a mix of question types: {', '.join(enabled_types)}
+                    8. Include clear, unambiguous questions with proper answer keys and rubrics
+
+                    CRITICAL: If you cannot find enough material in the PRIMARY LECTURE CONTENT for {num_questions} questions, generate fewer questions rather than hallucinating topics not covered in the material.
 
                     For each question, provide:
                     - Clear, well-structured question text
@@ -784,10 +1139,16 @@ class AssignmentGenerator:
                     {content_context}
 
                     Please generate questions that:
-                    1. Are appropriate for {level_text}students
-                    2. Test understanding of key concepts from the provided Content Context; DO NOT deviate to unrelated topics other than in the Content Context
-                    3. Include a mix of question types: {', '.join(enabled_types)}
-                    4. Include clear, unambiguous questions with proper answer keys
+                    1. Are based EXCLUSIVELY on material explicitly covered in the PRIMARY LECTURE CONTENT section above
+                    2. DO NOT generate questions on topics not mentioned in the lecture material
+                    3. DO NOT generate random or generic questions unrelated to the lecture content
+                    4. DO NOT introduce concepts, formulas, or examples not present in the lecture notes
+                    5. Quote or reference specific parts of the lecture material in questions when appropriate
+                    6. Are appropriate for {level_text}students
+                    7. Include a mix of question types: {', '.join(enabled_types)}
+                    8. Include clear, unambiguous questions with proper answer keys
+
+                    CRITICAL: If you cannot find enough material in the PRIMARY LECTURE CONTENT for {num_questions} questions, generate fewer questions rather than hallucinating topics not covered in the material.
 
                     For each question, provide:
                     - Clear, well-structured question text

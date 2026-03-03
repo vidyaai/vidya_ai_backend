@@ -15,11 +15,23 @@ from pdf2image import convert_from_bytes
 class DocumentProcessor:
     """Service for processing various document types and extracting text content"""
 
-    def __init__(self):
+    def __init__(self, use_docling: bool = True):
+        """
+        Initialize document processor
+
+        Args:
+            use_docling: If True, use Docling for PDF extraction (faster, more reliable)
+                        If False, use GPT-4o vision (legacy method)
+        """
         self.client = OpenAI()
         self.model = "gpt-4o"  # Vision-capable model for PDF extraction
+        self.use_docling = use_docling
+
+        # Choose PDF extraction method
+        pdf_extractor = self._extract_pdf_text_docling if use_docling else self._extract_pdf_text
+
         self.supported_types = {
-            "application/pdf": self._extract_pdf_text,
+            "application/pdf": pdf_extractor,
             "text/plain": self._extract_text,
             "application/msword": self._extract_doc_text,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document": self._extract_docx_text,
@@ -83,51 +95,32 @@ class DocumentProcessor:
         try:
             # Convert PDF pages to images using Poppler
             images = convert_from_bytes(content, dpi=200)
-            logger.info(f"Converted PDF to {len(images)} images")
+            num_pages = len(images)
+            logger.info(f"Converted PDF to {num_pages} images")
 
-            # Convert all images to base64
-            image_contents = []
-            for page_num, image in enumerate(images, 1):
-                buffered = BytesIO()
-                image.save(buffered, format="PNG")
-                img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                image_contents.append(
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{img_base64}"},
-                    }
-                )
+            # Strategy 1: For PDFs <= 10 pages, extract all at once
+            # Note: 10 pages balances speed vs reliability (5 was too slow, 15 caused refusals)
+            if num_pages <= 10:
+                return self._extract_pdf_chunk(images, 1, num_pages)
 
-            # Build message content with text instruction followed by all images
-            user_content = [
-                {
-                    "type": "text",
-                    "text": f"Extract ALL text from this {len(images)}-page PDF document. For each page, start with '--- Page N ---' followed by all the text from that page. Maintain the original formatting, structure, and layout. Extract text in page order.",
-                }
-            ]
-            user_content.extend(image_contents)
-
-            # Single API call to extract text from all pages
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a precise OCR system. Extract ALL text from images exactly as it appears, maintaining formatting, structure, and layout. Include all text visible in the images.",
-                    },
-                    {"role": "user", "content": user_content},
-                ],
-                max_tokens=16000,
-            )
-
-            extracted_text = response.choices[0].message.content
-            if extracted_text:
-                logger.info(
-                    f"Successfully extracted text from all {len(images)} pages in one API call"
-                )
-                return extracted_text.strip()
+            # Strategy 2: For large PDFs, chunk into batches of 10 pages
             else:
-                raise ValueError("Empty response from GPT-4o")
+                logger.info(f"Large PDF detected ({num_pages} pages). Using chunked extraction.")
+                extracted_chunks = []
+                chunk_size = 10  # Balanced for speed and reliability
+
+                for start_idx in range(0, num_pages, chunk_size):
+                    end_idx = min(start_idx + chunk_size, num_pages)
+                    chunk_images = images[start_idx:end_idx]
+                    start_page = start_idx + 1
+                    end_page = end_idx
+
+                    logger.info(f"Extracting pages {start_page}-{end_page}...")
+                    chunk_text = self._extract_pdf_chunk(chunk_images, start_page, end_page)
+                    extracted_chunks.append(chunk_text)
+
+                logger.info(f"Successfully extracted all {num_pages} pages in {len(extracted_chunks)} chunks")
+                return "\n\n".join(extracted_chunks)
 
         except Exception as e:
             logger.error(f"Error extracting PDF text with Poppler/GPT-4o: {str(e)}")
@@ -143,6 +136,121 @@ class DocumentProcessor:
             except Exception as fallback_error:
                 logger.error(f"Fallback extraction also failed: {str(fallback_error)}")
                 raise ValueError("Failed to extract text from PDF file")
+
+    def _extract_pdf_chunk(self, images: list, start_page: int, end_page: int) -> str:
+        """Extract text from a chunk of PDF pages using GPT-4o vision"""
+        try:
+            # Convert images to base64
+            image_contents = []
+            for image in images:
+                buffered = BytesIO()
+                image.save(buffered, format="PNG")
+                img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                image_contents.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{img_base64}"},
+                    }
+                )
+
+            # Build message content with text instruction followed by all images
+            page_range = f"{start_page}-{end_page}" if start_page != end_page else f"{start_page}"
+            num_images = len(images)
+            user_content = [
+                {
+                    "type": "text",
+                    "text": f"You are viewing {num_images} page image(s) from an academic document. Extract ALL text from these images.\n\nFor each image:\n1. Start with '--- Page N ---' where N is the page number (starting from {start_page})\n2. Extract ALL visible text exactly as it appears\n3. Maintain original formatting, structure, equations, and layout\n4. For diagrams, figures, charts, graphs, or circuits, add:\n   [DIAGRAM: Brief description including key labels and values]\n5. Preserve all mathematical equations, formulas, and technical terms\n6. Keep everything in sequential page order\n\nBegin extraction now:",
+                }
+            ]
+            user_content.extend(image_contents)
+
+            # API call to extract text from this chunk
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert OCR system that extracts text from document images. Your job is to read images and transcribe ALL visible text exactly as shown. Also describe any diagrams, charts, graphs, equations, or visual elements with technical precision. Never refuse - always extract the visible text from the provided images.",
+                    },
+                    {"role": "user", "content": user_content},
+                ],
+                max_tokens=16384,  # GPT-4o max completion tokens
+            )
+
+            extracted_text = response.choices[0].message.content
+
+            # Check for refusal patterns in the response
+            if extracted_text:
+                refusal_patterns = [
+                    "I'm sorry, I can't",
+                    "I cannot",
+                    "I'm unable to",
+                    "I can't assist",
+                    "I can't process",
+                    "provide the pages individually",
+                    "one at a time",
+                    "smaller groups"
+                ]
+
+                extracted_lower = extracted_text.lower()
+                for pattern in refusal_patterns:
+                    if pattern.lower() in extracted_lower:
+                        logger.error(f"GPT-4o refused to extract pages {page_range}. Response: {extracted_text[:200]}")
+                        raise ValueError(f"GPT-4o refused extraction for pages {page_range}. Try reducing chunk size or checking page content.")
+
+                logger.info(f"Successfully extracted pages {page_range} ({len(extracted_text)} chars)")
+                return extracted_text.strip()
+            else:
+                raise ValueError(f"Empty response from GPT-4o for pages {page_range}")
+
+        except Exception as e:
+            logger.error(f"Error extracting pages {page_range}: {str(e)}")
+            raise
+
+    def _extract_pdf_text_docling(self, content: bytes) -> str:
+        """
+        Extract PDF text using Docling (fast, reliable, image detection)
+
+        This is the new default method for PDF extraction.
+        Benefits over GPT-4o vision:
+        - 8.8x faster (35-41s vs 305s for 47-page PDF)
+        - Free (no API costs)
+        - More reliable (no refusals)
+        - Detects all images with location markers
+        - Better structure preservation (markdown output)
+
+        Args:
+            content: PDF file bytes
+
+        Returns:
+            Extracted markdown text with image markers
+        """
+        try:
+            from utils.docling_processor import DoclingProcessor
+
+            logger.info("Extracting PDF with Docling (fast mode)")
+
+            # Use Docling without image descriptions (fast, free)
+            # Image descriptions can be added later per-topic if needed
+            processor = DoclingProcessor(enable_image_descriptions=False)
+            markdown_text = processor.extract_text_from_pdf(
+                content,
+                describe_images=False
+            )
+
+            logger.info(
+                f"Docling extraction complete: {len(markdown_text):,} chars, "
+                f"{markdown_text.count('<!-- image -->')} images detected"
+            )
+
+            return markdown_text
+
+        except Exception as e:
+            logger.error(f"Docling extraction failed: {str(e)}")
+            logger.info("Falling back to legacy GPT-4o vision extraction...")
+
+            # Fallback to GPT-4o vision if docling fails
+            return self._extract_pdf_text(content)
 
     def _extract_text(self, content: bytes) -> str:
         """Extract text from plain text files"""

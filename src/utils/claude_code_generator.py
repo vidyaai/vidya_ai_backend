@@ -193,6 +193,17 @@ class ClaudeCodeGenerator:
 4. **Library-Specific Guidelines:**
 
 **MATPLOTLIB** (general plots, 2D diagrams, physics):
+
+**CRITICAL - VALID MATPLOTLIB COLORS ONLY:**
+ONLY use these color names or formats:
+- Named colors: 'red', 'blue', 'green', 'orange', 'purple', 'yellow', 'cyan', 'magenta', 'black', 'white', 'gray', 'brown', 'pink', 'lime', 'navy', 'olive', 'teal', 'maroon', 'silver', 'gold'
+- Hex codes: '#FF5733', '#3498DB', '#2ECC71', etc.
+- RGB tuples: (0.2, 0.5, 0.8), (1.0, 0.0, 0.0), etc. (values between 0.0 and 1.0)
+- RGBA tuples: (0.2, 0.5, 0.8, 0.7), etc. (fourth value is alpha 0.0-1.0)
+
+❌ INVALID COLORS - DO NOT USE:
+'lightorange', 'lightblue', 'darkred', 'darkblue', 'darkgreen', 'lightgreen', 'lightgray', 'darkgray', or ANY color name with 'light' or 'dark' prefix (except 'lightblue' is not valid despite seeming standard)
+
 ```python
 import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -215,6 +226,7 @@ fig, ax = plt.subplots(figsize=(10, 6))  # adjust per complexity
 #   bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='gray', alpha=0.9)
 # For dimension labels, use fontsize=14 or larger
 # For legend, use fontsize=12 with framealpha=0.9
+# CRITICAL: Use ONLY valid matplotlib colors from the list above!
 
 ax.set_xlim(0, 10)
 ax.set_ylim(0, 10)
@@ -476,7 +488,12 @@ plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')
 6. Use fontsize=14+ for dimension labels, axis labels, and annotations so text is readable in PDF
 7. MANDATORY: Use matplotlib mathtext for ALL subscripts — $y_1$ NOT 'y1', $P_2$ NOT 'P2', $V_{{out}}$ NOT 'Vout'
 8. MANDATORY: ALL text labels must have white bbox background for readability
-9. ANSWER HIDING (CRITICAL): This is a student assignment — the diagram must NOT reveal the answer.
+9. CRITICAL COLOR CONSTRAINT: Use ONLY valid matplotlib colors:
+   - Named: 'red', 'blue', 'green', 'orange', 'purple', 'yellow', 'cyan', 'magenta', 'black', 'white', 'gray', 'brown', 'pink', 'lime', 'navy', 'olive', 'teal', 'maroon', 'silver', 'gold'
+   - Hex codes: '#FF5733', '#3498DB', etc.
+   - RGB tuples: (0.2, 0.5, 0.8), etc.
+   - DO NOT use 'lightorange', 'lightblue', 'darkred', 'darkgreen', or ANY 'light*'/'dark*' prefix colors!
+10. ANSWER HIDING (CRITICAL): This is a student assignment — the diagram must NOT reveal the answer.
    - For timing/waveform diagrams: draw ONLY INPUT waveforms (CLK, D, A, B, EN, RESET).
      OUTPUT signals (Q, Q1, Q2, Q̄, Y) must be BLANK dashed lines with "?" labels.
      NEVER draw actual output waveform values — students must determine these.
