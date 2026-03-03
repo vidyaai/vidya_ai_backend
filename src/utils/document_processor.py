@@ -82,7 +82,6 @@ class DocumentProcessor:
         """Extract text from PDF files using Poppler and GPT-4o vision"""
         try:
             # Convert PDF pages to images using Poppler
-            print(type(content))  # Debug: print type of content
             images = convert_from_bytes(content, dpi=200)
             logger.info(f"Converted PDF to {len(images)} images")
 
