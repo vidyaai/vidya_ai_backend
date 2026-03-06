@@ -301,9 +301,7 @@ class AssignmentGenerator:
                 # Review questions
                 review_results = reviewer.review_questions(
                     questions=questions,
-                    lecture_notes_content=lecture_content[
-                        :5000
-                    ],  # Send first 5000 chars
+                    lecture_notes_content=lecture_content,  # Send full content for better review context
                     user_prompt=generation_prompt or "Generate assignment",
                     generation_options=generation_options,
                 )
@@ -423,8 +421,8 @@ class AssignmentGenerator:
         system_prompt = self._get_system_prompt(generation_options)
 
         # debug: Log the final prompt and system prompt before sending to AI
-        logger.info(f"Final system prompt for AI:\n{system_prompt}")
-        logger.info(f"Final user prompt for AI:\n{prompt}")
+        logger.info(f"Final system prompt for AI:\n{dedent(system_prompt)}")
+        logger.info(f"Final user prompt for AI:\n{dedent(prompt)}")
 
         # Generate questions using OpenAI with structured output
         try:
@@ -504,22 +502,14 @@ class AssignmentGenerator:
             context_parts.append("## Supporting Video Content:")
             for video in content_sources["video_transcripts"]:
                 context_parts.append(f"### {video['title']}")
-                context_parts.append(
-                    video["transcript"][:20000] + "..."
-                    if len(video["transcript"]) > 20000
-                    else video["transcript"]
-                )
+                context_parts.append(video["transcript"])
 
         # Add document content as supporting material
         if content_sources.get("document_texts"):
             context_parts.append("## Supporting Document Content:")
             for doc in content_sources["document_texts"]:
                 context_parts.append(f"### {doc['name']}")
-                context_parts.append(
-                    doc["content"][:20000] + "..."
-                    if len(doc["content"]) > 20000
-                    else doc["content"]
-                )
+                context_parts.append(doc["content"])
 
         return "\n\n".join(context_parts)
 
