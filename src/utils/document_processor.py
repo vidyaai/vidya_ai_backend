@@ -142,14 +142,18 @@ class DocumentProcessor:
             )
 
             extracted_text = response.choices[0].message.content
-            
+
             if extracted_text:
-                if len(extracted_text) < 1000:  # Debug: Check if extracted text is unusually short
+                if (
+                    len(extracted_text) < 1000
+                ):  # Debug: Check if extracted text is unusually short
                     logger.warning(
                         f"Extracted text is very short ({len(extracted_text)} characters). This may indicate an issue with the extraction process."
                     )
-                    raise ValueError("Extracted text is unexpectedly short, possible extraction failure.")
-            
+                    raise ValueError(
+                        "Extracted text is unexpectedly short, possible extraction failure."
+                    )
+
             if extracted_text:
                 logger.info(
                     f"Successfully extracted text from all {len(images)} pages in one API call"

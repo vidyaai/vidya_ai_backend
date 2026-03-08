@@ -187,7 +187,9 @@ Format your response as JSON:
         """Format questions for review prompt"""
         formatted = []
         for i, q in enumerate(questions, 1):
-            equations = q.get("equations", []) # [{'id': 'q2_eq1', 'latex': 'K = \\frac{AE}{L} \\begin{bmatrix} 1 & -1 \\\\ -1 & 1 \\end{bmatrix}', 'position': {'char_index': 54, 'context': 'correctAnswer'}}]
+            equations = q.get(
+                "equations", []
+            )  # [{'id': 'q2_eq1', 'latex': 'K = \\frac{AE}{L} \\begin{bmatrix} 1 & -1 \\\\ -1 & 1 \\end{bmatrix}', 'position': {'char_index': 54, 'context': 'correctAnswer'}}]
             formatted_equations = []
             for eq in equations:
                 eq_id = eq.get("id", "unknown")

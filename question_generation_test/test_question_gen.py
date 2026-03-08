@@ -117,6 +117,7 @@ def create_linked_videos(video_urls):
     """Create linked videos data structure for generation input"""
     return [{"url": url} for url in video_urls]
 
+
 def create_lecture_notes(note_paths):
     """Create lecture notes data structure for generation input"""
     lecture_notes = []
@@ -124,11 +125,13 @@ def create_lecture_notes(note_paths):
         if path.exists():
             with open(path, "rb") as f:
                 content = base64.b64encode(f.read())
-                lecture_notes.append({
-                    "name": path.name,
-                    "type": "application/pdf",  # Assuming PDF, could be enhanced to detect type
-                    "content": content,
-                })
+                lecture_notes.append(
+                    {
+                        "name": path.name,
+                        "type": "application/pdf",  # Assuming PDF, could be enhanced to detect type
+                        "content": content,
+                    }
+                )
         else:
             logger.warning(f"Lecture note file not found: {path}")
     return lecture_notes
@@ -142,7 +145,11 @@ def main():
         "-input", "--input", required=False, help="Path to input prompt file"
     )
     parser.add_argument(
-        "-lecture-notes", "--lecture-notes", nargs="*", required=False, help="Paths to lecture notes file (space-separated)"
+        "-lecture-notes",
+        "--lecture-notes",
+        nargs="*",
+        required=False,
+        help="Paths to lecture notes file (space-separated)",
     )
     parser.add_argument(
         "-linked-videos",
@@ -203,8 +210,10 @@ def main():
 
     input_path = Path(args.input) if args.input else None
     linked_video_urls = args.linked_videos if args.linked_videos else None
-    lecture_note_paths = [Path(ln) for ln in args.lecture_notes] if args.lecture_notes else None
-    
+    lecture_note_paths = (
+        [Path(ln) for ln in args.lecture_notes] if args.lecture_notes else None
+    )
+
     generation_prompt = None
     if input_path and not input_path.exists():
         print(f"❌ Error: Input file not found: {args.input}")
@@ -215,7 +224,9 @@ def main():
             generation_prompt = f.read().strip()
 
     if not generation_prompt and not linked_video_urls and not lecture_note_paths:
-        print("❌ Error: either input prompt, linked videos, or lecture notes must be provided")
+        print(
+            "❌ Error: either input prompt, linked videos, or lecture notes must be provided"
+        )
         return 1
 
     # Create output directory for this run
@@ -268,12 +279,25 @@ def main():
             else f"   Prompt: {generation_prompt}"
         ) if generation_prompt else "   No input prompt provided"
         print(f"   Linked videos: {linked_video_urls if linked_video_urls else 'None'}")
-        print(f"   Lecture notes: {[ln.name for ln in lecture_note_paths] if lecture_note_paths else 'None'}")
-        
-        linked_videos = create_linked_videos(linked_video_urls) if linked_video_urls else None
-        lecture_notes = create_lecture_notes(lecture_note_paths) if lecture_note_paths else None
-        
-        print("Lecture notes processed:", (lecture_notes[0].keys() if lecture_notes else "No lecture notes to process"))
+        print(
+            f"   Lecture notes: {[ln.name for ln in lecture_note_paths] if lecture_note_paths else 'None'}"
+        )
+
+        linked_videos = (
+            create_linked_videos(linked_video_urls) if linked_video_urls else None
+        )
+        lecture_notes = (
+            create_lecture_notes(lecture_note_paths) if lecture_note_paths else None
+        )
+
+        print(
+            "Lecture notes processed:",
+            (
+                lecture_notes[0].keys()
+                if lecture_notes
+                else "No lecture notes to process"
+            ),
+        )
 
         # Initialize generator
         generator = AssignmentGenerator()
