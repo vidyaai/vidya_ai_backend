@@ -286,9 +286,13 @@ class LLMGrader:
             q_id = str(q.get("id"))
             q_type = q.get("type", "text")
             equations = q.get("equations", [])
-            question_text = self._sanitize_text_for_prompt(q.get("question", ""), equations)
+            question_text = self._sanitize_text_for_prompt(
+                q.get("question", ""), equations
+            )
             rubric = self._sanitize_text_for_prompt(q.get("rubric", ""), equations)
-            correct_answer = self._sanitize_text_for_prompt(q.get("correctAnswer", q.get("correct_answer", "")), equations)
+            correct_answer = self._sanitize_text_for_prompt(
+                q.get("correctAnswer", q.get("correct_answer", "")), equations
+            )
             max_pts = float(q.get("points", 0) or 0)
 
             prompt_parts.append(f"QUESTION {q_id} ({q_type}):")
@@ -379,10 +383,12 @@ class LLMGrader:
 
         return total_score, total_points, feedback_by_question, overall_feedback
 
-    def _sanitize_text_for_prompt(self, text: str, equations: List[dict[str, Any]] = []) -> str:
+    def _sanitize_text_for_prompt(
+        self, text: str, equations: List[dict[str, Any]] = []
+    ) -> str:
         if not text:
             return ""
-        
+
         # Replace LaTeX equations with text equations
         for eq in equations:
             eq_id = eq.get("id")
@@ -846,9 +852,16 @@ class LLMGrader:
             q_id = str(question.get("id"))
             q_type = question.get("type", "text")
             equations = question.get("equations", [])
-            question_text = self._sanitize_text_for_prompt(question.get("question", ""), equations)
-            rubric = self._sanitize_text_for_prompt(question.get("rubric", ""), equations)
-            correct_answer = self._sanitize_text_for_prompt(question.get("correctAnswer", question.get("correct_answer", "")), equations)
+            question_text = self._sanitize_text_for_prompt(
+                question.get("question", ""), equations
+            )
+            rubric = self._sanitize_text_for_prompt(
+                question.get("rubric", ""), equations
+            )
+            correct_answer = self._sanitize_text_for_prompt(
+                question.get("correctAnswer", question.get("correct_answer", "")),
+                equations,
+            )
             max_points = float(question.get("points", 0) or 0)
 
             # Add question details

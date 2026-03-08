@@ -842,7 +842,9 @@ class AssignmentDocumentParser:
 
             # Recurse into subquestions, passing current path as parent
             for sub in q.get("subquestions", []) or []:
-                items.extend(_collect_items_needing_generation(sub, parent_path=current_path))
+                items.extend(
+                    _collect_items_needing_generation(sub, parent_path=current_path)
+                )
 
             return items
 
@@ -966,7 +968,9 @@ class AssignmentDocumentParser:
             )
 
             # Update original questions in-place using the mapping
-            def _apply_generation_to_question(q: Dict[str, Any], parent_path: Optional[str] = None):
+            def _apply_generation_to_question(
+                q: Dict[str, Any], parent_path: Optional[str] = None
+            ):
                 q_id = q.get("id")
                 # Must mirror the same hierarchical path logic used during collection
                 path = (
