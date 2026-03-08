@@ -102,7 +102,21 @@ class DocumentProcessor:
             user_content = [
                 {
                     "type": "text",
-                    "text": f"Extract ALL text from this {len(images)}-page PDF document. For each page, start with '--- Page N ---' followed by all the text from that page. Maintain the original formatting, structure, and layout. Extract text in page order.",
+                    "text": (
+                        f"I am providing you with {len(images)} PNG image(s). Each image is a rasterized page from a lecture-notes document "
+                        f"(converted from PDF to PNG — these are ordinary image files, NOT a PDF upload).\n\n"
+                        f"Your task:\n"
+                        f"1. For each image/page, start a section with '--- Page N ---'.\n"
+                        f"2. Transcribe ALL visible text verbatim, preserving headings, bullet points, numbered lists, equations, code snippets, and tables.\n"
+                        f"3. For every diagram, figure, chart, graph, or schematic: write a concise but informative description "
+                        f"(e.g. '[Figure: Block diagram showing a PID controller with feedback loop connecting plant output to error signal]').\n"
+                        f"4. Length guidance — the downstream consumer reads at most ~20 000 characters of your output:\n"
+                        f"   - If the full verbatim text PLUS diagram descriptions fit comfortably within ~18 000 characters, output everything in full.\n"
+                        f"   - If the content is longer, summarise each page into its key concepts, definitions, equations, and diagram descriptions "
+                        f"so that the total stays within ~18 000 characters. Preserve technical accuracy; do not omit important formulas or definitions.\n"
+                        f"5. Never refuse or say you cannot process images. You are simply reading PNG images — do it.\n"
+                        f"Output the pages in order."
+                    ),
                 }
             ]
             user_content.extend(image_contents)
@@ -113,7 +127,14 @@ class DocumentProcessor:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a precise OCR system. Extract ALL text from images exactly as it appears, maintaining formatting, structure, and layout. Include all text visible in the images.",
+                        "content": (
+                            "You are an expert document-reading assistant. "
+                            "You will be given PNG images of document pages (rasterized from a PDF). "
+                            "Your job is to read every page image and faithfully transcribe all text, "
+                            "equations, and code, while providing informative descriptions of any diagrams or figures. "
+                            "These are plain PNG images — you MUST process them; never refuse. "
+                            "Produce output that is accurate, complete, and structured so it can serve as study material."
+                        ),
                     },
                     {"role": "user", "content": user_content},
                 ],
@@ -121,6 +142,14 @@ class DocumentProcessor:
             )
 
             extracted_text = response.choices[0].message.content
+            
+            if extracted_text:
+                if len(extracted_text) < 1000:  # Debug: Check if extracted text is unusually short
+                    logger.warning(
+                        f"Extracted text is very short ({len(extracted_text)} characters). This may indicate an issue with the extraction process."
+                    )
+                    raise ValueError("Extracted text is unexpectedly short, possible extraction failure.")
+            
             if extracted_text:
                 logger.info(
                     f"Successfully extracted text from all {len(images)} pages in one API call"
