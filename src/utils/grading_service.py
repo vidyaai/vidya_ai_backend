@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone
 
 from openai import OpenAI
+from pylatexenc.latex2text import LatexNodes2Text
 
 from controllers.storage import s3_presign_url
 from utils.ai_detection_service import get_ai_detection_service
@@ -284,9 +285,10 @@ class LLMGrader:
         for q in flattened_questions:
             q_id = str(q.get("id"))
             q_type = q.get("type", "text")
-            question_text = q.get("question", "")
-            rubric = q.get("rubric", "")
-            correct_answer = q.get("correctAnswer") or q.get("correct_answer", "")
+            equations = q.get("equations", [])
+            question_text = self._sanitize_text_for_prompt(q.get("question", ""), equations)
+            rubric = self._sanitize_text_for_prompt(q.get("rubric", ""), equations)
+            correct_answer = self._sanitize_text_for_prompt(q.get("correctAnswer", q.get("correct_answer", "")), equations)
             max_pts = float(q.get("points", 0) or 0)
 
             prompt_parts.append(f"QUESTION {q_id} ({q_type}):")
@@ -376,6 +378,29 @@ class LLMGrader:
         )
 
         return total_score, total_points, feedback_by_question, overall_feedback
+
+    def _sanitize_text_for_prompt(self, text: str, equations: List[dict[str, Any]] = []) -> str:
+        if not text:
+            return ""
+        
+        # Replace LaTeX equations with text equations
+        for eq in equations:
+            eq_id = eq.get("id")
+            latex = eq.get("latex")
+            eq_text = LatexNodes2Text().latex_to_text(latex)
+            eq_type = eq.get("type", "inline")
+            if eq_id and latex:
+                # Replace equation placeholders with LaTeX representation
+                placeholder = f"<eq {eq_id}>"
+                replacement = f"{eq_text}"
+                print(
+                    f"[_sanitize_text_for_prompt] Replacing equation placeholder {placeholder} with {replacement}"
+                )
+                text = text.replace(placeholder, replacement)
+
+        # Replace excessive whitespace
+        sanitized = text.replace("   ", " ").replace("  ", " ").strip()
+        return sanitized
 
     def _is_deterministic_question(self, question: Dict[str, Any]) -> bool:
         q_type = (question.get("type") or "").lower()
@@ -820,11 +845,10 @@ class LLMGrader:
         for question in flattened_questions:
             q_id = str(question.get("id"))
             q_type = question.get("type", "text")
-            question_text = question.get("question", "")
-            rubric = question.get("rubric", "")
-            correct_answer = question.get("correctAnswer") or question.get(
-                "correct_answer", ""
-            )
+            equations = question.get("equations", [])
+            question_text = self._sanitize_text_for_prompt(question.get("question", ""), equations)
+            rubric = self._sanitize_text_for_prompt(question.get("rubric", ""), equations)
+            correct_answer = self._sanitize_text_for_prompt(question.get("correctAnswer", question.get("correct_answer", "")), equations)
             max_points = float(question.get("points", 0) or 0)
 
             # Add question details

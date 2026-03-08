@@ -102,8 +102,8 @@ STRICT RULE:
 USER PROMPT/TOPIC:
 {user_prompt}
 
-LECTURE NOTES CONTENT (excerpt):
-{lecture_notes_content[:3000]}...  # First 3000 chars for context
+LECTURE NOTES CONTENT:
+{lecture_notes_content}
 
 GENERATION OPTIONS:
 - Difficulty: {generation_options.get('difficulty', 'mixed')}
@@ -187,6 +187,12 @@ Format your response as JSON:
         """Format questions for review prompt"""
         formatted = []
         for i, q in enumerate(questions, 1):
+            equations = q.get("equations", []) # [{'id': 'q2_eq1', 'latex': 'K = \\frac{AE}{L} \\begin{bmatrix} 1 & -1 \\\\ -1 & 1 \\end{bmatrix}', 'position': {'char_index': 54, 'context': 'correctAnswer'}}]
+            formatted_equations = []
+            for eq in equations:
+                eq_id = eq.get("id", "unknown")
+                eq_latex = eq.get("latex", "N/A")
+                formatted_equations.append(f"{eq_id} (latex: {eq_latex})")
             formatted.append(
                 f"""
 Question {i}:
@@ -194,6 +200,7 @@ Type: {q.get('type', 'unknown')}
 Points: {q.get('points', 0)}
 Has Diagram: {q.get('hasDiagram', False)}
 Question Text: {q.get('question', 'N/A')}
+Equations: {', '.join(formatted_equations) if formatted_equations else 'N/A'}
 Correct Answer: {q.get('correctAnswer', 'N/A')[:200]}...
 """
             )

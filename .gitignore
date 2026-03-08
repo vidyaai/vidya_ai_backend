@@ -36,3 +36,5 @@ question_papers_log/
 *.log
 
 debug/
+
+question_generation_test/run*

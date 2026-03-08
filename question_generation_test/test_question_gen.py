@@ -13,6 +13,7 @@ Usage:
 Subjects: electrical, mechanical, cs, civil, math, physics, chemistry, computer_eng
 """
 
+import base64
 import sys
 import os
 import json
@@ -112,12 +113,43 @@ def save_images_to_folder(questions: list, output_dir: Path):
     return images_saved
 
 
+def create_linked_videos(video_urls):
+    """Create linked videos data structure for generation input"""
+    return [{"url": url} for url in video_urls]
+
+def create_lecture_notes(note_paths):
+    """Create lecture notes data structure for generation input"""
+    lecture_notes = []
+    for path in note_paths:
+        if path.exists():
+            with open(path, "rb") as f:
+                content = base64.b64encode(f.read())
+                lecture_notes.append({
+                    "name": path.name,
+                    "type": "application/pdf",  # Assuming PDF, could be enhanced to detect type
+                    "content": content,
+                })
+        else:
+            logger.warning(f"Lecture note file not found: {path}")
+    return lecture_notes
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate assignment questions programmatically"
     )
     parser.add_argument(
-        "-input", "--input", required=True, help="Path to input prompt file"
+        "-input", "--input", required=False, help="Path to input prompt file"
+    )
+    parser.add_argument(
+        "-lecture-notes", "--lecture-notes", nargs="*", required=False, help="Paths to lecture notes file (space-separated)"
+    )
+    parser.add_argument(
+        "-linked-videos",
+        "--linked-videos",
+        nargs="*",
+        required=False,
+        help="List of linked video URLs (space-separated)",
     )
     parser.add_argument(
         "-subject",
@@ -169,17 +201,21 @@ def main():
 
     args = parser.parse_args()
 
-    # Read input prompt
-    input_path = Path(args.input)
-    if not input_path.exists():
+    input_path = Path(args.input) if args.input else None
+    linked_video_urls = args.linked_videos if args.linked_videos else None
+    lecture_note_paths = [Path(ln) for ln in args.lecture_notes] if args.lecture_notes else None
+    
+    generation_prompt = None
+    if input_path and not input_path.exists():
         print(f"❌ Error: Input file not found: {args.input}")
         return 1
 
-    with open(input_path, "r") as f:
-        generation_prompt = f.read().strip()
+    if input_path:
+        with open(input_path, "r") as f:
+            generation_prompt = f.read().strip()
 
-    if not generation_prompt:
-        print("❌ Error: Input prompt is empty")
+    if not generation_prompt and not linked_video_urls and not lecture_note_paths:
+        print("❌ Error: either input prompt, linked videos, or lecture notes must be provided")
         return 1
 
     # Create output directory for this run
@@ -192,7 +228,7 @@ def main():
     print(f"ASSIGNMENT GENERATION TEST - RUN {run_number}")
     print(f"{'='*60}")
     print(f"Subject: {args.subject}")
-    print(f"Input prompt: {input_path.name}")
+    print(f"Input prompt: {input_path.name if input_path else 'None'}")
     print(f"Level: {args.level}")
     print(f"Engine: {args.engine}")
     print(
@@ -213,10 +249,12 @@ def main():
             "true-false": False,
             "fill-in-blanks": False,
             "diagram-analysis": False,  # Off, but model decides intelligently
+            "multipart": True,  # Enable multipart questions
         },
-        "difficultyLevel": "graduate" if args.level == "grad" else "undergraduate",
+        "engineeringLevel": "graduate" if args.level == "grad" else "undergraduate",
+        "engineeringDiscipline": args.subject,
+        "difficultyLevel": "mixed",
         "includeRubric": True,
-        "multipartQuestions": True,  # Enable multipart questions
     }
 
     # Generate unique assignment ID
@@ -228,7 +266,14 @@ def main():
             f"   Prompt: {generation_prompt[:100]}..."
             if len(generation_prompt) > 100
             else f"   Prompt: {generation_prompt}"
-        )
+        ) if generation_prompt else "   No input prompt provided"
+        print(f"   Linked videos: {linked_video_urls if linked_video_urls else 'None'}")
+        print(f"   Lecture notes: {[ln.name for ln in lecture_note_paths] if lecture_note_paths else 'None'}")
+        
+        linked_videos = create_linked_videos(linked_video_urls) if linked_video_urls else None
+        lecture_notes = create_lecture_notes(lecture_note_paths) if lecture_note_paths else None
+        
+        print("Lecture notes processed:", (lecture_notes[0].keys() if lecture_notes else "No lecture notes to process"))
 
         # Initialize generator
         generator = AssignmentGenerator()
@@ -236,8 +281,8 @@ def main():
         # Generate assignment
         assignment_data = generator.generate_assignment(
             generation_options=generation_options,
-            linked_videos=None,
-            uploaded_files=None,
+            linked_videos=linked_videos,
+            uploaded_files=lecture_notes,
             generation_prompt=generation_prompt,
             title=f"Test Assignment - Run {run_number}",
             description=f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",

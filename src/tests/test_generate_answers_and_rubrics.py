@@ -21,7 +21,7 @@ from utils.assignment_document_parser import AssignmentDocumentParser
 
 
 # Load Q2.json
-Q2_JSON_PATH = "src/tests/test_files/Q2.json"
+Q2_JSON_PATH = "src/tests/test_files/Q3.json"
 
 
 def test_generate_missing_answers_and_rubrics():
@@ -35,8 +35,8 @@ def test_generate_missing_answers_and_rubrics():
 
     # mock images
     image_files = [
-        "src/tests/test_files/Q2/page_1.png",
-        "src/tests/test_files/Q2/page_2.png",
+        "src/tests/test_files/Q3/page_1.png",
+        # "src/tests/test_files/Q2/page_2.png",
     ]  # list of image file paths corresponding to input_data
     images = [Image.open(img_path) for img_path in image_files]
 
@@ -53,19 +53,30 @@ def test_generate_missing_answers_and_rubrics():
 
     for q in result["questions"]:
         print(f"\nQ{q['id']}:")
-        for sub in q.get("subquestions", []):
-            answer = sub.get("correctAnswer", "")[:100]
-            rubric = sub.get("rubric", "")[:50]
-            equations = sub.get("equations", [])
+        if q.get("type") == "multi-part":
+            for sub in q.get("subquestions", []):
+                answer = sub.get("correctAnswer", "")[:100]
+                rubric = sub.get("rubric", "")[:50]
+                equations = sub.get("equations", [])
+                if equations:
+                    print(
+                        f"  {sub['id']}: answer={answer}... rubric={rubric}... equations={equations}..."
+                    )
+                else:
+                    print(f"  {sub['id']}: answer={answer}... rubric={rubric}...")
+        else:
+            answer = q.get("correctAnswer", "")[:100]
+            rubric = q.get("rubric", "")[:50]
+            equations = q.get("equations", [])
             if equations:
                 print(
-                    f"  {sub['id']}: answer={answer}... rubric={rubric}... equations={equations}..."
+                    f"  answer={answer}... rubric={rubric}... equations={equations}..."
                 )
             else:
-                print(f"  {sub['id']}: answer={answer}... rubric={rubric}...")
+                print(f"  answer={answer}... rubric={rubric}...")
 
     return result
 
 
 if __name__ == "__main__":
-    test_generate_missing_answers_and_rubrics()
+    print(test_generate_missing_answers_and_rubrics())
