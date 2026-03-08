@@ -808,12 +808,18 @@ class AssignmentDocumentParser:
         logger.info("Step 3.1: Collecting question groups and batching using GPT-4o...")
 
         def _collect_items_needing_generation(
-            q: Dict[str, Any]
+            q: Dict[str, Any], parent_path: Optional[str] = None
         ) -> List[Dict[str, Any]]:
             """Recursively collect all items (question + subquestions) that need generation."""
             items: List[Dict[str, Any]] = []
             q_id = q.get("id")
-            path = str(q_id) if q_id is not None else None
+            # Build hierarchical path to avoid id collisions across question families
+            # e.g. Q1.sub1 -> "1_1", Q2.sub1 -> "2_1", Q2.sub1.subsub1 -> "2_1_1"
+            current_path = (
+                (f"{parent_path}_{q_id}" if parent_path is not None else str(q_id))
+                if q_id is not None
+                else None
+            )
             needs_answer = (
                 not bool(q.get("correctAnswer"))
                 if q.get("type") != "multi-part"
@@ -824,19 +830,19 @@ class AssignmentDocumentParser:
             )
 
             # Add this question if it needs generation
-            if path and (needs_answer or needs_rubric):
+            if current_path and (needs_answer or needs_rubric):
                 items.append(
                     {
-                        "path": path,
+                        "path": current_path,
                         "question": q,
                         "needs_answer": needs_answer,
                         "needs_rubric": needs_rubric,
                     }
                 )
 
-            # Recurse into subquestions
+            # Recurse into subquestions, passing current path as parent
             for sub in q.get("subquestions", []) or []:
-                items.extend(_collect_items_needing_generation(sub))
+                items.extend(_collect_items_needing_generation(sub, parent_path=current_path))
 
             return items
 
@@ -960,8 +966,14 @@ class AssignmentDocumentParser:
             )
 
             # Update original questions in-place using the mapping
-            def _apply_generation_to_question(q: Dict[str, Any]):
-                path = str(q.get("id")) if q.get("id") is not None else None
+            def _apply_generation_to_question(q: Dict[str, Any], parent_path: Optional[str] = None):
+                q_id = q.get("id")
+                # Must mirror the same hierarchical path logic used during collection
+                path = (
+                    (f"{parent_path}_{q_id}" if parent_path is not None else str(q_id))
+                    if q_id is not None
+                    else None
+                )
                 if path and path in all_generated:
                     gen = all_generated[path]
                     # Accept multiple possible key names from LLM
@@ -983,7 +995,7 @@ class AssignmentDocumentParser:
                         q["equations"] = eqs
 
                 for sub in q.get("subquestions", []) or []:
-                    _apply_generation_to_question(sub)
+                    _apply_generation_to_question(sub, parent_path=path)
 
             for q in questions:
                 _apply_generation_to_question(q)

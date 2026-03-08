@@ -2421,103 +2421,6 @@ async def submit_assignment(
             .first()
         )
 
-        # Handle PDF submission method - convert PDF to JSON immediately
-        if (
-            submission_data.submission_method == "pdf"
-            and submission_data.submitted_files
-        ):
-            # Get the PDF file from submitted_files
-            pdf_file_info = (
-                submission_data.submitted_files[0]
-                if submission_data.submitted_files
-                else None
-            )
-
-            if pdf_file_info and pdf_file_info.get("s3_key"):
-                try:
-                    # Download PDF from S3 temporarily
-                    import tempfile
-
-                    with tempfile.NamedTemporaryFile(
-                        delete=False, suffix=".pdf"
-                    ) as tmp:
-                        s3_client.download_fileobj(
-                            AWS_S3_BUCKET, pdf_file_info["s3_key"], tmp
-                        )
-                        tmp_pdf_path = tmp.name
-
-                    # Convert PDF to JSON using PDFAnswerProcessor
-                    from utils.pdf_answer_processor import PDFAnswerProcessor
-
-                    processor = PDFAnswerProcessor()
-                    answers_from_pdf = processor.process_pdf_to_json(
-                        tmp_pdf_path, assignment.questions or []
-                    )
-
-                    # Clean up temp file
-                    os.unlink(tmp_pdf_path)
-
-                    # Override answers with extracted data
-                    submission_data.answers = answers_from_pdf
-
-                    logger.info(
-                        f"Converted PDF to JSON for submission: {len(answers_from_pdf)} answers extracted"
-                    )
-
-                except Exception as e:
-                    logger.error(f"Error processing PDF to JSON: {str(e)}")
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail=f"Failed to process PDF submission: {str(e)}",
-                    )
-
-        # Validate optional parts selection
-        questions = assignment.questions or []
-        for question in questions:
-            q_id = str(question.get("id"))
-            if question.get("type") == "multi-part" and question.get("optionalParts"):
-                required_count = question.get("requiredPartsCount", 0)
-                answer_obj = submission_data.answers.get(q_id)
-
-                answered_subqs = []
-                if answer_obj and isinstance(answer_obj, dict):
-                    subanswers = answer_obj.get("subAnswers", {})
-                    # Count non-empty answers
-                    answered_subqs = [k for k, v in subanswers.items() if v]
-
-                if len(answered_subqs) != required_count:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Question {q_id}: Must answer exactly {required_count} of {len(question.get('subquestions', []))} parts (answered {len(answered_subqs)})",
-                    )
-
-                # Recursively validate nested optional parts
-                if question.get("subquestions"):
-                    for subq in question.get("subquestions", []):
-                        subq_id = str(subq.get("id"))
-                        if subq.get("type") == "multi-part" and subq.get(
-                            "optionalParts"
-                        ):
-                            subq_required_count = subq.get("requiredPartsCount", 0)
-                            subq_answer = (
-                                answer_obj.get("subAnswers", {}).get(subq_id)
-                                if answer_obj
-                                else None
-                            )
-
-                            subq_answered = []
-                            if subq_answer and isinstance(subq_answer, dict):
-                                subq_subanswers = subq_answer.get("subAnswers", {})
-                                subq_answered = [
-                                    k for k, v in subq_subanswers.items() if v
-                                ]
-
-                            if len(subq_answered) != subq_required_count:
-                                raise HTTPException(
-                                    status_code=status.HTTP_400_BAD_REQUEST,
-                                    detail=f"Question {q_id}, Sub-question {subq_id}: Must answer exactly {subq_required_count} of {len(subq.get('subquestions', []))} parts",
-                                )
-
         if existing_submission:
             # Check if already submitted - prevent resubmission
             if (
@@ -2542,32 +2445,6 @@ async def submit_assignment(
             db.commit()
             db.refresh(existing_submission)
 
-            # Extract diagrams from PDF submission (foreground task)
-            if (
-                submission_data.submission_method == "pdf"
-                and submission_data.submitted_files
-                and existing_submission.answers
-            ):
-                from utils.pdf_answer_processor import PDFAnswerProcessor
-                from sqlalchemy.orm.attributes import flag_modified
-
-                processor = PDFAnswerProcessor()
-                updated_answers = processor.extract_and_upload_diagrams(
-                    submission_id=existing_submission.id,
-                    pdf_s3_key=submission_data.submitted_files[0].get("s3_key"),
-                    answers=existing_submission.answers,
-                    s3_client=s3_client,
-                    s3_bucket=AWS_S3_BUCKET,
-                    s3_upload_func=s3_upload_file,
-                )
-                # Update submission with extracted diagram s3_keys
-                # Use flag_modified to ensure SQLAlchemy detects the JSON change
-                existing_submission.answers = updated_answers
-                flag_modified(existing_submission, "answers")
-                existing_submission.updated_at = datetime.now(timezone.utc)
-                db.commit()
-                db.refresh(existing_submission)
-
             logger.info(
                 f"Updated submission for assignment {assignment_id} by user {user_id}"
             )
@@ -2589,32 +2466,6 @@ async def submit_assignment(
             db.add(submission)
             db.commit()
             db.refresh(submission)
-
-            # Extract diagrams from PDF submission (foreground task)
-            if (
-                submission_data.submission_method == "pdf"
-                and submission_data.submitted_files
-                and submission.answers
-            ):
-                from utils.pdf_answer_processor import PDFAnswerProcessor
-                from sqlalchemy.orm.attributes import flag_modified
-
-                processor = PDFAnswerProcessor()
-                updated_answers = processor.extract_and_upload_diagrams(
-                    submission_id=submission.id,
-                    pdf_s3_key=submission_data.submitted_files[0].get("s3_key"),
-                    answers=submission.answers,
-                    s3_client=s3_client,
-                    s3_bucket=AWS_S3_BUCKET,
-                    s3_upload_func=s3_upload_file,
-                )
-                # Update submission with extracted diagram s3_keys
-                # Use flag_modified to ensure SQLAlchemy detects the JSON change
-                submission.answers = updated_answers
-                flag_modified(submission, "answers")
-                submission.updated_at = datetime.now(timezone.utc)
-                db.commit()
-                db.refresh(submission)
 
             logger.info(
                 f"Created submission for assignment {assignment_id} by user {user_id}"
@@ -2945,21 +2796,13 @@ async def bulk_upload_pdfs(
                         answers={},  # Will be populated by PDF processing
                         submission_method="on-behalf",
                         submitted_files=submitted_files,
-                        status="processing",  # Start with processing status
+                        status="submitted",  # No need to process, set to submitted directly
                         submitted_at=datetime.now(timezone.utc),
                     )
                     db.add(submission)
 
                 db.commit()
                 db.refresh(submission)
-
-                # Schedule PDF processing in background thread
-                thread = threading.Thread(
-                    target=process_pdf_in_background,
-                    args=(submission.id, s3_key, assignment.questions or []),
-                )
-                thread.daemon = True
-                thread.start()
 
                 successful_uploads.append(
                     {
