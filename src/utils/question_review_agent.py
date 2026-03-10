@@ -5,9 +5,11 @@ Validates generated questions against lecture notes and user requirements.
 Acts as a quality control step to ensure questions are appropriate and aligned.
 """
 
+import re
 from typing import Dict, List, Any, Optional
 from openai import OpenAI
 from controllers.config import logger
+from pylatexenc.latex2text import LatexNodes2Text
 
 
 class QuestionReviewAgent:
@@ -183,6 +185,52 @@ Format your response as JSON:
                 },
             }
 
+    def _sanitize_text_for_prompt(
+        self, text: str, equations: List[dict[str, Any]] = []
+    ) -> str:
+        if not text:
+            return ""
+
+        # Replace LaTeX equations with text equations
+        for eq in equations:
+            eq_id = eq.get("id")
+            latex = eq.get("latex")
+            eq_text = LatexNodes2Text().latex_to_text(latex)
+            eq_type = eq.get("type", "inline")
+            if eq_id and latex:
+                # Replace equation placeholders with LaTeX representation
+                placeholder = f"<eq {eq_id}>"
+                replacement = f"{eq_text}"
+                print(
+                    f"[_sanitize_text_for_prompt] Replacing equation placeholder {placeholder} with {replacement}"
+                )
+                text = text.replace(placeholder, replacement)
+
+        # Replace excessive whitespace
+        sanitized = text.replace("   ", " ").replace("  ", " ").strip()
+        return sanitized
+
+    def _resolve_equation_placeholders(
+        self, question: Dict[str, Any], text: str
+    ) -> str:
+        """
+        Replace <eq ID> placeholders with their LaTeX values so the diagram
+        agent and downstream tools see actual values instead of opaque tokens.
+
+        Example: "<eq q2_eq1>" → "01"  (from the question's equations array)
+        """
+        equations = question.get("equations", [])
+        if not equations:
+            return text
+
+        resolved = self._sanitize_text_for_prompt(text, equations)
+        if resolved != text:
+            logger.info(
+                f"Resolved {len(equations)} equation placeholders in question text"
+            )
+        
+        return resolved
+
     def _format_questions_for_review(self, questions: List[Dict[str, Any]]) -> str:
         """Format questions for review prompt"""
         formatted = []
@@ -201,9 +249,7 @@ Question {i}:
 Type: {q.get('type', 'unknown')}
 Points: {q.get('points', 0)}
 Has Diagram: {q.get('hasDiagram', False)}
-Question Text: {q.get('question', 'N/A')}
-Equations: {', '.join(formatted_equations) if formatted_equations else 'N/A'}
-Correct Answer: {q.get('correctAnswer', 'N/A')[:200]}...
+Question Text: {self._resolve_equation_placeholders(q, q.get('question', 'N/A'))}
 """
             )
         return "\n".join(formatted)
