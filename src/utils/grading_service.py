@@ -150,7 +150,6 @@ class LLMGrader:
             return (response.content[0].text or "").strip()
 
         elif self.provider == "gemini":
-            import google.genai as _genai
             from google.genai import types as _genai_types
 
             parts: List[Any] = []
@@ -326,7 +325,9 @@ class LLMGrader:
             # Use Structured Outputs schema for Gemini if available
             schema = GeminiGradingResponse if HAS_PYDANTIC and self.provider == "gemini" else None
             # Increase tokens for Gemini to accommodate Chain-of-Thought
-            max_tokens_to_use = 8000 if self.provider == "gemini" else 2000
+            # max_tokens_to_use = 8000 if self.provider == "gemini" else 2000
+            # For grading, we want to allow as much response as possible to get detailed feedback, so we'll use max tokens for all providers. The main constraint is the model's overall context window, which should be sufficient given our prompt and expected response size.
+            max_tokens_to_use = 8000
 
             # Make single LLM call
             result_text = self._call_llm(
@@ -1154,8 +1155,21 @@ class LLMGrader:
         overall_feedback = ""
 
         try:
+            import re as _re
+            # Strip markdown code fences and leading/trailing prose before parsing
+            clean_text = response_text
+            md_match = _re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', clean_text)
+            if md_match:
+                clean_text = md_match.group(1)
+            else:
+                # Fall back to extracting the outermost JSON object
+                first_brace = clean_text.find('{')
+                last_brace = clean_text.rfind('}')
+                if first_brace != -1 and last_brace != -1:
+                    clean_text = clean_text[first_brace:last_brace + 1]
+
             # Try to parse as JSON
-            response_data = json.loads(response_text)
+            response_data = json.loads(clean_text)
 
             # Handle structured Gemini 'grades' array safely
             if "grades" in response_data and isinstance(response_data["grades"], list):

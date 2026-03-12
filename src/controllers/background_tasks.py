@@ -315,7 +315,7 @@ def grade_submission_background(
         # model = "gpt-4o"
         # model = "gpt-5"
         # model = "claude-sonnet-4-6"
-        model = "gemini-2.0-flash"
+        model = "gemini-2.5-flash"
         grader = LLMGrader(model=model)
 
         # for PDF submissions, grade directly from the raw PDF via vision LLM
