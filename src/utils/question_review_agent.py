@@ -228,7 +228,7 @@ Format your response as JSON:
             logger.info(
                 f"Resolved {len(equations)} equation placeholders in question text"
             )
-        
+
         return resolved
 
     def _format_questions_for_review(self, questions: List[Dict[str, Any]]) -> str:

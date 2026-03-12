@@ -18,6 +18,7 @@ from utils.ai_detection_service import get_ai_detection_service
 # Safely import Pydantic to enable Strict Structured Outputs for Gemini
 try:
     from pydantic import BaseModel
+
     class GeminiQuestionGrade(BaseModel):
         question_id: str
         reasoning: str
@@ -29,6 +30,7 @@ try:
     class GeminiGradingResponse(BaseModel):
         grades: List[GeminiQuestionGrade]
         overall_feedback: str
+
     HAS_PYDANTIC = True
 except ImportError:
     HAS_PYDANTIC = False
@@ -62,9 +64,13 @@ class LLMGrader:
             self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
         elif self.provider == "anthropic":
             import anthropic as _anthropic
-            self.client = _anthropic.Anthropic(api_key=api_key or os.getenv("ANTHROPIC_API_KEY"))
+
+            self.client = _anthropic.Anthropic(
+                api_key=api_key or os.getenv("ANTHROPIC_API_KEY")
+            )
         elif self.provider == "gemini":
             import google.genai as _genai
+
             self.client = _genai.Client(api_key=api_key or os.getenv("GOOGLE_API_KEY"))
         else:
             raise ValueError(f"Unsupported provider for model: {model}")
@@ -96,7 +102,9 @@ class LLMGrader:
         if self.provider == "openai":
             system_msg = {"role": "system", "content": system_content}
             # Reasoning models (gpt-5, o-series) use reasoning_effort instead of temperature
-            if self.model.startswith("gpt-5") or self.model.startswith(("o1", "o3", "o4")):
+            if self.model.startswith("gpt-5") or self.model.startswith(
+                ("o1", "o3", "o4")
+            ):
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[system_msg, {"role": "user", "content": user_content}],
@@ -118,29 +126,39 @@ class LLMGrader:
                     anthropic_content.append({"type": "text", "text": part["text"]})
                 elif part.get("type") == "pdf_document":
                     # Native Anthropic PDF support — send raw PDF as a document block
-                    anthropic_content.append({
-                        "type": "document",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "application/pdf",
-                            "data": part["base64"],
-                        },
-                    })
+                    anthropic_content.append(
+                        {
+                            "type": "document",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "application/pdf",
+                                "data": part["base64"],
+                            },
+                        }
+                    )
                 elif part.get("type") == "image_url":
                     url = part["image_url"]["url"]
                     if url.startswith("data:"):
                         # Base64 data URL
                         header, data = url.split(",", 1)
                         media_type = header.split(":")[1].split(";")[0]
-                        anthropic_content.append({
-                            "type": "image",
-                            "source": {"type": "base64", "media_type": media_type, "data": data},
-                        })
+                        anthropic_content.append(
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": media_type,
+                                    "data": data,
+                                },
+                            }
+                        )
                     else:
-                        anthropic_content.append({
-                            "type": "image",
-                            "source": {"type": "url", "url": url},
-                        })
+                        anthropic_content.append(
+                            {
+                                "type": "image",
+                                "source": {"type": "url", "url": url},
+                            }
+                        )
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=max_tokens,
@@ -162,12 +180,22 @@ class LLMGrader:
                         header, data = url.split(",", 1)
                         media_type = header.split(":")[1].split(";")[0]
                         image_bytes = base64.b64decode(data)
-                        parts.append(_genai_types.Part.from_bytes(data=image_bytes, mime_type=media_type))
+                        parts.append(
+                            _genai_types.Part.from_bytes(
+                                data=image_bytes, mime_type=media_type
+                            )
+                        )
                     else:
                         resp = _requests.get(url, timeout=30)
                         resp.raise_for_status()
-                        content_type = resp.headers.get("content-type", "image/jpeg").split(";")[0]
-                        parts.append(_genai_types.Part.from_bytes(data=resp.content, mime_type=content_type))
+                        content_type = resp.headers.get(
+                            "content-type", "image/jpeg"
+                        ).split(";")[0]
+                        parts.append(
+                            _genai_types.Part.from_bytes(
+                                data=resp.content, mime_type=content_type
+                            )
+                        )
 
             # Dynamically build config to support optional schema enforcement
             config_kwargs = {
@@ -323,7 +351,11 @@ class LLMGrader:
             print("user_content", user_content)
 
             # Use Structured Outputs schema for Gemini if available
-            schema = GeminiGradingResponse if HAS_PYDANTIC and self.provider == "gemini" else None
+            schema = (
+                GeminiGradingResponse
+                if HAS_PYDANTIC and self.provider == "gemini"
+                else None
+            )
             # Increase tokens for Gemini to accommodate Chain-of-Thought
             # max_tokens_to_use = 8000 if self.provider == "gemini" else 2000
             # For grading, we want to allow as much response as possible to get detailed feedback, so we'll use max tokens for all providers. The main constraint is the model's overall context window, which should be sufficient given our prompt and expected response size.
@@ -436,15 +468,15 @@ class LLMGrader:
                 "Return ONLY a JSON object with this exact structure:\n"
                 "{\n"
                 '  "grades": [\n'
-                '    {\n'
+                "    {\n"
                 '      "question_id": "<id>",\n'
                 '      "reasoning": "<step-by-step logic against rubric>",\n'
                 '      "score": <float in [0, max_points]>,\n'
                 '      "strengths": "<brief strengths>",\n'
                 '      "areas_for_improvement": "<areas to improve>",\n'
                 '      "breakdown": "<detailed analysis>"\n'
-                '    }\n'
-                '  ],\n'
+                "    }\n"
+                "  ],\n"
                 '  "overall_feedback": "<overall assessment>"\n'
                 "}\n\n"
                 "Grade strictly according to the rubric and max points for each question.\n"
@@ -508,7 +540,9 @@ class LLMGrader:
         if self.provider == "anthropic":
             # Send the raw PDF directly — Claude handles text + visual extraction natively
             b64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
-            print(f"[grade_pdf_direct] using Anthropic native PDF support ({len(pdf_bytes)} bytes)")
+            print(
+                f"[grade_pdf_direct] using Anthropic native PDF support ({len(pdf_bytes)} bytes)"
+            )
             # Anthropic recommends placing the document BEFORE the text prompt
             page_parts: List[Dict[str, Any]] = [
                 {"type": "pdf_document", "base64": b64_pdf}
@@ -517,7 +551,9 @@ class LLMGrader:
             # Convert each page to a JPEG and send as image_url parts
             tmp_pdf_path: Optional[str] = None
             try:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=".pdf"
+                ) as tmp_pdf:
                     tmp_pdf.write(pdf_bytes)
                     tmp_pdf_path = tmp_pdf.name
 
@@ -552,7 +588,9 @@ class LLMGrader:
 
         # For Anthropic the document block must come before the text prompt
         if self.provider == "anthropic":
-            user_content: List[Dict[str, Any]] = page_parts + [{"type": "text", "text": prompt_text}]
+            user_content: List[Dict[str, Any]] = page_parts + [
+                {"type": "text", "text": prompt_text}
+            ]
         else:
             user_content = [{"type": "text", "text": prompt_text}] + page_parts
 
@@ -560,7 +598,11 @@ class LLMGrader:
             f"[grade_pdf_direct] making LLM call ({self.provider}, {len(page_parts)} content part(s))"
         )
 
-        schema = GeminiGradingResponse if HAS_PYDANTIC and self.provider == "gemini" else None
+        schema = (
+            GeminiGradingResponse
+            if HAS_PYDANTIC and self.provider == "gemini"
+            else None
+        )
 
         result_text = self._call_llm(
             system_content=system_msg["content"],
@@ -1043,15 +1085,15 @@ class LLMGrader:
                 "Return your response as JSON with the following structure:\n"
                 "{\n"
                 '  "grades": [\n'
-                '    {\n'
+                "    {\n"
                 '      "question_id": "<id>",\n'
                 '      "reasoning": "<step-by-step logic against rubric>",\n'
                 '      "score": <float in [0, max_points]>,\n'
                 '      "strengths": "<brief strengths>",\n'
                 '      "areas_for_improvement": "<areas to improve>",\n'
                 '      "breakdown": "<detailed analysis>"\n'
-                '    }\n'
-                '  ],\n'
+                "    }\n"
+                "  ],\n"
                 '  "overall_feedback": "<overall assessment>"\n'
                 "}\n\n"
                 "GRADING CRITERIA:\n"
@@ -1156,17 +1198,18 @@ class LLMGrader:
 
         try:
             import re as _re
+
             # Strip markdown code fences and leading/trailing prose before parsing
             clean_text = response_text
-            md_match = _re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', clean_text)
+            md_match = _re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", clean_text)
             if md_match:
                 clean_text = md_match.group(1)
             else:
                 # Fall back to extracting the outermost JSON object
-                first_brace = clean_text.find('{')
-                last_brace = clean_text.rfind('}')
+                first_brace = clean_text.find("{")
+                last_brace = clean_text.rfind("}")
                 if first_brace != -1 and last_brace != -1:
-                    clean_text = clean_text[first_brace:last_brace + 1]
+                    clean_text = clean_text[first_brace : last_brace + 1]
 
             # Try to parse as JSON
             response_data = json.loads(clean_text)
@@ -1174,10 +1217,10 @@ class LLMGrader:
             # Handle structured Gemini 'grades' array safely
             if "grades" in response_data and isinstance(response_data["grades"], list):
                 overall_feedback = response_data.get("overall_feedback", "")
-                
+
                 for grade_item in response_data["grades"]:
                     q_id = str(grade_item.get("question_id"))
-                    
+
                     # Look up max points dynamically to clamp safely
                     max_points = 0.0
                     for q in flattened_questions:
@@ -1191,13 +1234,19 @@ class LLMGrader:
                     reasoning = grade_item.get("reasoning", "")
                     raw_breakdown = grade_item.get("breakdown", "")
                     # Prepend reasoning logic if present for visibility
-                    breakdown = f"Reasoning: {reasoning}\n\n{raw_breakdown}" if reasoning else raw_breakdown
+                    breakdown = (
+                        f"Reasoning: {reasoning}\n\n{raw_breakdown}"
+                        if reasoning
+                        else raw_breakdown
+                    )
 
                     feedback_by_question[q_id] = {
                         "score": score,
                         "max_points": max_points,
                         "strengths": grade_item.get("strengths", ""),
-                        "areas_for_improvement": grade_item.get("areas_for_improvement", ""),
+                        "areas_for_improvement": grade_item.get(
+                            "areas_for_improvement", ""
+                        ),
                         "breakdown": breakdown,
                     }
                 return feedback_by_question, overall_feedback

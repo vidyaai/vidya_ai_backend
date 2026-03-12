@@ -22,6 +22,7 @@ sys.path.insert(0, str(src_dir))
 
 from utils.grading_service import LLMGrader
 
+
 def test_pdf_grading():
     # Load test PDF submissions and assignment details
     test_data_dir = Path(__file__).parent / "test_files"
@@ -61,19 +62,23 @@ def test_pdf_grading():
                     pdf_s3_key=pdf_s3_key,
                     options={},
                 )
-                results[pdf_id].append({
-                    "model": model,
-                    "total_score": total_score,
-                    "total_points": total_points,
-                    "feedback_by_question": feedback_by_question,
-                    "overall_feedback": overall_feedback,
-                })
+                results[pdf_id].append(
+                    {
+                        "model": model,
+                        "total_score": total_score,
+                        "total_points": total_points,
+                        "feedback_by_question": feedback_by_question,
+                        "overall_feedback": overall_feedback,
+                    }
+                )
         except Exception as e:
             print(f"Error grading with model {model}: {str(e)}")
-            results[pdf_id].append({
-                "model": model,
-                "error": str(e),
-            })
+            results[pdf_id].append(
+                {
+                    "model": model,
+                    "error": str(e),
+                }
+            )
 
     out_dir = "src/tests/grading_results"
     os.makedirs(out_dir, exist_ok=True)
@@ -83,15 +88,19 @@ def test_pdf_grading():
         json.dump(results, f, indent=4)
 
     import pandas as pd
+
     all_results = []
     for pdf_id, pdf_results in results.items():
         for res in pdf_results:
-            all_results.append({
-                "pdf_id": pdf_id,
-                **res,
-            })
+            all_results.append(
+                {
+                    "pdf_id": pdf_id,
+                    **res,
+                }
+            )
     df = pd.DataFrame(all_results)
     df.to_csv(os.path.join(out_dir, "grading_results.csv"), index=False)
+
 
 if __name__ == "__main__":
     test_pdf_grading()
