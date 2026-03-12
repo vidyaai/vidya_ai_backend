@@ -3,7 +3,7 @@ import threading
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from utils.db import SessionLocal
-from utils.youtube_utils import download_video
+# from utils.youtube_utils import download_video  # Disabled - YouTube download not working
 from utils.format_transcript import create_formatted_transcript
 from models import Video, Assignment, AssignmentSubmission
 from .config import (
@@ -25,6 +25,17 @@ def download_video_background(video_id: str, url: str, user_id: str):
     logger.info(f"Starting background download for video ID: {video_id}")
     db = SessionLocal()
     try:
+        # Check if it's a YouTube URL - skip download as it's not working
+        if "youtube.com" in url or "youtu.be" in url:
+            logger.info(f"Skipping YouTube video download for {video_id} - download disabled")
+            status = {
+                "status": "skipped",
+                "message": "YouTube video download disabled - using transcript only",
+                "path": None,
+            }
+            update_download_status(db, video_id, status)
+            return
+
         status = {
             "status": "downloading",
             "message": "Video download in progress...",
