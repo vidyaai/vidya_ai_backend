@@ -308,7 +308,14 @@ def grade_submission_background(
         # Run grading
         from utils.grading_service import LLMGrader
 
-        model = options.get("model", "gpt-4o") if options else "gpt-4o"
+        # Switch provider by changing the model string:
+        #   OpenAI   — "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-5", "o3-mini"
+        #   Anthropic — "claude-3-7-sonnet-20250219", "claude-3-5-haiku-20241022"
+        #   Gemini   — "gemini-2.0-flash", "gemini-1.5-pro"
+        # model = "gpt-4o"
+        # model = "gpt-5"
+        # model = "claude-sonnet-4-6"
+        model = "gemini-2.5-flash"
         grader = LLMGrader(model=model)
 
         # for PDF submissions, grade directly from the raw PDF via vision LLM

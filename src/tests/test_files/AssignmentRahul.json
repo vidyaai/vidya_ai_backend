@@ -1,0 +1,831 @@
+{
+    "id": "3b149b63-2275-4c8a-86e4-7a22d2ce7663",
+    "user_id": "TgHuQkY3QVSCtxg0l1mwWCQWXV02",
+    "title": "End Semester Examination (1st Semester) – December 2024",
+    "description": "Course Code: EL/MD-540; Course Name: Computer Application (CAD & CAM).",
+    "course_id": "859efa0a-2665-478c-9cc2-62a7655c8c4d",
+    "due_date": null,
+    "total_points": "72",
+    "total_questions": "6",
+    "status": "published",
+    "shared_count": "0",
+    "question_types": [
+        "multi-part",
+        "long-answer"
+    ],
+    "engineering_level": "undergraduate",
+    "engineering_discipline": "general",
+    "google_form_url": null,
+    "google_form_response_url": null,
+    "questions": [
+        {
+            "id": 1,
+            "code": "",
+            "type": "multi-part",
+            "order": 1,
+            "points": 12,
+            "rubric": "",
+            "hasCode": false,
+            "options": [],
+            "question": "Answer all subparts.",
+            "equations": [
+                {
+                    "id": "q1_4_eq1",
+                    "type": "inline",
+                    "latex": "3+7*2",
+                    "position": {
+                        "context": "question_text",
+                        "char_index": 54
+                    }
+                }
+            ],
+            "hasDiagram": false,
+            "outputType": "",
+            "rubricType": "per-subquestion",
+            "codeLanguage": "",
+            "subquestions": [
+                {
+                    "id": 1,
+                    "code": "",
+                    "type": "short-answer",
+                    "order": 1,
+                    "points": 1,
+                    "rubric": "Full credit (1.0): Clearly states that process planning determines and documents the sequence of manufacturing operations and resources (machines, tools/fixtures, parameters) to transform a design/blank into a finished part. Partial credit (0.5): Mentions either (a) determining operations/sequences, or (b) selecting resources (tools/machines) but not both, or omits the transformation objective. No credit (0): Vague or incorrect descriptions (e.g., only scheduling or only product design).",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "Define Process Planning ?",
+                    "equations": [],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "Process planning is the systematic determination and documentation of the manufacturing processes needed to convert a design (raw material or blank) into a finished part, including selection and sequencing of operations, machines, tools, fixtures, cutting parameters, inspection steps, and routing.",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                },
+                {
+                    "id": 2,
+                    "code": "",
+                    "type": "short-answer",
+                    "order": 1,
+                    "points": 1,
+                    "rubric": "Full credit (1.0): States that hybrid CAPP integrates variant/retrieval (GT-based) and generative (rule-based/feature-based) methods, using a retrieved baseline plan refined by generative logic. Partial credit (0.5): Mentions both variant and generative but not how they are combined, or mentions combining retrieval with rule-based refinement without explicitly naming both. No credit (0): Describes only one approach or mischaracterizes CAPP.",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "What is hybrid CAPP ?",
+                    "equations": [],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "Hybrid CAPP (Computer-Aided Process Planning) combines the variant (retrieval/group technology) approach with the generative approach: it starts from standardized plans retrieved for part families and then algorithmically refines/extends them based on part features and rules to produce an optimized, part-specific plan.",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                },
+                {
+                    "id": 3,
+                    "code": "",
+                    "type": "short-answer",
+                    "order": 1,
+                    "points": 1,
+                    "rubric": "Full credit (1.0): Defines meshing as discretizing the domain into finite elements with nodes and notes its role in enabling numerical approximation and its impact on accuracy/cost. Partial credit (0.5): Mentions discretization into elements but omits nodes or the purpose/impact. No credit (0): Confuses meshing with rendering or non-FEA concepts.",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "What is meshing in FEA ?",
+                    "equations": [],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "Meshing in FEA is the discretization of a continuous geometry into a finite number of small elements (e.g., beams, trusses, shells, tetrahedra, hexahedra) connected at nodes, so that the field equations can be approximated piecewise. Mesh size/quality controls accuracy and computational cost.",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                },
+                {
+                    "id": 4,
+                    "code": "",
+                    "type": "short-answer",
+                    "order": 1,
+                    "points": 1,
+                    "rubric": "Full credit (1.0): Applies MATLAB operator precedence (multiplication before addition) to evaluate 3+7*2 as 17, showing intermediate step 7*2=14 then 3+14=17. Partial credit (0.5): States correct precedence but gives no intermediate step or minor arithmetic slip corrected. No credit (0): Evaluates left-to-right as (3+7)*2=20 or otherwise incorrect.",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "What is the output of the MATLAB command <eq q1_4_eq1> ?",
+                    "equations": [
+                        {
+                            "id": "q1_4_eq1",
+                            "type": "inline",
+                            "latex": "3+7*2",
+                            "position": {
+                                "context": "question_text",
+                                "char_index": 54
+                            }
+                        },
+                        {
+                            "id": "q1_4_step1",
+                            "type": "inline",
+                            "latex": "7\\times 2=14",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 46
+                            }
+                        },
+                        {
+                            "id": "q1_4_step2",
+                            "type": "inline",
+                            "latex": "3+14=17",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 79
+                            }
+                        },
+                        {
+                            "id": "q1_4_ans",
+                            "type": "inline",
+                            "latex": "17",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 109
+                            }
+                        }
+                    ],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "Operator precedence applies: multiplication before addition. Compute <eq q1_4_step1>, then add 3: <eq q1_4_step2>. Result: <eq q1_4_ans>.",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                },
+                {
+                    "id": 5,
+                    "code": "",
+                    "type": "short-answer",
+                    "order": 1,
+                    "points": 1,
+                    "rubric": "Full credit (1.0): States that mirror creates a symmetric copy across a reference and specifies the requirement of a mirror plane/axis (reference geometry). Partial credit (0.5): Mentions symmetry copying but omits the need for a reference, or vaguely states “needs a plane” without describing symmetry. No credit (0): Misstates function (e.g., rotates or scales) or omits requirement.",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "What does the mirror tool do and what is the requirement for mirroring ?",
+                    "equations": [],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "The mirror tool creates a symmetric copy of selected geometry/features across a reference. Requirement: a defined mirror reference (plane, face, datum plane, or axis/line of symmetry) and selectable source geometry/features to mirror.",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                },
+                {
+                    "id": 6,
+                    "code": "",
+                    "type": "short-answer",
+                    "order": 1,
+                    "points": 1,
+                    "rubric": "Full credit (1.0): Gives clearvars (or clear all with correct note that it also clears functions) as the command to clear all variables. Partial credit (0.5): Gives clear all without qualification but intent is correct. No credit (0): Other commands (e.g., clc, close all) without mentioning clearvars/clear all.",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "Which command clears all variables from workspace ?",
+                    "equations": [],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "clearvars  (clears all variables from the workspace). Note: clear all also removes variables but additionally clears functions and MEX links.",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                },
+                {
+                    "id": 7,
+                    "code": "",
+                    "type": "short-answer",
+                    "order": 1,
+                    "points": 1,
+                    "rubric": "Full credit (1.0): Clearly contrasts curves: tough material has large area under curve (high toughness), significant plastic deformation before fracture; soft material has lower modulus/strength, earlier yielding, smaller area; references area under curve concept. Partial credit (0.5): Describes only one of the two correctly or compares incompletely (e.g., mentions lower strength for soft but omits area/toughness concept). No credit (0): Confuses toughness with hardness/strength or provides irrelevant descriptions.",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "Draw the stress-strain diagram of a tough and soft material.",
+                    "equations": [],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "A tough material’s stress–strain curve shows a large area under the curve (high energy absorption), typically with substantial elastic region, clear yield, long plastic region, and high fracture strain/stress. A soft material (low strength, often lower modulus) shows a lower initial slope (E), early yielding at low stress, lower ultimate strength, and a smaller area under the curve; it may be ductile (large strain but at low stress) or compliant with limited strength. Key comparison: Tough = large area under curve; Soft = lower slope and strengths, smaller area.",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                },
+                {
+                    "id": 8,
+                    "code": "",
+                    "type": "short-answer",
+                    "order": 1,
+                    "points": 1,
+                    "rubric": "Full credit (1.0): States parallel line to elastic slope, offset by 0.2% strain (0.002 in strain), intersection defines yield strength. Partial credit (0.5): Mentions offset or parallel to elastic slope but omits numerical value or intersection criterion. No credit (0): Incorrect definition (e.g., at 0.2% stress).",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "What is 0.2% offset yield method ?",
+                    "equations": [
+                        {
+                            "id": "q1_8_eps",
+                            "type": "inline",
+                            "latex": "\\varepsilon=0.002\\;\\text{(0.2\\%)}",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 157
+                            }
+                        }
+                    ],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "The 0.2% offset yield method defines yield strength by drawing a line parallel to the initial elastic (Young’s modulus) slope but offset by <eq q1_8_eps> strain to the right; the intersection of this offset line with the stress–strain curve gives the 0.2% offset yield strength.",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                },
+                {
+                    "id": 9,
+                    "code": "",
+                    "type": "short-answer",
+                    "order": 1,
+                    "points": 1,
+                    "rubric": "Full credit (1.0): Defines toughness as energy absorption to fracture and identifies area under the stress–strain curve (energy per unit volume). Partial credit (0.5): Mentions energy absorption but not fracture limit or omits the area-under-curve measure. No credit (0): Confuses with strength or hardness.",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "Define Toughness ?",
+                    "equations": [],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "Toughness is the ability of a material to absorb energy up to fracture; quantitatively, it is the total area under the engineering stress–strain curve up to the point of fracture (energy per unit volume).",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                },
+                {
+                    "id": 10,
+                    "code": "",
+                    "type": "short-answer",
+                    "order": 1,
+                    "points": 1,
+                    "rubric": "Full credit (1.0): Distinguishes G (preparatory/motion/mode) from M (miscellaneous/machine functions) with examples or clear roles. Partial credit (0.5): States G for motion and M for machine functions without elaboration. No credit (0): Reverses roles or gives unrelated meanings.",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "What are G and M codes ?",
+                    "equations": [],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "In CNC, G-codes are preparatory codes that specify motion and machining modes (e.g., linear/interpolated moves, plane selection), while M-codes are miscellaneous codes that control machine functions (e.g., spindle, coolant, program stop).",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                },
+                {
+                    "id": 11,
+                    "code": "",
+                    "type": "short-answer",
+                    "order": 1,
+                    "points": 1,
+                    "rubric": "Full credit (1.0): Provides “Computer Numerical Control.” Partial credit (0.5): Minor wording issues preserving meaning (e.g., “computerized numerical control”). No credit (0): Any other expansion.",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "What does CNC stands for ?",
+                    "equations": [],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "CNC stands for Computer Numerical Control.",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                },
+                {
+                    "id": 12,
+                    "code": "",
+                    "type": "short-answer",
+                    "order": 1,
+                    "points": 1,
+                    "rubric": "Full credit (1.0): States shell (plate/shell or membrane) elements are used for thin structures. Partial credit (0.5): Mentions plates/shells without context or says “2D elements for thin structures.” No credit (0): States solid bricks/tetrahedra as primary choice without mentioning shells.",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "What type of elements are used for modelling thin structures in FEA?",
+                    "equations": [],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "Shell (plate/shell or membrane) finite elements are used to model thin structures; they capture bending and in-plane behavior efficiently for thin-walled parts.",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                }
+            ],
+            "correctAnswer": "",
+            "optionalParts": false,
+            "requiredPartsCount": 12,
+            "allowMultipleCorrect": false,
+            "multipleCorrectAnswers": []
+        },
+        {
+            "id": 2,
+            "code": "",
+            "type": "multi-part",
+            "order": 2,
+            "points": 12,
+            "rubric": "",
+            "hasCode": false,
+            "options": [],
+            "question": "Answer the following (2 parts):",
+            "equations": [],
+            "hasDiagram": false,
+            "outputType": "",
+            "rubricType": "per-subquestion",
+            "codeLanguage": "",
+            "subquestions": [
+                {
+                    "id": 1,
+                    "code": "",
+                    "type": "multi-part",
+                    "order": 1,
+                    "points": 6,
+                    "rubric": "",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "(i) A patient is given a drug where the dosage increases by 20 mg every hour, starting from the 1st hour up to the 5th hour. Write a MATLAB program that:",
+                    "equations": [],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "subquestions": [
+                        {
+                            "id": 1,
+                            "code": "",
+                            "type": "code-writing",
+                            "order": 1,
+                            "points": 3,
+                            "rubric": "Grading rubric (0.0 points total, award partial credit where applicable):\n- Correct use of fopen with 'w' mode to create dosage.txt (or equivalent method that explicitly creates the file): 40%\n- Proper error/return code check for fopen (e.g., fid == -1) OR a brief justification if omitted (in minimal scripts): 15%\n- Proper fclose(fid) to avoid resource leak: 35%\n- Clear comments or brief explanation of each step (what fopen does, why close): 10%\nCommon issues and partial credit:\n- Uses incorrect filename or wrong mode: minor filename typo (−10%), wrong mode (e.g., 'r') but otherwise correct structure (max 40% credit lost).\n- Omits fclose: deduct 35%.\n- Different but valid environment (e.g., C or Python) accepted if it explicitly creates dosage.txt and closes it; award proportional credit to the above criteria.",
+                            "hasCode": false,
+                            "options": [],
+                            "question": "(a) Creates a text file named dosage.txt.",
+                            "equations": [],
+                            "hasDiagram": false,
+                            "outputType": "code",
+                            "rubricType": "overall",
+                            "codeLanguage": "",
+                            "correctAnswer": "MATLAB/Octave code to create an empty text file named dosage.txt and ensure it is closed:\n\n% (a) Create a text file named dosage.txt\nfid = fopen('dosage.txt','w');   % open for writing (creates/overwrites file)\nif fid == -1\n    error('Failed to create dosage.txt');\nend\nfclose(fid);                      % always close the file\n\nExplanation of steps:\n- fopen with mode 'w' creates the file if it does not exist, or truncates it if it does.\n- Check fid for -1 to ensure the file opened successfully.\n- fclose releases the file handle so the file is saved and not locked.",
+                            "optionalParts": false,
+                            "requiredPartsCount": 0,
+                            "allowMultipleCorrect": false,
+                            "multipleCorrectAnswers": []
+                        },
+                        {
+                            "id": 2,
+                            "code": "",
+                            "type": "code-writing",
+                            "order": 1,
+                            "points": 3,
+                            "rubric": "Grading rubric (0.0 points total, award partial credit where applicable):\n- Correct file handling: fopen with write mode, fid check, and fclose: 30%\n- Correct tabular output using fprintf with tab separators (\\t) and newline (\\n): 30%\n- Correctly iterates over paired time and dosage arrays (matching lengths, writes all rows): 25%\n- Reasonable numeric formatting (e.g., %.2f/%.4f) and/or header line: 10%\n- Comments/explanations for clarity: 5%\nCommon issues and partial credit:\n- Missing fid check: −10%.\n- No tabs/newlines (e.g., space-separated but consistent): up to −15%.\n- Vectorized fprintf without loop is acceptable if it writes aligned columns; award full credit if correct.\n- Mismatched array lengths or off-by-one errors: deduct proportionally (up to −25%).",
+                            "hasCode": false,
+                            "options": [],
+                            "question": "(b) Stores the values of time (in hours) and dosage (in mg) in a tabular format using fopen, fprintf, and fclose.",
+                            "equations": [],
+                            "hasDiagram": false,
+                            "outputType": "code",
+                            "rubricType": "overall",
+                            "codeLanguage": "",
+                            "correctAnswer": "MATLAB/Octave code using fopen, fprintf, and fclose to store time (hours) and dosage (mg) in tabular format:\n\n% (b) Write time (h) and dosage (mg) to dosage.txt in tabular format\n% Example data (replace with actual vectors as needed)\ntime   = [0 6 12 18 24 30 36 42];      % hours\ndosage = [80 40 20 10 5 2.5 1.25 0.625]; % mg\n\nfid = fopen('dosage.txt','w');\nif fid == -1\n    error('Failed to open dosage.txt for writing');\nend\n\n% Optional header\nfprintf(fid, 'Time(h)\\tDosage(mg)\\n');\n\n% Write rows in tab-separated format\nfor k = 1:numel(time)\n    fprintf(fid, '%.2f\\t%.4f\\n', time(k), dosage(k));\nend\n\nfclose(fid);\n\nExplanation of steps:\n- fopen in 'w' creates/overwrites dosage.txt for writing.\n- fprintf writes a header, then each row with tab separation (\\t) and newline (\\n).\n- Formatting controls numeric precision (%.2f for hours, %.4f for mg).\n- fclose saves and releases the file.",
+                            "optionalParts": false,
+                            "requiredPartsCount": 0,
+                            "allowMultipleCorrect": false,
+                            "multipleCorrectAnswers": []
+                        }
+                    ],
+                    "correctAnswer": "",
+                    "optionalParts": false,
+                    "requiredPartsCount": 2,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                },
+                {
+                    "id": 2,
+                    "code": "",
+                    "type": "code-writing",
+                    "order": 1,
+                    "points": 6,
+                    "rubric": "Points: 6.0 total. Award partial credit as follows:\n- Model setup (1.5 pts)\n  - States/uses correct half-life relation A(t) = A0*(1/2)^(t/6) OR the discrete step model A_n = A0*(1/2)^n with 6-hour steps: 1.0 pt\n  - Correct inequality goal A < 1 mg: 0.5 pt\n- Analytical reasoning (optional but creditable) (1.5 pts)\n  - Solves 80*(1/2)^(t/6) < 1 to get t > 6*log(80)/log(2) ≈ 37.93 h (continuous threshold): 1.0 pt\n  - Distinguishes discrete 6-hour steps vs. continuous time and identifies need to take the next multiple of 6 hours: 0.5 pt\n- While-loop implementation (2.0 pts)\n  - Correct loop condition and update: while amount >= 1, amount = amount/2, hours = hours + 6: 1.5 pts\n  - Proper initialization (amount=80, hours=0) and termination with first time strictly below 1 mg: 0.5 pt\n- Final result and interpretation (1.0 pt)\n  - Reports 42 hours as the first time the amount is less than 1 mg and, if shown, the corresponding amount 0.625 mg: 1.0 pt\nCommon errors and partial credit guidance:\n- Gives 36 or 38 hours from continuous model without adjusting to discrete steps: cap at 3.0/6 if reasoning is otherwise correct.\n- Off-by-one in loop (e.g., uses > instead of >= leading to 36 hours): deduct 1.0–1.5 pts.\n- Arithmetic/printing only minor issues but correct logic/result: deduct up to 0.5 pt.",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "(ii) A drug quantity in the body reduces to half after every 6 hours. Starting from 80 mg, use a while loop to find after how many hours the amount will become less than 1 mg?",
+                    "equations": [
+                        {
+                            "id": "q2_2_eq1",
+                            "type": "inline",
+                            "latex": "A(t)=A_0\\left(\\tfrac{1}{2}\\right)^{t/6}",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 229
+                            }
+                        },
+                        {
+                            "id": "q2_2_eq2",
+                            "type": "inline",
+                            "latex": "A(t)<1\\ \\text{mg}",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 311
+                            }
+                        },
+                        {
+                            "id": "q2_2_eq3",
+                            "type": "inline",
+                            "latex": "80\\left(\\tfrac{1}{2}\\right)^{t/6}<1",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 357
+                            }
+                        },
+                        {
+                            "id": "q2_2_eq4",
+                            "type": "inline",
+                            "latex": "t>6\\,\\frac{\\ln(80)}{\\ln(2)}",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 553
+                            }
+                        },
+                        {
+                            "id": "q2_2_eq5",
+                            "type": "inline",
+                            "latex": "t>6\\,\\frac{\\ln(80)}{\\ln(2)}\\approx 37.93\\ \\text{h}",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 618
+                            }
+                        },
+                        {
+                            "id": "q2_2_eq6",
+                            "type": "inline",
+                            "latex": "A_n=80\\left(\\tfrac{1}{2}\\right)^n",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 768
+                            }
+                        },
+                        {
+                            "id": "q2_2_eq7",
+                            "type": "inline",
+                            "latex": "A_n<1",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 820
+                            }
+                        },
+                        {
+                            "id": "q2_2_eq8",
+                            "type": "inline",
+                            "latex": "80\\left(\\tfrac{1}{2}\\right)^n<1\\iff n>\\log_2(80)",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 840
+                            }
+                        },
+                        {
+                            "id": "q2_2_eq9",
+                            "type": "inline",
+                            "latex": "n=\\lceil\\log_2(80)\\rceil=7",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 897
+                            }
+                        },
+                        {
+                            "id": "q2_2_eq10",
+                            "type": "inline",
+                            "latex": "t=6n=42\\ \\text{h}",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 927
+                            }
+                        }
+                    ],
+                    "hasDiagram": false,
+                    "outputType": "code",
+                    "rubricType": "overall",
+                    "codeLanguage": "MATLAB",
+                    "correctAnswer": "We are told the drug amount halves every 6 hours, starting from 80 mg. We will use a while loop that updates the amount by halving and increments time by 6 hours each iteration until the amount is below 1 mg. We also verify with the exponential half-life model.\n\nStep-by-step mathematical model:\n1) Define half-life model: <eq q2_2_eq1>\n2) We seek the first time t such that <eq q2_2_eq2>\n3) Substitute A0 = 80 mg: <eq q2_2_eq3>\n4) Solve the inequality (continuous model) by taking natural logs on both sides and using ln rules:\n   - Since ln(1/2) < 0, dividing by it reverses inequality, yielding <eq q2_2_eq4>\n5) Compute the numeric value: <eq q2_2_eq5>\n   - This continuous-time threshold occurs at about 37.93 hours, but because the process occurs in discrete 6-hour halvings, we need the first multiple of 6 hours when A(t) drops below 1 mg.\n6) Discrete halving steps: After n halvings, amount is <eq q2_2_eq6>. We need the smallest integer n with <eq q2_2_eq7>, i.e., <eq q2_2_eq8>, hence <eq q2_2_eq9>. Therefore time is <eq q2_2_eq10>.\n\nConclusion (discrete process aligned with while loop): The amount first becomes less than 1 mg after 42 hours.\n\nMATLAB/Octave while-loop implementation:\n\n% (ii) Half-life halving every 6 hours: start 80 mg, stop when < 1 mg\namount = 80;      % mg\nhours  = 0;       % h\nwhile amount >= 1\n    amount = amount / 2;  % halve every 6 hours\n    hours  = hours + 6;   % advance time by 6 hours\nend\nfprintf('Amount falls below 1 mg after %d hours (amount = %.3f mg).\\n', hours, amount);\n\nOutput: hours = 42, amount = 0.625 mg (first time strictly below 1 mg).",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                }
+            ],
+            "correctAnswer": "",
+            "optionalParts": false,
+            "requiredPartsCount": 2,
+            "allowMultipleCorrect": false,
+            "multipleCorrectAnswers": []
+        },
+        {
+            "id": 3,
+            "code": "",
+            "type": "long-answer",
+            "order": 3,
+            "points": 12,
+            "rubric": "Points: 12.0 total. Award partial credit as follows:\n- Definition and purpose of CAPP (2.0 pts)\n  - Clear definition; role bridging CAD and CAM; outputs (routings, ops, parameters): 2.0 pts\n- Variant CAPP explanation (3.0 pts)\n  - GT/classification, retrieval/edit workflow: 1.5 pts\n  - Data/knowledge needs; strengths/limitations; typical applications: 1.5 pts\n- Generative CAPP explanation (4.0 pts)\n  - Rule-/algorithm-based synthesis; feature recognition; workflow steps: 2.0 pts\n  - Data/knowledge needs; algorithms; strengths/limitations; applications: 2.0 pts\n- Direct comparison (3.0 pts)\n  - Side-by-side contrasts on inputs, knowledge source, automation, flexibility, optimization, implementation/maintenance: 2.5 pts\n  - Appropriate recommendations/when-to-use: 0.5 pts\nCommon deductions:\n- Only defines CAPP without comparing: max 3/12.\n- Mentions Variant vs Generative but lacks depth (no workflows/strengths/limits): cap 6/12.\n- Confuses the two approaches (e.g., describes retrieval as rule-based): deduct 1–2 pts depending on severity.\n- Lacks examples or practical context: −0.5 pt.",
+            "hasCode": false,
+            "options": [],
+            "question": "What is CAPP? Compare Variant and Generative CAPP approaches in detail.",
+            "equations": [],
+            "hasDiagram": false,
+            "outputType": "",
+            "rubricType": "overall",
+            "codeLanguage": "",
+            "correctAnswer": "Definition of CAPP:\n- CAPP (Computer-Aided Process Planning) is the use of computer systems to plan the manufacturing processes required to transform a design into a finished product. It bridges CAD (design) and CAM (manufacturing) by selecting processes, machines, tools, sequences, operation parameters, and generating routings and documentation.\n\nTwo main approaches:\n1) Variant CAPP (Retrieval/GT-based)\n- Core idea: Reuse and adapt standard process plans for similar parts based on Group Technology (GT). Parts are classified and coded into families; a baseline plan for the family is retrieved and edited for the new part.\n- Workflow:\n  - Part classification and coding into a GT code.\n  - Retrieve a standard plan for the part family from a library.\n  - Human/planner edits operations, sequences, times, tools for the specific part.\n  - Output routing sheets, operation sheets, setup instructions.\n- Knowledge/data requirements:\n  - GT classification/coding system.\n  - A well-maintained library of standard plans by part family.\n  - Organizational standards and editing guidelines.\n- Algorithms/representation:\n  - Similarity retrieval using GT codes, taxonomies, or feature keys.\n  - Simple rule checks to flag mismatches (material, size limits), but primary knowledge is embedded in stored plans.\n- Strengths:\n  - Fast planning for recurring/similar parts; consistency across parts in a family.\n  - Easier to implement; leverages existing know-how; lower initial knowledge engineering cost.\n  - Good for stable product-mix and mature processes.\n- Limitations:\n  - Dependent on quality/coverage of the library; poor for novel/unique parts.\n  - Less flexible/adaptive; may propagate outdated practices if templates not maintained.\n  - Still requires significant human editing; limited optimization.\n- Typical applications:\n  - Job shops with repeating part families; organizations with strong standards libraries.\n\n2) Generative CAPP (Rule-/Algorithm-based)\n- Core idea: Automatically synthesize a process plan from the part’s features, material, tolerances, and resources using explicit rules, decision logic, and optimization algorithms.\n- Workflow:\n  - Extract manufacturing features from CAD (holes, pockets, bosses; surfaces; tolerances).\n  - Select processes and machines using decision rules/heuristics and resource databases.\n  - Sequence operations (precedence constraints, setup planning, changeover minimization).\n  - Determine parameters (feeds, speeds, depths), tools, fixtures; estimate times and costs.\n  - Generate routings, setup sheets, NC-ready information; iterate with optimization if available.\n- Knowledge/data requirements:\n  - Formalized rule base and knowledge models (materials, process capabilities, tooling, machines, tolerances, setup/logistics).\n  - Feature recognition from CAD; resource and capability databases; sometimes simulation.\n- Algorithms/representation:\n  - Production rules, decision trees, constraint-based reasoning.\n  - Feature–process mapping, operation sequencing under precedence constraints (graph search), setup clustering (grouping), and parameter calculation models.\n  - May include optimization (e.g., MILP/CP, heuristics) and AI (case-based + rules, ontologies).\n- Strengths:\n  - Scales to novel parts; consistent, up-to-date plans; reduces manual effort.\n  - Enables optimization (cost, time, energy), quick what-if analysis, integration with CAD/CAM/MES.\n  - Captures corporate knowledge explicitly; easier to enforce standards and constraints.\n- Limitations:\n  - High upfront knowledge engineering and data curation cost; maintenance burden.\n  - Complexity in robust feature recognition and handling special cases.\n  - Requires reliable, current resource data; user acceptance/trust considerations.\n- Typical applications:\n  - Enterprises with diverse/novel parts, high automation goals, digital thread initiatives.\n\nDetailed comparison (Variant vs Generative):\n- Input dependence:\n  - Variant: Needs GT codes and a similar prior plan; weak CAD integration.\n  - Generative: Needs rich CAD/feature data and resource databases; strong CAD/CAM integration.\n- Knowledge source:\n  - Variant: Implicit in stored plans and human editors.\n  - Generative: Explicit rule bases, algorithms, and constraints.\n- Degree of automation:\n  - Variant: Semi-automatic (retrieve + edit).\n  - Generative: Largely automatic; can be fully automatic with oversight.\n- Flexibility/novelty handling:\n  - Variant: Poor for new, unique parts or new processes.\n  - Generative: Better for novel parts if rules cover the domain.\n- Optimization capability:\n  - Variant: Limited; edits rely on human expertise.\n  - Generative: Can optimize sequencing, setups, parameters, and resource selection.\n- Implementation effort:\n  - Variant: Lower initial; faster deployment.\n  - Generative: Higher initial effort; pays off with scale and variability.\n- Maintenance:\n  - Variant: Maintain libraries and codes; risk of outdated templates.\n  - Generative: Maintain rule base, capabilities, and data; systematic updates needed.\n- Typical outputs:\n  - Both produce routings, operation sheets, tooling/fixture lists, time standards; generative often also outputs parameterized NC data and analytics.\n\nWhen to choose which:\n- Use Variant when product mix is stable, families repeat, and a robust library exists; focus on speed and consistency with minimal investment.\n- Use Generative when part diversity is high, rapid design changes occur, optimization is valuable, and integration with digital systems is desired.\n\nExample illustration:\n- Part: Prismatic block with two through holes and a pocket.\n  - Variant: Retrieve standard plan for the hole–pocket family; edit tool sizes, operation order, times.\n  - Generative: Recognize features; select drilling and pocket milling operations; plan setups, choose tools and parameters; sequence operations; output routing and NC parameters.",
+            "optionalParts": false,
+            "requiredPartsCount": 0,
+            "allowMultipleCorrect": false,
+            "multipleCorrectAnswers": []
+        },
+        {
+            "id": 4,
+            "code": "",
+            "type": "long-answer",
+            "order": 4,
+            "points": 12,
+            "rubric": "Scoring (12 points total)\n- 2 pts: CAD stage clearly described (geometry, tolerances/GD&T, material, DFM checks)\n- 2 pts: CAM setup (WCS, stock/fixtures, machine selection, associativity) detailed\n- 2 pts: Tooling and cutting data with correct relationships among speed/feed and parameters; includes interpolation concepts\n- 2 pts: Toolpath strategies across rough/semi/finish and holemaking, including multi-axis where relevant\n- 2 pts: Verification/simulation and post-processing steps, controller specifics (modal codes, safety lines) and sample structure\n- 1 pt: Shop-floor setup (tool/work offsets, probing, dry run) and first-article process\n- 1 pt: Production controls (DNC, SPC, in-process probing) and feedback loop\nPartial credit guidance\n- Minor omissions within a stage: award 50–75% of that stage’s points\n- Concept present but inaccurate details (e.g., wrong modal codes): up to 50% of that stage\n- Correct formulas but missing units or variables: 0.5/2 within the relevant criterion\n- Logical sequence not maintained: deduct 1 point overall if major reordering obscures workflow\nExemplary answers reference cutting formulae and interpolation and show controller-aware post details.",
+            "hasCode": false,
+            "options": [],
+            "question": "Explain the complete workflow of CAD \u0010 CAM \u0010 CNC in part programming.",
+            "equations": [
+                {
+                    "id": "q4_eq1",
+                    "type": "inline",
+                    "latex": "n=\\frac{1000\\,V_c}{\\pi D}\\quad(\\text{rpm})",
+                    "position": {
+                        "context": "correctAnswer",
+                        "char_index": 0
+                    }
+                },
+                {
+                    "id": "q4_eq2",
+                    "type": "inline",
+                    "latex": "V_f=f_z\\,z\\,n",
+                    "position": {
+                        "context": "correctAnswer",
+                        "char_index": 0
+                    }
+                },
+                {
+                    "id": "q4_eq3",
+                    "type": "inline",
+                    "latex": "\\mathbf{P}(t)=\\mathbf{P}_0+t\\,(\\mathbf{P}_1-\\mathbf{P}_0),\\;0\\le t\\le 1",
+                    "position": {
+                        "context": "correctAnswer",
+                        "char_index": 0
+                    }
+                }
+            ],
+            "hasDiagram": false,
+            "outputType": "",
+            "rubricType": "overall",
+            "codeLanguage": "",
+            "correctAnswer": "Complete workflow of CAD → CAM → CNC in part programming (end-to-end)\n\n1) Product definition in CAD\n- Define geometry: 2D sketches → constraints → 3D features (extrude, revolve, sweep). Create datums, reference planes, and design tree. Apply GD&T to critical features. Create assembly context if needed for fit and clearance.\n- Define materials and metadata: assign material for density, machining allowances, and to enable cutting data lookup. Verify units and tolerances.\n- Design-for-manufacture checks: minimum radii, reachable features, draft angles, hole depths, stock size. Run interferences and model validation.\n\n2) Transition to CAM (import/associativity)\n- Import native CAD or neutral formats (STEP/Parasolid). Prefer associativity so toolpaths update with design changes. Orient part to machine axes; define stock and workholding (vise, soft jaws, fixture, chuck/collet) and machine kinematics (3-axis, 5-axis table/head).\n\n3) Setup definition in CAM\n- Set work coordinate system (WCS): choose datum origin (corner, bore center, spindle line). Map to machine coordinate system (G54/G55, etc.).\n- Define stock: block/cylinder/raw casting with allowances. Add fixtures as avoid/contain geometry for collision checks.\n- Select machine/post: choose machine configuration, controller dialect (Fanuc/Siemens/Heidenhain), units, limits (max feed, spindle, travels), tool change positions, coolant and safety line conventions.\n\n4) Tooling and cutting data\n- Build tool library: tool type (end mill, drill, tap, boring bar), diameter/length, holder, stick-out, corner radius/helix/flutes, tool number and length/wear offsets (H/D).\n- Cutting parameters: choose surface speed Vc, chip load per tooth fz, number of teeth z, then compute spindle speed and feedrate:\n  - Spindle speed: <eq q4_eq1>\n  - Feedrate for milling: <eq q4_eq2>\n  - For turning, feed f (mm/rev) and depth of cut ap/ae selected per insert/grade and material machinability.\n- Coolant strategy: flood/MQL/air; peck/cycle parameters for drilling.\n\n5) Operation planning and toolpath generation\n- Roughing: select strategy (2.5D pocketing, adaptive/trochoidal high-efficiency, face milling, rough turn). Set stepover, stepdown, optimal load, entry ramps/helixes, stock to leave.\n- Semi-finish/finish: constant scallop, parallel, contour, pencil; set cusp height via step-over derived from tool radius and tolerance. For turning, finishing passes with small DOC and nose radius compensation.\n- Holemaking: spot → drill → chamfer/deburr; canned cycles (G81/G83/G84) with proper retract planes and peck depths; break-through allowances.\n- Multi-axis: define tool axis control, collision avoidance with holder, swarf/flow/drive surfaces; smoothing and tilt limits.\n- Interpolation fundamentals the CAM emits to CNC:\n  - Linear interpolation between two programmed points P0 and P1: <eq q4_eq3>\n  - Circular interpolation (G02/G03) defined by center (I,J,K) or radius and plane (G17/G18/G19); respect controller arc tolerance/quad.\n\n6) Simulation, verification, and optimization\n- Toolpath verification: graphical material removal (stock model), gouge and holder collisions, fixture avoidance, rest material detection.\n- Machine simulation: kinematic-aware check (axes limits, singularities, over-travel, retract/approach safety), clamp/fixture reachability.\n- Feed/speed optimization: limit engagement, maintain chip thickness, override feed in corners, smoothing filters (look‑ahead, jerk limits), arc fitting to reduce point density. Adjust tolerance/CVT to meet part tolerance while controlling cycle time.\n\n7) Post-processing to controller-specific G-code\n- Translate CAM-neutral toolpaths into controller dialect with safe header and modal states: units (G20/G21), absolute/incremental (G90/G91), plane, WCS (G54–G59), tool call (T), spindle (S, M03/M04), coolant (M08/M09), tool length/radius comp (G43 H, G41/G42 D), feed (F), motions (G00/G01/G02/G03), canned cycles, subprograms, and safe end (M05, M30). Include safe retract and pre-positioning.\n- Include program structure and metadata: program number, comments, operation blocks, probing macros if used.\n\n8) Shop-floor setup and proofing\n- Load tools and set offsets: touch-off length H and measure diameter/wear D on presetter or in-machine probe. Verify holders and stick-out match simulation.\n- Set work offsets: indicate or probe datums to write G54–G59 (or G54.1 Pn). Confirm orientation and zero shifts.\n- Dry run/air cut: single-block, feed hold, override low %, optional stop between ops. Verify clearance planes, tool changes, coolant, spindle direction.\n- First-article inspection: measure critical features; adjust wear offsets (D/H) and, if necessary, toolpath parameters. Lock process plan and document.\n\n9) Production and in-process control\n- DNC/NC program management: send files to machine, revision control, checksum. Backups for tool lists and offsets.\n- In-process probing: adaptive control for tool wear, broken tool detection, and automatic work offset updates.\n- SPC and feedback loop: capture dimensional data to refine CAM parameters, feeds/speeds, and tool life management.\n\n10) Typical CNC code skeleton produced from this workflow (milling example)\n- Safety and setup: G90 G17 G21; G54; T01 M06; S... M03; G43 H01 Z...; M08.\n- Roughing/finishing: G00/G01 paths with arcs where applicable; canned cycles for holes; radius comp on contours; safe retracts.\n- End: M09; G53 Z0; M05; M30.\n\nKey deliverables at each stage\n- CAD: validated model + drawings/GD&T. CAM: setup sheet, tool list, operation sequence, NC program before post, verification reports. CNC: posted G-code, tool/offset tables, probing macros, and inspection results.",
+            "optionalParts": false,
+            "requiredPartsCount": 0,
+            "allowMultipleCorrect": false,
+            "multipleCorrectAnswers": []
+        },
+        {
+            "id": 5,
+            "code": "",
+            "type": "long-answer",
+            "order": 5,
+            "points": 12,
+            "rubric": "Scoring (12 points total)\n- 2 pts: Clear problem definition/idealization choices (physics, geometry simplifications, materials)\n- 2 pts: Discretization/meshing strategy and element types with rationale (quality, refinement)\n- 3 pts: Formulation details with shape functions, strain–displacement, and element stiffness integral (including correct integrals and what matrices mean)\n- 2 pts: Assembly and boundary condition application (distinguish essential vs natural), constraints/contacts\n- 2 pts: Solution strategies across linear, modal, transient, and nonlinear (naming at least two with correct methods)\n- 1 pt: Post-processing, verification/validation, and reporting essentials\nPartial credit guidance\n- If equations are present but misapplied: up to 50% of the affected criterion\n- If only a high-level list without equations: max 6/12\n- Minor omissions in one step but generally correct flow: deduct 0.5–1 point\n- Significant conceptual error (e.g., applying Neumann as displacement): zero the BC criterion.",
+            "hasCode": false,
+            "options": [],
+            "question": "Explain the complete step-by-step process of Finite Element Analysis.",
+            "equations": [
+                {
+                    "id": "q5_eq1",
+                    "type": "inline",
+                    "latex": "\\mathbf{K}\\,\\mathbf{u}=\\mathbf{f}",
+                    "position": {
+                        "context": "correctAnswer",
+                        "char_index": 0
+                    }
+                },
+                {
+                    "id": "q5_eq2",
+                    "type": "inline",
+                    "latex": "\\mathbf{k}_e=\\int_{V_e} \\mathbf{B}^T\\,\\mathbf{D}\\,\\mathbf{B}\\,\\mathrm{d}V",
+                    "position": {
+                        "context": "correctAnswer",
+                        "char_index": 0
+                    }
+                },
+                {
+                    "id": "q5_eq3",
+                    "type": "inline",
+                    "latex": "\\mathbf{u}(\\mathbf{x})=\\mathbf{N}(\\mathbf{x})\\,\\mathbf{d}",
+                    "position": {
+                        "context": "correctAnswer",
+                        "char_index": 0
+                    }
+                },
+                {
+                    "id": "q5_eq4",
+                    "type": "inline",
+                    "latex": "\\boldsymbol{\\varepsilon}=\\mathbf{B}\\,\\mathbf{d}",
+                    "position": {
+                        "context": "correctAnswer",
+                        "char_index": 0
+                    }
+                },
+                {
+                    "id": "q5_eq5",
+                    "type": "inline",
+                    "latex": "\\Pi(\\mathbf{u})=\\tfrac{1}{2}\\,\\mathbf{u}^T\\mathbf{K}\\,\\mathbf{u}-\\mathbf{u}^T\\mathbf{f}",
+                    "position": {
+                        "context": "correctAnswer",
+                        "char_index": 0
+                    }
+                }
+            ],
+            "hasDiagram": false,
+            "outputType": "",
+            "rubricType": "overall",
+            "codeLanguage": "",
+            "correctAnswer": "Complete step-by-step process of Finite Element Analysis (FEA)\n\n1) Problem definition and idealization\n- Identify objectives: stresses, displacements, natural frequencies, heat flux, etc. Define domain, loads, and boundary conditions (BCs). Choose analysis type: linear static, geometric/material nonlinearity, transient, modal, thermal, coupled.\n- Simplify geometry: exploit symmetry, mid-surface shells, cyclic sectors; decide 3D solid vs. shell/beam idealizations. Select material models (isotropic, orthotropic, hyperelastic, plasticity, viscoelastic).\n\n2) Discretization (meshing)\n- Partition domain into finite elements (tri/tet/hex, beam/shell) with nodes DOF appropriate to physics.\n- Mesh strategy: refine in high-gradient regions (notches, contacts), use mapped/structured meshes when possible, maintain good aspect ratio and Jacobian quality, ensure compatibility across parts.\n\n3) Element interpolation (shape functions)\n- Approximate field variable within each element using nodal values. For displacement-based solids:\n  - Field interpolation: <eq q5_eq3>\n  - Strain–displacement relation (small strain): <eq q5_eq4>\n- Choose interpolation order (linear/quadratic) and reduced/full integration to balance accuracy and locking.\n\n4) Element equations via weighted residual/variational formulation\n- Starting from governing continuum equations (e.g., equilibrium ∇·σ + b = 0 with constitutive σ = D ε), derive element stiffness by the principle of virtual work or Galerkin method. For an element e:\n  - Element stiffness matrix: <eq q5_eq2>\n  - Element load vector: f_e = ∫_Ve N^T b dV + ∫_Se N^T t dS (body/traction contributions)\n- For thermal problems, analogous k_e = ∫_Ve (∇N)^T k ∇N dV and f_e = ∫_Ve N^T q dV + ∫_Se N^T h(T_∞−T) dS.\n\n5) Assembly of global system\n- Scatter/assemble element matrices into global matrices using connectivity. Impose equilibrium in discrete form:\n  - Global linear system: <eq q5_eq1>\n- Handle multi-physics couplings by block matrices when necessary.\n\n6) Apply boundary conditions and constraints\n- Essential (Dirichlet) BCs: prescribe nodal DOF; enforce by row/column modification or penalty/Lagrange multipliers.\n- Natural (Neumann) BCs: enter as loads in f. Add MPCs/contacts, symmetry, and rigid links as needed.\n\n7) Solve the algebraic system\n- Linear static: direct solvers (LDLᵀ/Cholesky) for SPD K, or iterative solvers (CG, GMRES) with preconditioning.\n- Modal: solve (K − ω²M)φ = 0 → eigenpairs; choose shift/invert, Lanczos.\n- Transient: time integration (Newmark, generalized-α, θ-method) for M ü + C u̇ + K u = f(t); pick step size, damping.\n- Nonlinear: Newton–Raphson with consistent tangent; update internal variables; line search/arc-length for snap-through.\n\n8) Post-processing\n- Recover strains/stresses at Gauss points, extrapolate to nodes and average. Energy norm and error indicators; compute reaction forces, constraint forces.\n- Derived quantities: von Mises stress, principal values, safety factors, deflection criteria, fluxes/gradients.\n\n9) Verification and validation\n- Mesh convergence (h/p-refinement), patch tests. Benchmark against analytical solutions or experiments. Sensitivity studies for loads/materials/BCs.\n\n10) Reporting and decision-making\n- Document assumptions, mesh, BCs, solver settings, convergence plots, and safety margins. Provide design recommendations and propose design changes based on results.\n\nKey governing relations referenced\n- Discrete field: <eq q5_eq3>\n- Strain relation: <eq q5_eq4>\n- Element stiffness: <eq q5_eq2>\n- Global system: <eq q5_eq1>\n- Energy functional (for linear elasticity, optional): <eq q5_eq5>",
+            "optionalParts": false,
+            "requiredPartsCount": 0,
+            "allowMultipleCorrect": false,
+            "multipleCorrectAnswers": []
+        },
+        {
+            "id": 6,
+            "code": "",
+            "type": "multi-part",
+            "order": 6,
+            "points": 12,
+            "rubric": "",
+            "hasCode": false,
+            "options": [],
+            "question": "Answer the following (2 parts):",
+            "equations": [],
+            "hasDiagram": false,
+            "outputType": "",
+            "rubricType": "per-subquestion",
+            "codeLanguage": "",
+            "subquestions": [
+                {
+                    "id": 1,
+                    "code": "",
+                    "type": "diagram-analysis",
+                    "order": 1,
+                    "points": 8,
+                    "rubric": "Scoring (8 points total)\n- 2 pts: Correct identification and ordering of key regions (elastic, yield plateau, strain hardening, necking, fracture)\n- 2 pts: Proper explanation of upper/lower yield and Lüders plateau specific to mild steel\n- 2 pts: Inclusion of Hooke’s law with E as slope and correct definitions of engineering stress/strain\n- 1 pt: Identification of UTS and necking onset, with correct association to maximum engineering stress\n- 1 pt: Ductility measures (% elongation and % reduction in area) defined\nPartial credit guidance\n- Missing one labeled region: deduct 0.5–1 pt depending on severity\n- Confusing UTS vs fracture stress: up to −1 pt\n- If true stress/strain are discussed accurately, can compensate for a minor omission elsewhere (+0.5 up to cap 8/8).",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "(i) Draw the stress strain diagram of a mild steel describing each points.",
+                    "equations": [
+                        {
+                            "id": "q61_eq1",
+                            "type": "inline",
+                            "latex": "\\sigma=\\frac{P}{A_0}",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 0
+                            }
+                        },
+                        {
+                            "id": "q61_eq2",
+                            "type": "inline",
+                            "latex": "\\varepsilon=\\frac{\\Delta L}{L_0}",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 0
+                            }
+                        },
+                        {
+                            "id": "q61_eq3",
+                            "type": "inline",
+                            "latex": "\\sigma=E\\,\\varepsilon",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 0
+                            }
+                        },
+                        {
+                            "id": "q61_eq4",
+                            "type": "inline",
+                            "latex": "\\sigma_{\\text{UTS}}=\\max\\,\\sigma_{\\text{eng}}",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 0
+                            }
+                        },
+                        {
+                            "id": "q61_eq5",
+                            "type": "inline",
+                            "latex": "\\sigma_{\\text{true}}=\\frac{P}{A_{\\text{inst}}}",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 0
+                            }
+                        },
+                        {
+                            "id": "q61_eq6",
+                            "type": "inline",
+                            "latex": "\\varepsilon_{\\text{true}}=\\ln\\!\\left(\\frac{L}{L_0}\\right)",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 0
+                            }
+                        },
+                        {
+                            "id": "q61_eq7",
+                            "type": "inline",
+                            "latex": "\\%\\,\\text{Elong.}=\\frac{L_f-L_0}{L_0}\\times 100\\%",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 0
+                            }
+                        },
+                        {
+                            "id": "q61_eq8",
+                            "type": "inline",
+                            "latex": "\\%\\,\\text{RA}=\\frac{A_0-A_f}{A_0}\\times 100\\%",
+                            "position": {
+                                "context": "correctAnswer",
+                                "char_index": 0
+                            }
+                        }
+                    ],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "Mild steel stress–strain diagram: features and descriptions (engineering stress–strain unless noted)\n\nDefinitions\n- Engineering stress and strain: <eq q61_eq1>, <eq q61_eq2>\n- Linear elastic (Hooke’s law): <eq q61_eq3> with slope E (Young’s modulus). For mild steel, E ≈ 200 GPa.\n\nKey labeled points/regions on the diagram (plot stress on y-axis vs strain on x-axis)\n1) O–A: Proportional limit\n- Straight line region obeying Hooke’s law; stress proportional to strain. End of strict proportionality is point A (slightly below elastic limit).\n2) A–B: Elastic limit/yield onset\n- Up to point B (elastic limit), unloading returns to zero strain. For mild steel, a distinct yield phenomenon appears next.\n3) B–C: Upper yield point\n- Point C is the upper yield stress where dislocation unlocking begins; a small drop follows.\n4) C–D: Yield plateau (Lüders extension)\n- Approximately constant stress while strain increases (Lüders bands propagate). This defines the lower yield stress. Mark D as end of plateau.\n5) D–E: Strain hardening region\n- Stress rises with strain due to work hardening; curve ascends nonlinearly as dislocation density increases.\n6) Point E: Ultimate tensile strength (UTS)\n- Maximum engineering stress on the curve: <eq q61_eq4>. After this point, necking initiates; load may drop though local true stress can continue to rise.\n7) E–F: Necking to fracture\n- Engineering stress decreases as area reduces in the neck. Fracture at point F; note brittle/ductile fracture surface appearance (cup-and-cone for mild steel).\n\nTrue vs engineering measures (optional annotations)\n- True stress and true strain: <eq q61_eq5>, <eq q61_eq6>\n- In uniform plastic region up to necking, for incompressible plastic flow A·L ≈ constant, so σ_true ≈ σ_eng(1+ε_eng) and ε_true ≈ ln(1+ε_eng).\n- Necking onset criterion (Considère): dσ_true/dε_true = σ_true (can be noted near UTS).\n\nDuctility measures to report on the diagram\n- Percent elongation: <eq q61_eq7>\n- Percent reduction in area: <eq q61_eq8>\n\nDrawing instructions\n- Draw a straight line from origin to A (slope E), slight deviation to B, mark a peak at C (upper yield), horizontal/near-horizontal to D (lower yield), rising curve to a maximum at E (UTS), then descending to F (fracture). Annotate each point with its physical meaning above.",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                },
+                {
+                    "id": 2,
+                    "code": "",
+                    "type": "diagram-analysis",
+                    "order": 1,
+                    "points": 4,
+                    "rubric": "Scoring (4 points total)\n- 1 pt: Ceramics correctly characterized as linear-elastic brittle with negligible plastic strain\n- 1 pt: Polymers correctly described with nonlinear elastic, yield/drawing plateau, and strain hardening; note rate/temperature sensitivity\n- 1 pt: Bone described with anisotropy and distinct cortical vs trabecular behavior (limited plasticity vs crushing-like plateau)\n- 1 pt: Metals described as ductile with yield and significant plastic region including strain hardening and necking\nPartial credit guidance\n- If any material is misclassified (e.g., polymers called brittle like ceramics): 0 for that material\n- If description is generally correct but missing a key feature (e.g., necking for metals): award 0.5 for that material.",
+                    "hasCode": false,
+                    "options": [],
+                    "question": "(ii) Draw the stress-strain diagram of ceramic, polymer, bone and metals.",
+                    "equations": [],
+                    "hasDiagram": false,
+                    "outputType": "",
+                    "rubricType": "overall",
+                    "codeLanguage": "",
+                    "correctAnswer": "Stress–strain diagram sketches and distinguishing features for ceramic, polymer, bone, and metals (engineering stress–strain)\n\n1) Ceramics\n- Linear elastic up to sudden brittle fracture with almost no plastic region. Very high slope (high E), very small strain to failure (<0.2%). No yield point; curve is a steep line ending abruptly.\n\n2) Polymers\n- Nonlinear elastic region from the outset (low initial slope); many thermoplastics show yield, followed by a drop to a drawing plateau (cold drawing), then strain hardening at large strains. Large strain to failure; rate and temperature sensitive; viscoelastic hysteresis.\n\n3) Bone\n- Anisotropic and rate-dependent. Cortical bone: nearly linear elastic to a small plastic region, then brittle-like fracture; lower E than metals but higher than many polymers. Trabecular bone: pronounced nonlinear behavior with yielding/crushing at relatively low stresses; large apparent strain.\n\n4) Metals (generic ductile metal)\n- Linear elastic region (Hooke’s law), distinct yield (for mild steel) or smooth yielding (aluminum), significant plastic region with strain hardening, peak at UTS, then necking to fracture. Moderate E, substantial ductility compared to ceramics and cortical bone.\n\nDrawing guidance\n- Plot four small curves on the same axes (stress vs strain):\n  - Ceramic: steep straight line ending sharply.\n  - Polymer: gentle slope, rounded knee to yield, drop/plateau, then rising strain hardening.\n  - Bone: intermediate slope; cortical shows limited plasticity, relatively abrupt failure; trabecular shows long nonlinear plateau.\n  - Metal: linear to yield, extended plastic with hardening, peak and descending necking region.",
+                    "optionalParts": false,
+                    "requiredPartsCount": 0,
+                    "allowMultipleCorrect": false,
+                    "multipleCorrectAnswers": []
+                }
+            ],
+            "correctAnswer": "",
+            "optionalParts": false,
+            "requiredPartsCount": 2,
+            "allowMultipleCorrect": false,
+            "multipleCorrectAnswers": []
+        }
+    ],
+    "created_at": "2026-03-08T12:10:50.508044",
+    "updated_at": "2026-03-08T12:10:50.508061"
+}

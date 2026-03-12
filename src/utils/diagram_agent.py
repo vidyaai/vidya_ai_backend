@@ -18,6 +18,7 @@ from utils.diagram_tools import DiagramTools, DIAGRAM_TOOLS
 from utils.domain_router import DomainRouter
 from utils.subject_prompt_registry import SubjectPromptRegistry
 from utils.fallback_router import SubjectSpecificFallbackRouter
+from pylatexenc.latex2text import LatexNodes2Text
 
 
 def _repair_truncated_json(s: str) -> dict:
@@ -276,6 +277,31 @@ If you detect such a question, note this in your response so the system can upda
 
         return base_prompt
 
+    def _sanitize_text_for_prompt(
+        self, text: str, equations: List[dict[str, Any]] = []
+    ) -> str:
+        if not text:
+            return ""
+
+        # Replace LaTeX equations with text equations
+        for eq in equations:
+            eq_id = eq.get("id")
+            latex = eq.get("latex")
+            eq_text = LatexNodes2Text().latex_to_text(latex)
+            eq_type = eq.get("type", "inline")
+            if eq_id and latex:
+                # Replace equation placeholders with LaTeX representation
+                placeholder = f"<eq {eq_id}>"
+                replacement = f"{eq_text}"
+                print(
+                    f"[_sanitize_text_for_prompt] Replacing equation placeholder {placeholder} with {replacement}"
+                )
+                text = text.replace(placeholder, replacement)
+
+        # Replace excessive whitespace
+        sanitized = text.replace("   ", " ").replace("  ", " ").strip()
+        return sanitized
+
     def _resolve_equation_placeholders(
         self, question: Dict[str, Any], text: str
     ) -> str:
@@ -289,18 +315,10 @@ If you detect such a question, note this in your response so the system can upda
         if not equations:
             return text
 
-        eq_map = {eq["id"]: eq.get("latex", "") for eq in equations if "id" in eq}
-        if not eq_map:
-            return text
-
-        def _replacer(m):
-            eq_id = m.group(1)
-            return eq_map.get(eq_id, m.group(0))  # keep original if ID not found
-
-        resolved = re.sub(r"<eq\s+(\S+)>", _replacer, text)
+        resolved = self._sanitize_text_for_prompt(text, equations)
         if resolved != text:
             logger.info(
-                f"Resolved {len(eq_map)} equation placeholders in question text"
+                f"Resolved {len(equations)} equation placeholders in question text"
             )
         return resolved
 
