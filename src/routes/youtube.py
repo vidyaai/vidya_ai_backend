@@ -10,6 +10,7 @@ from controllers.config import (
     formatting_executor,
     s3_client,
     AWS_S3_BUCKET,
+    logger,
 )
 from controllers.db_helpers import (
     get_video_path,
