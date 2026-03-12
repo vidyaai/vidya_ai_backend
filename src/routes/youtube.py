@@ -72,7 +72,9 @@ async def get_formatting_status_endpoint(
     if not video:
         raise HTTPException(status_code=404, detail="Video not found or access denied")
 
-    return get_formatting_status(db, video_id)
+    result = get_formatting_status(db, video_id)
+    logger.info(f"📊 Formatting status for {video_id}: status={result.get('status')}, has_transcript={bool(result.get('formatted_transcript'))}")
+    return result
 
 
 @router.get("/formatted-transcript/{video_id}")
@@ -80,6 +82,7 @@ async def get_formatted_transcript(
     video_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
 ):
     status = get_formatting_status(db, video_id)
+    logger.info(f"📄 Formatted transcript request for {video_id}: formatting_status={status.get('status')}")
     if status["status"] == "completed":
         return {
             "video_id": video_id,
@@ -99,12 +102,15 @@ async def get_formatted_transcript(
         .filter(Video.id == video_id, Video.user_id == current_user["uid"])
         .first()
     )
+    logger.info(f"📄 Checking video record - exists: {bool(video)}, has_formatted_transcript: {bool(video.formatted_transcript) if video else False}")
     if video and video.formatted_transcript:
+        logger.info(f"✅ Returning formatted transcript from video.formatted_transcript field (length: {len(video.formatted_transcript)})")
         return {
             "video_id": video_id,
             "status": "completed",
             "formatted_transcript": video.formatted_transcript,
         }
+    logger.warning(f"❌ Formatted transcript not found for {video_id}")
     raise HTTPException(status_code=404, detail="Formatted transcript not found")
 
 
