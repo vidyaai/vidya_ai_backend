@@ -21,7 +21,7 @@ from controllers.conversation_manager import (
     get_merged_conversation_history,
 )
 from utils.youtube_utils import download_transcript_api, grab_youtube_frame
-from utils.youtube_frame_capturer import capture_youtube_frame
+# from utils.youtube_frame_capturer import capture_youtube_frame  # Disabled - YouTube frame capture not working
 from utils.ml_models import OpenAIVisionClient
 from schemas import VideoQuery
 from utils.firebase_auth import get_current_user
@@ -131,73 +131,40 @@ async def process_query(
             }
 
         if is_image_query:
+            # YouTube image queries disabled - video download not working
+            if current_video.source_type == "youtube":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Image queries are not supported for YouTube videos. Please ask questions based on the transcript instead."
+                )
+
             if timestamp is None:
                 raise HTTPException(
                     status_code=400, detail="Timestamp is required for image queries"
                 )
 
-            youtube_url = f"https://www.youtube.com/watch?v={video_id}"
-
-            # Try fast frame capture first (10-15 seconds, no download needed!)
-            try:
-                frame_result = await capture_youtube_frame(
-                    video_url=youtube_url,
-                    timestamp=timestamp,
-                    return_base64=False
+            # Only for non-YouTube videos (uploaded videos)
+            video_path_local = get_video_path(db, video_id)
+            if not video_path_local:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Video not available for frame extraction"
                 )
 
-                if frame_result['success']:
-                    # Fast path - got frame directly from YouTube!
-                    frame_path = frame_result['file_path']
+            # Extract frame from local video
+            frame_filename = f"frame_{video_id}_{int(timestamp)}.jpg"
+            frame_path = os.path.join(frames_path, frame_filename)
+            output_file, frame = grab_youtube_frame(
+                video_path_local, timestamp, frame_path
+            )
+            if not output_file:
+                raise HTTPException(status_code=500, detail="Frame extraction failed")
 
-                    # Send to LLM immediately
-                    response = vision_client.ask_with_image(
-                        query, frame_path, transcript_to_use, conversation_context
-                    )
-                    web_sources = []
-                    used_web_search = False
-
-                    # Optionally start background download silently (for future caching)
-                    # Don't wait for it, don't tell user about it
-                    video_path_local = get_video_path(db, video_id)
-                    if not video_path_local:
-                        download_status_info = get_download_status(db, video_id)
-                        if download_status_info["status"] not in ["downloading", "completed"]:
-                            # Start silent background download for future use
-                            download_executor.submit(
-                                download_video_background,
-                                video_id,
-                                youtube_url,
-                                current_user["uid"],
-                            )
-                else:
-                    # Frame capture failed, try fallback to downloaded video
-                    raise Exception(f"Frame capture failed: {frame_result.get('error')}")
-
-            except Exception as frame_error:
-                # Fallback: use downloaded video if available
-                video_path_local = get_video_path(db, video_id)
-
-                if video_path_local:
-                    # Video already downloaded, use it
-                    frame_filename = f"frame_{video_id}_{int(timestamp)}.jpg"
-                    frame_path = os.path.join(frames_path, frame_filename)
-                    output_file, frame = grab_youtube_frame(
-                        video_path_local, timestamp, frame_path
-                    )
-                    if not output_file:
-                        raise HTTPException(status_code=500, detail="Frame extraction failed")
-                    response = vision_client.ask_with_image(
-                        query, frame_path, transcript_to_use, conversation_context
-                    )
-                    web_sources = []
-                    used_web_search = False
-                else:
-                    # No video and frame capture failed
-                    raise HTTPException(
-                        status_code=500,
-                        detail="Unable to capture frame at this time. Please try again in a moment."
-                    )
+            response = vision_client.ask_with_image(
+                query, frame_path, transcript_to_use, conversation_context
+            )
+            web_sources = []
+            used_web_search = False
         else:
             # Use web-augmented answering for text queries
             web_result = vision_client.ask_with_web_augmentation(
