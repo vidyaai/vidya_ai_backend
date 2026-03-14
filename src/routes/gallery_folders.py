@@ -153,6 +153,8 @@ def list_gallery(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    from controllers.storage import s3_presign_url
+
     q = db.query(Video).filter(Video.source_type == source_type)
     q = q.filter(Video.user_id == current_user["uid"])
     if folder_id is None:
@@ -160,7 +162,41 @@ def list_gallery(
     else:
         q = q.filter(Video.folder_id == folder_id)
     rows = q.order_by(Video.created_at.desc()).all()
-    return rows
+
+    # Add thumbnail URLs to each video
+    result = []
+    for video in rows:
+        video_dict = {
+            "id": video.id,
+            "user_id": video.user_id,
+            "source_type": video.source_type,
+            "title": video.title,
+            "youtube_id": video.youtube_id,
+            "youtube_url": video.youtube_url,
+            "s3_key": video.s3_key,
+            "thumb_key": video.thumb_key,
+            "transcript_s3_key": video.transcript_s3_key,
+            "local_path": video.local_path,
+            "transcript_text": video.transcript_text,
+            "formatted_transcript": video.formatted_transcript,
+            "folder_id": video.folder_id,
+            "thumbnail_url": None,
+        }
+
+        # Generate thumbnail URL
+        if video.source_type == "youtube" and video.youtube_id:
+            # Use YouTube's native thumbnail (always available)
+            video_dict["thumbnail_url"] = f"https://img.youtube.com/vi/{video.youtube_id}/hqdefault.jpg"
+        elif video.thumb_key and s3_client and AWS_S3_BUCKET:
+            # Generate presigned URL for uploaded video thumbnails
+            try:
+                video_dict["thumbnail_url"] = s3_presign_url(video.thumb_key, expires_in=3600)
+            except Exception:
+                pass  # Leave as None if presigning fails
+
+        result.append(VideoOut(**video_dict))
+
+    return result
 
 
 @router.post("/gallery/move")

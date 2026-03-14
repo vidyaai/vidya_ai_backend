@@ -1,16 +1,18 @@
 import json
 import os
 import re
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 from typing import List, Dict
 import sys
+import asyncio
 
 from controllers.db_helpers import update_formatting_status
 from utils.db import SessionLocal
 from controllers.config import logger
 
-# Initialize OpenAI client (reads OPENAI_API_KEY from environment)
+# Initialize OpenAI clients (reads OPENAI_API_KEY from environment)
 client = OpenAI()
+async_client = AsyncOpenAI()
 
 
 def load_transcript(file_path: str) -> Dict:
@@ -80,73 +82,14 @@ def group_subtitles(
     return groups
 
 
-# REPLACE the existing format_with_openai function with this:
-def format_with_openai(text_chunks: List[str], video_id: str = None) -> List[str]:
-    """Use OpenAI to format text with proper punctuation and progress tracking"""
-    formatted_chunks = []
-    total_chunks = len(text_chunks)
-
-    logger.info(
-        f"Formatting {total_chunks} chunks with OpenAI of video_id: {video_id}..."
-    )
-
-    # UPDATE progress tracking if video_id provided
-    if video_id:
-        # Import here to avoid circular imports
+async def format_chunk_async(
+    chunk: str, chunk_index: int, semaphore: asyncio.Semaphore
+) -> tuple[int, str]:
+    """Format a single chunk using OpenAI API asynchronously"""
+    async with semaphore:  # Limit concurrent requests
         try:
-            sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-            db = SessionLocal()
-            try:
-                # Update total chunks in status
-                update_formatting_status(
-                    db,
-                    video_id,
-                    {
-                        "status": "formatting",
-                        "message": f"AI formatting in progress... 0/{total_chunks} chunks (0%)",
-                        "formatted_transcript": None,
-                        "error": None,
-                        "progress": 0,
-                        "total_chunks": total_chunks,
-                        "current_chunk": 0,
-                    },
-                )
-            finally:
-                db.close()
-        except ImportError:
-            pass  # Continue without progress tracking if import fails
-
-    for i, chunk in enumerate(text_chunks):
-        logger.debug(f"Processing chunk {i+1}/{total_chunks}...")
-
-        # UPDATE progress if video_id provided
-        if video_id:
-            try:
-                db = SessionLocal()
-                try:
-                    current_progress = int((i / total_chunks) * 100)
-                    update_formatting_status(
-                        db,
-                        video_id,
-                        {
-                            "status": "formatting",
-                            "message": f"AI formatting in progress... {i+1}/{total_chunks} chunks ({current_progress}%)",
-                            "formatted_transcript": None,
-                            "error": None,
-                            "progress": current_progress,
-                            "total_chunks": total_chunks,
-                            "current_chunk": i + 1,
-                        },
-                    )
-                finally:
-                    db.close()
-            except:
-                pass  # Continue without progress updates if there's an error
-
-        try:
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+            response = await async_client.chat.completions.create(
+                model="gpt-4o-mini",
                 messages=[
                     {
                         "role": "system",
@@ -168,14 +111,100 @@ def format_with_openai(text_chunks: List[str], video_id: str = None) -> List[str
             )
 
             formatted_text = response.choices[0].message.content.strip()
-            formatted_chunks.append(formatted_text)
-            logger.debug(f"✓ Chunk {i+1} formatted successfully")
+            logger.debug(f"✓ Chunk {chunk_index+1} formatted successfully")
+            return (chunk_index, formatted_text)
 
         except Exception as e:
-            logger.error(f"✗ Error formatting chunk {i+1}: {e}")
-            formatted_chunks.append(chunk)  # Use original if formatting fails
+            logger.error(f"✗ Error formatting chunk {chunk_index+1}: {e}")
+            return (chunk_index, chunk)  # Use original if formatting fails
 
+
+async def format_with_openai_async(
+    text_chunks: List[str], video_id: str = None, max_concurrent: int = 15
+) -> List[str]:
+    """Use OpenAI to format text chunks in parallel"""
+    total_chunks = len(text_chunks)
+    logger.info(
+        f"Formatting {total_chunks} chunks with OpenAI (max {max_concurrent} concurrent) for video_id: {video_id}..."
+    )
+
+    # Initialize progress tracking
+    if video_id:
+        try:
+            sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+            db = SessionLocal()
+            try:
+                update_formatting_status(
+                    db,
+                    video_id,
+                    {
+                        "status": "formatting",
+                        "message": f"AI formatting in progress... 0/{total_chunks} chunks (0%)",
+                        "formatted_transcript": None,
+                        "error": None,
+                        "progress": 0,
+                        "total_chunks": total_chunks,
+                        "current_chunk": 0,
+                    },
+                )
+            finally:
+                db.close()
+        except ImportError:
+            pass
+
+    # Create semaphore to limit concurrent requests
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    # Create tasks for all chunks
+    tasks = [
+        format_chunk_async(chunk, i, semaphore)
+        for i, chunk in enumerate(text_chunks)
+    ]
+
+    # Process all chunks in parallel and update progress periodically
+    formatted_results = []
+    completed = 0
+
+    for coro in asyncio.as_completed(tasks):
+        chunk_index, formatted_text = await coro
+        formatted_results.append((chunk_index, formatted_text))
+        completed += 1
+
+        # Update progress every 5 chunks or on last chunk
+        if video_id and (completed % 5 == 0 or completed == total_chunks):
+            try:
+                db = SessionLocal()
+                try:
+                    current_progress = int((completed / total_chunks) * 100)
+                    update_formatting_status(
+                        db,
+                        video_id,
+                        {
+                            "status": "formatting",
+                            "message": f"AI formatting in progress... {completed}/{total_chunks} chunks ({current_progress}%)",
+                            "formatted_transcript": None,
+                            "error": None,
+                            "progress": current_progress,
+                            "total_chunks": total_chunks,
+                            "current_chunk": completed,
+                        },
+                    )
+                finally:
+                    db.close()
+            except:
+                pass
+
+    # Sort results by original index to maintain order
+    formatted_results.sort(key=lambda x: x[0])
+    formatted_chunks = [text for _, text in formatted_results]
+
+    logger.info(f"✓ All {total_chunks} chunks formatted successfully")
     return formatted_chunks
+
+
+def format_with_openai(text_chunks: List[str], video_id: str = None) -> List[str]:
+    """Synchronous wrapper for async formatting function"""
+    return asyncio.run(format_with_openai_async(text_chunks, video_id))
 
 
 def convert_plain_text_to_transcript_data(
@@ -241,7 +270,7 @@ def create_formatted_transcript(
     logger.debug(f"transcript_data: {transcript_data[0]}")
 
     # Group subtitles into manageable chunks
-    groups = group_subtitles(transcript_data[0]["transcription"], group_duration=15.0)
+    groups = group_subtitles(transcript_data[0]["transcription"], group_duration=30.0)
 
     # Extract text chunks for formatting
     text_chunks = [group["text"] for group in groups]

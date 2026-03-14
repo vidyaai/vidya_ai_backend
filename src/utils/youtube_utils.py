@@ -643,13 +643,9 @@ def _fallback_youtube_transcript_api(video_id):
                 logger.info(f"No English transcript for {video_id}, using: {available[0].language}")
                 transcript_data = available[0].fetch()
         except Exception as e:
-            # If list/fetch fails, try direct fetch
-            try:
-                transcript_data = YouTubeTranscriptApi.get_transcript(video_id, languages=['en'])
-            except:
-                # Try any language
-                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-                transcript_data = transcript_list.find_transcript(['en']).fetch()
+            # If list/fetch fails, raise the error
+            logger.error(f"Failed to fetch transcript using YouTubeTranscriptApi for {video_id}: {e}")
+            raise
 
         # Convert to text and JSON format compatible with RapidAPI format
         text_parts = []

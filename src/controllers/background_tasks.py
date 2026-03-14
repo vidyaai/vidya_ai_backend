@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Any
 from utils.db import SessionLocal
 # from utils.youtube_utils import download_video  # Disabled - YouTube download not working
 from utils.format_transcript import create_formatted_transcript
-from models import Video, Assignment, AssignmentSubmission
+from models import Video, Assignment, AssignmentSubmission, VideoSummary
 from .config import (
     frames_path,
     output_path,
@@ -185,6 +185,49 @@ def format_transcript_background(video_id: str, json_data: dict):
         logger.info(
             f"Transcript formatting completed successfully for video ID: {video_id}"
         )
+
+        # Phase 1+2 Combined: Proactively generate both chunks and summaries
+        # This ensures both retrieval mechanisms are ready before users ask questions
+        try:
+            from services.summary_service import SummaryService
+            from services.chunking_embedding_service import TranscriptProcessor
+            from models import VideoSummary, TranscriptChunk
+
+            # Phase 1: Generate chunks with embeddings
+            try:
+                chunk_processor = TranscriptProcessor()
+                existing_chunks = db.query(TranscriptChunk).filter(
+                    TranscriptChunk.video_id == video_id
+                ).first()
+
+                if not existing_chunks:
+                    logger.info(f"Generating chunks with embeddings for video {video_id}")
+                    num_chunks = chunk_processor.process_transcript(db, video_id, formatted_transcript_text)
+                    logger.info(f"Generated {num_chunks} chunks for video {video_id}")
+                else:
+                    logger.info(f"Chunks already exist for video {video_id}, skipping")
+            except Exception as e:
+                logger.error(f"Chunk generation failed for {video_id}: {e}")
+
+            # Phase 2: Generate hierarchical summary
+            try:
+                summary_service = SummaryService()
+                existing_summary = db.query(VideoSummary).filter(
+                    VideoSummary.video_id == video_id
+                ).first()
+
+                if not existing_summary or existing_summary.processing_status != "completed":
+                    logger.info(f"Generating summary for video {video_id} after formatting")
+                    summary_service.generate_video_summary(db, video_id, formatted_transcript_text)
+                    logger.info(f"Summary generated for video {video_id}")
+                else:
+                    logger.info(f"Summary already exists for video {video_id}, skipping")
+            except Exception as e:
+                logger.error(f"Summary generation failed for {video_id}: {e}")
+
+        except Exception as e:
+            # Don't fail the whole formatting job if processing fails
+            logger.error(f"Phase 1+2 processing failed for {video_id}: {e}, but transcript formatting succeeded")
     except Exception as e:
         logger.error(f"Transcript formatting failed for video ID {video_id}: {e}")
         status = {
@@ -418,3 +461,73 @@ def queue_batch_grading(
         thread.start()
 
     logger.info(f"Started {len(submission_ids)} grading threads")
+
+
+def generate_summary_background(video_id: str, transcript: str):
+    """
+    Generate hierarchical summary and chunks for a video in the background.
+    Phase 1+2 Combined: Creates both embeddings and summaries.
+    """
+    logger.info(f"Starting background processing (Phase 1+2) for video {video_id}")
+    db = SessionLocal()
+
+    try:
+        from services.summary_service import SummaryService
+        from services.chunking_embedding_service import TranscriptProcessor
+        from models import TranscriptChunk
+
+        # Phase 1: Generate chunks with embeddings
+        try:
+            existing_chunks = db.query(TranscriptChunk).filter(
+                TranscriptChunk.video_id == video_id
+            ).first()
+
+            if not existing_chunks:
+                logger.info(f"Generating chunks for video {video_id}")
+                chunk_processor = TranscriptProcessor()
+                num_chunks = chunk_processor.process_transcript(db, video_id, transcript)
+                logger.info(f"Successfully generated {num_chunks} chunks for video {video_id}")
+            else:
+                logger.info(f"Chunks already exist for video {video_id}, skipping")
+        except Exception as e:
+            # Log but don't fail the whole job
+            logger.error(f"Chunk generation failed for {video_id}: {e}")
+
+        # Phase 2: Generate summary
+        try:
+            existing_summary = db.query(VideoSummary).filter(VideoSummary.video_id == video_id).first()
+            if existing_summary and existing_summary.processing_status == "completed":
+                logger.info(f"Summary already exists for video {video_id}, skipping")
+                return
+
+            # Mark as processing
+            if existing_summary:
+                existing_summary.processing_status = "processing"
+                db.commit()
+            else:
+                summary_record = VideoSummary(
+                    video_id=video_id,
+                    processing_status="processing",
+                )
+                db.add(summary_record)
+                db.commit()
+
+            # Generate summary
+            summary_service = SummaryService()
+            summary_service.generate_video_summary(db, video_id, transcript)
+            logger.info(f"Successfully generated summary for video {video_id}")
+
+        except Exception as e:
+            logger.error(f"Summary generation failed for {video_id}: {e}")
+            # Mark as failed
+            summary_record = db.query(VideoSummary).filter(VideoSummary.video_id == video_id).first()
+            if summary_record:
+                summary_record.processing_status = "failed"
+                summary_record.error_message = str(e)
+                db.commit()
+
+    except Exception as e:
+        logger.error(f"Error in background processing for {video_id}: {e}")
+
+    finally:
+        db.close()

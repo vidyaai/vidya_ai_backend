@@ -122,15 +122,15 @@ def get_merged_conversation_history(
     client_history: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     """
-    Retrieve conversation history from database and merge with client-sent history.
-    Database is the source of truth; client history is used as fallback.
+    Retrieve conversation history from database ONLY.
+    Database is the ONLY source of truth; client history is IGNORED.
 
     Args:
         db: Database session
         video_id: YouTube video ID
         firebase_uid: Firebase user UID
         session_id: Chat session ID (optional)
-        client_history: Conversation history sent from client
+        client_history: Conversation history sent from client (IGNORED - for backward compatibility)
 
     Returns:
         List[Dict]: Conversation history in OpenAI message format (last 20 messages)
@@ -140,9 +140,9 @@ def get_merged_conversation_history(
         video = db.query(Video).filter(Video.id == video_id).first()
         if not video or not video.chat_sessions:
             logger.info(
-                f"No chat sessions found for video {video_id}, using client history"
+                f"No chat sessions found for video {video_id}, returning empty history"
             )
-            return client_history
+            return []  # Return empty list, ignore client history
 
         # Find the active session
         active_session = None
@@ -162,20 +162,35 @@ def get_merged_conversation_history(
 
         if not active_session:
             logger.info(
-                f"No matching session found for video {video_id}, using client history"
+                f"No matching session found for video {video_id}, returning empty history"
             )
-            return client_history
+            return []  # Return empty list, ignore client history
 
         # Get messages from database (last 20 for context window)
         db_messages = active_session.get("messages", [])[-20:]
 
+        # DEBUG: Log first message to see structure
+        if db_messages:
+            logger.info(f"DEBUG: First db_message: {db_messages[0]}")
+            logger.info(f"DEBUG: Message keys: {db_messages[0].keys() if isinstance(db_messages[0], dict) else 'Not a dict'}")
+
         # Convert to OpenAI format
+        # Handle both formats: frontend sends {sender, text}, backend stores {role, content}
         formatted_messages = []
         for msg in db_messages:
+            # Try both field names for compatibility
+            role = msg.get("role") or msg.get("sender", "user")
+            content = msg.get("content") or msg.get("text", "")
+
+            # Map frontend role names to OpenAI role names
+            # Frontend uses "ai", OpenAI expects "assistant"
+            if role == "ai":
+                role = "assistant"
+
             formatted_messages.append(
                 {
-                    "role": msg.get("role", "user"),
-                    "content": msg.get("content", ""),
+                    "role": role,
+                    "content": content,
                     "timestamp": msg.get("timestamp"),
                 }
             )
@@ -183,9 +198,9 @@ def get_merged_conversation_history(
         logger.info(
             f"Retrieved {len(formatted_messages)} messages from session {active_session.get('id')} for video {video_id}"
         )
-        return formatted_messages if formatted_messages else client_history
+        return formatted_messages  # Return whatever we got from DB (even if empty)
 
     except Exception as e:
         logger.error(f"Error retrieving conversation history: {e}")
-        # Fall back to client history on error
-        return client_history
+        # Return empty list on error - do NOT use client history
+        return []

@@ -85,6 +85,10 @@ class Video(Base):
 
     folder = relationship("Folder", back_populates="videos")
 
+    # Cascade delete for related records
+    video_summary = relationship("VideoSummary", back_populates="video", cascade="all, delete-orphan", uselist=False)
+    chunks = relationship("TranscriptChunk", back_populates="video", cascade="all, delete-orphan")
+
 
 class ShareTypeEnum(str):
     FOLDER = "folder"
@@ -515,3 +519,77 @@ class CourseMaterial(Base):
     # Relationships
     course = relationship("Course", back_populates="materials")
     video = relationship("Video")
+
+
+# ── Video Understanding - Phase 1: Semantic Chunking ───────────────────
+
+
+class TranscriptChunk(Base):
+    """
+    Semantic chunks of video transcripts with embeddings.
+    Phase 1 of video understanding optimization.
+    Enables precise retrieval of specific content anywhere in video.
+    """
+
+    __tablename__ = "transcript_chunks"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    video_id = Column(String, ForeignKey("videos.id", ondelete="CASCADE"), index=True, nullable=False)
+    chunk_index = Column(Integer, nullable=False)
+
+    # Content
+    text = Column(Text, nullable=False)
+
+    # Timestamps
+    start_time = Column(String, nullable=True)  # "00:05:23"
+    end_time = Column(String, nullable=True)    # "00:06:15"
+    start_seconds = Column(Float, nullable=True)
+    end_seconds = Column(Float, nullable=True)
+
+    # Embedding (1536 dimensions for text-embedding-3-small)
+    embedding = Column(JSON, nullable=True)
+
+    # Metadata
+    word_count = Column(Integer, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    video = relationship("Video", back_populates="chunks")
+
+
+# ── Video Understanding - Phase 2: Hierarchical Summaries ───────────────────
+
+
+class VideoSummary(Base):
+    """
+    Hierarchical summaries for videos to enable efficient querying.
+    Phase 2 of video understanding optimization.
+    """
+
+    __tablename__ = "video_summaries"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    video_id = Column(String, ForeignKey("videos.id", ondelete="CASCADE"), unique=True, index=True, nullable=False)
+
+    # Level 1: High-level overview (50-100 tokens)
+    overview_summary = Column(Text, nullable=True)
+    key_topics = Column(JSON, nullable=True)  # ["Topic 1", "Topic 2", ...]
+
+    # Level 2: Section summaries (5-10 sections with timestamps)
+    sections = Column(JSON, nullable=True)  # [{"title": "...", "start_time": "...", "summary": "..."}]
+
+    # Metadata
+    total_duration_seconds = Column(Float, nullable=True)
+    processing_status = Column(String, default="pending")  # 'pending', 'processing', 'completed', 'failed'
+    error_message = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=datetime.now(timezone.utc),
+        onupdate=datetime.now(timezone.utc),
+    )
+
+    # Relationships
+    video = relationship("Video", back_populates="video_summary")
