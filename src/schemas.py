@@ -34,6 +34,7 @@ class VideoOut(BaseModel):
     transcript_text: Optional[str] = None
     formatted_transcript: Optional[str] = None
     folder_id: Optional[str] = None
+    thumbnail_url: Optional[str] = None  # Computed field for video thumbnails
 
     class Config:
         from_attributes = True

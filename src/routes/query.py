@@ -9,8 +9,8 @@ from controllers.db_helpers import (
     get_download_status,
     get_video_path,
 )
-from controllers.background_tasks import download_video_background
-from controllers.config import frames_path, download_executor
+from controllers.background_tasks import download_video_background, generate_summary_background
+from controllers.config import frames_path, download_executor, logger
 from controllers.subscription_service import (
     check_usage_limits,
     increment_usage,
@@ -21,10 +21,12 @@ from controllers.conversation_manager import (
     get_merged_conversation_history,
 )
 from utils.youtube_utils import download_transcript_api, grab_youtube_frame
+# from utils.youtube_frame_capturer import capture_youtube_frame  # Disabled - YouTube frame capture not working
 from utils.ml_models import OpenAIVisionClient
 from schemas import VideoQuery
 from utils.firebase_auth import get_current_user
-from models import User, Video
+from models import User, Video, VideoSummary
+from services.summary_service import SummaryService, QueryRouter
 
 
 router = APIRouter(prefix="/api/query", tags=["Query"])
@@ -89,6 +91,7 @@ async def process_query(
             client_history=query_request.conversation_history or [],
         )
 
+        # Get full transcript (needed for summary generation and specific queries)
         transcript_to_use = None
         formatting_status_info = get_formatting_status(db, video_id)
         if formatting_status_info["status"] == "completed":
@@ -102,6 +105,53 @@ async def process_query(
                 transcript_to_use = transcript_data
                 update_transcript_cache(db, video_id, transcript_data, json_data)
 
+        # Initialize services for Phase 2: Hierarchical Summaries
+        summary_service = SummaryService()
+        query_router = QueryRouter()
+
+        # Check if summary exists
+        video_summary = summary_service.get_summary(db, video_id)
+
+        # If no summary exists, trigger background generation
+        if not video_summary and transcript_to_use:
+            logger.info(f"No summary found for video {video_id}, triggering background generation")
+            download_executor.submit(generate_summary_background, video_id, transcript_to_use)
+
+        # Classify query type for intelligent routing
+        query_type = query_router.classify_query(query)
+        logger.info(f"Query classified as: {query_type}")
+
+        # Build context based on query type and summary availability
+        # Phase 1+2 Combined: Uses both semantic chunks and hierarchical summaries
+        context_for_llm = transcript_to_use  # Default fallback
+        retrieval_strategy = "full_transcript"  # Default
+
+        if video_summary:
+            if query_type == "broad":
+                # Use summary only for broad questions (80-90% token reduction)
+                context_for_llm = query_router.build_context_from_summary(video_summary)
+                retrieval_strategy = "summary_only"
+                logger.info(f"Using summary-only context ({len(context_for_llm)} chars vs {len(transcript_to_use)} chars)")
+
+            elif query_type == "hybrid":
+                # Phase 1+2: Use summary + semantic chunks for hybrid queries
+                context_for_llm = query_router.build_hybrid_context(
+                    db, video_id, query, video_summary, transcript_to_use
+                )
+                retrieval_strategy = "hybrid_semantic"
+                logger.info(f"Using hybrid context (summary + top-3 semantic chunks)")
+
+            elif query_type == "specific":
+                # Phase 1: Use semantic chunk retrieval for specific queries
+                semantic_context = query_router.build_semantic_context(db, video_id, query, top_k=5)
+                if semantic_context:
+                    context_for_llm = semantic_context
+                    retrieval_strategy = "semantic_chunks"
+                    logger.info(f"Using semantic chunks context (top-5 relevant chunks)")
+                else:
+                    # Fallback to full transcript if no chunks available yet
+                    logger.warning(f"No chunks available for video {video_id}, using full transcript")
+
         # Check if question is relevant to video content
         video_record = db.query(Video).filter(Video.id == video_id).first()
         video_title = video_record.title if video_record else ""
@@ -110,6 +160,7 @@ async def process_query(
             question=query,
             transcript_excerpt=transcript_to_use[:1000] if transcript_to_use else "",
             video_title=video_title,
+            conversation_history=conversation_context,  # Pass conversation history for context
         )
 
         # If question is clearly off-topic, provide gentle redirect
@@ -130,40 +181,27 @@ async def process_query(
             }
 
         if is_image_query:
+            # YouTube image queries disabled - video download not working
+            if video_record and video_record.source_type == "youtube":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Image queries are not supported for YouTube videos. Please ask questions based on the transcript instead."
+                )
+
             if timestamp is None:
                 raise HTTPException(
                     status_code=400, detail="Timestamp is required for image queries"
                 )
+
+            # Only for non-YouTube videos (uploaded videos)
             video_path_local = get_video_path(db, video_id)
             if not video_path_local:
-                download_status_info = get_download_status(db, video_id)
-                if download_status_info["status"] == "downloading":
-                    return {
-                        "response": "🎬 Something amazing is being loaded! The video is still downloading in the background. Please continue to chat with the video content in the meantime, and try frame-specific questions again in a moment!",
-                        "video_id": video_id,
-                        "timestamp": timestamp,
-                        "query_type": "downloading",
-                        "is_downloading": True,
-                    }
-                elif download_status_info["status"] == "failed":
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Video download failed: {download_status_info['message']}",
-                    )
-                else:
-                    download_executor.submit(
-                        download_video_background,
-                        video_id,
-                        f"https://www.youtube.com/watch?v={video_id}",
-                        current_user["uid"],
-                    )
-                    return {
-                        "response": "🎬 Something amazing is being loaded! Video download has started in the background. Please continue to chat with the video content in the meantime, and try frame-specific questions again in a moment!",
-                        "video_id": video_id,
-                        "timestamp": timestamp,
-                        "query_type": "downloading",
-                        "is_downloading": True,
-                    }
+                raise HTTPException(
+                    status_code=400,
+                    detail="Video not available for frame extraction"
+                )
+
+            # Extract frame from local video
             frame_filename = f"frame_{video_id}_{int(timestamp)}.jpg"
             frame_path = os.path.join(frames_path, frame_filename)
             output_file, frame = grab_youtube_frame(
@@ -171,17 +209,17 @@ async def process_query(
             )
             if not output_file:
                 raise HTTPException(status_code=500, detail="Frame extraction failed")
+
             response = vision_client.ask_with_image(
                 query, frame_path, transcript_to_use, conversation_context
             )
-            # Image queries don't use web search currently
             web_sources = []
             used_web_search = False
         else:
-            # Use web-augmented answering for text queries
+            # Use web-augmented answering for text queries with intelligent context
             web_result = vision_client.ask_with_web_augmentation(
                 prompt=query,
-                context=transcript_to_use,
+                context=context_for_llm,  # Use intelligent context instead of full transcript
                 conversation_history=conversation_context,
                 video_title=video_title,
                 enable_search=True,  # Can be controlled via user settings
@@ -212,6 +250,8 @@ async def process_query(
             "query_type": "image" if is_image_query else "text",
             "web_sources": web_sources,
             "used_web_search": used_web_search,
+            "retrieval_strategy": retrieval_strategy,  # For analytics
+            "classified_query_type": query_type,  # For analytics
         }
     except Exception as e:
         raise HTTPException(
