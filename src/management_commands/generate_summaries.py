@@ -74,7 +74,11 @@ def generate_summaries(limit: int = None, force: bool = False, video_id: str = N
                     .first()
                 )
 
-                if existing_summary and existing_summary.processing_status == "completed" and not force:
+                if (
+                    existing_summary
+                    and existing_summary.processing_status == "completed"
+                    and not force
+                ):
                     logger.info(f"  ✓ Summary already exists, skipping")
                     skip_count += 1
                     continue

@@ -86,8 +86,15 @@ class Video(Base):
     folder = relationship("Folder", back_populates="videos")
 
     # Cascade delete for related records
-    video_summary = relationship("VideoSummary", back_populates="video", cascade="all, delete-orphan", uselist=False)
-    chunks = relationship("TranscriptChunk", back_populates="video", cascade="all, delete-orphan")
+    video_summary = relationship(
+        "VideoSummary",
+        back_populates="video",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    chunks = relationship(
+        "TranscriptChunk", back_populates="video", cascade="all, delete-orphan"
+    )
 
 
 class ShareTypeEnum(str):
@@ -534,7 +541,9 @@ class TranscriptChunk(Base):
     __tablename__ = "transcript_chunks"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    video_id = Column(String, ForeignKey("videos.id", ondelete="CASCADE"), index=True, nullable=False)
+    video_id = Column(
+        String, ForeignKey("videos.id", ondelete="CASCADE"), index=True, nullable=False
+    )
     chunk_index = Column(Integer, nullable=False)
 
     # Content
@@ -542,7 +551,7 @@ class TranscriptChunk(Base):
 
     # Timestamps
     start_time = Column(String, nullable=True)  # "00:05:23"
-    end_time = Column(String, nullable=True)    # "00:06:15"
+    end_time = Column(String, nullable=True)  # "00:06:15"
     start_seconds = Column(Float, nullable=True)
     end_seconds = Column(Float, nullable=True)
 
@@ -570,18 +579,28 @@ class VideoSummary(Base):
     __tablename__ = "video_summaries"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    video_id = Column(String, ForeignKey("videos.id", ondelete="CASCADE"), unique=True, index=True, nullable=False)
+    video_id = Column(
+        String,
+        ForeignKey("videos.id", ondelete="CASCADE"),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
 
     # Level 1: High-level overview (50-100 tokens)
     overview_summary = Column(Text, nullable=True)
     key_topics = Column(JSON, nullable=True)  # ["Topic 1", "Topic 2", ...]
 
     # Level 2: Section summaries (5-10 sections with timestamps)
-    sections = Column(JSON, nullable=True)  # [{"title": "...", "start_time": "...", "summary": "..."}]
+    sections = Column(
+        JSON, nullable=True
+    )  # [{"title": "...", "start_time": "...", "summary": "..."}]
 
     # Metadata
     total_duration_seconds = Column(Float, nullable=True)
-    processing_status = Column(String, default="pending")  # 'pending', 'processing', 'completed', 'failed'
+    processing_status = Column(
+        String, default="pending"
+    )  # 'pending', 'processing', 'completed', 'failed'
     error_message = Column(Text, nullable=True)
 
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)

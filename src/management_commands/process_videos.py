@@ -46,7 +46,7 @@ def process_videos(
     force: bool = False,
     video_id: str = None,
     chunks_only: bool = False,
-    summaries_only: bool = False
+    summaries_only: bool = False,
 ):
     """
     Process videos with Phase 1+2 combined.
@@ -133,7 +133,9 @@ def process_videos(
                             )
 
                             elapsed = (datetime.now() - start_time).total_seconds()
-                            logger.info(f"  ✓ Generated {num_chunks} chunks in {elapsed:.2f}s")
+                            logger.info(
+                                f"  ✓ Generated {num_chunks} chunks in {elapsed:.2f}s"
+                            )
                             chunks_success += 1
 
                     except Exception as e:

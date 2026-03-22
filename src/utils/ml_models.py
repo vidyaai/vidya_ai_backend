@@ -49,8 +49,12 @@ class OpenAIVisionClient:
             )
 
             # Debug log to verify LaTeX-only instructions are being used
-            logger.info(f"🔍 System prompt check - Contains 'LaTeX ONLY': {'LaTeX ONLY' in system_prompt}")
-            logger.info(f"🔍 System prompt check - Contains 'NEVER use HTML': {'NEVER use HTML' in system_prompt}")
+            logger.info(
+                f"🔍 System prompt check - Contains 'LaTeX ONLY': {'LaTeX ONLY' in system_prompt}"
+            )
+            logger.info(
+                f"🔍 System prompt check - Contains 'NEVER use HTML': {'NEVER use HTML' in system_prompt}"
+            )
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -82,10 +86,18 @@ class OpenAIVisionClient:
             ai_response = response.choices[0].message.content
 
             # Log first 500 chars to check for MathML
-            logger.info(f"🤖 AI Response (first 500 chars): {ai_response[:500] if ai_response else 'None'}")
-            logger.info(f"🔍 Response contains 'MathML': {'MathML' in ai_response if ai_response else False}")
-            logger.info(f"🔍 Response contains '<math': {'<math' in ai_response if ai_response else False}")
-            logger.info(f"🔍 Response contains '\\(': {'\\(' in ai_response if ai_response else False}")
+            logger.info(
+                f"🤖 AI Response (first 500 chars): {ai_response[:500] if ai_response else 'None'}"
+            )
+            logger.info(
+                f"🔍 Response contains 'MathML': {'MathML' in ai_response if ai_response else False}"
+            )
+            logger.info(
+                f"🔍 Response contains '<math': {'<math' in ai_response if ai_response else False}"
+            )
+            logger.info(
+                f"🔍 Response contains '\\(': {'\\(' in ai_response if ai_response else False}"
+            )
 
             return ai_response
         except Exception as e:
@@ -113,8 +125,12 @@ class OpenAIVisionClient:
             )
 
             # Debug log to verify LaTeX-only instructions are being used
-            logger.info(f"🔍 System prompt check - Contains 'LaTeX ONLY': {'LaTeX ONLY' in system_prompt}")
-            logger.info(f"🔍 System prompt check - Contains 'NEVER use HTML': {'NEVER use HTML' in system_prompt}")
+            logger.info(
+                f"🔍 System prompt check - Contains 'LaTeX ONLY': {'LaTeX ONLY' in system_prompt}"
+            )
+            logger.info(
+                f"🔍 System prompt check - Contains 'NEVER use HTML': {'NEVER use HTML' in system_prompt}"
+            )
 
             # Encode the image
             base64_image = self._encode_image(image_path)
@@ -184,7 +200,7 @@ class OpenAIVisionClient:
         question: str,
         transcript_excerpt: str,
         video_title: str = "",
-        conversation_history: Optional[List[Dict[str, Any]]] = None
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
     ) -> dict:
         """
         Check if a student's question is relevant to the video content.
@@ -223,7 +239,9 @@ class OpenAIVisionClient:
                     content = msg.get("content", "")
                     if content:  # Only include non-empty messages
                         # Limit each message to 200 chars for brevity
-                        content_preview = content[:200] + "..." if len(content) > 200 else content
+                        content_preview = (
+                            content[:200] + "..." if len(content) > 200 else content
+                        )
                         conversation_context += f"{role}: {content_preview}\n"
 
             prompt = f"""You are analyzing whether a student's question is relevant to a video they're watching.
@@ -332,7 +350,7 @@ Only mark as irrelevant if it's clearly about something completely unrelated to 
                 return {
                     "rewritten_query": user_query,
                     "has_ambiguous_reference": False,
-                    "original_query": user_query
+                    "original_query": user_query,
                 }
 
             # Build conversation context (last 15 messages = 7-8 Q&A pairs)
@@ -354,7 +372,9 @@ Only mark as irrelevant if it's clearly about something completely unrelated to 
             logger.info(f"=" * 80)
             logger.info(f"QUERY REWRITER DEBUG:")
             logger.info(f"User query: '{user_query}'")
-            logger.info(f"Total conversation history messages: {len(conversation_history) if conversation_history else 0}")
+            logger.info(
+                f"Total conversation history messages: {len(conversation_history) if conversation_history else 0}"
+            )
             logger.info(f"Using last {len(recent_messages)} messages")
             logger.info(f"Conversation text sent to LLM:")
             logger.info(f"-" * 80)
@@ -528,9 +548,9 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an intelligent query analysis expert. When you detect references to numbered items (point 2, question 8, the 2nd point, etc.), you MUST extract the actual topic name from the numbered list and use it in the rewritten query. Be specific and concrete - never add generic phrases like 'regarding the topic'. Use semantic understanding, not keyword matching. Output valid JSON only."
+                        "content": "You are an intelligent query analysis expert. When you detect references to numbered items (point 2, question 8, the 2nd point, etc.), you MUST extract the actual topic name from the numbered list and use it in the rewritten query. Be specific and concrete - never add generic phrases like 'regarding the topic'. Use semantic understanding, not keyword matching. Output valid JSON only.",
                     },
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
                 response_format={"type": "json_object"},
                 max_tokens=500,  # Increased from 400 to handle longer extraction context
@@ -561,7 +581,7 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
             return {
                 "rewritten_query": user_query,
                 "has_ambiguous_reference": False,
-                "original_query": user_query
+                "original_query": user_query,
             }
 
     def ask_with_web_augmentation(
@@ -604,8 +624,7 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
 
             # STEP 1: Rewrite query to resolve ambiguous references
             rewrite_result = self.rewrite_query_with_context(
-                user_query=prompt,
-                conversation_history=conversation_history
+                user_query=prompt, conversation_history=conversation_history
             )
 
             # Use rewritten query for all downstream processing
@@ -673,7 +692,9 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
             # If no web search or search failed, use standard answer
             logger.info("Generating answer from video content only")
             result["response"] = self.ask_text_only(
-                contextualized_prompt, context, conversation_history  # Use rewritten query
+                contextualized_prompt,
+                context,
+                conversation_history,  # Use rewritten query
             )
             result["used_web_search"] = False
 
@@ -684,7 +705,9 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
             # Fallback to standard answer (use original prompt if rewriting failed)
             fallback_query = prompt
             return {
-                "response": self.ask_text_only(fallback_query, context, conversation_history),
+                "response": self.ask_text_only(
+                    fallback_query, context, conversation_history
+                ),
                 "sources": [],
                 "used_web_search": False,
                 "search_query": "",

@@ -32,9 +32,7 @@ class EmbeddingService:
         """Generate embedding for single text."""
         try:
             response = self.client.embeddings.create(
-                model=self.model,
-                input=text,
-                encoding_format="float"
+                model=self.model, input=text, encoding_format="float"
             )
             return response.data[0].embedding
         except Exception as e:
@@ -46,16 +44,16 @@ class EmbeddingService:
         embeddings = []
 
         for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
+            batch = texts[i : i + batch_size]
             try:
                 response = self.client.embeddings.create(
-                    model=self.model,
-                    input=batch,
-                    encoding_format="float"
+                    model=self.model, input=batch, encoding_format="float"
                 )
                 batch_embeddings = [item.embedding for item in response.data]
                 embeddings.extend(batch_embeddings)
-                logger.info(f"Generated {len(batch_embeddings)} embeddings (batch {i//batch_size + 1})")
+                logger.info(
+                    f"Generated {len(batch_embeddings)} embeddings (batch {i//batch_size + 1})"
+                )
             except Exception as e:
                 logger.error(f"Error in batch {i}-{i+batch_size}: {e}")
                 # Fallback to individual
@@ -74,7 +72,7 @@ class EmbeddingService:
         self,
         query_embedding: List[float],
         candidates: List[Dict[str, Any]],
-        top_k: int = 5
+        top_k: int = 5,
     ) -> List[Dict[str, Any]]:
         """
         Find top-k most similar chunks.
@@ -93,14 +91,8 @@ class EmbeddingService:
             if not candidate.get("embedding"):
                 continue
 
-            similarity = self.cosine_similarity(
-                query_embedding,
-                candidate["embedding"]
-            )
-            similarities.append({
-                **candidate,
-                "similarity": similarity
-            })
+            similarity = self.cosine_similarity(query_embedding, candidate["embedding"])
+            similarities.append({**candidate, "similarity": similarity})
 
         similarities.sort(key=lambda x: x["similarity"], reverse=True)
         return similarities[:top_k]
@@ -151,18 +143,24 @@ class SemanticChunker:
                 current_end_sec = section["end_seconds"]
             else:
                 # Save current chunk
-                chunks.append({
-                    "text": "\n".join(current_chunk_text),
-                    "start_time": current_start,
-                    "end_time": current_end,
-                    "start_seconds": current_start_sec,
-                    "end_seconds": current_end_sec,
-                    "word_count": len(" ".join(current_chunk_text).split())
-                })
+                chunks.append(
+                    {
+                        "text": "\n".join(current_chunk_text),
+                        "start_time": current_start,
+                        "end_time": current_end,
+                        "start_seconds": current_start_sec,
+                        "end_seconds": current_end_sec,
+                        "word_count": len(" ".join(current_chunk_text).split()),
+                    }
+                )
 
                 # Start new chunk with overlap
                 overlap_text = self._get_overlap(current_chunk_text)
-                current_chunk_text = [overlap_text, section["text"]] if overlap_text else [section["text"]]
+                current_chunk_text = (
+                    [overlap_text, section["text"]]
+                    if overlap_text
+                    else [section["text"]]
+                )
                 current_start = section["start_time"]
                 current_start_sec = section["start_seconds"]
                 current_end = section["end_time"]
@@ -170,14 +168,16 @@ class SemanticChunker:
 
         # Add final chunk
         if current_chunk_text:
-            chunks.append({
-                "text": "\n".join(current_chunk_text),
-                "start_time": current_start,
-                "end_time": current_end,
-                "start_seconds": current_start_sec,
-                "end_seconds": current_end_sec,
-                "word_count": len(" ".join(current_chunk_text).split())
-            })
+            chunks.append(
+                {
+                    "text": "\n".join(current_chunk_text),
+                    "start_time": current_start,
+                    "end_time": current_end,
+                    "start_seconds": current_start_sec,
+                    "end_seconds": current_end_sec,
+                    "word_count": len(" ".join(current_chunk_text).split()),
+                }
+            )
 
         return chunks
 
@@ -186,7 +186,9 @@ class SemanticChunker:
         sections = []
         lines = transcript.split("\n")
 
-        timestamp_pattern = re.compile(r"(\d{1,2}:\d{2}(?::\d{2})?)\s*(?:-\s*(\d{1,2}:\d{2}(?::\d{2})?))?")
+        timestamp_pattern = re.compile(
+            r"(\d{1,2}:\d{2}(?::\d{2})?)\s*(?:-\s*(\d{1,2}:\d{2}(?::\d{2})?))?"
+        )
 
         current_section = None
         current_text = []
@@ -217,7 +219,7 @@ class SemanticChunker:
                 current_text = []
 
                 # Text after timestamp
-                text_after = line_stripped[match.end():].strip()
+                text_after = line_stripped[match.end() :].strip()
                 if text_after:
                     current_text.append(text_after)
             else:
@@ -262,15 +264,17 @@ class SemanticChunker:
         chunk_chars = 2000
 
         for i in range(0, len(text), chunk_chars):
-            chunk_text = text[i:i + chunk_chars]
-            chunks.append({
-                "text": chunk_text,
-                "start_time": None,
-                "end_time": None,
-                "start_seconds": None,
-                "end_seconds": None,
-                "word_count": len(chunk_text.split())
-            })
+            chunk_text = text[i : i + chunk_chars]
+            chunks.append(
+                {
+                    "text": chunk_text,
+                    "start_time": None,
+                    "end_time": None,
+                    "start_seconds": None,
+                    "end_seconds": None,
+                    "word_count": len(chunk_text.split()),
+                }
+            )
 
         return chunks
 
@@ -285,12 +289,7 @@ class TranscriptProcessor:
         self.chunker = SemanticChunker()
         self.embedder = EmbeddingService()
 
-    def process_transcript(
-        self,
-        db: Session,
-        video_id: str,
-        transcript: str
-    ) -> int:
+    def process_transcript(self, db: Session, video_id: str, transcript: str) -> int:
         """
         Process transcript: chunk, embed, store.
 
@@ -309,9 +308,7 @@ class TranscriptProcessor:
         logger.info(f"Generated {len(embeddings)} embeddings")
 
         # Step 3: Delete existing chunks (if reprocessing)
-        db.query(TranscriptChunk).filter(
-            TranscriptChunk.video_id == video_id
-        ).delete()
+        db.query(TranscriptChunk).filter(TranscriptChunk.video_id == video_id).delete()
 
         # Step 4: Store chunks
         for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
@@ -324,7 +321,7 @@ class TranscriptProcessor:
                 start_seconds=chunk.get("start_seconds"),
                 end_seconds=chunk.get("end_seconds"),
                 embedding=embedding,
-                word_count=chunk.get("word_count", 0)
+                word_count=chunk.get("word_count", 0),
             )
             db.add(chunk_record)
 
@@ -334,7 +331,9 @@ class TranscriptProcessor:
 
     def is_processed(self, db: Session, video_id: str) -> bool:
         """Check if video has chunks."""
-        count = db.query(TranscriptChunk).filter(
-            TranscriptChunk.video_id == video_id
-        ).count()
+        count = (
+            db.query(TranscriptChunk)
+            .filter(TranscriptChunk.video_id == video_id)
+            .count()
+        )
         return count > 0

@@ -172,7 +172,9 @@ def get_merged_conversation_history(
         # DEBUG: Log first message to see structure
         if db_messages:
             logger.info(f"DEBUG: First db_message: {db_messages[0]}")
-            logger.info(f"DEBUG: Message keys: {db_messages[0].keys() if isinstance(db_messages[0], dict) else 'Not a dict'}")
+            logger.info(
+                f"DEBUG: Message keys: {db_messages[0].keys() if isinstance(db_messages[0], dict) else 'Not a dict'}"
+            )
 
         # Convert to OpenAI format
         # Handle both formats: frontend sends {sender, text}, backend stores {role, content}

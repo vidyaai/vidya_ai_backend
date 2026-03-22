@@ -337,7 +337,9 @@ class SearchDecisionAgent:
             # Build conversation context for better decision making
             conversation_context = ""
             if conversation_history and isinstance(conversation_history, list):
-                recent_messages = conversation_history[-10:]  # Last 5 Q&A pairs (increased from 2)
+                recent_messages = conversation_history[
+                    -10:
+                ]  # Last 5 Q&A pairs (increased from 2)
                 for msg in recent_messages:
                     if isinstance(msg, dict) and "role" in msg and "content" in msg:
                         role = msg.get("role", "user").upper()

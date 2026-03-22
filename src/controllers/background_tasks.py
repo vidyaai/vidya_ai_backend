@@ -3,6 +3,7 @@ import threading
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from utils.db import SessionLocal
+
 # from utils.youtube_utils import download_video  # Disabled - YouTube download not working
 from utils.format_transcript import create_formatted_transcript
 from models import Video, Assignment, AssignmentSubmission, VideoSummary
@@ -27,7 +28,9 @@ def download_video_background(video_id: str, url: str, user_id: str):
     try:
         # Check if it's a YouTube URL - skip download as it's not working
         if "youtube.com" in url or "youtu.be" in url:
-            logger.info(f"Skipping YouTube video download for {video_id} - download disabled")
+            logger.info(
+                f"Skipping YouTube video download for {video_id} - download disabled"
+            )
             status = {
                 "status": "skipped",
                 "message": "YouTube video download disabled - using transcript only",
@@ -196,13 +199,19 @@ def format_transcript_background(video_id: str, json_data: dict):
             # Phase 1: Generate chunks with embeddings
             try:
                 chunk_processor = TranscriptProcessor()
-                existing_chunks = db.query(TranscriptChunk).filter(
-                    TranscriptChunk.video_id == video_id
-                ).first()
+                existing_chunks = (
+                    db.query(TranscriptChunk)
+                    .filter(TranscriptChunk.video_id == video_id)
+                    .first()
+                )
 
                 if not existing_chunks:
-                    logger.info(f"Generating chunks with embeddings for video {video_id}")
-                    num_chunks = chunk_processor.process_transcript(db, video_id, formatted_transcript_text)
+                    logger.info(
+                        f"Generating chunks with embeddings for video {video_id}"
+                    )
+                    num_chunks = chunk_processor.process_transcript(
+                        db, video_id, formatted_transcript_text
+                    )
                     logger.info(f"Generated {num_chunks} chunks for video {video_id}")
                 else:
                     logger.info(f"Chunks already exist for video {video_id}, skipping")
@@ -212,22 +221,35 @@ def format_transcript_background(video_id: str, json_data: dict):
             # Phase 2: Generate hierarchical summary
             try:
                 summary_service = SummaryService()
-                existing_summary = db.query(VideoSummary).filter(
-                    VideoSummary.video_id == video_id
-                ).first()
+                existing_summary = (
+                    db.query(VideoSummary)
+                    .filter(VideoSummary.video_id == video_id)
+                    .first()
+                )
 
-                if not existing_summary or existing_summary.processing_status != "completed":
-                    logger.info(f"Generating summary for video {video_id} after formatting")
-                    summary_service.generate_video_summary(db, video_id, formatted_transcript_text)
+                if (
+                    not existing_summary
+                    or existing_summary.processing_status != "completed"
+                ):
+                    logger.info(
+                        f"Generating summary for video {video_id} after formatting"
+                    )
+                    summary_service.generate_video_summary(
+                        db, video_id, formatted_transcript_text
+                    )
                     logger.info(f"Summary generated for video {video_id}")
                 else:
-                    logger.info(f"Summary already exists for video {video_id}, skipping")
+                    logger.info(
+                        f"Summary already exists for video {video_id}, skipping"
+                    )
             except Exception as e:
                 logger.error(f"Summary generation failed for {video_id}: {e}")
 
         except Exception as e:
             # Don't fail the whole formatting job if processing fails
-            logger.error(f"Phase 1+2 processing failed for {video_id}: {e}, but transcript formatting succeeded")
+            logger.error(
+                f"Phase 1+2 processing failed for {video_id}: {e}, but transcript formatting succeeded"
+            )
     except Exception as e:
         logger.error(f"Transcript formatting failed for video ID {video_id}: {e}")
         status = {
@@ -485,15 +507,21 @@ def generate_summary_background(video_id: str, transcript: str):
 
         # Phase 1: Generate chunks with embeddings
         try:
-            existing_chunks = db.query(TranscriptChunk).filter(
-                TranscriptChunk.video_id == video_id
-            ).first()
+            existing_chunks = (
+                db.query(TranscriptChunk)
+                .filter(TranscriptChunk.video_id == video_id)
+                .first()
+            )
 
             if not existing_chunks:
                 logger.info(f"Generating chunks for video {video_id}")
                 chunk_processor = TranscriptProcessor()
-                num_chunks = chunk_processor.process_transcript(db, video_id, transcript)
-                logger.info(f"Successfully generated {num_chunks} chunks for video {video_id}")
+                num_chunks = chunk_processor.process_transcript(
+                    db, video_id, transcript
+                )
+                logger.info(
+                    f"Successfully generated {num_chunks} chunks for video {video_id}"
+                )
             else:
                 logger.info(f"Chunks already exist for video {video_id}, skipping")
         except Exception as e:
@@ -502,7 +530,9 @@ def generate_summary_background(video_id: str, transcript: str):
 
         # Phase 2: Generate summary
         try:
-            existing_summary = db.query(VideoSummary).filter(VideoSummary.video_id == video_id).first()
+            existing_summary = (
+                db.query(VideoSummary).filter(VideoSummary.video_id == video_id).first()
+            )
             if existing_summary and existing_summary.processing_status == "completed":
                 logger.info(f"Summary already exists for video {video_id}, skipping")
                 return
@@ -527,7 +557,9 @@ def generate_summary_background(video_id: str, transcript: str):
         except Exception as e:
             logger.error(f"Summary generation failed for {video_id}: {e}")
             # Mark as failed
-            summary_record = db.query(VideoSummary).filter(VideoSummary.video_id == video_id).first()
+            summary_record = (
+                db.query(VideoSummary).filter(VideoSummary.video_id == video_id).first()
+            )
             if summary_record:
                 summary_record.processing_status = "failed"
                 summary_record.error_message = str(e)

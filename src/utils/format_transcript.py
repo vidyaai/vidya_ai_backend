@@ -157,8 +157,7 @@ async def format_with_openai_async(
 
     # Create tasks for all chunks
     tasks = [
-        format_chunk_async(chunk, i, semaphore)
-        for i, chunk in enumerate(text_chunks)
+        format_chunk_async(chunk, i, semaphore) for i, chunk in enumerate(text_chunks)
     ]
 
     # Process all chunks in parallel and update progress periodically
