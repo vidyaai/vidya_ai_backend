@@ -7,6 +7,7 @@ import os
 import tempfile
 from datetime import datetime
 import time
+from urllib.parse import quote
 
 from utils.db import get_db
 from controllers.config import logger, s3_client, AWS_S3_BUCKET
@@ -261,7 +262,7 @@ async def download_lecture_summary(
 
             # Generate filename
             video_title = video.title or "lecture"
-            # Clean filename (remove special characters)
+            # Build a Unicode-safe filename
             clean_title = "".join(
                 c for c in video_title if c.isalnum() or c in (" ", "_", "-")
             ).replace(" ", "_")
@@ -269,11 +270,22 @@ async def download_lecture_summary(
 
             logger.info(f"Returning PDF: {filename}")
 
+            # RFC 5987 encoding for Unicode filenames in Content-Disposition
+            # Provide ASCII fallback for older clients
+            ascii_filename = (
+                filename.encode("ascii", "ignore").decode("ascii") or "Summary.pdf"
+            )
+            encoded_filename = quote(filename, safe="-_.~")
+            content_disposition = (
+                f'attachment; filename="{ascii_filename}"; '
+                f"filename*=UTF-8''{encoded_filename}"
+            )
+
             return Response(
                 content=pdf_content,
                 media_type="application/pdf",
                 headers={
-                    "Content-Disposition": f'attachment; filename="{filename}"',
+                    "Content-Disposition": content_disposition,
                     "Access-Control-Expose-Headers": "Content-Disposition",
                 },
             )
