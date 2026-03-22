@@ -134,7 +134,8 @@ class SummaryService:
 
         # Pattern for timestamps: "MM:SS" or "HH:MM:SS" or "MM:SS - MM:SS"
         timestamp_pattern = re.compile(
-            r"(\d{1,2}:\d{2}(?::\d{2})?)\s*(?:-\s*(\d{1,2}:\d{2}(?::\d{2})?))?")
+            r"(\d{1,2}:\d{2}(?::\d{2})?)\s*(?:-\s*(\d{1,2}:\d{2}(?::\d{2})?))?"
+        )
 
         current_section = None
         current_text = []
@@ -166,7 +167,7 @@ class SummaryService:
                 current_text = []
 
                 # Add text after timestamp on same line
-                text_after = line[match.end():].strip()
+                text_after = line[match.end() :].strip()
                 if text_after:
                     current_text.append(text_after)
             else:
@@ -392,7 +393,9 @@ Return ONLY a JSON object with a "topics" array:
         Returns:
             Dictionary with summary data or None if not found/not completed
         """
-        summary = db.query(VideoSummary).filter(VideoSummary.video_id == video_id).first()
+        summary = (
+            db.query(VideoSummary).filter(VideoSummary.video_id == video_id).first()
+        )
 
         if not summary or summary.processing_status != "completed":
             return None
@@ -496,7 +499,7 @@ class QueryRouter:
         video_id: str,
         query: str,
         summary: Dict[str, Any],
-        full_transcript: str
+        full_transcript: str,
     ) -> str:
         """
         Build context combining summary overview with semantic chunks.
@@ -523,17 +526,15 @@ class QueryRouter:
         return context
 
     def build_semantic_context(
-        self,
-        db: Session,
-        video_id: str,
-        query: str,
-        top_k: int = 5
+        self, db: Session, video_id: str, query: str, top_k: int = 5
     ) -> str:
         """
         Build context from semantically relevant chunks only.
         Used for specific queries that need precise information.
         """
-        relevant_chunks = self.retrieve_relevant_chunks(db, video_id, query, top_k=top_k)
+        relevant_chunks = self.retrieve_relevant_chunks(
+            db, video_id, query, top_k=top_k
+        )
 
         if not relevant_chunks:
             return ""
@@ -545,17 +546,15 @@ class QueryRouter:
             if chunk.get("start_time"):
                 timestamp_info = f"[{chunk['start_time']} - {chunk['end_time']}] "
 
-            context += f"{i}. {timestamp_info}(Relevance: {chunk.get('similarity', 0):.2f})\n"
+            context += (
+                f"{i}. {timestamp_info}(Relevance: {chunk.get('similarity', 0):.2f})\n"
+            )
             context += f"{chunk['text']}\n\n"
 
         return context
 
     def retrieve_relevant_chunks(
-        self,
-        db: Session,
-        video_id: str,
-        query: str,
-        top_k: int = 5
+        self, db: Session, video_id: str, query: str, top_k: int = 5
     ) -> List[Dict[str, Any]]:
         """
         Retrieve most relevant chunks using semantic search.
@@ -571,9 +570,12 @@ class QueryRouter:
         """
         try:
             # Get all chunks for this video
-            chunks = db.query(TranscriptChunk).filter(
-                TranscriptChunk.video_id == video_id
-            ).order_by(TranscriptChunk.chunk_index).all()
+            chunks = (
+                db.query(TranscriptChunk)
+                .filter(TranscriptChunk.video_id == video_id)
+                .order_by(TranscriptChunk.chunk_index)
+                .all()
+            )
 
             if not chunks:
                 logger.warning(f"No chunks found for video {video_id}")
@@ -586,21 +588,21 @@ class QueryRouter:
             candidates = []
             for chunk in chunks:
                 if chunk.embedding:
-                    candidates.append({
-                        "text": chunk.text,
-                        "start_time": chunk.start_time,
-                        "end_time": chunk.end_time,
-                        "start_seconds": chunk.start_seconds,
-                        "end_seconds": chunk.end_seconds,
-                        "chunk_index": chunk.chunk_index,
-                        "embedding": chunk.embedding
-                    })
+                    candidates.append(
+                        {
+                            "text": chunk.text,
+                            "start_time": chunk.start_time,
+                            "end_time": chunk.end_time,
+                            "start_seconds": chunk.start_seconds,
+                            "end_seconds": chunk.end_seconds,
+                            "chunk_index": chunk.chunk_index,
+                            "embedding": chunk.embedding,
+                        }
+                    )
 
             # Find most similar
             relevant = self.embedder.find_most_similar(
-                query_embedding,
-                candidates,
-                top_k=top_k
+                query_embedding, candidates, top_k=top_k
             )
 
             logger.info(f"Retrieved {len(relevant)} relevant chunks for query")

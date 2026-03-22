@@ -186,11 +186,15 @@ def list_gallery(
         # Generate thumbnail URL
         if video.source_type == "youtube" and video.youtube_id:
             # Use YouTube's native thumbnail (always available)
-            video_dict["thumbnail_url"] = f"https://img.youtube.com/vi/{video.youtube_id}/hqdefault.jpg"
+            video_dict[
+                "thumbnail_url"
+            ] = f"https://img.youtube.com/vi/{video.youtube_id}/hqdefault.jpg"
         elif video.thumb_key and s3_client and AWS_S3_BUCKET:
             # Generate presigned URL for uploaded video thumbnails
             try:
-                video_dict["thumbnail_url"] = s3_presign_url(video.thumb_key, expires_in=3600)
+                video_dict["thumbnail_url"] = s3_presign_url(
+                    video.thumb_key, expires_in=3600
+                )
             except Exception:
                 pass  # Leave as None if presigning fails
 

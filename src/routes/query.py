@@ -9,7 +9,10 @@ from controllers.db_helpers import (
     get_download_status,
     get_video_path,
 )
-from controllers.background_tasks import download_video_background, generate_summary_background
+from controllers.background_tasks import (
+    download_video_background,
+    generate_summary_background,
+)
 from controllers.config import frames_path, download_executor, logger
 from controllers.subscription_service import (
     check_usage_limits,
@@ -21,6 +24,7 @@ from controllers.conversation_manager import (
     get_merged_conversation_history,
 )
 from utils.youtube_utils import download_transcript_api, grab_youtube_frame
+
 # from utils.youtube_frame_capturer import capture_youtube_frame  # Disabled - YouTube frame capture not working
 from utils.ml_models import OpenAIVisionClient
 from schemas import VideoQuery
@@ -114,8 +118,12 @@ async def process_query(
 
         # If no summary exists, trigger background generation
         if not video_summary and transcript_to_use:
-            logger.info(f"No summary found for video {video_id}, triggering background generation")
-            download_executor.submit(generate_summary_background, video_id, transcript_to_use)
+            logger.info(
+                f"No summary found for video {video_id}, triggering background generation"
+            )
+            download_executor.submit(
+                generate_summary_background, video_id, transcript_to_use
+            )
 
         # Classify query type for intelligent routing
         query_type = query_router.classify_query(query)
@@ -131,7 +139,9 @@ async def process_query(
                 # Use summary only for broad questions (80-90% token reduction)
                 context_for_llm = query_router.build_context_from_summary(video_summary)
                 retrieval_strategy = "summary_only"
-                logger.info(f"Using summary-only context ({len(context_for_llm)} chars vs {len(transcript_to_use)} chars)")
+                logger.info(
+                    f"Using summary-only context ({len(context_for_llm)} chars vs {len(transcript_to_use)} chars)"
+                )
 
             elif query_type == "hybrid":
                 # Phase 1+2: Use summary + semantic chunks for hybrid queries
@@ -143,14 +153,20 @@ async def process_query(
 
             elif query_type == "specific":
                 # Phase 1: Use semantic chunk retrieval for specific queries
-                semantic_context = query_router.build_semantic_context(db, video_id, query, top_k=5)
+                semantic_context = query_router.build_semantic_context(
+                    db, video_id, query, top_k=5
+                )
                 if semantic_context:
                     context_for_llm = semantic_context
                     retrieval_strategy = "semantic_chunks"
-                    logger.info(f"Using semantic chunks context (top-5 relevant chunks)")
+                    logger.info(
+                        f"Using semantic chunks context (top-5 relevant chunks)"
+                    )
                 else:
                     # Fallback to full transcript if no chunks available yet
-                    logger.warning(f"No chunks available for video {video_id}, using full transcript")
+                    logger.warning(
+                        f"No chunks available for video {video_id}, using full transcript"
+                    )
 
         # Check if question is relevant to video content
         video_record = db.query(Video).filter(Video.id == video_id).first()
@@ -185,7 +201,7 @@ async def process_query(
             if video_record and video_record.source_type == "youtube":
                 raise HTTPException(
                     status_code=400,
-                    detail="Image queries are not supported for YouTube videos. Please ask questions based on the transcript instead."
+                    detail="Image queries are not supported for YouTube videos. Please ask questions based on the transcript instead.",
                 )
 
             if timestamp is None:
@@ -197,8 +213,7 @@ async def process_query(
             video_path_local = get_video_path(db, video_id)
             if not video_path_local:
                 raise HTTPException(
-                    status_code=400,
-                    detail="Video not available for frame extraction"
+                    status_code=400, detail="Video not available for frame extraction"
                 )
 
             # Extract frame from local video

@@ -629,7 +629,7 @@ def _fallback_youtube_transcript_api(video_id):
             # Try to find English transcript
             english_transcript = None
             for t in transcript_list:
-                if t.language_code.startswith('en'):
+                if t.language_code.startswith("en"):
                     english_transcript = t
                     break
 
@@ -640,30 +640,38 @@ def _fallback_youtube_transcript_api(video_id):
                 available = list(transcript_list)
                 if not available:
                     raise Exception(f"No transcripts available for video {video_id}")
-                logger.info(f"No English transcript for {video_id}, using: {available[0].language}")
+                logger.info(
+                    f"No English transcript for {video_id}, using: {available[0].language}"
+                )
                 transcript_data = available[0].fetch()
         except Exception as e:
             # If list/fetch fails, raise the error
-            logger.error(f"Failed to fetch transcript using YouTubeTranscriptApi for {video_id}: {e}")
+            logger.error(
+                f"Failed to fetch transcript using YouTubeTranscriptApi for {video_id}: {e}"
+            )
             raise
 
         # Convert to text and JSON format compatible with RapidAPI format
         text_parts = []
         json_entries = []
         for snippet in transcript_data:
-            text = snippet.get('text', '')
-            start = snippet.get('start', 0)
-            duration = snippet.get('duration', 0)
+            text = snippet.get("text", "")
+            start = snippet.get("start", 0)
+            duration = snippet.get("duration", 0)
             text_parts.append(text)
-            json_entries.append({
-                "text": text,
-                "start": start,
-                "duration": duration,
-            })
+            json_entries.append(
+                {
+                    "text": text,
+                    "start": start,
+                    "duration": duration,
+                }
+            )
 
         transcript_text = " ".join(text_parts)
         # Wrap in RapidAPI-compatible format
-        json_data = [{"transcriptionAsText": transcript_text, "transcription": json_entries}]
+        json_data = [
+            {"transcriptionAsText": transcript_text, "transcription": json_entries}
+        ]
         return transcript_text, json_data
     except Exception as e:
         logger.error(f"Fallback youtube_transcript_api also failed for {video_id}: {e}")
@@ -688,12 +696,18 @@ def _rapidapi_fetch_transcript(video_id, lang=None):
         transcript_data = response.json()
         if isinstance(transcript_data, list) and len(transcript_data) > 0:
             entry = transcript_data[0]
-            if isinstance(entry, dict) and "transcriptionAsText" in entry and entry["transcriptionAsText"]:
+            if (
+                isinstance(entry, dict)
+                and "transcriptionAsText" in entry
+                and entry["transcriptionAsText"]
+            ):
                 return entry["transcriptionAsText"], response.json()
 
         raise Exception(f"No transcriptionAsText in response for lang={lang}")
     else:
-        raise Exception(f"Transcription Error: {response.status_code} - {response.text}")
+        raise Exception(
+            f"Transcription Error: {response.status_code} - {response.text}"
+        )
 
 
 def download_transcript_api(video_id, max_retries=3):
@@ -721,25 +735,36 @@ def download_transcript_api(video_id, max_retries=3):
     for attempt in range(max_retries):
         try:
             querystring = {"video_id": video_id}
-            response = requests.get(url, headers=headers, params=querystring, timeout=30)
+            response = requests.get(
+                url, headers=headers, params=querystring, timeout=30
+            )
 
             if response.status_code == 200:
                 transcript_data = response.json()
 
                 if isinstance(transcript_data, list) and len(transcript_data) > 0:
                     entry = transcript_data[0]
-                    if isinstance(entry, dict) and "transcriptionAsText" in entry and entry["transcriptionAsText"]:
+                    if (
+                        isinstance(entry, dict)
+                        and "transcriptionAsText" in entry
+                        and entry["transcriptionAsText"]
+                    ):
                         available_langs = entry.get("availableLangs", [])
-                        logger.info(f"Transcript fetched for {video_id}, available languages: {available_langs}")
+                        logger.info(
+                            f"Transcript fetched for {video_id}, available languages: {available_langs}"
+                        )
 
                         # If English is available and the auto-returned transcript isn't English,
                         # fetch English explicitly
                         if available_langs:
-                            has_english = any("en" in lang.lower() for lang in available_langs)
+                            has_english = any(
+                                "en" in lang.lower() for lang in available_langs
+                            )
                             # Check if current transcript is already English
                             current_lang = entry.get("lang", "")
                             is_english = current_lang.startswith("en") or any(
-                                lang.startswith("en") for lang in available_langs
+                                lang.startswith("en")
+                                for lang in available_langs
                                 if lang == current_lang
                             )
                             if has_english and not is_english:
@@ -747,20 +772,33 @@ def download_transcript_api(video_id, max_retries=3):
                                 for lang in available_langs:
                                     if "en" in lang.lower():
                                         try:
-                                            en_text, en_json = _rapidapi_fetch_transcript(video_id, lang=lang)
-                                            logger.info(f"Fetched English transcript ({lang}) for {video_id}")
+                                            (
+                                                en_text,
+                                                en_json,
+                                            ) = _rapidapi_fetch_transcript(
+                                                video_id, lang=lang
+                                            )
+                                            logger.info(
+                                                f"Fetched English transcript ({lang}) for {video_id}"
+                                            )
                                             return en_text, en_json
                                         except Exception:
                                             continue
 
                         # Return whatever language we got (non-English is fine)
-                        logger.info(f"Returning transcript for {video_id} in language: {entry.get('lang', 'unknown')} (available: {available_langs})")
+                        logger.info(
+                            f"Returning transcript for {video_id} in language: {entry.get('lang', 'unknown')} (available: {available_langs})"
+                        )
                         return entry["transcriptionAsText"], response.json()
 
-                logger.warning(f"No transcript data in auto-detect response for {video_id}")
+                logger.warning(
+                    f"No transcript data in auto-detect response for {video_id}"
+                )
                 raise Exception("No transcript data in the response")
             else:
-                logger.error(f"Transcript API error (attempt {attempt + 1}/{max_retries}): {response.status_code} - {response.text}")
+                logger.error(
+                    f"Transcript API error (attempt {attempt + 1}/{max_retries}): {response.status_code} - {response.text}"
+                )
                 last_exception = Exception(
                     f"Transcription Error: {response.status_code} - {response.text}"
                 )
@@ -773,20 +811,30 @@ def download_transcript_api(video_id, max_retries=3):
 
         except Exception as e:
             last_exception = e
-            if attempt < max_retries - 1 and ("Invalid video id" in str(e) or "Transcription Error" in str(e)):
+            if attempt < max_retries - 1 and (
+                "Invalid video id" in str(e) or "Transcription Error" in str(e)
+            ):
                 wait_time = (attempt + 1) * 2
-                logger.info(f"Retrying transcript API in {wait_time}s (attempt {attempt + 1}/{max_retries})...")
+                logger.info(
+                    f"Retrying transcript API in {wait_time}s (attempt {attempt + 1}/{max_retries})..."
+                )
                 time.sleep(wait_time)
                 continue
             break
 
     # Step 2: Fallback to youtube_transcript_api (works locally, blocked on cloud IPs)
-    logger.info(f"RapidAPI failed for {video_id} after {max_retries} attempts, trying youtube_transcript_api fallback...")
+    logger.info(
+        f"RapidAPI failed for {video_id} after {max_retries} attempts, trying youtube_transcript_api fallback..."
+    )
     try:
         return _fallback_youtube_transcript_api(video_id)
     except Exception as fallback_error:
-        logger.error(f"All transcript methods failed for {video_id}: RapidAPI={last_exception}, Fallback={fallback_error}")
-        raise Exception(f"Transcript unavailable for video {video_id}. No captions found in any language.") from fallback_error
+        logger.error(
+            f"All transcript methods failed for {video_id}: RapidAPI={last_exception}, Fallback={fallback_error}"
+        )
+        raise Exception(
+            f"Transcript unavailable for video {video_id}. No captions found in any language."
+        ) from fallback_error
 
 
 def format_transcript_data(transcript_data):
