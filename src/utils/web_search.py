@@ -223,6 +223,7 @@ class SearchDecisionAgent:
         user_question: str,
         transcript_excerpt: str,
         video_title: str = "",
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         Determine if web search is needed to answer the question.
@@ -333,10 +334,22 @@ class SearchDecisionAgent:
             else:
                 relevant_excerpt = transcript_excerpt[:2000]
 
+            # Build conversation context for better decision making
+            conversation_context = ""
+            if conversation_history and isinstance(conversation_history, list):
+                recent_messages = conversation_history[-10:]  # Last 5 Q&A pairs (increased from 2)
+                for msg in recent_messages:
+                    if isinstance(msg, dict) and "role" in msg and "content" in msg:
+                        role = msg.get("role", "user").upper()
+                        content = msg.get("content", "")[:200]  # Limit length
+                        conversation_context += f"{role}: {content}\n"
+
             prompt = f"""You are an AI assistant helping students learn from videos. Analyze whether web search is needed to supplement the video content.
 
 Video title: {video_title or "Unknown"}
 Video content sample: {relevant_excerpt}
+
+{f"Recent conversation context:\n{conversation_context}" if conversation_context else ""}
 
 Student's question: {user_question}
 

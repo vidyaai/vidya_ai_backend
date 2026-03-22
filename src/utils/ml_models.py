@@ -48,6 +48,10 @@ class OpenAIVisionClient:
                 else SYSTEM_PROMPT_CONVERSATIONAL_INITIAL
             )
 
+            # Debug log to verify LaTeX-only instructions are being used
+            logger.info(f"🔍 System prompt check - Contains 'LaTeX ONLY': {'LaTeX ONLY' in system_prompt}")
+            logger.info(f"🔍 System prompt check - Contains 'NEVER use HTML': {'NEVER use HTML' in system_prompt}")
+
             messages = [
                 {"role": "system", "content": system_prompt},
             ]
@@ -75,7 +79,15 @@ class OpenAIVisionClient:
                 temperature=0.3,  # Slightly increased for more natural language
             )
 
-            return response.choices[0].message.content
+            ai_response = response.choices[0].message.content
+
+            # Log first 500 chars to check for MathML
+            logger.info(f"🤖 AI Response (first 500 chars): {ai_response[:500] if ai_response else 'None'}")
+            logger.info(f"🔍 Response contains 'MathML': {'MathML' in ai_response if ai_response else False}")
+            logger.info(f"🔍 Response contains '<math': {'<math' in ai_response if ai_response else False}")
+            logger.info(f"🔍 Response contains '\\(': {'\\(' in ai_response if ai_response else False}")
+
+            return ai_response
         except Exception as e:
             return f"Error: {str(e)}"
 
@@ -99,6 +111,10 @@ class OpenAIVisionClient:
                 if has_timestamps
                 else SYSTEM_PROMPT_CONVERSATIONAL_INITIAL
             )
+
+            # Debug log to verify LaTeX-only instructions are being used
+            logger.info(f"🔍 System prompt check - Contains 'LaTeX ONLY': {'LaTeX ONLY' in system_prompt}")
+            logger.info(f"🔍 System prompt check - Contains 'NEVER use HTML': {'NEVER use HTML' in system_prompt}")
 
             # Encode the image
             base64_image = self._encode_image(image_path)
@@ -164,15 +180,21 @@ class OpenAIVisionClient:
             return f"Error: {str(e)}"
 
     def check_question_relevance(
-        self, question: str, transcript_excerpt: str, video_title: str = ""
+        self,
+        question: str,
+        transcript_excerpt: str,
+        video_title: str = "",
+        conversation_history: Optional[List[Dict[str, Any]]] = None
     ) -> dict:
         """
         Check if a student's question is relevant to the video content.
+        Now includes conversation history to understand context and references.
 
         Args:
             question: The student's question
             transcript_excerpt: A sample of the video transcript (first 500-1000 chars)
             video_title: Title of the video (optional)
+            conversation_history: Recent conversation messages for context (optional)
 
         Returns:
             dict: {
@@ -191,14 +213,40 @@ class OpenAIVisionClient:
                 else "No transcript available"
             )
 
+            # Build conversation context (last 6 messages = 3 Q&A pairs)
+            conversation_context = ""
+            if conversation_history and len(conversation_history) > 0:
+                recent_messages = conversation_history[-6:]
+                conversation_context = "\nRecent conversation:\n"
+                for msg in recent_messages:
+                    role = msg.get("role", "user").upper()
+                    content = msg.get("content", "")
+                    if content:  # Only include non-empty messages
+                        # Limit each message to 200 chars for brevity
+                        content_preview = content[:200] + "..." if len(content) > 200 else content
+                        conversation_context += f"{role}: {content_preview}\n"
+
             prompt = f"""You are analyzing whether a student's question is relevant to a video they're watching.
+
+⚠️ IMPORTANT: The student may refer to previous conversation (e.g., "question 7", "point 8", "the above topic").
+These references are RELEVANT if they refer to topics discussed in the conversation about THIS video.
 
 Video title: {video_title or "Unknown"}
 Video content sample: {context_sample}
+{conversation_context}
+Student's current question: {question}
 
-Student's question: {question}
+TASK: Determine if this question is about the video content or completely unrelated.
 
-Analyze if this question is about the video content or completely unrelated (e.g., asking about homework, other subjects, personal topics, etc.).
+RELEVANT examples:
+- References to previous conversation about the video (e.g., "explain question 7 in detail", "tell me more about point 8")
+- Follow-up questions based on AI's previous answers (e.g., "can you elaborate on that?", "give me examples")
+- Questions about numbered items from previous AI responses about THIS video
+- Any question related to video topics, even if phrased ambiguously
+
+IRRELEVANT examples:
+- Questions about homework, personal life, other subjects completely unrelated to the video
+- Off-topic conversations that have nothing to do with video content
 
 Respond with a JSON object:
 {{
@@ -208,7 +256,8 @@ Respond with a JSON object:
   "video_topic": "what the video is about"
 }}
 
-Be generous - if the question is even loosely related or could be asking for clarification about video concepts, mark it as relevant. Only mark as irrelevant if it's clearly about something else entirely."""
+Be generous - if the question references previous conversation about the video, mark it as RELEVANT.
+Only mark as irrelevant if it's clearly about something completely unrelated to the video."""
 
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -249,6 +298,272 @@ Be generous - if the question is even loosely related or could be asking for cla
                 "suggested_redirect": "",
             }
 
+    def rewrite_query_with_context(
+        self,
+        user_query: str,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Resolve ambiguous references in user queries using conversation history.
+        Uses LLM to intelligently determine if a query needs contextualization.
+
+        This handles ANY type of reference:
+        - "can you give me links about the above topic?" -> "can you give me links about wafer level chip packaging?"
+        - "tell me more about point 6" -> "tell me more about Engine Power Settings"
+        - "explain this in detail" -> "explain rocket propulsion in detail"
+        - "what are the benefits of that?" -> "what are the benefits of transformer architecture?"
+        - "dive deeper into question 8" -> "dive deeper into Historical Context of Instruments"
+
+        Args:
+            user_query: The user's original query (may contain references to previous context)
+            conversation_history: Recent conversation messages for context
+
+        Returns:
+            dict: {
+                "rewritten_query": str (contextualized query),
+                "has_ambiguous_reference": bool,
+                "original_query": str,
+                "resolved_term": str (what was referenced)
+            }
+        """
+        try:
+            # Only skip if there's no conversation history (nothing to contextualize with)
+            if not conversation_history or len(conversation_history) == 0:
+                return {
+                    "rewritten_query": user_query,
+                    "has_ambiguous_reference": False,
+                    "original_query": user_query
+                }
+
+            # Build conversation context (last 15 messages = 7-8 Q&A pairs)
+            # Increased from 10 to 15 to ensure numbered lists from longer conversations are included
+            recent_messages = conversation_history[-15:] if conversation_history else []
+            conversation_text = ""
+            for msg in recent_messages:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+
+                # Safety check: limit extremely long messages to 10k chars
+                # But don't truncate normal messages - we need full numbered lists
+                if len(content) > 10000:
+                    content = content[:10000] + "... [truncated]"
+
+                conversation_text += f"{role.upper()}: {content}\n"
+
+            # DEBUG LOGGING
+            logger.info(f"=" * 80)
+            logger.info(f"QUERY REWRITER DEBUG:")
+            logger.info(f"User query: '{user_query}'")
+            logger.info(f"Total conversation history messages: {len(conversation_history) if conversation_history else 0}")
+            logger.info(f"Using last {len(recent_messages)} messages")
+            logger.info(f"Conversation text sent to LLM:")
+            logger.info(f"-" * 80)
+            logger.info(conversation_text)
+            logger.info(f"-" * 80)
+
+            prompt = f"""You are an intelligent query analysis assistant. Your job is to determine if a user's query needs context from the conversation history to be fully understood.
+
+⚠️ CRITICAL: You MUST use ONLY the conversation history below. Do NOT use any topics or terms from the examples at the bottom of this prompt.
+
+CONVERSATION HISTORY (USE THIS - NOT THE EXAMPLES):
+{conversation_text}
+
+USER'S CURRENT QUERY: {user_query}
+
+TASK: Analyze if this query references anything from the conversation history.
+
+QUESTIONS TO ASK YOURSELF:
+1. Does the query reference something from previous messages?
+   - Examples: "point 6", "the 2nd point", "question 8", "the second one", "that concept", "it", "this"
+2. Would someone reading ONLY this query understand what it's asking about?
+3. Does it refer to a numbered item, topic, concept, or entity discussed earlier?
+
+TYPES OF REFERENCES TO DETECT (not exhaustive - use your understanding):
+- Numbered references: "point 6", "the 2nd point", "question 8", "item 3", "step 2", "the second one"
+- Demonstratives: "this", "that", "these", "those", "it"
+- Location references: "the above topic", "the previous concept", "earlier"
+- Implicit references: "elaborate more", "give me links" (when topic is implicit)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 NUMBERED LIST EXTRACTION (CRITICAL) 🔥
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When you see references like "point 2", "the 2nd point", "question 3":
+
+STEP 1 - FIND THE NUMBERED LIST:
+Search conversation history for numbered lists with patterns:
+- "1.", "2.", "3." (with period)
+- "1)", "2)", "3)" (with parenthesis)
+- "1:", "2:", "3:" (with colon)
+- "1 -", "2 -", "3 -" (with dash)
+
+STEP 2 - EXTRACT THE TOPIC/TITLE:
+Extract the text IMMEDIATELY after the number, up to:
+- The first colon (:)
+- The first dash (-)
+- The first newline
+- The first period followed by space
+
+Example:
+"2. Power Levers and Propeller Control: Explanation of constant-speed..."
+          ↑↑↑ Extract this part ↑↑↑
+Extract: "Power Levers and Propeller Control"
+
+STEP 3 - REWRITE THE QUERY:
+Replace the numbered reference with the extracted topic.
+
+✅ CORRECT:
+User asks: "explain the 2nd point in detail"
+You find: "2. Power Levers and Propeller Control: ..."
+You write: "explain Power Levers and Propeller Control in detail"
+
+❌ WRONG - DO NOT DO THIS:
+User asks: "explain the 2nd point in detail"
+You write: "explain the 2nd point in detail regarding the topic we discussed"
+           ↑↑↑ This is WRONG - too generic! ↑↑↑
+
+STEP 4 - BE SPECIFIC:
+- DO use the actual extracted topic name
+- DO NOT add generic phrases like "regarding the topic we discussed"
+- DO NOT keep the numbered reference in the rewritten query
+- BE concrete and specific
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DECISION PROCESS:
+- If YES (query needs context from history):
+  → Rewrite the query to be self-contained
+  → Include the referenced topic/concept/entity explicitly
+  → Extract the actual content from the conversation (e.g., "the 2nd point" → "Power Levers and Propeller Control")
+  → Set has_ambiguous_reference: true
+
+- If NO (query is already clear and self-contained):
+  → Return the query unchanged
+  → Set has_ambiguous_reference: false
+
+RULES:
+1. Be intelligent - don't just look for keywords, understand the semantic meaning
+2. Look for numbered lists in the conversation (1., 2., 3. or 1), 2), 3) or bullet points)
+3. Extract the TOPIC NAME from the numbered item, not the full description
+4. Prefer the MOST RECENT relevant topic from the conversation
+5. Keep the query's structure and tone - only replace ambiguous references
+6. NEVER add generic phrases like "regarding the topic we discussed" - use the ACTUAL topic name
+7. If uncertain, lean towards rewriting (better to be explicit)
+
+OUTPUT FORMAT (JSON):
+{{
+  "rewritten_query": "the contextualized query (or unchanged if no references)",
+  "has_ambiguous_reference": true/false,
+  "resolved_term": "what was referenced (or null if no reference)"
+}}
+
+CRITICAL INSTRUCTION:
+- You MUST use ONLY the conversation history provided above
+- The examples below are for FORMAT ILLUSTRATION ONLY - do NOT use their content
+- NEVER copy topics from examples - your output must be based SOLELY on the actual conversation
+- Examples use placeholders - you should use actual content from the conversation
+
+EXAMPLES (FOR FORMAT ONLY - DO NOT USE THESE TOPICS):
+
+Example 1 - Numbered list extraction (ordinal):
+Conversation:
+ASSISTANT: "Here are key topics:
+1. Engine Types: Differences between turboprops...
+2. Power Levers and Propeller Control: Explanation of constant-speed propellers...
+3. Flight Instruments: Overview of the six-pack..."
+USER: "explain the 2nd point in detail."
+
+Output:
+{{
+  "rewritten_query": "explain Power Levers and Propeller Control in detail",
+  "has_ambiguous_reference": true,
+  "resolved_term": "Power Levers and Propeller Control"
+}}
+
+Example 2 - Numbered list extraction (point N):
+Conversation:
+ASSISTANT: "Important concepts:
+6. Engine Power Settings: Why is it generally advised...
+7. Gyroscopic Effects: How gyroscopes work...
+8. Historical Context: How modern instruments relate..."
+USER: "dive deeper into point 8"
+
+Output:
+{{
+  "rewritten_query": "dive deeper into Historical Context of modern flight instruments",
+  "has_ambiguous_reference": true,
+  "resolved_term": "Historical Context"
+}}
+
+Example 3 - Demonstrative reference:
+Conversation:
+USER: "is wafer level chip packaging discussed?"
+ASSISTANT: "Yes, at 60:31"
+USER: "can you give me links about the above topic?"
+
+Output:
+{{
+  "rewritten_query": "can you give me links about wafer level chip packaging?",
+  "has_ambiguous_reference": true,
+  "resolved_term": "wafer level chip packaging"
+}}
+
+Example 4 - Self-contained query (no rewriting needed):
+Conversation:
+USER: "explain aircraft systems"
+ASSISTANT: "Aircraft systems include..."
+USER: "what are rocket engines?"
+
+Output:
+{{
+  "rewritten_query": "what are rocket engines?",
+  "has_ambiguous_reference": false,
+  "resolved_term": null
+}}
+
+Now process the ACTUAL conversation provided above (NOT the examples):"""
+
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",  # Fast and accurate for this task
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an intelligent query analysis expert. When you detect references to numbered items (point 2, question 8, the 2nd point, etc.), you MUST extract the actual topic name from the numbered list and use it in the rewritten query. Be specific and concrete - never add generic phrases like 'regarding the topic'. Use semantic understanding, not keyword matching. Output valid JSON only."
+                    },
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=500,  # Increased from 400 to handle longer extraction context
+                temperature=0.2,  # Low temperature for consistent analysis
+            )
+
+            result = json.loads(response.choices[0].message.content)
+
+            # Add original query to result
+            result["original_query"] = user_query
+
+            # DEBUG LOGGING - Show LLM's response
+            logger.info(f"LLM Response (raw JSON):")
+            logger.info(f"{json.dumps(result, indent=2)}")
+            logger.info(f"=" * 80)
+
+            logger.info(
+                f"Query rewriter: {'REWROTE' if result.get('has_ambiguous_reference') else 'NO CHANGE'} | "
+                f"Original: '{user_query}' | "
+                f"Rewritten: '{result.get('rewritten_query')}'"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in query rewriting: {e}")
+            # On error, return original query
+            return {
+                "rewritten_query": user_query,
+                "has_ambiguous_reference": False,
+                "original_query": user_query
+            }
+
     def ask_with_web_augmentation(
         self,
         prompt: str,
@@ -265,7 +580,7 @@ Be generous - if the question is even loosely related or could be asking for cla
 
         Args:
             prompt: User's question
-            context: Video transcript
+            context: Video transcript (RAG-retrieved relevant context)
             conversation_history: Previous conversation messages
             video_title: Title of the video
             enable_search: Whether to enable web search (default True)
@@ -287,12 +602,35 @@ Be generous - if the question is even loosely related or could be asking for cla
                 "search_query": "",
             }
 
+            # STEP 1: Rewrite query to resolve ambiguous references
+            rewrite_result = self.rewrite_query_with_context(
+                user_query=prompt,
+                conversation_history=conversation_history
+            )
+
+            # Use rewritten query for all downstream processing
+            contextualized_prompt = rewrite_result["rewritten_query"]
+
+            logger.info(
+                f"Query processing: Original='{prompt}' | "
+                f"Rewritten='{contextualized_prompt}' | "
+                f"Changed={rewrite_result.get('has_ambiguous_reference', False)}"
+            )
+
             # Decide if web search is needed
             if enable_search:
+                # Use the FULL semantic RAG context directly
+                # The context is already semantically relevant (from embedding-based retrieval in query.py)
+                # - For "specific" queries: top-5 semantic chunks using embeddings
+                # - For "hybrid" queries: summary + top-3 semantic chunks
+                # - For "broad" queries: summary only
+                # NO need for keyword extraction - semantic search already found the right content!
+
                 decision = self.search_agent.should_search_web(
-                    user_question=prompt,
-                    transcript_excerpt=context[:1000] if context else "",
+                    user_question=contextualized_prompt,  # Use rewritten query
+                    transcript_excerpt=context,  # Use FULL semantic RAG context (already relevant!)
                     video_title=video_title,
+                    conversation_history=conversation_history,  # Pass conversation history for better context
                 )
 
                 logger.info(
@@ -316,7 +654,7 @@ Be generous - if the question is even loosely related or could be asking for cla
                         # Synthesize answer with web results
                         synthesis = synthesize_with_web_results(
                             openai_client=self.client,
-                            user_question=prompt,
+                            user_question=contextualized_prompt,  # Use rewritten query
                             video_content=context,
                             search_results=search_results,
                             conversation_history=conversation_history,
@@ -335,7 +673,7 @@ Be generous - if the question is even loosely related or could be asking for cla
             # If no web search or search failed, use standard answer
             logger.info("Generating answer from video content only")
             result["response"] = self.ask_text_only(
-                prompt, context, conversation_history
+                contextualized_prompt, context, conversation_history  # Use rewritten query
             )
             result["used_web_search"] = False
 
@@ -343,9 +681,10 @@ Be generous - if the question is even loosely related or could be asking for cla
 
         except Exception as e:
             logger.error(f"Error in web-augmented answering: {e}")
-            # Fallback to standard answer
+            # Fallback to standard answer (use original prompt if rewriting failed)
+            fallback_query = prompt
             return {
-                "response": self.ask_text_only(prompt, context, conversation_history),
+                "response": self.ask_text_only(fallback_query, context, conversation_history),
                 "sources": [],
                 "used_web_search": False,
                 "search_query": "",

@@ -10,6 +10,7 @@ from controllers.config import (
     formatting_executor,
     s3_client,
     AWS_S3_BUCKET,
+    logger,
 )
 from controllers.db_helpers import (
     get_video_path,
@@ -72,7 +73,9 @@ async def get_formatting_status_endpoint(
     if not video:
         raise HTTPException(status_code=404, detail="Video not found or access denied")
 
-    return get_formatting_status(db, video_id)
+    result = get_formatting_status(db, video_id)
+    logger.info(f"📊 Formatting status for {video_id}: status={result.get('status')}, has_transcript={bool(result.get('formatted_transcript'))}")
+    return result
 
 
 @router.get("/formatted-transcript/{video_id}")
@@ -80,6 +83,7 @@ async def get_formatted_transcript(
     video_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
 ):
     status = get_formatting_status(db, video_id)
+    logger.info(f"📄 Formatted transcript request for {video_id}: formatting_status={status.get('status')}")
     if status["status"] == "completed":
         return {
             "video_id": video_id,
@@ -99,12 +103,15 @@ async def get_formatted_transcript(
         .filter(Video.id == video_id, Video.user_id == current_user["uid"])
         .first()
     )
+    logger.info(f"📄 Checking video record - exists: {bool(video)}, has_formatted_transcript: {bool(video.formatted_transcript) if video else False}")
     if video and video.formatted_transcript:
+        logger.info(f"✅ Returning formatted transcript from video.formatted_transcript field (length: {len(video.formatted_transcript)})")
         return {
             "video_id": video_id,
             "status": "completed",
             "formatted_transcript": video.formatted_transcript,
         }
+    logger.warning(f"❌ Formatted transcript not found for {video_id}")
     raise HTTPException(status_code=404, detail="Formatted transcript not found")
 
 
@@ -201,61 +208,72 @@ async def get_youtube_info(
             )
             download_message = "Video download, thumbnail generation, and cloud upload started in background"
     transcript_info = get_transcript_cache(db, video_id)
+    transcript_error = None
     if transcript_info and transcript_info.get("transcript_data"):
         transcript_data = transcript_info["transcript_data"]
         json_data = transcript_info["json_data"]
     else:
-        transcript_data, json_data = download_transcript_api(video_id)
+        # Try to fetch transcript, but don't fail the whole request if it errors
         try:
-            v = db.query(Video).filter(Video.id == video_id).first()
-            if v is None:
-                v = Video(
-                    id=video_id,
-                    user_id=current_user["uid"],
-                    source_type="youtube",
-                    title=title,
-                    youtube_id=video_id,
-                    youtube_url=url,
-                    transcript_text=transcript_data,
-                    transcript_json=json_data,
-                )
-                db.add(v)
-            else:
-                v.user_id = v.user_id or current_user["uid"]
-                v.source_type = "youtube"
-                v.title = title or v.title
-                v.youtube_id = video_id
-                v.youtube_url = url
-                v.transcript_text = transcript_data or v.transcript_text
-                v.transcript_json = json_data or v.transcript_json
-            db.commit()
-        except Exception:
-            pass
+            transcript_data, json_data = download_transcript_api(video_id)
+            try:
+                v = db.query(Video).filter(Video.id == video_id).first()
+                if v is None:
+                    v = Video(
+                        id=video_id,
+                        user_id=current_user["uid"],
+                        source_type="youtube",
+                        title=title,
+                        youtube_id=video_id,
+                        youtube_url=url,
+                        transcript_text=transcript_data,
+                        transcript_json=json_data,
+                    )
+                    db.add(v)
+                else:
+                    v.user_id = v.user_id or current_user["uid"]
+                    v.source_type = "youtube"
+                    v.title = title or v.title
+                    v.youtube_id = video_id
+                    v.youtube_url = url
+                    v.transcript_text = transcript_data or v.transcript_text
+                    v.transcript_json = json_data or v.transcript_json
+                db.commit()
+            except Exception:
+                pass
+        except Exception as e:
+            logger.error(f"Transcript fetch failed for {video_id}: {e}")
+            transcript_data = None
+            json_data = None
+            transcript_error = str(e)
     formatting_message = "Transcript not formatted"
-    status = get_formatting_status(db, video_id)
-    if status["status"] == "not_found":
-        if json_data:
-            formatting_executor.submit(
-                format_transcript_background, video_id, json_data
-            )
-            formatting_message = "AI transcript formatting started in background"
-        else:
-            formatting_message = "No JSON data available for formatting"
-    elif status["status"] == "failed":
-        # Retry formatting if previous attempt failed and json data is available
-        if json_data:
-            formatting_executor.submit(
-                format_transcript_background, video_id, json_data
-            )
-            formatting_message = "Retrying AI transcript formatting in background"
+    if transcript_data and json_data:
+        status = get_formatting_status(db, video_id)
+        if status["status"] == "not_found":
+            if json_data:
+                formatting_executor.submit(
+                    format_transcript_background, video_id, json_data
+                )
+                formatting_message = "AI transcript formatting started in background"
+            else:
+                formatting_message = "No JSON data available for formatting"
+        elif status["status"] == "failed":
+            # Retry formatting if previous attempt failed and json data is available
+            if json_data:
+                formatting_executor.submit(
+                    format_transcript_background, video_id, json_data
+                )
+                formatting_message = "Retrying AI transcript formatting in background"
+            else:
+                formatting_message = (
+                    f"Formatting status: {status['status']} - {status['message']}"
+                )
         else:
             formatting_message = (
                 f"Formatting status: {status['status']} - {status['message']}"
             )
     else:
-        formatting_message = (
-            f"Formatting status: {status['status']} - {status['message']}"
-        )
+        formatting_message = "Transcript unavailable - cannot format"
     video_url = None
     thumbnail_url = None
     formatted_transcript_url = None
@@ -286,7 +304,9 @@ async def get_youtube_info(
         "video_id": video_id,
         "title": title,
         "url": url,
-        "transcript": transcript_data,
+        "transcript": transcript_data if transcript_data else None,
+        "transcript_error": transcript_error,
+        "transcript_available": transcript_data is not None,
         "embed_url": f"https://www.youtube.com/embed/{video_id}?enablejsapi=1",
         "download_status": download_message,
         "formatting_status": formatting_message,
