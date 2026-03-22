@@ -85,6 +85,30 @@ _FALLBACK_TOOL_MAP = {
     ("computer_eng", "logic_circuit"): ("circuitikz_tool", "circuitikz"),
     ("computer_eng", "isa_timing"): ("claude_code_tool", "matplotlib"),
     ("computer_eng", "cache_organization"): ("claude_code_tool", "matplotlib"),
+    # ── Anatomy ─────────────────────────────────────────────────────────────
+    # Spatial/structural diagrams → Gemini imagen (ai_suitable=True), but
+    # if engine=nonai is forced, use matplotlib patches
+    ("anatomy", "anatomical_diagram"): ("claude_code_tool", "matplotlib"),
+    ("anatomy", "cross_section"): ("claude_code_tool", "matplotlib"),
+    ("anatomy", "histology"): ("claude_code_tool", "matplotlib"),
+    # ── Physiology ──────────────────────────────────────────────────────────
+    ("physiology", "action_potential"): ("claude_code_tool", "matplotlib"),
+    ("physiology", "feedback_loop"): ("claude_code_tool", "matplotlib"),
+    ("physiology", "pressure_volume_loop"): ("claude_code_tool", "matplotlib"),
+    ("physiology", "cardiac_loop"): ("claude_code_tool", "matplotlib"),
+    # ── Biochemistry ─────────────────────────────────────────────────────────
+    ("biochemistry", "metabolic_pathway"): ("claude_code_tool", "matplotlib"),
+    ("biochemistry", "enzyme_kinetics"): ("claude_code_tool", "matplotlib"),
+    # ── Pharmacology ─────────────────────────────────────────────────────────
+    ("pharmacology", "dose_response"): ("claude_code_tool", "matplotlib"),
+    ("pharmacology", "pharmacokinetics"): ("claude_code_tool", "matplotlib"),
+    # ── Pathology ────────────────────────────────────────────────────────────
+    ("pathology", "disease_progression"): ("claude_code_tool", "matplotlib"),
+    ("pathology", "histopathology"): ("claude_code_tool", "matplotlib"),
+    # ── Microbiology ─────────────────────────────────────────────────────────
+    ("microbiology", "bacterial_structure"): ("claude_code_tool", "matplotlib"),
+    ("microbiology", "infection_cycle"): ("claude_code_tool", "matplotlib"),
+    ("microbiology", "growth_curve"): ("claude_code_tool", "matplotlib"),
 }
 
 # Default fallback for unrecognized domain/diagram_type

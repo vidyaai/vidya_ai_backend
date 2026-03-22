@@ -195,12 +195,15 @@ class Assignment(Base):
     status = Column(String, default="draft")  # "draft", "published", "archived"
 
     # Assignment configuration
+    subject_category = Column(
+        String, default="engineering"
+    )  # "engineering", "pcm", "medical"
     engineering_level = Column(
         String, default="undergraduate"
-    )  # "undergraduate", "graduate"
+    )  # "undergraduate", "graduate", "pre_med", "mbbs_preclinical", "mbbs_clinical", "md"
     engineering_discipline = Column(
         String, default="general"
-    )  # "general", "electrical", etc.
+    )  # "general", "electrical", ..., "anatomy", "physiology", etc.
     question_types = Column(JSONB, nullable=True)  # Array of question types used
     ai_penalty_percentage = Column(
         Float, default=50.0

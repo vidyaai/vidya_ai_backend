@@ -203,6 +203,104 @@ COMPUTER ENGINEERING DIAGRAM RULES:
   if students are asked to derive it
 - Show ONLY the problem setup — students must work out the SOLUTION
 """,
+    # ─── Medical subjects ───────────────────────────────────────────────────
+    "anatomy": """
+ANATOMY DIAGRAM RULES:
+- Anatomical diagrams: show regional or systemic anatomy with standard directional labels
+- Use imagen_tool for anatomical illustrations; claude_code_tool with matplotlib for schematic cross-sections
+- Label: structures using correct anatomical terminology (Latin/English as appropriate)
+- For cross-sections (e.g., spinal cord, limb): show all relevant layers/compartments with labels
+- For nerve/vessel courses: show trajectory with key branching points and relationships labeled
+- For osteology: show bone landmarks (processes, foramina, facets) with labels
+- For histology slides: label cell types, layers, and distinct structural features
+- Include orientation indicators (superior/inferior, medial/lateral, anterior/posterior)
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label the structure being asked about ("identify this structure")
+- For nerve/vessel identification questions: show the diagram and leave target structures with "?" labels
+- For surface anatomy: show landmarks, NOT the answer to "mark the position of X"
+- Show ONLY the problem setup; students must identify or annotate the answers
+""",
+    "physiology": """
+PHYSIOLOGY DIAGRAM RULES:
+- Functional diagrams: organ system flow diagrams, feedback loops, signal transduction pathways
+- Use claude_code_tool with matplotlib for graphs (action potential, pressure-volume, dose-response)
+- For action potential curves: label axes (time in ms, membrane potential in mV), phases (depolarization, repolarization, hyperpolarization), threshold line
+- For homeostatic feedback loops: show sensor → integrating centre → effector with arrows labeled with stimulus and response
+- For organ system diagrams: use labeled boxes/organs connected by arrows showing flow direction
+- For pressure-volume (cardiac) loops: label axes, phases (isovolumetric contraction/relaxation, filling, ejection), key points (ESV, EDV)
+- For lung compliance curves: label volume and pressure axes, normal vs abnormal curves
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label the numerical values if the question asks students to calculate or identify them
+- For action potential: show the waveform setup, NOT the ionic basis if students must explain it
+- For cardiac loops: show the graph, NOT the calculated stroke volume or ejection fraction
+- Show ONLY the problem setup — students must derive the physiological explanation
+""",
+    "biochemistry": """
+BIOCHEMISTRY DIAGRAM RULES:
+- Metabolic pathway diagrams: show substrates, products, enzymes, and cofactors as labeled nodes/arrows
+- Use claude_code_tool with matplotlib for kinetics plots and pathway schematics
+- For enzyme kinetics (Michaelis-Menten): label axes (substrate [S], reaction rate V), Vmax and Km lines
+- For Lineweaver-Burk plots: label axes (1/[S], 1/V), x-intercept (−1/Km), y-intercept (1/Vmax)
+- For metabolic pathways: boxes for intermediates, arrows for reactions, label enzyme names above/below arrows
+- For molecular structures (optional): describe using SMILES or IUPAC name for Gemini; label functional groups
+- For TCA cycle / glycolysis / ETC: show intermediates as oval nodes, reactions as arrows, ATP/NADH yields labeled
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label the enzyme name if the question asks students to identify the enzyme at a step
+- For pathway diagrams: show the pathway with key intermediates, NOT the answer to "what is the product of this step?"
+- For kinetics plots: show the graph, NOT the calculated Km or Vmax if students must determine them
+- Show ONLY the problem setup — students must complete or interpret the pathway
+""",
+    "pharmacology": """
+PHARMACOLOGY DIAGRAM RULES:
+- Dose-response curves: use claude_code_tool with matplotlib; label axes (log dose, % response or effect)
+- For dose-response curves: show EC50 / ED50, Emax, curve sigmoidal shape; label drug names on curves
+- For pharmacokinetics graphs: label axes (time, plasma concentration), show Cmax, tmax, AUC, half-life (t½)
+- For drug mechanism diagrams: show receptor, signalling cascade, downstream effect with labeled arrows
+- For drug receptor interaction: show agonist/antagonist effects, competitive vs non-competitive shifts
+- For bioavailability comparison: overlay IV vs oral curves on same axes, label F (bioavailability fraction)
+- Use imagen_tool for receptor-level mechanism illustrations; matplotlib for quantitative graphs
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label EC50 / ED50 values if the question asks students to determine them from the graph
+- For shifted curves (antagonists): show both curves, NOT the numerical shift value if students must calculate it
+- For pharmacokinetics: show the graph, NOT the half-life calculation if that is the question
+- Show ONLY the problem setup — students must read values or interpret the pharmacodynamics
+""",
+    "pathology": """
+PATHOLOGY DIAGRAM RULES:
+- Histopathology diagrams: describe tissue section with key pathological features labeled
+- Use imagen_tool for histopathology illustrations; claude_code_tool for disease progression charts
+- For histology: label cell type, tissue layer, key abnormal features (e.g., necrosis type, inflammatory infiltrate)
+- For disease progression charts: show stages/grades as labeled boxes connected by arrows with progression criteria
+- For gross pathology: describe macroscopic features (colour, texture, size, borders) in labels
+- For oncology staging: show TNM or grade progression as a labeled flow diagram
+- For immunofluorescence patterns: describe pattern (linear, granular, mesangial) with structure labels
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label the diagnosis if the question asks students to "identify the pathological finding"
+- For histology images: show the tissue features with neutral labels, NOT the full diagnosis
+- For disease progression: show the stages, NOT the answer to "what is the next stage?"
+- Show ONLY the problem setup — students must interpret the histopathological findings
+""",
+    "microbiology": """
+MICROBIOLOGY DIAGRAM RULES:
+- Bacterial structure diagrams: use imagen_tool for morphology; claude_code_tool for life cycles/infection pathways
+- For bacterial cell diagrams: label cell wall, membrane, flagella, pili, capsule, plasmid as appropriate
+- For infection/pathogenesis cycles: show host cell → pathogen entry → replication → release as labeled flow diagram
+- For culture/growth curves: label axes (time, log CFU/mL), phases (lag, exponential, stationary, death)
+- For antibiotic mechanism diagrams: show target site (cell wall, ribosome, DNA gyrase, etc.) with labeled arrows
+- For serology/ELISA diagrams: show steps with labeled reagents (antigen, antibody, enzyme, substrate)
+- For Gram stain workflow: show steps as a labeled flow chart (crystal violet → iodine → decolourisation → safranin)
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label the organism name if the question asks students to "identify the organism from the diagram"
+- For infection cycles: show the cycle steps, NOT the answer to "what is the virulence factor responsible?"
+- For culture growth curves: show the curve, NOT the calculated generation time if students must calculate it
+- Show ONLY the problem setup — students must identify or analyse the microbiological findings
+""",
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -466,6 +564,93 @@ _IMAGEN_DESCRIPTION_PROMPTS = {
         "Show gates as: AND (D-shape), OR (curved), NOT (triangle with bubble), "
         "NAND (D-shape with bubble), NOR (curved with bubble). "
         "Label all inputs and outputs. Inputs on left, outputs on right."
+    ),
+    # ─── Medical subjects ────────────────────────────────────────────────────
+    ("anatomy", "anatomical_diagram"): (
+        "Draw a schematic anatomical diagram. Use clean line-art style. "
+        "Label all visible structures with leader lines and correct anatomical terminology. "
+        "Include directional indicators (superior/inferior, medial/lateral, anterior/posterior). "
+        "Colour-code or differentiate tissue types (muscle, bone, nerve, vessel) if helpful. "
+        "Do NOT label structures that are the subject of identification questions."
+    ),
+    ("anatomy", "cross_section"): (
+        "Draw an anatomical cross-section (transverse, sagittal, or coronal as specified). "
+        "Show all compartments/layers with labeled boundaries. "
+        "Use standard anatomical shading conventions: bone (white/stippled), muscle (pink), fat (yellow). "
+        "Label key structures with leader lines. Include a small orientation inset diagram."
+    ),
+    ("anatomy", "histology"): (
+        "Draw a schematic histology diagram (light microscopy appearance). "
+        "Show tissue layers and cell types clearly. Label cell nuclei, cytoplasm, and key organelles if relevant. "
+        "Label each layer/cell type with standard histological terminology. "
+        "Include magnification indicator or scale bar. "
+        "CRITICAL: Do NOT label the tissue name or diagnosis if that is what students must identify."
+    ),
+    ("physiology", "action_potential"): (
+        "Draw an action potential graph. X-axis: time (ms), Y-axis: membrane potential (mV). "
+        "Show threshold line (~-55 mV), resting potential (~-70 mV), depolarization peak (~+30 mV), "
+        "repolarization, and hyperpolarization. Label all phases and key voltage levels. "
+        "Use a clean single-line waveform on a white background."
+    ),
+    ("physiology", "feedback_loop"): (
+        "Draw a homeostatic feedback loop diagram. Show boxes for: stimulus, receptor/sensor, "
+        "afferent pathway, integrating centre (e.g., hypothalamus), efferent pathway, effector, response. "
+        "Connect with directional arrows. Label the feedback type (negative/positive). "
+        "Include the set point and deviation indicators."
+    ),
+    ("physiology", "pressure_volume_loop"): (
+        "Draw a cardiac pressure-volume loop. X-axis: ventricular volume (mL), "
+        "Y-axis: ventricular pressure (mmHg). Show four phases: isovolumetric contraction, "
+        "ejection, isovolumetric relaxation, filling. Label EDV, ESV, stroke volume, "
+        "mitral valve opening/closing, aortic valve opening/closing points."
+    ),
+    ("biochemistry", "metabolic_pathway"): (
+        "Draw a metabolic pathway diagram. Show intermediates as labeled oval nodes. "
+        "Show reactions as arrows between nodes. Label enzyme names above/below arrows. "
+        "Show cofactors (NAD+/NADH, ATP/ADP, CoA) as labeled side branches. "
+        "Use colour to distinguish input substrates (blue), output products (red), and intermediates (white). "
+        "CRITICAL: Do NOT label enzymes that are the subject of identification questions."
+    ),
+    ("biochemistry", "enzyme_kinetics"): (
+        "Draw a Michaelis-Menten enzyme kinetics curve. "
+        "X-axis: substrate concentration [S] (mM), Y-axis: reaction velocity V (μmol/min). "
+        "Show a hyperbolic curve reaching Vmax asymptote. "
+        "Mark Vmax with a dashed horizontal line. Mark Km at V = Vmax/2 with dashed lines to both axes. "
+        "Label Vmax, Km, and both axes with units."
+    ),
+    ("pharmacology", "dose_response"): (
+        "Draw a dose-response curve. X-axis: log dose (or log concentration), "
+        "Y-axis: % maximum response (0–100%). Show a sigmoid (S-shaped) curve. "
+        "Mark EC50 or ED50 at 50% response with dashed lines to both axes. "
+        "Label Emax, EC50, and the curve (drug name if specified). "
+        "If comparing two drugs or agonist/antagonist, label each curve distinctly."
+    ),
+    ("pharmacology", "pharmacokinetics"): (
+        "Draw a plasma concentration-time curve. X-axis: time (hours), "
+        "Y-axis: plasma drug concentration (μg/mL or ng/mL). "
+        "Show curve with labeled Cmax, tmax, AUC (shaded region), and elimination phase. "
+        "Mark t½ (half-life) with dashed lines. If comparing IV vs oral, overlay both curves with labels."
+    ),
+    ("pathology", "disease_progression"): (
+        "Draw a disease progression/staging flow diagram. "
+        "Show stages as labeled rectangular boxes connected by directional arrows. "
+        "Label each stage with its name, key histological or clinical features. "
+        "Use colour coding (normal=green, early=yellow, late=orange, end-stage=red). "
+        "CRITICAL: Do NOT reveal the diagnosis if students must identify it."
+    ),
+    ("microbiology", "bacterial_structure"): (
+        "Draw a labeled bacterial cell diagram. Show and label: cell wall, plasma membrane, "
+        "cytoplasm, nucleoid (chromosome), ribosomes, flagella (if present), pili, capsule (if present), plasmid. "
+        "Differentiate Gram-positive (thick peptidoglycan, no outer membrane) vs "
+        "Gram-negative (thin peptidoglycan + outer membrane) if specified. "
+        "CRITICAL: Do NOT label the species name if identification is asked."
+    ),
+    ("microbiology", "infection_cycle"): (
+        "Draw a pathogen infection/replication cycle diagram. Show steps as labeled boxes: "
+        "attachment → entry → replication → assembly → release. "
+        "Use directional arrows between steps. Label key virulence factors at relevant steps. "
+        "Show host cell schematically. "
+        "CRITICAL: Do NOT label the pathogen name if identification is the question."
     ),
 }
 
@@ -954,6 +1139,125 @@ _NONAI_TOOL_PROMPTS = {
         "Show ALU as central block with labeled inputs (A, B, operation select) and output. "
         "Internal logic gates if detailed, or block-level if architectural. "
         "Label all signals and bus widths. Standard IEEE gate symbols."
+    ),
+    # ─── Medical subjects ────────────────────────────────────────────────────
+    ("anatomy", "anatomical_diagram", "matplotlib"): (
+        "Draw a schematic anatomical diagram using matplotlib. "
+        "Use Polygon and Circle patches for organ/structure outlines. "
+        "Label structures with ax.annotate() and leader lines. "
+        "Use anatomical colour conventions: bone=white/grey, muscle=pink/red, fat=yellow, nerve=yellow/white, vessel=red (artery)/blue (vein). "
+        "figsize=(8, 7). ax.axis('off'). Clean white background."
+    ),
+    ("anatomy", "cross_section", "matplotlib"): (
+        "Draw an anatomical cross-section using matplotlib.patches. "
+        "Show concentric or layered regions for each compartment. "
+        "Use FancyBboxPatch or Polygon for each layer. "
+        "Label each region with ax.annotate(). Include a small orientation legend. "
+        "figsize=(7, 7). ax.set_aspect('equal'). ax.axis('off')."
+    ),
+    ("physiology", "action_potential", "matplotlib"): (
+        "Draw an action potential curve using matplotlib. "
+        "x-axis: 'Time (ms)', range 0–5 ms. y-axis: 'Membrane Potential (mV)', range -90 to +40. "
+        "Draw the waveform: resting (-70 mV), threshold (-55 mV dashed line), depolarization rise, +30 mV peak, repolarization, hyperpolarization, return to rest. "
+        "Add dashed horizontal lines for threshold and resting potential. Label phases as text annotations. "
+        "figsize=(7, 5). Include grid (alpha=0.3)."
+    ),
+    ("physiology", "pressure_volume_loop", "matplotlib"): (
+        "Draw a cardiac pressure-volume (P-V) loop using matplotlib. "
+        "x-axis: 'Ventricular Volume (mL)', y-axis: 'Ventricular Pressure (mmHg)'. "
+        "Draw a closed loop rectangle with rounded corners representing the four phases. "
+        "Label EDV, ESV, stroke volume (horizontal arrow), systolic and diastolic pressures. "
+        "Add dashed vertical lines at EDV and ESV. figsize=(6, 5)."
+    ),
+    ("biochemistry", "metabolic_pathway", "matplotlib"): (
+        "Draw a metabolic pathway using matplotlib. "
+        "Represent each metabolite as an oval (Ellipse patch) with its name inside. "
+        "Connect metabolites with directional arrows (ax.annotate arrowprops). "
+        "Label enzyme names above each arrow. Show cofactors (ATP, NADH, CoA) as smaller side-branch ovals. "
+        "Use colour: substrate=light blue, product=light green, enzyme=orange label. "
+        "figsize=(10, 6). ax.axis('off')."
+    ),
+    ("biochemistry", "enzyme_kinetics", "matplotlib"): (
+        "Draw a Michaelis-Menten enzyme kinetics curve using matplotlib. "
+        "x-axis: '[S] (mM)', y-axis: 'v (μmol/min)'. Plot a hyperbolic curve approaching Vmax. "
+        "Draw a dashed horizontal line at Vmax and label it. "
+        "Mark Km at V=Vmax/2: draw dashed vertical and horizontal lines from the curve to both axes. "
+        "Label Vmax and Km. figsize=(6, 5). Include grid (alpha=0.3)."
+    ),
+    ("pharmacology", "dose_response", "matplotlib"): (
+        "Draw a dose-response curve using matplotlib. "
+        "x-axis: 'Log Dose' (or 'Log [Drug] (M)'), y-axis: '% Maximum Response', range 0–100. "
+        "Plot a sigmoid (S-shaped) curve using logistic function. "
+        "Mark EC50 at 50% response with dashed lines to both axes. Label EC50, Emax. "
+        "If comparing two drugs: overlay curves with different colours and a legend. "
+        "figsize=(6, 5). Include grid (alpha=0.3)."
+    ),
+    ("pharmacology", "pharmacokinetics", "matplotlib"): (
+        "Draw a plasma concentration-time curve using matplotlib. "
+        "x-axis: 'Time (hours)', y-axis: 'Plasma Concentration (μg/mL)'. "
+        "Plot absorption rise then exponential decline. "
+        "Mark Cmax and tmax with dashed lines and labels. Shade AUC region (alpha=0.2). "
+        "Mark t½ on the elimination phase with a dashed horizontal line. "
+        "figsize=(7, 5). Include grid (alpha=0.3)."
+    ),
+    ("microbiology", "bacterial_structure", "matplotlib"): (
+        "Draw a labeled bacterial cell diagram using matplotlib.patches. "
+        "Draw cell body as an Ellipse. Add Patch layers for: cell wall (outer), membrane (inner), cytoplasm fill. "
+        "Add Ellipse for nucleoid, small circles for ribosomes, lines for flagella and pili, outer layer for capsule if relevant. "
+        "Label all structures with ax.annotate() leader lines. "
+        "figsize=(8, 6). ax.set_aspect('equal'). ax.axis('off')."
+    ),
+    ("microbiology", "infection_cycle", "matplotlib"): (
+        "Draw a pathogen infection/replication cycle using matplotlib. "
+        "Represent each step as a FancyBboxPatch with the step name. "
+        "Connect steps with curved directional arrows (ax.annotate with connectionstyle='arc3,rad=0.3'). "
+        "Steps: Attachment → Entry → Replication → Assembly → Release. "
+        "Add small labels for key virulence factors at relevant steps. "
+        "figsize=(8, 6). ax.axis('off')."
+    ),
+    ("microbiology", "growth_curve", "matplotlib"): (
+        "Draw a bacterial growth curve using matplotlib. "
+        "x-axis: 'Time (hours)', y-axis: 'log(CFU/mL)' or 'OD600'. "
+        "Plot a sigmoid-like curve with four labeled phases: Lag, Exponential (Log), Stationary, Decline (Death). "
+        "Mark phase boundaries with dashed vertical lines. Label each phase with a text annotation. "
+        "figsize=(7, 5). Include grid (alpha=0.3)."
+    ),
+    # Missing anatomy/histology nonai prompt
+    ("anatomy", "histology", "matplotlib"): (
+        "Draw a schematic histology diagram using matplotlib. "
+        "Use ax.add_patch() with FancyBboxPatch or Ellipse shapes to represent cell layers. "
+        "Show 2-4 distinct tissue layers as horizontal bands with different fill colours. "
+        "Add cell nuclei as small dark Ellipse patches within each layer. "
+        "Label each layer with ax.annotate() leader lines. "
+        "figsize=(7, 6). ax.axis('off'). ax.set_aspect('equal')."
+    ),
+    # Missing physiology/feedback_loop nonai prompt
+    ("physiology", "feedback_loop", "matplotlib"): (
+        "Draw a homeostatic feedback loop using matplotlib. "
+        "Use FancyBboxPatch rectangles for each node: Stimulus, Receptor, Integrating Centre, Effector, Response. "
+        "Connect nodes with directional arrows (ax.annotate arrowprops={'arrowstyle':'->', 'lw':2}). "
+        "Label the feedback pathway type (Negative / Positive) prominently. "
+        "Include a 'Set Point' indicator. Arrange nodes in a circular flow layout. "
+        "figsize=(7, 6). ax.axis('off')."
+    ),
+    # Missing pathology/disease_progression nonai prompt
+    ("pathology", "disease_progression", "matplotlib"): (
+        "Draw a disease progression/staging diagram using matplotlib. "
+        "Draw each stage as a FancyBboxPatch. Arrange stages left-to-right or in a flow. "
+        "Connect stages with thick directional arrows. "
+        "Colour-code stages: normal=green, early=yellow, progressive=orange, end-stage=red. "
+        "Label each box with stage name and key features. "
+        "CRITICAL: Do NOT label the disease name if students must identify it. "
+        "figsize=(10, 5). ax.axis('off')."
+    ),
+    ("pathology", "histopathology", "matplotlib"): (
+        "Draw a schematic histopathology diagram using matplotlib. "
+        "Show abnormal tissue architecture using layered FancyBboxPatch shapes. "
+        "Indicate cellular changes: enlarged nuclei (larger dark Ellipse patches), "
+        "irregular cell shapes (Polygon patches), loss of normal layer organisation. "
+        "Label key pathological features with ax.annotate() leader lines. "
+        "CRITICAL: Do NOT write the disease name as a label if identification is asked. "
+        "figsize=(7, 6). ax.axis('off')."
     ),
 }
 
@@ -1853,6 +2157,180 @@ COMPUTER ENGINEERING DIAGRAM REVIEW RULES
   • Signal transitions aligned vertically where simultaneous
   • Setup time, hold time marked if relevant
   • Propagation delay indicated if asked
+""",
+    # ── Medical sciences ────────────────────────────────────────────────────
+    "anatomy": r"""
+═══════════════════════════════════════════════════════════════════════════════
+ANATOMY DIAGRAM REVIEW RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+▶ LABELS & TERMINOLOGY
+  • All visible structures must be labeled with correct anatomical terminology
+  • Directional indicators (superior/inferior, medial/lateral, anterior/posterior, proximal/distal)
+    must be correct and present where the diagram type requires them
+  • Labels must NOT overlap with drawing elements — use leader lines
+  • Abbreviations must match standard anatomical convention (e.g., LV = Left Ventricle, not arbitrary)
+
+▶ COLOUR CONVENTIONS
+  • Bone/cartilage: white or pale grey (stippled shading acceptable)
+  • Muscle: pink or red (matching depth/type if labelled)
+  • Fat/adipose: yellow
+  • Nerve: yellow or white with thin outline
+  • Artery: red
+  • Vein: blue or purple
+  • Lymphatic: green (when shown)
+
+▶ STRUCTURAL ACCURACY
+  • Relative proportions of organs/structures must be approximately correct
+  • Organs must be shown in anatomically correct spatial relationships
+  • For layered cross-sections: layer order must be anatomically accurate (e.g., skin → subcutaneous fat → fascia → muscle)
+
+▶ ANSWER HIDING
+  • If the question asks students to IDENTIFY or LABEL a structure:
+    - The corresponding label must NOT appear in the diagram
+    - Use a blank arrow or numbered callout instead
+  • If the question asks students to TRACE a pathway or NAME a nerve/vessel:
+    - Do NOT label the pathway/nerve/vessel being asked about
+
+▶ CROSS-SECTION SPECIFICS
+  • Include a small orientation inset (e.g., axial/sagittal/coronal indicator)
+  • Show correct relative sizes of compartments
+  • Left/right orientation must match anatomical convention (patient's left = diagram right for axial views)
+
+▶ HISTOLOGY SPECIFICS
+  • Cell layers must be distinct and clearly separated
+  • Cell nuclei: small, dark, correctly positioned within cell
+  • Scale bar or magnification indicator must be present if shown in original question
+  • Do NOT label cell type / tissue name if that is what students must identify
+""",
+    "physiology": r"""
+═══════════════════════════════════════════════════════════════════════════════
+PHYSIOLOGY DIAGRAM REVIEW RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+▶ ACTION POTENTIAL PLOTS
+  • x-axis must be time (ms), y-axis must be membrane potential (mV)
+  • Resting potential: ~–70 mV; threshold: ~–55 mV (dashed line); peak: ~+30 mV
+  • Phases must be correctly sequenced: rest → depolarization → peak → repolarization → hyperpolarization → rest
+  • Dashed reference lines for threshold and resting potential must be present
+  • Phase labels (depolarization, repolarization, etc.) must be correctly positioned
+  • ANSWER HIDING: Do NOT show the phase name/arrow that students are asked to identify
+
+▶ PRESSURE-VOLUME LOOPS
+  • x-axis: ventricular volume (mL), y-axis: ventricular pressure (mmHg)
+  • Four phases of the cardiac cycle must be correctly labeled: isovolumetric contraction, ejection, isovolumetric relaxation, filling
+  • EDV and ESV must be marked (vertical dashed lines)
+  • Stroke volume = EDV − ESV (shown as horizontal arrow or bracket)
+  • Mitral and aortic valve events at correct corners
+  • ANSWER HIDING: Do NOT draw a modified loop (e.g., afterload/preload change) if that is what students must predict
+
+▶ FEEDBACK LOOP DIAGRAMS
+  • Must include: stimulus, sensor/receptor, afferent pathway, control centre (integrating centre), efferent pathway, effector, response
+  • Negative vs positive feedback must be clearly labeled
+  • Set point must be indicated
+  • Arrows must show correct directional flow
+
+▶ AXES & UNITS
+  • All axes must have correct units (mV, mmHg, mL, s, ms, Hz)
+  • Grid lines acceptable at alpha=0.3
+  • Font size ≥ 10 pt for readability
+""",
+    "biochemistry": r"""
+═══════════════════════════════════════════════════════════════════════════════
+BIOCHEMISTRY DIAGRAM REVIEW RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+▶ METABOLIC PATHWAY DIAGRAMS
+  • Each intermediate metabolite must be shown as a labeled oval/node
+  • Enzyme name must be labeled on or adjacent to each reaction arrow
+  • Cofactors (ATP, ADP, NAD+, NADH, CoA, Pi) shown as side branches with correct directionality
+  • Irreversible reactions: single-headed arrow; reversible: double-headed arrow
+  • ANSWER HIDING: If students must name an enzyme or metabolite, leave that label blank/numbered
+
+▶ ENZYME KINETICS CURVES
+  • x-axis: [S] with concentration units (e.g., mM, μM); y-axis: reaction velocity V (μmol/min or equivalent)
+  • Curve must be hyperbolic (Michaelis-Menten) reaching Vmax asymptote
+  • Vmax: horizontal dashed line clearly labeled
+  • Km: marked at V = Vmax/2 with dashed lines to both axes, clearly labeled
+  • For inhibitor comparisons: correctly show competitive (same Vmax, higher Km) or non-competitive (lower Vmax, same Km)
+  • ANSWER HIDING: Do NOT label Vmax or Km values if students are asked to calculate them from given data
+
+▶ ACCURACY
+  • Pathway direction (anabolic vs catabolic) must match the question context
+  • Regulatory enzyme steps (committed steps) may be marked if given in question
+""",
+    "pharmacology": r"""
+═══════════════════════════════════════════════════════════════════════════════
+PHARMACOLOGY DIAGRAM REVIEW RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+▶ DOSE-RESPONSE CURVES
+  • x-axis: log dose or log[Drug] with units; y-axis: % maximum response (0–100%)
+  • Curve shape must be sigmoid (S-shaped logistic function), not linear
+  • EC50 (or ED50) marked at 50% response with dashed lines to both axes, labeled
+  • Emax (100% response) horizontal dashed line, labeled
+  • For agonist/antagonist comparison: correct relative positions (competitive antagonist shifts curve right; non-competitive lowers Emax)
+  • ANSWER HIDING: Do NOT label EC50 values if students must read them off or calculate them
+
+▶ PHARMACOKINETICS CURVES
+  • x-axis: time with units (hours); y-axis: plasma drug concentration with units (μg/mL, ng/mL)
+  • Curve shape: absorption rise (first-order) followed by elimination decline (exponential)
+  • Cmax (peak concentration) and tmax (time to peak) labeled with dashed lines to axes
+  • AUC region shaded (alpha=0.2) if reference in question
+  • t½ marked on elimination slope with dashed line
+  • For IV vs oral: IV curve starts high and declines; oral curve has a rising phase
+  • ANSWER HIDING: Do NOT show AUC value, t½ value, or Cmax value if students must calculate them
+
+▶ DRUG NAMING
+  • Drug names must be spelled correctly (use INN names)
+  • Do NOT include mechanism of action text if students must describe it
+""",
+    "pathology": r"""
+═══════════════════════════════════════════════════════════════════════════════
+PATHOLOGY DIAGRAM REVIEW RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+▶ DISEASE PROGRESSION DIAGRAMS
+  • Stages must flow in correct pathological sequence (e.g., Normal → Hyperplasia → Dysplasia → CIS → Invasive)
+  • Colour coding must progress logically (green→yellow→orange→red for severity)
+  • Each stage box must include key pathological features (cellular/histological changes)
+  • Stage names must be clinically standard (TNM staging, WHO grading, etc.)
+  • ANSWER HIDING: Do NOT write the disease diagnosis label if students must identify it
+    (use a neutral title like "Disease X Progression" or "Progression Stages")
+
+▶ HISTOPATHOLOGY DIAGRAMS
+  • Show architectural distortion: enlarged, irregular nuclei; high N:C ratio; loss of polarity
+  • Normal tissue shown for comparison on same diagram (if relevant)
+  • Do NOT annotate "malignant" / "carcinoma" / specific diagnosis if that is what students must identify
+
+▶ GENERAL
+  • Microscopic vs macroscopic view must be clearly distinguished
+  • Scale bar or level indicator (low/high magnification) should be present if relevant
+""",
+    "microbiology": r"""
+═══════════════════════════════════════════════════════════════════════════════
+MICROBIOLOGY DIAGRAM REVIEW RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+▶ BACTERIAL STRUCTURE DIAGRAMS
+  • Must label: cell wall, plasma membrane, cytoplasm, nucleoid, ribosomes
+  • Optional (if relevant): capsule, flagella, pili, plasmid, outer membrane (Gram-negative)
+  • Gram-positive: thick peptidoglycan layer, NO outer membrane
+  • Gram-negative: thin peptidoglycan, WITH outer membrane (lipopolysaccharide)
+  • ANSWER HIDING: Do NOT label the Gram-type or species name if students must identify it
+
+▶ INFECTION/REPLICATION CYCLE DIAGRAMS
+  • Steps must be in correct biological sequence for the pathogen type
+  • Correct terminology: adsorption/attachment → penetration/entry → uncoating → replication → assembly → release
+  • Bacteriophage cycles: lytic (immediate) vs lysogenic (integration) clearly differentiated
+  • ANSWER HIDING: Do NOT label the pathogen species or the step name/mechanism if students must identify it
+
+▶ GROWTH CURVE DIAGRAMS
+  • Four phases must be labeled: Lag, Exponential (Log), Stationary, Death (Decline)
+  • x-axis: time (hours); y-axis: log(CFU/mL) or OD600
+  • Phase boundaries shown with dashed vertical lines
+  • Annotations may note generation time during exponential phase
+  • ANSWER HIDING: Do NOT include specific CFU numbers or time values if students must calculate them
 """,
 }
 

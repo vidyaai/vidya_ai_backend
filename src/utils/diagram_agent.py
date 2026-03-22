@@ -158,7 +158,11 @@ YOUR TASK:
       - Do NOT include output values, boolean expressions, or specific input values
       - Describe ONLY: what components, how they connect, what nodes are named
    c) For claude_code_tool: Specify domain, diagram_type, and tool_type (matplotlib/networkx)
-   d) Rephrase question naturally to reference "the diagram below" or "shown below"
+   d) For MEDICAL questions: ALWAYS use claude_code_tool with tool_type="matplotlib" — never circuitikz
+      - action_potential, feedback_loop, pressure_volume_loop → matplotlib line/curve plots
+      - metabolic_pathway, enzyme_kinetics, dose_response, pharmacokinetics → matplotlib plots
+      - anatomical_diagram, cross_section, histology, bacterial_structure → matplotlib patch-based diagrams
+   e) Rephrase question naturally to reference "the diagram below" or "shown below"
 
 WHEN TO ADD DIAGRAMS:
 
@@ -167,9 +171,16 @@ WHEN TO ADD DIAGRAMS:
 ✅ Data structure questions (trees, graphs) — students need to see the structure
 ✅ Questions where the setup is reused across multiple sub-questions
 ✅ Questions where the original LLM suggested a diagram (strong hint)
+✅ Medical/physiology questions asking about specific curves or plots:
+   - Action potential graph (axes, phases, threshold)
+   - Pressure-volume loops (cardiac cycle)
+   - Dose-response / pharmacokinetics curves
+   - Metabolic pathway diagrams
+✅ Anatomical/histological setup diagrams (organ relationships, tissue layers)
 
 ❌ DO NOT ADD for pure theory, definitions, or abstract conceptual questions
 ❌ DO NOT ADD for simple single-step calculations without spatial complexity
+❌ DO NOT ADD for medical questions that only ask to explain or describe mechanisms without a visual component
 
 PROFESSOR'S JUDGMENT:
 Ask: "If I were teaching this in class, would I draw this on the board?"
@@ -212,7 +223,15 @@ This rule applies to ALL subjects and ALL diagram types.
 - Do NOT shade/label areas, intersection points, or derivatives if students must compute them
 - Do NOT show reaction products or mechanisms if students must predict/draw them
 
-**General Rule (ALL SUBJECTS):**
+**Medical / Life Sciences Diagrams:**
+- Action potential: Do NOT label a phase or mark a threshold value if students must identify it
+- Metabolic pathway: Do NOT label an enzyme name if students must name it; use a numbered blank ("Enzyme ?")
+- Pharmacokinetics: Do NOT show Cmax, t½, or AUC values if students must calculate them
+- Dose-response: Do NOT mark EC50 if students must read it off or calculate it
+- Histology / pathology: Do NOT write the disease diagnosis or tissue type label if students must identify it
+  (use neutral numbered callouts instead)
+- Anatomical diagrams: Leave blank callouts for structures students must identify
+- Feedback loop: Show the loop structure, but omit the specific hormone/messenger names if those are the answer**
 - If the question asks "what is the output?", "determine", "find", "calculate",
   "draw", "sketch", "describe", "predict", or "trace" — the diagram must NOT contain that answer
 - Diagrams are visual aids showing the PROBLEM SETUP, not the SOLUTION
@@ -1718,6 +1737,111 @@ Examples:
             ]
         ):
             return "mathematics"
+        # ── Medical sciences ──────────────────────────────────────────────────
+        elif any(
+            kw in q_lower
+            for kw in [
+                "anatomical",
+                "anatomy",
+                "histology",
+                "histological",
+                "cross-section",
+                "sagittal",
+                "coronal",
+                "transverse section",
+                "organ",
+                "bone",
+                "ligament",
+                "tendon",
+            ]
+        ):
+            return "anatomy"
+        elif any(
+            kw in q_lower
+            for kw in [
+                "action potential",
+                "membrane potential",
+                "resting potential",
+                "depolarization",
+                "repolarization",
+                "excitation-contraction",
+                "sarcoplasmic reticulum",
+                "cardiac cycle",
+                "pressure-volume",
+                "p-v loop",
+                "homeostasis",
+                "feedback loop",
+                "cardiac output",
+                "stroke volume",
+            ]
+        ):
+            return "physiology"
+        elif any(
+            kw in q_lower
+            for kw in [
+                "metabolic pathway",
+                "glycolysis",
+                "krebs cycle",
+                "citric acid",
+                "enzyme kinetics",
+                "michaelis",
+                "vmax",
+                "metabolite",
+                "atp synthesis",
+                "nadh",
+                "coenzyme",
+                "biochemical",
+            ]
+        ):
+            return "biochemistry"
+        elif any(
+            kw in q_lower
+            for kw in [
+                "dose-response",
+                "dose response",
+                "ec50",
+                "pharmacokinetics",
+                "plasma concentration",
+                "bioavailability",
+                "half-life",
+                "agonist",
+                "antagonist",
+                "therapeutic index",
+            ]
+        ):
+            return "pharmacology"
+        elif any(
+            kw in q_lower
+            for kw in [
+                "histopathology",
+                "disease progression",
+                "cancer staging",
+                "neoplasia",
+                "necrosis",
+                "inflammation",
+                "pathogenesis",
+                "tumour",
+                "tumor",
+            ]
+        ):
+            return "pathology"
+        elif any(
+            kw in q_lower
+            for kw in [
+                "bacterial",
+                "bacteria",
+                "gram stain",
+                "gram-positive",
+                "gram-negative",
+                "infection cycle",
+                "replication cycle",
+                "pathogen",
+                "antimicrobial",
+                "growth curve",
+                "colony forming",
+            ]
+        ):
+            return "microbiology"
         return "general"
 
     def _strip_code_fences(self, code: str) -> str:
