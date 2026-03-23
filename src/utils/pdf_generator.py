@@ -695,7 +695,7 @@ class AssignmentPDFGenerator:
                 # Use diagram description as caption if available
                 caption_text = question.get("diagram", {}).get("description", "")
                 if not caption_text:
-                    caption_text = f"Circuit diagram for Question {question_num}"
+                    caption_text = f"Diagram for Question {question_num}"
                 html += f"""
                 <div class="figure-container">
                     <img src="{diagram_base64}" alt="Question diagram">
@@ -779,7 +779,7 @@ class AssignmentPDFGenerator:
                     if diagram_base64:
                         sub_caption = subq.get("diagram", {}).get(
                             "description",
-                            f"Circuit diagram for Part {question_num}.{i+1}",
+                            f"Diagram for Part {question_num}.{i+1}",
                         )
                         html += f"""
                         <div class="figure-container">
@@ -1348,13 +1348,16 @@ class AssignmentPDFGenerator:
 
         # Append correct answer
         raw_answer = question.get("correctAnswer") or question.get("correct_answer", "")
+        # correctAnswer for true/false questions is a bool — convert to string
+        if isinstance(raw_answer, bool):
+            raw_answer = "True" if raw_answer else "False"
         if raw_answer:
             if equations:
                 answer_html = self.process_question_text_with_equations(
-                    raw_answer, equations
+                    str(raw_answer), equations
                 )
             else:
-                answer_html = self.process_question_text(raw_answer)
+                answer_html = self.process_question_text(str(raw_answer))
             html += f"""
         <div class="solution-answer">
             <div class="solution-label">Answer</div>
@@ -1386,6 +1389,9 @@ class AssignmentPDFGenerator:
                 raw_subq_answer = subq.get("correctAnswer") or subq.get(
                     "correct_answer", ""
                 )
+                # correctAnswer for true/false subquestions may be a bool
+                if isinstance(raw_subq_answer, bool):
+                    raw_subq_answer = "True" if raw_subq_answer else "False"
                 subq_rubric = subq.get("rubric", "")
 
                 if raw_subq_q or raw_subq_answer:

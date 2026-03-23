@@ -80,22 +80,22 @@ DIAGRAM_TOOLS = [
         "type": "function",
         "function": {
             "name": "claude_code_tool",
-            "description": "RECOMMENDED: Use Claude to generate diagram code for any STEM domain. Works for: physics, mechanical, CS data structures, mathematics, chemistry, civil, biology — any technical diagram that is NOT a circuit schematic. Claude generates clean matplotlib/schemdraw/networkx code executed for technical accuracy.",
+            "description": "RECOMMENDED: Use Claude to generate diagram code for any STEM or medical domain. Works for: physics, mechanical, CS data structures, mathematics, chemistry, civil, biology, and ALL medical subjects (physiology, biochemistry, pharmacology, pathology, microbiology) — any technical diagram that is NOT a circuit schematic. Use for precise scientific plots: action potentials, metabolic pathways, dose-response curves, pharmacokinetics, disease progression charts, infection cycles, growth curves, pressure-volume loops, feedback loops. Claude generates clean matplotlib/schemdraw/networkx code executed for technical accuracy.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "domain": {
                         "type": "string",
-                        "description": "Domain: physics, electrical, computer_science, mathematics, chemistry, biology, mechanical, civil, or general",
+                        "description": "Domain: physics, electrical, computer_science, mathematics, chemistry, biology, mechanical, civil, anatomy, physiology, biochemistry, pharmacology, pathology, microbiology, or general",
                     },
                     "diagram_type": {
                         "type": "string",
-                        "description": "Specific diagram type: manometer, circuit, free_body_diagram, graph, tree, etc.",
+                        "description": "Specific diagram type: manometer, circuit, free_body_diagram, graph, tree, action_potential, feedback_loop, pressure_volume_loop, cardiac_loop, metabolic_pathway, enzyme_kinetics, dose_response, pharmacokinetics, disease_progression, infection_cycle, growth_curve, etc.",
                     },
                     "tool_type": {
                         "type": "string",
                         "enum": ["matplotlib", "schemdraw", "networkx"],
-                        "description": "Which library Claude should generate code for: matplotlib (plots, physics, general), schemdraw (circuits), networkx (graphs/trees)",
+                        "description": "Which library Claude should generate code for: matplotlib (plots, physics, ALL medical scientific plots), schemdraw (circuits), networkx (graphs/trees)",
                     },
                     "description": {
                         "type": "string",
@@ -158,6 +158,28 @@ DIAGRAM_TOOLS = [
                     },
                 },
                 "required": ["prompt", "description"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "imagen_tool",
+            "description": "PREFERRED for spatial/visual medical diagrams: Generate anatomical illustrations, histology slides, bacterial morphology diagrams, and histopathology images using Gemini native image generation. Use for: anatomical_diagram (organ/body region illustrations), histology (tissue cross-sections, cell types), bacterial_structure (cell wall, flagella, pili, capsule), histopathology (diseased vs. normal tissue), and any medical diagram where spatial structure and visual realism matter more than precise data plots. Do NOT use for mathematical plots (action_potential, metabolic_pathway, dose_response, pharmacokinetics) — use claude_code_tool with tool_type=matplotlib for those.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "Detailed description of the medical diagram to generate. Include all structures, labels, anatomical region, orientation (anterior/posterior, superior/inferior), and any specific features to highlight.",
+                    },
+                    "subject": {
+                        "type": "string",
+                        "enum": ["anatomy", "histology", "pathology", "microbiology", "biochemistry", "physiology", "pharmacology", "general"],
+                        "description": "Medical subject domain for the diagram",
+                    },
+                },
+                "required": ["description", "subject"],
             },
         },
     },

@@ -228,9 +228,9 @@ class AssignmentCreate(BaseModel):
     course_id: Optional[str] = None
     due_date: Optional[datetime] = None
     status: str = "draft"
-    subject_category: str = "engineering"
-    engineering_level: str = "undergraduate"
-    engineering_discipline: str = "general"
+    subject_category: Optional[str] = "engineering"
+    engineering_level: Optional[str] = "undergraduate"
+    engineering_discipline: Optional[str] = "general"
     question_types: Optional[List[str]] = None
     linked_videos: Optional[List[dict]] = None
     uploaded_files: Optional[List[dict]] = None
@@ -266,9 +266,9 @@ class AssignmentOut(BaseModel):
     total_points: str
     total_questions: str
     status: str
-    subject_category: str = "engineering"
-    engineering_level: str
-    engineering_discipline: str
+    subject_category: Optional[str] = "engineering"
+    engineering_level: Optional[str] = None
+    engineering_discipline: Optional[str] = None
     question_types: Optional[List[str]] = None
     linked_videos: Optional[List[dict]] = None
     uploaded_files: Optional[List[dict]] = None
@@ -298,9 +298,9 @@ class AssignmentSummary(BaseModel):
     total_points: str
     total_questions: str
     status: str
-    subject_category: str = "engineering"
-    engineering_level: str
-    engineering_discipline: str
+    subject_category: Optional[str] = "engineering"
+    engineering_level: Optional[str] = None
+    engineering_discipline: Optional[str] = None
     question_types: Optional[List[str]] = None
     shared_count: str
     created_at: datetime

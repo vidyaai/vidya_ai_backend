@@ -1314,6 +1314,16 @@ class AssignmentGenerator:
             else:
                 return f"{engineering_level.title()} {engineering_discipline.title()} Assignment"
 
+    # Human-readable display names for academic level keys
+    _LEVEL_DISPLAY_NAMES = {
+        "undergraduate": "Undergraduate",
+        "graduate": "Graduate",
+        "pre_med": "Pre-Med",
+        "mbbs_preclinical": "MBBS Pre-Clinical",
+        "mbbs_clinical": "MBBS Clinical",
+        "md": "MD/Postgraduate",
+    }
+
     def _generate_description(
         self, generation_options: Dict[str, Any], content_sources: Dict[str, Any]
     ) -> str:
@@ -1322,14 +1332,17 @@ class AssignmentGenerator:
         engineering_discipline = generation_options.get("engineeringDiscipline", "")
         num_questions = generation_options.get("numQuestions", 5)
 
+        # Convert raw level key (e.g. mbbs_preclinical) to a human-readable name
+        level_display = self._LEVEL_DISPLAY_NAMES.get(engineering_level, engineering_level)
+
         # Build description based on available options
-        if engineering_level and engineering_discipline:
+        if level_display and engineering_discipline:
             description_parts = [
-                f"AI-generated {engineering_level}-level {engineering_discipline} assignment",
+                f"AI-generated {level_display}-level {engineering_discipline} assignment",
             ]
-        elif engineering_level:
+        elif level_display:
             description_parts = [
-                f"AI-generated {engineering_level}-level assignment",
+                f"AI-generated {level_display}-level assignment",
             ]
         elif engineering_discipline:
             description_parts = [
