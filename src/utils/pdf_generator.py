@@ -1286,7 +1286,7 @@ class AssignmentPDFGenerator:
 
                 {f'''
                 <div class="instructions">
-                    <p>{self.process_question_text(description)}</p>
+                    <p>{description}</p>
                 </div>
                 ''' if description else ''}
 
@@ -1530,7 +1530,7 @@ class AssignmentPDFGenerator:
 
                 {f'''
                 <div class="instructions">
-                    <p>{self.process_question_text(description)}</p>
+                    <p>{description}</p>
                 </div>
                 ''' if description else ''}
 
