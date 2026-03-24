@@ -27,10 +27,12 @@ from utils.youtube_utils import download_transcript_api, grab_youtube_frame
 
 # from utils.youtube_frame_capturer import capture_youtube_frame  # Disabled - YouTube frame capture not working
 from utils.ml_models import OpenAIVisionClient
+from utils.context_extraction import extract_relevant_context, truncate_to_token_limit
 from schemas import VideoQuery
 from utils.firebase_auth import get_current_user
-from models import User, Video, VideoSummary
+from models import User, Video, VideoSummary, TranscriptChunk
 from services.summary_service import SummaryService, QueryRouter
+from utils.text_utils import normalize_ai_response
 
 
 router = APIRouter(prefix="/api/query", tags=["Query"])
@@ -131,8 +133,22 @@ async def process_query(
 
         # Build context based on query type and summary availability
         # Phase 1+2 Combined: Uses both semantic chunks and hierarchical summaries
-        context_for_llm = transcript_to_use  # Default fallback
-        retrieval_strategy = "full_transcript"  # Default
+
+        # Check if chunks are available for RAG
+        chunks_available = db.query(TranscriptChunk).filter(
+            TranscriptChunk.video_id == video_id
+        ).count() > 0
+
+        # Default fallback: Use smart extraction instead of full transcript
+        if not chunks_available and not video_summary and transcript_to_use:
+            context_for_llm = extract_relevant_context(
+                transcript_to_use, query, max_tokens=3000
+            )
+            retrieval_strategy = "fallback_extraction"
+            logger.info(f"Using fallback extraction (no chunks/summary available yet)")
+        else:
+            context_for_llm = transcript_to_use  # Original fallback
+            retrieval_strategy = "full_transcript"
 
         if video_summary:
             if query_type == "broad":
@@ -163,10 +179,14 @@ async def process_query(
                         f"Using semantic chunks context (top-5 relevant chunks)"
                     )
                 else:
-                    # Fallback to full transcript if no chunks available yet
+                    # Fallback: Use smart keyword extraction when chunks not available
                     logger.warning(
-                        f"No chunks available for video {video_id}, using full transcript"
+                        f"No chunks available for video {video_id}, using smart extraction fallback"
                     )
+                    context_for_llm = extract_relevant_context(
+                        transcript_to_use, query, max_tokens=3000
+                    )
+                    retrieval_strategy = "fallback_extraction"
 
         # Check if question is relevant to video content
         video_record = db.query(Video).filter(Video.id == video_id).first()
@@ -242,6 +262,13 @@ async def process_query(
             response = web_result["response"]
             web_sources = web_result.get("sources", [])
             used_web_search = web_result.get("used_web_search", False)
+
+        # Normalize AI response for consistent frontend rendering
+        logger.info(f"📝 BEFORE normalization (first 300 chars): {response[:300]}")
+        logger.info(f"📝 BEFORE normalization (repr): {repr(response[:150])}")
+        response = normalize_ai_response(response)
+        logger.info(f"📝 AFTER normalization (first 300 chars): {response[:300]}")
+        logger.info(f"📝 AFTER normalization (repr): {repr(response[:150])}")
 
         # Store conversation turn in database
         session_id_used = store_conversation_turn(
