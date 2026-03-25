@@ -613,19 +613,25 @@ _IMAGEN_DESCRIPTION_PROMPTS = {
         "Draw an action potential graph. X-axis: time (ms), Y-axis: membrane potential (mV). "
         "Show threshold line (~-55 mV), resting potential (~-70 mV), depolarization peak (~+30 mV), "
         "repolarization, and hyperpolarization. Label all phases and key voltage levels. "
-        "Use a clean single-line waveform on a white background."
+        "Use a clean single-line waveform on a white background. "
+        "CRITICAL: If the question asks students to identify a specific phase or its ionic basis, "
+        "do NOT label that phase — use a '?' callout instead."
     ),
     ("physiology", "feedback_loop"): (
         "Draw a homeostatic feedback loop diagram. Show boxes for: stimulus, receptor/sensor, "
         "afferent pathway, integrating centre (e.g., hypothalamus), efferent pathway, effector, response. "
         "Connect with directional arrows. Label the feedback type (negative/positive). "
-        "Include the set point and deviation indicators."
+        "Include the set point and deviation indicators. "
+        "CRITICAL: If the question asks students to identify the feedback type, a specific hormone/messenger, "
+        "or the effector organ, do NOT label that element — leave it as a blank '?' node."
     ),
     ("physiology", "pressure_volume_loop"): (
         "Draw a cardiac pressure-volume loop. X-axis: ventricular volume (mL), "
         "Y-axis: ventricular pressure (mmHg). Show four phases: isovolumetric contraction, "
         "ejection, isovolumetric relaxation, filling. Label EDV, ESV, stroke volume, "
-        "mitral valve opening/closing, aortic valve opening/closing points."
+        "mitral valve opening/closing, aortic valve opening/closing points. "
+        "CRITICAL: If the question asks students to calculate or identify stroke volume, EDV, ESV, "
+        "or a specific valve event, do NOT annotate that value — omit its label from the diagram."
     ),
     ("biochemistry", "metabolic_pathway"): (
         "Draw a metabolic pathway diagram. Show intermediates as labeled oval nodes. "
@@ -639,20 +645,26 @@ _IMAGEN_DESCRIPTION_PROMPTS = {
         "X-axis: substrate concentration [S] (mM), Y-axis: reaction velocity V (μmol/min). "
         "Show a hyperbolic curve reaching Vmax asymptote. "
         "Mark Vmax with a dashed horizontal line. Mark Km at V = Vmax/2 with dashed lines to both axes. "
-        "Label Vmax, Km, and both axes with units."
+        "Label Vmax, Km, and both axes with units. "
+        "CRITICAL: If the question asks students to determine Km, Vmax, or inhibitor type, "
+        "do NOT mark or label those values — show the curve shape only without those annotations."
     ),
     ("pharmacology", "dose_response"): (
         "Draw a dose-response curve. X-axis: log dose (or log concentration), "
         "Y-axis: % maximum response (0–100%). Show a sigmoid (S-shaped) curve. "
         "Mark EC50 or ED50 at 50% response with dashed lines to both axes. "
         "Label Emax, EC50, and the curve (drug name if specified). "
-        "If comparing two drugs or agonist/antagonist, label each curve distinctly."
+        "If comparing two drugs or agonist/antagonist, label each curve distinctly. "
+        "CRITICAL: If the question asks students to determine EC50/ED50, potency, or Emax, "
+        "do NOT mark those values on the graph — show the curve(s) without EC50/Emax markers."
     ),
     ("pharmacology", "pharmacokinetics"): (
         "Draw a plasma concentration-time curve. X-axis: time (hours), "
         "Y-axis: plasma drug concentration (μg/mL or ng/mL). "
         "Show curve with labeled Cmax, tmax, AUC (shaded region), and elimination phase. "
-        "Mark t½ (half-life) with dashed lines. If comparing IV vs oral, overlay both curves with labels."
+        "Mark t½ (half-life) with dashed lines. If comparing IV vs oral, overlay both curves with labels. "
+        "CRITICAL: If the question asks students to calculate Cmax, tmax, AUC, or t½, "
+        "do NOT annotate those values — show the curve shape without those markers."
     ),
     ("pathology", "disease_progression"): (
         "Draw a disease progression/staging flow diagram. "
@@ -1183,6 +1195,8 @@ _NONAI_TOOL_PROMPTS = {
         "x-axis: 'Time (ms)', range 0–5 ms. y-axis: 'Membrane Potential (mV)', range -90 to +40. "
         "Draw the waveform: resting (-70 mV), threshold (-55 mV dashed line), depolarization rise, +30 mV peak, repolarization, hyperpolarization, return to rest. "
         "Add dashed horizontal lines for threshold and resting potential. Label phases as text annotations. "
+        "CRITICAL: If the question asks students to identify a specific phase or its ionic mechanism, "
+        "omit that phase's text annotation — leave it blank or use a '?' label. "
         "figsize=(7, 5). Include grid (alpha=0.3)."
     ),
     ("physiology", "pressure_volume_loop", "matplotlib"): (
@@ -1190,7 +1204,10 @@ _NONAI_TOOL_PROMPTS = {
         "x-axis: 'Ventricular Volume (mL)', y-axis: 'Ventricular Pressure (mmHg)'. "
         "Draw a closed loop rectangle with rounded corners representing the four phases. "
         "Label EDV, ESV, stroke volume (horizontal arrow), systolic and diastolic pressures. "
-        "Add dashed vertical lines at EDV and ESV. figsize=(6, 5)."
+        "Add dashed vertical lines at EDV and ESV. "
+        "CRITICAL: If the question asks students to calculate stroke volume, identify EDV/ESV, "
+        "or determine a specific valve event, omit the corresponding label from the diagram. "
+        "figsize=(6, 5)."
     ),
     ("biochemistry", "metabolic_pathway", "matplotlib"): (
         "Draw a metabolic pathway using matplotlib. "
@@ -1198,6 +1215,7 @@ _NONAI_TOOL_PROMPTS = {
         "Connect metabolites with directional arrows (ax.annotate arrowprops). "
         "Label enzyme names above each arrow. Show cofactors (ATP, NADH, CoA) as smaller side-branch ovals. "
         "Use colour: substrate=light blue, product=light green, enzyme=orange label. "
+        "CRITICAL: Do NOT label enzyme names if students must identify them — use '?' in place of the enzyme label. "
         "figsize=(10, 6). ax.axis('off')."
     ),
     ("biochemistry", "enzyme_kinetics", "matplotlib"): (
@@ -1205,7 +1223,10 @@ _NONAI_TOOL_PROMPTS = {
         "x-axis: '[S] (mM)', y-axis: 'v (μmol/min)'. Plot a hyperbolic curve approaching Vmax. "
         "Draw a dashed horizontal line at Vmax and label it. "
         "Mark Km at V=Vmax/2: draw dashed vertical and horizontal lines from the curve to both axes. "
-        "Label Vmax and Km. figsize=(6, 5). Include grid (alpha=0.3)."
+        "Label Vmax and Km. "
+        "CRITICAL: If the question asks students to determine Km or Vmax, "
+        "omit those dashed marker lines and labels — show the hyperbolic curve shape only. "
+        "figsize=(6, 5). Include grid (alpha=0.3)."
     ),
     ("pharmacology", "dose_response", "matplotlib"): (
         "Draw a dose-response curve using matplotlib. "
@@ -1213,6 +1234,8 @@ _NONAI_TOOL_PROMPTS = {
         "Plot a sigmoid (S-shaped) curve using logistic function. "
         "Mark EC50 at 50% response with dashed lines to both axes. Label EC50, Emax. "
         "If comparing two drugs: overlay curves with different colours and a legend. "
+        "CRITICAL: If the question asks students to determine EC50/ED50, Emax, or potency ratio, "
+        "omit those dashed marker lines and labels — show the sigmoid curve(s) without EC50/Emax markers. "
         "figsize=(6, 5). Include grid (alpha=0.3)."
     ),
     ("pharmacology", "pharmacokinetics", "matplotlib"): (
@@ -1221,6 +1244,8 @@ _NONAI_TOOL_PROMPTS = {
         "Plot absorption rise then exponential decline. "
         "Mark Cmax and tmax with dashed lines and labels. Shade AUC region (alpha=0.2). "
         "Mark t½ on the elimination phase with a dashed horizontal line. "
+        "CRITICAL: If the question asks students to calculate Cmax, tmax, AUC, or t½, "
+        "omit those annotations — show the curve shape without those markers. "
         "figsize=(7, 5). Include grid (alpha=0.3)."
     ),
     ("microbiology", "bacterial_structure", "matplotlib"): (
@@ -1236,6 +1261,8 @@ _NONAI_TOOL_PROMPTS = {
         "Connect steps with curved directional arrows (ax.annotate with connectionstyle='arc3,rad=0.3'). "
         "Steps: Attachment → Entry → Replication → Assembly → Release. "
         "Add small labels for key virulence factors at relevant steps. "
+        "CRITICAL: Do NOT label the virulence factor or pathogen name if identification is the question — "
+        "use '?' instead. "
         "figsize=(8, 6). ax.axis('off')."
     ),
     ("microbiology", "growth_curve", "matplotlib"): (
@@ -1243,6 +1270,8 @@ _NONAI_TOOL_PROMPTS = {
         "x-axis: 'Time (hours)', y-axis: 'log(CFU/mL)' or 'OD600'. "
         "Plot a sigmoid-like curve with four labeled phases: Lag, Exponential (Log), Stationary, Decline (Death). "
         "Mark phase boundaries with dashed vertical lines. Label each phase with a text annotation. "
+        "CRITICAL: If the question asks students to identify a specific phase or calculate generation time, "
+        "omit that phase label or the calculated value. "
         "figsize=(7, 5). Include grid (alpha=0.3)."
     ),
     # Missing anatomy/histology nonai prompt
@@ -1252,6 +1281,7 @@ _NONAI_TOOL_PROMPTS = {
         "Show 2-4 distinct tissue layers as horizontal bands with different fill colours. "
         "Add cell nuclei as small dark Ellipse patches within each layer. "
         "Label each layer with ax.annotate() leader lines. "
+        "CRITICAL: Do NOT label the tissue or cell type names if that is what students must identify. "
         "figsize=(7, 6). ax.axis('off'). ax.set_aspect('equal')."
     ),
     # Missing physiology/feedback_loop nonai prompt
@@ -1261,6 +1291,8 @@ _NONAI_TOOL_PROMPTS = {
         "Connect nodes with directional arrows (ax.annotate arrowprops={'arrowstyle':'->', 'lw':2}). "
         "Label the feedback pathway type (Negative / Positive) prominently. "
         "Include a 'Set Point' indicator. Arrange nodes in a circular flow layout. "
+        "CRITICAL: If the question asks students to identify the feedback type or a specific node name, "
+        "omit that label — leave the node blank or use '?'. "
         "figsize=(7, 6). ax.axis('off')."
     ),
     # Missing pathology/disease_progression nonai prompt
@@ -1489,6 +1521,61 @@ _NONAI_TOOL_PROMPTS = {
         "CRITICAL: Do NOT label the disease name if identification is the question. "
         "ax.axis('off'). figsize=(11, 4). "
         "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    # ── Physiology ─────────────────────────────────────────────────────────────
+    ("physiology", "feedback_loop", "networkx"): (
+        "Generate a homeostatic/physiological FEEDBACK LOOP diagram using networkx DiGraph + matplotlib. "
+        "CRITICAL ANTI-OVERLAP RULES: "
+        "1. Use a TWO-COLUMN subplot layout so the graph and any annotation key never share axes: "
+        "   fig, (ax_loop, ax_key) = plt.subplots(1, 2, figsize=(14, 8), gridspec_kw={'width_ratios': [3, 1]}). "
+        "   Draw the circular feedback graph ONLY in ax_loop.  "
+        "   Draw any bullet-point key / mechanism list ONLY in ax_key. "
+        "2. Wrap all node labels before adding to the graph: "
+        "   import textwrap; label = textwrap.fill(raw_label, width=12). "
+        "3. Use nx.circular_layout(G, scale=2.5) for generous node spacing. "
+        "4. node_size=3500, font_size=9 — NEVER font_size=13 in multi-node circular graphs. "
+        "5. Draw each node as a FancyBboxPatch rectangle centred at pos[node] "
+        "   (width=1.4, height=0.6, boxstyle='round,pad=0.15', facecolor='#FFEEDD', edgecolor='#CC4400'). "
+        "6. Directed edges: connectionstyle='arc3,rad=0.15', edge_color='#CC0000'. "
+        "7. Central concept (if any): ax_loop.text(0, 0, ...) with yellow bbox — placed last. "
+        "ax_loop.set_xlim(-3.8,3.8); ax_loop.set_ylim(-3.8,3.8); ax_loop.set_aspect('equal'); ax_loop.axis('off'). "
+        "ax_key.axis('off'). "
+        "plt.tight_layout(pad=1.5). plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')."
+    ),
+    ("physiology", "feedback_loop", "matplotlib"): (
+        "Generate a FEEDBACK LOOP diagram using matplotlib with TWO subplots: "
+        "fig, (ax_loop, ax_key) = plt.subplots(1, 2, figsize=(14, 8), gridspec_kw={'width_ratios': [3, 1]}). "
+        "ax_loop: draw circular arrows and FancyBboxPatch nodes for the feedback loop. "
+        "ax_key: draw any annotation key or bullet list. NEVER put the key inside ax_loop. "
+        "Wrap long node labels: import textwrap; label = textwrap.fill(raw, 14). "
+        "Curved arrows: ax.annotate with arrowstyle='->', connectionstyle='arc3,rad=0.3'. "
+        "Central concept: ax_loop.text at (0,0) with yellow bbox. "
+        "ax_loop.set_xlim(-4,4); ax_loop.set_ylim(-4,4); ax_loop.set_aspect('equal'); ax_loop.axis('off'). "
+        "plt.tight_layout(pad=1.5). plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')."
+    ),
+    # ── Biochemistry ────────────────────────────────────────────────────────────
+    ("biochemistry", "metabolic_pathway", "networkx"): (
+        "Generate a METABOLIC PATHWAY diagram using networkx DiGraph + matplotlib. figsize=(12, 8). "
+        "Wrap all node labels: import textwrap; label = textwrap.fill(raw, 14). "
+        "Layout: try nx.nx_agraph.graphviz_layout(G, prog='dot') first; "
+        "fallback to nx.spring_layout(G, k=2.5, seed=42). "
+        "node_size=4000, font_size=9. "
+        "Edge labels (enzyme names): nx.draw_networkx_edge_labels with font_size=8 — short abbreviations. "
+        "All text: bbox=dict(boxstyle='round,pad=0.2', facecolor='white', edgecolor='gray', alpha=0.85). "
+        "ax.axis('off'). plt.tight_layout(pad=2.0). "
+        "plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')."
+    ),
+    ("microbiology", "disease_progression", "networkx"): (
+        "Generate a DISEASE PROGRESSION diagram using networkx DiGraph + matplotlib. "
+        "figsize=(12, 5) for linear <=5 stages, (14, 8) for branching. "
+        "Wrap stage labels: import textwrap; label = textwrap.fill(raw, 12). "
+        "Linear layout: pos = {nodes[i]: (i*3, 0) for i in range(len(nodes))}. "
+        "node_size=4000, font_size=9. "
+        "FancyBboxPatch nodes (width=2.0, height=0.8), colour-coded from green (normal) to red (severe). "
+        "Edges as ax.annotate curved arrows. "
+        "Feature annotations BELOW each box at y=-0.9 with fontsize=8. "
+        "ax.axis('off'). plt.tight_layout(pad=2.0). "
+        "plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')."
     ),
 }
 

@@ -50,6 +50,8 @@ class SubquestionLevel3(BaseModel):
         "true-false",
         "code-writing",
         "diagram-analysis",
+        "clinical-case",
+        "osce",
     ] = Field(description="Question type")
     question: str = Field(description="Question text with equation placeholders")
     points: float = Field(default=0, description="Points/marks for this question")
@@ -103,6 +105,8 @@ class SubquestionLevel2(BaseModel):
         "code-writing",
         "diagram-analysis",
         "multi-part",
+        "clinical-case",
+        "osce",
     ] = Field(description="Question type")
     question: str = Field(description="Question text with equation placeholders")
     points: float = Field(default=0, description="Points/marks for this question")
@@ -162,6 +166,8 @@ class Question(BaseModel):
         "code-writing",
         "diagram-analysis",
         "multi-part",
+        "clinical-case",
+        "osce",
     ] = Field(description="Question type")
     question: str = Field(description="Question text with equation placeholders")
     points: float = Field(default=0, description="Points/marks for this question")
@@ -242,6 +248,8 @@ class SubquestionLevel3Generation(BaseModel):
         "true-false",
         "code-writing",
         "diagram-analysis",
+        "clinical-case",
+        "osce",
     ] = Field(description="Question type (multi-part not allowed at this level)")
     question: str = Field(description="Question text")
     points: float = Field(default=0, description="Points/marks for this question")
@@ -289,6 +297,8 @@ class SubquestionLevel2Generation(BaseModel):
         "code-writing",
         "diagram-analysis",
         "multi-part",
+        "clinical-case",
+        "osce",
     ] = Field(description="Question type")
     question: str = Field(description="Question text")
     points: float = Field(default=0, description="Points/marks for this question")
@@ -341,6 +351,8 @@ class QuestionGenerationFlat(BaseModel):
         "true-false",
         "code-writing",
         "diagram-analysis",
+        "clinical-case",
+        "osce",
     ] = Field(description="Question type (multi-part not included)")
     question: str = Field(description="Question text")
     points: float = Field(default=0, description="Points/marks for this question")
@@ -395,6 +407,8 @@ class QuestionGenerationNested(BaseModel):
         "code-writing",
         "diagram-analysis",
         "multi-part",
+        "clinical-case",
+        "osce",
     ] = Field(description="Question type")
     question: str = Field(description="Question text")
     points: float = Field(default=0, description="Points/marks for this question")
