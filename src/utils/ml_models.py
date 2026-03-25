@@ -9,7 +9,7 @@ from .web_search import (
     SearchDecisionAgent,
     synthesize_with_web_results,
 )
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Iterator
 import json
 from controllers.config import logger
 
@@ -102,6 +102,72 @@ class OpenAIVisionClient:
             return ai_response
         except Exception as e:
             return f"Error: {str(e)}"
+
+    def ask_text_only_stream(self, prompt, context="", conversation_history=None) -> Iterator[str]:
+        """
+        Stream AI response word-by-word for better UX.
+
+        Args:
+            prompt: User question
+            context: Video transcript context
+            conversation_history: Previous messages
+
+        Yields:
+            Response chunks as they're generated
+        """
+        try:
+            # Check if the context contains timestamp markers
+            has_timestamps = False
+            if context and isinstance(context, str):
+                has_timestamps = any(
+                    ":" in line and " - " in line
+                    for line in context.split("\n")
+                    if line.strip()
+                )
+
+            # Select appropriate system prompt
+            system_prompt = (
+                SYSTEM_PROMPT_CONVERSATIONAL_FORMATTED
+                if has_timestamps
+                else SYSTEM_PROMPT_CONVERSATIONAL_INITIAL
+            )
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+            ]
+
+            # Add conversation history
+            if conversation_history and isinstance(conversation_history, list):
+                for msg in conversation_history:
+                    if isinstance(msg, dict) and "role" in msg and "content" in msg:
+                        messages.append(
+                            {"role": msg["role"], "content": msg["content"]}
+                        )
+
+            # Add current question
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"Context: {context}\n\nQuestion: {prompt}",
+                }
+            )
+
+            # Stream response from OpenAI
+            stream = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                max_tokens=1500,
+                temperature=0.3,
+                stream=True  # Enable streaming
+            )
+
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+        except Exception as e:
+            logger.error(f"Streaming error: {e}")
+            yield f"Error: {str(e)}"
 
     def ask_with_image(self, prompt, image_path, context="", conversation_history=None):
         """Ask a question with both text prompt and image with the appropriate system prompt"""
@@ -712,6 +778,139 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
                 "used_web_search": False,
                 "search_query": "",
             }
+
+    def ask_with_web_augmentation_stream(
+        self,
+        prompt: str,
+        context: str = "",
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        video_title: str = "",
+        enable_search: bool = True,
+    ) -> Iterator[str]:
+        """
+        Stream answer with optional web search augmentation.
+
+        Yields JSON-formatted chunks:
+        - {"type": "metadata", "data": {"used_web_search": bool, "sources": []}}
+        - {"type": "content", "data": "text chunk"}
+        - {"type": "done"}
+
+        Args:
+            prompt: User's question
+            context: Video transcript context
+            conversation_history: Previous messages
+            video_title: Video title
+            enable_search: Enable web search
+
+        Yields:
+            JSON strings with response chunks
+        """
+        try:
+            # STEP 1: Rewrite query
+            rewrite_result = self.rewrite_query_with_context(
+                user_query=prompt, conversation_history=conversation_history
+            )
+            contextualized_prompt = rewrite_result["rewritten_query"]
+
+            logger.info(
+                f"[STREAM] Query: '{prompt}' → '{contextualized_prompt}'"
+            )
+
+            # Decide if web search is needed
+            used_web_search = False
+            sources = []
+
+            if enable_search:
+                decision = self.search_agent.should_search_web(
+                    user_question=contextualized_prompt,
+                    transcript_excerpt=context,
+                    video_title=video_title,
+                    conversation_history=conversation_history,
+                )
+
+                logger.info(
+                    f"[STREAM] Web search decision: {decision.get('should_search')}"
+                )
+
+                # Perform web search if needed
+                if (
+                    decision.get("should_search")
+                    and decision.get("confidence", 0) > 0.6
+                ):
+                    search_query = decision.get("search_query", prompt)
+                    logger.info(f"[STREAM] Searching web: {search_query}")
+
+                    search_results = self.search_client.search(
+                        query=search_query, max_results=3, search_depth="basic"
+                    )
+
+                    if search_results:
+                        used_web_search = True
+                        sources = [r.get("url", "") for r in search_results]
+
+                        # Send metadata first
+                        yield json.dumps({
+                            "type": "metadata",
+                            "data": {
+                                "used_web_search": True,
+                                "sources": sources,
+                                "search_query": search_query
+                            }
+                        }) + "\n"
+
+                        # Stream synthesized answer
+                        # Note: synthesize_with_web_results doesn't support streaming yet
+                        # For now, we'll get the full response and yield it in chunks
+                        synthesis = synthesize_with_web_results(
+                            openai_client=self.client,
+                            user_question=contextualized_prompt,
+                            video_content=context,
+                            search_results=search_results,
+                            conversation_history=conversation_history,
+                        )
+
+                        # Yield answer in word-sized chunks for streaming effect
+                        answer = synthesis["answer"]
+                        words = answer.split(" ")
+                        for i, word in enumerate(words):
+                            chunk = word + (" " if i < len(words) - 1 else "")
+                            yield json.dumps({
+                                "type": "content",
+                                "data": chunk
+                            }) + "\n"
+
+                        yield json.dumps({"type": "done"}) + "\n"
+                        return
+
+            # No web search - stream from video content only
+            yield json.dumps({
+                "type": "metadata",
+                "data": {
+                    "used_web_search": False,
+                    "sources": [],
+                    "search_query": ""
+                }
+            }) + "\n"
+
+            # Stream response
+            for chunk in self.ask_text_only_stream(
+                contextualized_prompt,
+                context,
+                conversation_history
+            ):
+                yield json.dumps({
+                    "type": "content",
+                    "data": chunk
+                }) + "\n"
+
+            yield json.dumps({"type": "done"}) + "\n"
+
+        except Exception as e:
+            logger.error(f"[STREAM] Error: {e}")
+            yield json.dumps({
+                "type": "error",
+                "data": str(e)
+            }) + "\n"
 
 
 class OpenAIQuizClient:

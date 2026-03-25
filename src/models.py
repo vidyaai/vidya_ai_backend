@@ -16,6 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
+from pgvector.sqlalchemy import Vector
 from utils.db import Base
 
 
@@ -556,7 +557,7 @@ class TranscriptChunk(Base):
     end_seconds = Column(Float, nullable=True)
 
     # Embedding (1536 dimensions for text-embedding-3-small)
-    embedding = Column(JSON, nullable=True)
+    embedding = Column(Vector(1536), nullable=True)
 
     # Metadata
     word_count = Column(Integer, nullable=True)

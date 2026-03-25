@@ -554,40 +554,63 @@ class QueryRouter:
         return context
 
     def retrieve_relevant_chunks(
-        self, db: Session, video_id: str, query: str, top_k: int = 5
+        self, db: Session, video_id: str, query: str, top_k: int = 5, use_hybrid: bool = True
     ) -> List[Dict[str, Any]]:
         """
-        Retrieve most relevant chunks using semantic search.
+        Retrieve most relevant chunks using database-level vector search with caching.
+
+        OPTIMIZED: Uses pgvector for fast similarity search + Redis cache for repeated queries.
 
         Args:
             db: Database session
             video_id: Video identifier
             query: User query
             top_k: Number of chunks to retrieve
+            use_hybrid: Use hybrid retrieval (dense + BM25 rerank) if True, else pure semantic
 
         Returns:
-            List of relevant chunks with text, timestamps, and similarity scores
+            List of relevant chunks with text, timestamps, and relevance scores
         """
+        # Check cache first (30 min TTL)
+        from utils.cache import get_cached_rag_results, cache_rag_results
+
+        cached_results = get_cached_rag_results(video_id, f"{query}:k{top_k}:h{use_hybrid}")
+        if cached_results:
+            logger.info(f"Cache HIT: RAG results for video {video_id}, query '{query[:50]}...'")
+            return cached_results
+
+        logger.info(f"Cache MISS: Performing RAG retrieval for video {video_id}")
+
         try:
-            # Get all chunks for this video
-            chunks = (
-                db.query(TranscriptChunk)
-                .filter(TranscriptChunk.video_id == video_id)
-                .order_by(TranscriptChunk.chunk_index)
-                .all()
-            )
-
-            if not chunks:
-                logger.warning(f"No chunks found for video {video_id}")
-                return []
-
-            # Generate query embedding
+            # Generate query embedding (this is also cached)
             query_embedding = self.embedder.embed_text(query)
+            logger.info(f"[DEBUG] Query embedding shape: {len(query_embedding) if query_embedding else None}")
 
-            # Prepare candidates
-            candidates = []
-            for chunk in chunks:
-                if chunk.embedding:
+            # Check total chunks for this video
+            total_chunks = db.query(TranscriptChunk).filter(TranscriptChunk.video_id == video_id).count()
+            logger.info(f"[DEBUG] Total chunks in DB for video {video_id}: {total_chunks}")
+
+            if use_hybrid:
+                # HYBRID: Get top 20 from dense search, then rerank with BM25
+                # Step 1: Database-level dense retrieval using pgvector
+                logger.info(f"[DEBUG] Executing pgvector cosine_distance query...")
+                dense_chunks = (
+                    db.query(TranscriptChunk)
+                    .filter(TranscriptChunk.video_id == video_id)
+                    # Skip .isnot(None) check - pgvector handles null vectors
+                    .order_by(TranscriptChunk.embedding.cosine_distance(query_embedding))
+                    .limit(20)  # Get top 20 for reranking
+                    .all()
+                )
+                logger.info(f"[DEBUG] Dense chunks retrieved: {len(dense_chunks)}")
+
+                if not dense_chunks:
+                    logger.warning(f"No chunks with embeddings found for video {video_id}")
+                    return []
+
+                # Step 2: BM25 rerank (only on top 20, not all chunks)
+                candidates = []
+                for chunk in dense_chunks:
                     candidates.append(
                         {
                             "text": chunk.text,
@@ -600,14 +623,48 @@ class QueryRouter:
                         }
                     )
 
-            # Find most similar
-            relevant = self.embedder.find_most_similar(
-                query_embedding, candidates, top_k=top_k
-            )
+                # BM25 rerank (with BM25 index caching per video)
+                relevant = self.embedder.hybrid_search(
+                    query, query_embedding, candidates, top_k=top_k, alpha=0.5, cache_key=f"bm25:{video_id}"
+                )
+                logger.info(f"Retrieved {len(relevant)} chunks (hybrid: pgvector + BM25 rerank)")
 
-            logger.info(f"Retrieved {len(relevant)} relevant chunks for query")
+            else:
+                # SEMANTIC ONLY: Pure pgvector similarity search
+                semantic_chunks = (
+                    db.query(TranscriptChunk)
+                    .filter(TranscriptChunk.video_id == video_id)
+                    # Skip .isnot(None) check - pgvector handles null vectors
+                    .order_by(TranscriptChunk.embedding.cosine_distance(query_embedding))
+                    .limit(top_k)
+                    .all()
+                )
+
+                if not semantic_chunks:
+                    logger.warning(f"No chunks with embeddings found for video {video_id}")
+                    return []
+
+                relevant = []
+                for chunk in semantic_chunks:
+                    relevant.append(
+                        {
+                            "text": chunk.text,
+                            "start_time": chunk.start_time,
+                            "end_time": chunk.end_time,
+                            "start_seconds": chunk.start_seconds,
+                            "end_seconds": chunk.end_seconds,
+                            "chunk_index": chunk.chunk_index,
+                            "embedding": chunk.embedding,
+                        }
+                    )
+                logger.info(f"Retrieved {len(relevant)} chunks (pure semantic: pgvector)")
+
+            # Cache results before returning (30 min TTL)
+            cache_rag_results(video_id, f"{query}:k{top_k}:h{use_hybrid}", relevant, ttl=1800)
+
             return relevant
 
         except Exception as e:
-            logger.error(f"Error retrieving semantic chunks: {e}")
+            logger.error(f"Error retrieving chunks with pgvector: {e}")
+            # Fallback: return empty list
             return []

@@ -22,9 +22,18 @@ def s3_upload_file(
 def s3_presign_url(bucket_key: str, expires_in: int = 3600) -> str:
     if not s3_client or not AWS_S3_BUCKET:
         raise HTTPException(status_code=500, detail="S3 is not configured")
+
+    # Add response headers for video files to ensure proper playback
+    params = {"Bucket": AWS_S3_BUCKET, "Key": bucket_key}
+
+    # For video files, set explicit Content-Type in response
+    if bucket_key.endswith(('.mp4', '.webm', '.mov', '.avi', '.mkv')):
+        params["ResponseContentType"] = "video/mp4"  # Use mp4 for compatibility
+        params["ResponseCacheControl"] = "max-age=3600"
+
     return s3_client.generate_presigned_url(
         "get_object",
-        Params={"Bucket": AWS_S3_BUCKET, "Key": bucket_key},
+        Params=params,
         ExpiresIn=expires_in,
     )
 
