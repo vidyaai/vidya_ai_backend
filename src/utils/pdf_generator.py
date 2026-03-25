@@ -1333,6 +1333,17 @@ class AssignmentPDFGenerator:
             logger.error(f"Error generating assignment PDF: {e}")
             raise
 
+    def process_multiline_text(self, text: str, equations=None) -> str:
+        """Process text line-by-line and join with <br> to preserve newlines in the PDF."""
+        lines = str(text).split('\n')
+        processed_lines = []
+        for line in lines:
+            if equations:
+                processed_lines.append(self.process_question_text_with_equations(line, equations))
+            else:
+                processed_lines.append(self.process_question_text(line))
+        return '<br>'.join(processed_lines)
+
     def generate_solution_question_html(
         self, question: Dict[str, Any], question_num: int
     ) -> str:
@@ -1352,12 +1363,7 @@ class AssignmentPDFGenerator:
         if isinstance(raw_answer, bool):
             raw_answer = "True" if raw_answer else "False"
         if raw_answer:
-            if equations:
-                answer_html = self.process_question_text_with_equations(
-                    str(raw_answer), equations
-                )
-            else:
-                answer_html = self.process_question_text(str(raw_answer))
+            answer_html = self.process_multiline_text(str(raw_answer), equations or None)
             html += f"""
         <div class="solution-answer">
             <div class="solution-label">Answer</div>
@@ -1367,12 +1373,7 @@ class AssignmentPDFGenerator:
         # Append rubric
         rubric = question.get("rubric", "")
         if rubric:
-            if equations:
-                rubric_html = self.process_question_text_with_equations(
-                    rubric, equations
-                )
-            else:
-                rubric_html = self.process_question_text(rubric)
+            rubric_html = self.process_multiline_text(rubric, equations or None)
             html += f"""
         <div class="solution-rubric">
             <div class="solution-label">Grading Rubric</div>
@@ -1412,12 +1413,7 @@ class AssignmentPDFGenerator:
 
                     # Answer
                     if raw_subq_answer:
-                        if subq_equations:
-                            subq_ans_html = self.process_question_text_with_equations(
-                                raw_subq_answer, subq_equations
-                            )
-                        else:
-                            subq_ans_html = self.process_question_text(raw_subq_answer)
+                        subq_ans_html = self.process_multiline_text(raw_subq_answer, subq_equations or None)
                         html += f"""
             <div class="solution-answer" style="margin-top:6px;">
                 <div class="solution-label">Answer</div>
@@ -1426,12 +1422,7 @@ class AssignmentPDFGenerator:
 
                     # Rubric
                     if subq_rubric:
-                        if subq_equations:
-                            subq_rub_html = self.process_question_text_with_equations(
-                                subq_rubric, subq_equations
-                            )
-                        else:
-                            subq_rub_html = self.process_question_text(subq_rubric)
+                        subq_rub_html = self.process_multiline_text(subq_rubric, subq_equations or None)
                         html += f"""
             <div class="solution-rubric" style="margin-top:6px;">
                 <div class="solution-label">Grading Rubric</div>

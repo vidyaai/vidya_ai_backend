@@ -724,6 +724,11 @@ class AssignmentGenerator:
                     CORRECTANSWER AND MULTIPLECORRECTANSWERS FIELD GUIDELINES:
                     - correctAnswer is the complete correct answer for the question or subquestion expected from the student. It should be a fully formed answer, not just keywords
                     - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+                    - for numerical questions, correctAnswer must include the complete step-by-step derivation followed by the final answer. Use newlines to separate each step. Format as:
+                      Step 1: [state given values and formula]
+                      Step 2: [substitute values and simplify]
+                      ...
+                      Final answer: [value with units]
                     - for code questions, correctAnswer should depend on outputType.
                       -- If outputType is "code", correctAnswer should be the full code.
                       -- If outputType is "function", correctAnswer should be the full function defination.
@@ -782,6 +787,11 @@ class AssignmentGenerator:
                     CORRECTANSWER AND MULTIPLECORRECTANSWERS FIELD GUIDELINES:
                     - correctAnswer is the complete correct answer for the question or subquestion expected from the student. It should be a fully formed answer, not just keywords
                     - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+                    - for numerical questions, correctAnswer must include the complete step-by-step derivation followed by the final answer. Use newlines to separate each step. Format as:
+                      Step 1: [state given values and formula]
+                      Step 2: [substitute values and simplify]
+                      ...
+                      Final answer: [value with units]
                     - for code questions, correctAnswer should depend on outputType.
                       -- If outputType is "code", correctAnswer should be the full code.
                       -- If outputType is "function", correctAnswer should be the full function defination.
@@ -845,6 +855,11 @@ class AssignmentGenerator:
                     CORRECTANSWER AND MULTIPLECORRECTANSWERS FIELD GUIDELINES:
                     - correctAnswer is the complete correct answer for the question or subquestion expected from the student. It should be a fully formed answer, not just keywords
                     - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+                    - for numerical questions, correctAnswer must include the complete step-by-step derivation followed by the final answer. Use newlines to separate each step. Format as:
+                      Step 1: [state given values and formula]
+                      Step 2: [substitute values and simplify]
+                      ...
+                      Final answer: [value with units]
                     - for code questions, correctAnswer should depend on outputType.
                       -- If outputType is "code", correctAnswer should be the full code.
                       -- If outputType is "function", correctAnswer should be the full function defination.
@@ -901,6 +916,11 @@ class AssignmentGenerator:
                     CORRECTANSWER AND MULTIPLECORRECTANSWERS FIELD GUIDELINES:
                     - correctAnswer is the complete correct answer for the question or subquestion expected from the student. It should be a fully formed answer, not just keywords
                     - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+                    - for numerical questions, correctAnswer must include the complete step-by-step derivation followed by the final answer. Use newlines to separate each step. Format as:
+                      Step 1: [state given values and formula]
+                      Step 2: [substitute values and simplify]
+                      ...
+                      Final answer: [value with units]
                     - for code questions, correctAnswer should depend on outputType.
                       -- If outputType is "code", correctAnswer should be the full code.
                       -- If outputType is "function", correctAnswer should be the full function defination.
