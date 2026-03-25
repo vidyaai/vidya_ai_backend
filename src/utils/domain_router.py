@@ -46,6 +46,7 @@ _CODE_BETTER_TYPES = frozenset(
         "circuit_with_timing",
         # Medical sciences — precise scientific plots, not AI-generatable
         "action_potential",
+        "cardiac_loop",
         "feedback_loop",
         "pressure_volume_loop",
         "metabolic_pathway",
@@ -90,7 +91,10 @@ AI_SUITABLE (whether Gemini image gen works well — True for spatial/structural
 
 PREFERRED_TOOL (for nonai path):
 - circuitikz: circuit_schematic, sequential_circuit, flip_flop_circuit, counter_circuit, shift_register, cdc_diagram (best for ALL electrical circuits with precise pin labels)
-- matplotlib: most diagram types, timing_diagram, waveform, bode_plot, iv_curve, fsm_diagram, AND all medical diagram types (action_potential, feedback_loop, metabolic_pathway, enzyme_kinetics, dose_response, pharmacokinetics, disease_progression, infection_cycle, growth_curve, pressure_volume_loop)
+- neurokit2: action_potential, cardiac_loop (scipy-based physiological signal waveforms)
+- scipy: dose_response, pharmacokinetics, enzyme_kinetics, pressure_volume_loop, growth_curve (scipy/numpy mathematical curves)
+- networkx_pathway: metabolic_pathway, feedback_loop, infection_cycle, disease_progression (directed flow graphs)
+- matplotlib: most diagram types, timing_diagram, waveform, bode_plot, iv_curve, fsm_diagram, and medical types not covered above
 - networkx: binary_tree, linked_list, graph_network, automata_fsm, stack_queue, hash_table
 - graphviz: flowchart, automata_fsm
 - circuit_with_timing: Use circuitikz for the circuit + matplotlib for the timing → preferred_tool = circuitikz (primary)

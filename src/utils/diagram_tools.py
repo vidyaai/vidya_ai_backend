@@ -164,8 +164,83 @@ DIAGRAM_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "neurokit2_tool",
+            "description": "Generate physiological signal waveforms for medical education using neurokit2 + scipy. Use for: action_potential (neuronal AP with depolarization/repolarization/hyperpolarization phases, threshold line, resting potential), cardiac_loop (cardiac pressure-volume P-V loop with 4 phases, EDV/ESV/SV labels). Produces scientifically accurate waveforms with correct axes, units, and phase annotations. Preferred over claude_code_tool for these diagram types.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "domain": {
+                        "type": "string",
+                        "description": "Domain: physiology",
+                    },
+                    "diagram_type": {
+                        "type": "string",
+                        "description": "Diagram type: action_potential or cardiac_loop",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Brief description of what the diagram shows, including any specific features to highlight",
+                    },
+                },
+                "required": ["domain", "diagram_type", "description"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "scipy_curve_tool",
+            "description": "Generate precise mathematical and pharmacological curves using scipy + numpy. Use for: dose_response (sigmoid logistic curve with EC50/Emax markers, via scipy.special.expit), pharmacokinetics (plasma concentration-time curve using one-compartment PK model, marking Cmax/tmax/AUC/t½), enzyme_kinetics (Michaelis-Menten hyperbola with Vmax/Km dashed markers), pressure_volume_loop (cardiac P-V loop), growth_curve (bacterial growth with lag/exponential/stationary/death phases). Produces mathematically accurate curves using real scientific models rather than arbitrary matplotlib code.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "domain": {
+                        "type": "string",
+                        "description": "Domain: pharmacology, biochemistry, physiology, or microbiology",
+                    },
+                    "diagram_type": {
+                        "type": "string",
+                        "description": "Diagram type: dose_response, pharmacokinetics, enzyme_kinetics, pressure_volume_loop, or growth_curve",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Brief description of the curve, including specific values (EC50, Km, drug names) mentioned in the question",
+                    },
+                },
+                "required": ["domain", "diagram_type", "description"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "networkx_pathway_tool",
+            "description": "Generate directed flow/pathway/cycle diagrams using networkx DiGraph + matplotlib. Use for: metabolic_pathway (metabolites as oval nodes, enzymes as edge labels, cofactor side-nodes in glycolysis/TCA/ETC), feedback_loop (homeostatic loop: stimulus→receptor→integrator→effector→response in circular layout), infection_cycle (pathogen lifecycle: attachment→entry→replication→assembly→release in circular layout), disease_progression (staging flow: Normal→Stage I→Stage II→Stage III with colour-coded nodes). Produces professional pathway diagrams with correct directed edges, node labels, and standard biological layout.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "domain": {
+                        "type": "string",
+                        "description": "Domain: biochemistry, physiology, microbiology, or pathology",
+                    },
+                    "diagram_type": {
+                        "type": "string",
+                        "description": "Diagram type: metabolic_pathway, feedback_loop, infection_cycle, or disease_progression",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Brief description of the pathway/cycle, including specific metabolites, steps, or stages mentioned in the question",
+                    },
+                },
+                "required": ["domain", "diagram_type", "description"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "imagen_tool",
-            "description": "PREFERRED for spatial/visual medical diagrams: Generate anatomical illustrations, histology slides, bacterial morphology diagrams, and histopathology images using Gemini native image generation. Use for: anatomical_diagram (organ/body region illustrations), histology (tissue cross-sections, cell types), bacterial_structure (cell wall, flagella, pili, capsule), histopathology (diseased vs. normal tissue), and any medical diagram where spatial structure and visual realism matter more than precise data plots. Do NOT use for mathematical plots (action_potential, metabolic_pathway, dose_response, pharmacokinetics) — use claude_code_tool with tool_type=matplotlib for those.",
+            "description": "PREFERRED for spatial/visual medical diagrams: Generate anatomical illustrations, histology slides, bacterial morphology diagrams, and histopathology images using Gemini native image generation. Use for: anatomical_diagram (organ/body region illustrations), histology (tissue cross-sections, cell types), bacterial_structure (cell wall, flagella, pili, capsule), histopathology (diseased vs. normal tissue), and any medical diagram where spatial structure and visual realism matter more than precise data plots. Do NOT use for mathematical plots (action_potential, metabolic_pathway, dose_response, pharmacokinetics) — use neurokit2_tool, scipy_curve_tool, or networkx_pathway_tool for those.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -611,6 +686,156 @@ class DiagramTools:
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
+    async def neurokit2_tool(
+        self,
+        domain: str,
+        diagram_type: str,
+        description: str,
+        assignment_id: str,
+        question_idx: int,
+        question_text: str = "",
+        subject_guidance: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Generate physiological signal waveforms using neurokit2 + scipy.
+
+        Specialized for action_potential (neuronal AP waveform) and cardiac_loop
+        (P-V loop). Uses scipy.interpolate and numpy to produce scientifically
+        accurate waveforms with correct phases, axes, and annotations.
+
+        The generated code leverages neurokit2 for cardiac ECG simulations and
+        scipy for neuronal membrane potential models, producing publication-quality
+        physiological plots rather than hand-crafted matplotlib approximations.
+        """
+        try:
+            logger.info(
+                f"Executing neurokit2_tool for Q{question_idx}: {domain}/{diagram_type}"
+            )
+
+            # Look up neurokit2-specific guidance (falls back to matplotlib guidance)
+            if not subject_guidance:
+                if not hasattr(self, "_registry"):
+                    from utils.subject_prompt_registry import SubjectPromptRegistry
+                    self._registry = SubjectPromptRegistry()
+                subject_guidance = self._registry.get_nonai_tool_prompt(
+                    domain, diagram_type, "neurokit2"
+                ) or self._registry.get_nonai_tool_prompt(
+                    domain, diagram_type, "matplotlib"
+                )
+
+            # neurokit2 output is matplotlib-based — render with matplotlib pipeline
+            return await self.claude_code_tool(
+                domain=domain,
+                diagram_type=diagram_type,
+                tool_type="matplotlib",
+                description=description,
+                assignment_id=assignment_id,
+                question_idx=question_idx,
+                question_text=question_text,
+                subject_guidance=subject_guidance,
+            )
+        except Exception as e:
+            logger.error(f"Error in neurokit2_tool: {e}")
+            return None
+
+    async def scipy_curve_tool(
+        self,
+        domain: str,
+        diagram_type: str,
+        description: str,
+        assignment_id: str,
+        question_idx: int,
+        question_text: str = "",
+        subject_guidance: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Generate precise mathematical/pharmacological curves using scipy + numpy.
+
+        Specialized for dose_response (scipy.special.expit sigmoid), pharmacokinetics
+        (one-compartment PK model), enzyme_kinetics (Michaelis-Menten hyperbola),
+        pressure_volume_loop (cardiac P-V loop), and growth_curve (bacterial logistic
+        growth). Produces scientifically accurate curves using real mathematical models.
+        """
+        try:
+            logger.info(
+                f"Executing scipy_curve_tool for Q{question_idx}: {domain}/{diagram_type}"
+            )
+
+            # Look up scipy-specific guidance (falls back to matplotlib guidance)
+            if not subject_guidance:
+                if not hasattr(self, "_registry"):
+                    from utils.subject_prompt_registry import SubjectPromptRegistry
+                    self._registry = SubjectPromptRegistry()
+                subject_guidance = self._registry.get_nonai_tool_prompt(
+                    domain, diagram_type, "scipy"
+                ) or self._registry.get_nonai_tool_prompt(
+                    domain, diagram_type, "matplotlib"
+                )
+
+            # scipy curves render to matplotlib output
+            return await self.claude_code_tool(
+                domain=domain,
+                diagram_type=diagram_type,
+                tool_type="matplotlib",
+                description=description,
+                assignment_id=assignment_id,
+                question_idx=question_idx,
+                question_text=question_text,
+                subject_guidance=subject_guidance,
+            )
+        except Exception as e:
+            logger.error(f"Error in scipy_curve_tool: {e}")
+            return None
+
+    async def networkx_pathway_tool(
+        self,
+        domain: str,
+        diagram_type: str,
+        description: str,
+        assignment_id: str,
+        question_idx: int,
+        question_text: str = "",
+        subject_guidance: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Generate directed flow/pathway/cycle diagrams using networkx DiGraph + matplotlib.
+
+        Specialized for metabolic_pathway (metabolites as nodes, enzymes as edge labels),
+        feedback_loop (circular homeostatic loop), infection_cycle (pathogen lifecycle),
+        and disease_progression (staging flow diagram). Uses networkx layout algorithms
+        for professional graph positioning.
+        """
+        try:
+            logger.info(
+                f"Executing networkx_pathway_tool for Q{question_idx}: {domain}/{diagram_type}"
+            )
+
+            # Look up networkx-specific guidance (falls back to matplotlib guidance)
+            if not subject_guidance:
+                if not hasattr(self, "_registry"):
+                    from utils.subject_prompt_registry import SubjectPromptRegistry
+                    self._registry = SubjectPromptRegistry()
+                subject_guidance = self._registry.get_nonai_tool_prompt(
+                    domain, diagram_type, "networkx"
+                ) or self._registry.get_nonai_tool_prompt(
+                    domain, diagram_type, "matplotlib"
+                )
+
+            # networkx renders via matplotlib pipeline
+            return await self.claude_code_tool(
+                domain=domain,
+                diagram_type=diagram_type,
+                tool_type="networkx",
+                description=description,
+                assignment_id=assignment_id,
+                question_idx=question_idx,
+                question_text=question_text,
+                subject_guidance=subject_guidance,
+            )
+        except Exception as e:
+            logger.error(f"Error in networkx_pathway_tool: {e}")
+            return None
+
     async def imagen_fix_tool(
         self,
         image_bytes: bytes,
@@ -774,6 +999,36 @@ class DiagramTools:
                     question_idx=question_idx,
                     question_text=question_text,
                     subject=tool_arguments.get("subject", "electrical"),
+                )
+            elif tool_name == "neurokit2_tool":
+                return await self.neurokit2_tool(
+                    domain=tool_arguments.get("domain", "physiology"),
+                    diagram_type=tool_arguments.get("diagram_type", "action_potential"),
+                    description=tool_arguments.get("description", ""),
+                    assignment_id=assignment_id,
+                    question_idx=question_idx,
+                    question_text=question_text,
+                    subject_guidance=tool_arguments.get("subject_guidance", ""),
+                )
+            elif tool_name == "scipy_curve_tool":
+                return await self.scipy_curve_tool(
+                    domain=tool_arguments.get("domain", "pharmacology"),
+                    diagram_type=tool_arguments.get("diagram_type", "dose_response"),
+                    description=tool_arguments.get("description", ""),
+                    assignment_id=assignment_id,
+                    question_idx=question_idx,
+                    question_text=question_text,
+                    subject_guidance=tool_arguments.get("subject_guidance", ""),
+                )
+            elif tool_name == "networkx_pathway_tool":
+                return await self.networkx_pathway_tool(
+                    domain=tool_arguments.get("domain", "biochemistry"),
+                    diagram_type=tool_arguments.get("diagram_type", "metabolic_pathway"),
+                    description=tool_arguments.get("description", ""),
+                    assignment_id=assignment_id,
+                    question_idx=question_idx,
+                    question_text=question_text,
+                    subject_guidance=tool_arguments.get("subject_guidance", ""),
                 )
             else:
                 logger.error(f"Unknown tool: {tool_name}")

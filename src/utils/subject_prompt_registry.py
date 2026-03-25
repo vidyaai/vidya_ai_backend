@@ -224,15 +224,21 @@ ANATOMY DIAGRAM RULES:
     "physiology": """
 PHYSIOLOGY DIAGRAM RULES:
 - Functional diagrams: organ system flow diagrams, feedback loops, signal transduction pathways
-- Use claude_code_tool with matplotlib for graphs (action potential, pressure-volume, dose-response)
-- For action potential curves: label axes (time in ms, membrane potential in mV), phases (depolarization, repolarization, hyperpolarization), threshold line
-- For homeostatic feedback loops: show sensor → integrating centre → effector with arrows labeled with stimulus and response
-- For organ system diagrams: use labeled boxes/organs connected by arrows showing flow direction
-- For pressure-volume (cardiac) loops: label axes, phases (isovolumetric contraction/relaxation, filling, ejection), key points (ESV, EDV)
-- For lung compliance curves: label volume and pressure axes, normal vs abnormal curves
+
+═══ TOOL SELECTION ═══
+- neurokit2_tool  → action_potential (neuronal AP waveform), cardiac_loop (P-V loop)
+- scipy_curve_tool → pressure_volume_loop (cardiac P-V loop), growth-related curves
+- networkx_pathway_tool → feedback_loop (homeostatic feedback circuit)
+- claude_code_tool (matplotlib) → lung compliance curves, organ system flow diagrams,
+    and any physiology diagram NOT covered by the specialist tools above
+
+- For action potential: use neurokit2_tool — scipy CubicSpline waveform with threshold/resting lines
+- For cardiac P-V loop: use neurokit2_tool or scipy_curve_tool — 4-phase closed loop with valve annotations
+- For feedback loops: use networkx_pathway_tool — FancyBboxPatch nodes with circular directed edges
+- Label axes with CORRECT units: time in ms, membrane potential in mV, volume in mL, pressure in mmHg
 
 ⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
-- Do NOT label the numerical values if the question asks students to calculate or identify them
+- Do NOT label numerical values if the question asks students to calculate or identify them
 - For action potential: show the waveform setup, NOT the ionic basis if students must explain it
 - For cardiac loops: show the graph, NOT the calculated stroke volume or ejection fraction
 - Show ONLY the problem setup — students must derive the physiological explanation
@@ -240,12 +246,17 @@ PHYSIOLOGY DIAGRAM RULES:
     "biochemistry": """
 BIOCHEMISTRY DIAGRAM RULES:
 - Metabolic pathway diagrams: show substrates, products, enzymes, and cofactors as labeled nodes/arrows
-- Use claude_code_tool with matplotlib for kinetics plots and pathway schematics
-- For enzyme kinetics (Michaelis-Menten): label axes (substrate [S], reaction rate V), Vmax and Km lines
-- For Lineweaver-Burk plots: label axes (1/[S], 1/V), x-intercept (−1/Km), y-intercept (1/Vmax)
-- For metabolic pathways: boxes for intermediates, arrows for reactions, label enzyme names above/below arrows
-- For molecular structures (optional): describe using SMILES or IUPAC name for Gemini; label functional groups
-- For TCA cycle / glycolysis / ETC: show intermediates as oval nodes, reactions as arrows, ATP/NADH yields labeled
+
+═══ TOOL SELECTION ═══
+- scipy_curve_tool    → enzyme_kinetics (Michaelis-Menten curve with Vmax/Km markers)
+- networkx_pathway_tool → metabolic_pathway (DiGraph with oval metabolite nodes, enzyme edge labels)
+- claude_code_tool (matplotlib) → Lineweaver-Burk plots, molecular structure schematics,
+    ETC/glycolysis diagrams where custom layout is needed
+
+- For enzyme kinetics: use scipy_curve_tool — exact v=Vmax*S/(Km+S) with numpy; Km and Vmax annotations
+- For metabolic pathways: use networkx_pathway_tool — DiGraph with oval nodes, enzyme labels on edges,
+    cofactor side-nodes in lighter colour
+- For Lineweaver-Burk: use claude_code_tool with 1/[S] vs 1/V axes, x-intercept = −1/Km, y-intercept = 1/Vmax
 
 ⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
 - Do NOT label the enzyme name if the question asks students to identify the enzyme at a step
@@ -255,13 +266,18 @@ BIOCHEMISTRY DIAGRAM RULES:
 """,
     "pharmacology": """
 PHARMACOLOGY DIAGRAM RULES:
-- Dose-response curves: use claude_code_tool with matplotlib; label axes (log dose, % response or effect)
-- For dose-response curves: show EC50 / ED50, Emax, curve sigmoidal shape; label drug names on curves
-- For pharmacokinetics graphs: label axes (time, plasma concentration), show Cmax, tmax, AUC, half-life (t½)
-- For drug mechanism diagrams: show receptor, signalling cascade, downstream effect with labeled arrows
-- For drug receptor interaction: show agonist/antagonist effects, competitive vs non-competitive shifts
-- For bioavailability comparison: overlay IV vs oral curves on same axes, label F (bioavailability fraction)
-- Use imagen_tool for receptor-level mechanism illustrations; matplotlib for quantitative graphs
+
+═══ TOOL SELECTION ═══
+- scipy_curve_tool    → dose_response (sigmoid via scipy.special.expit), pharmacokinetics (PK model)
+- imagen_tool          → receptor mechanism illustrations, drug-receptor structural diagrams
+- claude_code_tool (matplotlib) → Lineweaver-Burk-style plots, any other pharmacology diagram
+
+- For dose-response curves: use scipy_curve_tool — y=100*expit(x) sigmoid; EC50 and Emax marked;
+    for agonist/antagonist comparison overlay two curves with correct relative EC50/Emax shifts
+- For pharmacokinetics: use scipy_curve_tool — one-compartment oral absorption model;
+    Cmax/tmax/AUC/t½ all annotated; IV vs oral overlay where relevant
+- For drug mechanism (receptor level): use imagen_tool
+- For drug receptor interaction overview: claude_code_tool with labeled arrow diagram
 
 ⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
 - Do NOT label EC50 / ED50 values if the question asks students to determine them from the graph
@@ -287,13 +303,20 @@ PATHOLOGY DIAGRAM RULES:
 """,
     "microbiology": """
 MICROBIOLOGY DIAGRAM RULES:
-- Bacterial structure diagrams: use imagen_tool for morphology; claude_code_tool for life cycles/infection pathways
-- For bacterial cell diagrams: label cell wall, membrane, flagella, pili, capsule, plasmid as appropriate
-- For infection/pathogenesis cycles: show host cell → pathogen entry → replication → release as labeled flow diagram
-- For culture/growth curves: label axes (time, log CFU/mL), phases (lag, exponential, stationary, death)
-- For antibiotic mechanism diagrams: show target site (cell wall, ribosome, DNA gyrase, etc.) with labeled arrows
-- For serology/ELISA diagrams: show steps with labeled reagents (antigen, antibody, enzyme, substrate)
-- For Gram stain workflow: show steps as a labeled flow chart (crystal violet → iodine → decolourisation → safranin)
+
+═══ TOOL SELECTION ═══
+- scipy_curve_tool       → growth_curve (4-phase piecewise: lag/exponential/stationary/death)
+- networkx_pathway_tool  → infection_cycle (circular 5-node directed cycle)
+- imagen_tool             → bacterial_structure (morphology and ultrastructure illustrations)
+- claude_code_tool (matplotlib) → antibiotic mechanism diagrams, Gram stain workflows,
+    serology/ELISA steps, and any other microbiology diagram not listed above
+
+- For bacterial growth curves: use scipy_curve_tool — piecewise log(CFU/mL) vs time with
+    phase boundary dashed verticals; annotate Lag, Exponential, Stationary, Death regions
+- For infection/replication cycles: use networkx_pathway_tool — circular DiGraph with
+    5 steps (Attachment, Entry, Replication, Assembly, Release) and directed arrows
+- For bacterial cell structure: use imagen_tool for realism;
+    claude_code_tool if a schematic cross-section is explicitly requested
 
 ⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
 - Do NOT label the organism name if the question asks students to "identify the organism from the diagram"
@@ -1258,6 +1281,214 @@ _NONAI_TOOL_PROMPTS = {
         "Label key pathological features with ax.annotate() leader lines. "
         "CRITICAL: Do NOT write the disease name as a label if identification is asked. "
         "figsize=(7, 6). ax.axis('off')."
+    ),
+
+    # ── Missing cardiac_loop matplotlib baseline ──────────────────────────────
+    ("physiology", "cardiac_loop", "matplotlib"): (
+        "Draw a cardiac pressure-volume (P-V) loop using matplotlib. "
+        "x-axis: 'Ventricular Volume (mL)', y-axis: 'Ventricular Pressure (mmHg)'. "
+        "Construct 4 phases as line segments forming a closed counterclockwise loop: "
+        "  Phase 1 (ventricular filling): low pressure ~10 mmHg, volume increases ESV→EDV. "
+        "  Phase 2 (isovolumetric contraction): pressure rises 10→80 mmHg, volume constant at EDV=130. "
+        "  Phase 3 (ejection): parabolic; volume decreases 130→50 mL, pressure rises to ~120 then falls to 80. "
+        "  Phase 4 (isovolumetric relaxation): pressure drops 80→10 mmHg, volume constant at ESV=50. "
+        "Label on x-axis: 'EDV=130 mL', 'ESV=50 mL'. "
+        "Add horizontal bracket labeled 'SV = EDV − ESV'. "
+        "Mark 'Aortic valve opens' and 'Aortic valve closes' at transition corners. "
+        "Mark 'Mitral valve opens' and 'Mitral valve closes' at other corners. "
+        "Add dashed vertical lines at EDV and ESV. figsize=(6, 5). Include grid (alpha=0.3). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+
+    # ── neurokit2 tool-type prompts ───────────────────────────────────────────
+    ("physiology", "action_potential", "neurokit2"): (
+        "Generate a neuronal action potential waveform using scipy and matplotlib. "
+        "import numpy as np; import matplotlib.pyplot as plt; from scipy.interpolate import CubicSpline. "
+        "Model piecewise: resting=-70, threshold=-55, peak=+30, trough=-80. "
+        "Time points t=[0,0.5,1.0,1.5,2.5,5.0] ms. "
+        "Voltage v=[-70,-70,-55,+30,-80,-70] mV — smooth with CubicSpline(t,v). "
+        "t_fine = np.linspace(0,5,500). Plot v_fine = cs(t_fine). "
+        "x-axis: 'Time (ms)', 0–5. y-axis: 'Membrane Potential (mV)', −90 to +40. "
+        "Add dashed horizontal lines: threshold at -55 (label 'Threshold −55 mV'), "
+        "resting at -70 (label 'Resting Potential −70 mV'). "
+        "Annotate phase regions with ax.text: 'Depolarisation', 'Repolarisation', 'Hyperpolarisation'. "
+        "figsize=(7, 5). ax.grid(alpha=0.3). ax.set_facecolor('#f9f9f9'). "
+        "plt.title('Neuronal Action Potential'). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("physiology", "cardiac_loop", "neurokit2"): (
+        "Generate a cardiac pressure-volume (P-V) loop using numpy and matplotlib. "
+        "import numpy as np; import matplotlib.pyplot as plt. "
+        "Model: EDV=130 mL, ESV=50 mL, peak_pressure=120 mmHg, baseline_pressure=10 mmHg. "
+        "Phase 1 – filling: v1=np.linspace(50,130,100), p1=np.ones(100)*10. "
+        "Phase 2 – isovolumetric contraction: v2=np.ones(50)*130, p2=np.linspace(10,80,50). "
+        "Phase 3 – ejection: v3=np.linspace(130,50,100), "
+        "  p3 = 80 + 40*np.sin(np.linspace(0,np.pi,100))  # parabolic rise-fall. "
+        "Phase 4 – isovolumetric relaxation: v4=np.ones(50)*50, p4=np.linspace(80,10,50). "
+        "v_all = np.concatenate([v1,v2,v3,v4]); p_all = np.concatenate([p1,p2,p3,p4]). "
+        "plt.plot(v_all, p_all, 'b-', linewidth=2.5). "
+        "Label: annotate('EDV=130',(130,5)), annotate('ESV=50',(50,5)). "
+        "Dashed verticals at x=50 and x=130. Arrow bracket 'SV = 80 mL'. "
+        "ax.set_xlabel('Ventricular Volume (mL)'); ax.set_ylabel('Ventricular Pressure (mmHg)'). "
+        "figsize=(6,5). ax.grid(alpha=0.3). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+
+    # ── scipy tool-type prompts ───────────────────────────────────────────────
+    ("pharmacology", "dose_response", "scipy"): (
+        "Generate a dose-response sigmoid curve using scipy.special.expit and matplotlib. "
+        "from scipy.special import expit; import numpy as np; import matplotlib.pyplot as plt. "
+        "x = np.linspace(-3, 3, 300)  # log10 of dose. "
+        "y = 100 * expit(x)  # where x=0 → 50% (EC50 at dose=1 arbitrary unit). "
+        "For drug comparisons: plot two curves with different EC50 shifts on same axes. "
+        "x-axis: 'Log [Drug] (M)' or 'Log Dose'. y-axis: '% Maximum Response', range 0–105. "
+        "Mark EC50 with dashed lines to X and Y axes, label 'EC50 = log10(1) = 0'. "
+        "Add horizontal dashed line: Emax = 100%, label 'Emax'. "
+        "figsize=(6, 5). ax.grid(alpha=0.3). Legend if multiple curves. "
+        "plt.title('Dose-Response Curve'). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("pharmacology", "pharmacokinetics", "scipy"): (
+        "Generate a pharmacokinetics plasma concentration-time curve using numpy and matplotlib. "
+        "import numpy as np; import matplotlib.pyplot as plt. "
+        "One-compartment oral absorption model: "
+        "  Ka=1.2, Ke=0.2, Vd=30, F=0.8, D=500  # Ka/hr, Ke/hr, Vd in L, D in mg. "
+        "  C = (F*D*Ka) / (Vd*(Ka-Ke)) * (np.exp(-Ke*t) - np.exp(-Ka*t))  # μg/mL. "
+        "t = np.linspace(0.001, 24, 500) hours. "
+        "x-axis: 'Time (hours)'. y-axis: 'Plasma Concentration (μg/mL)'. "
+        "Mark Cmax: find index of max C; add dashed lines to both axes, label 'Cmax'. "
+        "Mark tmax: x-value at Cmax, dashed vertical line, label 'tmax'. "
+        "Shade AUC: ax.fill_between(t, C, alpha=0.15, color='lightblue', label='AUC'). "
+        "For IV vs oral: overlay IV curve C_iv = (D/Vd)*np.exp(-Ke*t) in different colour. "
+        "figsize=(7, 5). ax.grid(alpha=0.3). Legend. "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("biochemistry", "enzyme_kinetics", "scipy"): (
+        "Generate a Michaelis-Menten enzyme kinetics curve using numpy and matplotlib. "
+        "import numpy as np; import matplotlib.pyplot as plt. "
+        "Vmax=10, Km=0.5  # μmol/min and mM. "
+        "S = np.linspace(0, 5, 500)  # mM. "
+        "v = Vmax * S / (Km + S). "
+        "x-axis: '[S] (mM)', 0–5. y-axis: 'v (μmol/min)', 0 to 1.1*Vmax. "
+        "Add dashed horizontal: y=Vmax, label 'Vmax = {Vmax}'. "
+        "Mark Km: at v=Vmax/2; ax.plot([0,Km],[Vmax/2,Vmax/2],'--', color='grey'); "
+        "  ax.plot([Km,Km],[0,Vmax/2],'--', color='grey'); "
+        "  ax.text(Km,-0.5,'Km',ha='center'); ax.text(-0.15,Vmax/2,'Vmax/2',ha='right'). "
+        "For inhibitor comparisons: plot competitive (same Vmax, Km×2) and/or non-competitive "
+        "  (Vmax/2, same Km) in different colours with legend. "
+        "figsize=(6, 5). ax.grid(alpha=0.3). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("physiology", "pressure_volume_loop", "scipy"): (
+        "Generate a cardiac pressure-volume (P-V) loop using numpy and matplotlib. "
+        "import numpy as np; import matplotlib.pyplot as plt. "
+        "Model: EDV=130 mL, ESV=50 mL, systolic BP=120 mmHg, diastolic baseline=10 mmHg. "
+        "Phase 1 – filling: v1=np.linspace(50,130,100), p1=np.ones(100)*10. "
+        "Phase 2 – isovolumetric contraction: v2=np.ones(50)*130, p2=np.linspace(10,80,50). "
+        "Phase 3 – ejection: v3=np.linspace(130,50,100), "
+        "  p3 = 80 + 40*np.sin(np.linspace(0,np.pi,100)). "
+        "Phase 4 – isovolumetric relaxation: v4=np.ones(50)*50, p4=np.linspace(80,10,50). "
+        "v_all=np.concatenate([v1,v2,v3,v4]); p_all=np.concatenate([p1,p2,p3,p4]). "
+        "plt.plot(v_all, p_all, 'b-', linewidth=2.5). "
+        "ax.axvline(130,ls='--',color='grey',alpha=0.7); ax.axvline(50,ls='--',color='grey',alpha=0.7). "
+        "Annotate EDV, ESV, SV on x-axis. Note valve events at corners. "
+        "ax.set_xlabel('Ventricular Volume (mL)'); ax.set_ylabel('Ventricular Pressure (mmHg)'). "
+        "figsize=(6, 5). ax.grid(alpha=0.3). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("physiology", "cardiac_loop", "scipy"): (
+        "Generate a cardiac pressure-volume (P-V) loop using numpy and matplotlib. "
+        "import numpy as np; import matplotlib.pyplot as plt. "
+        "Model: EDV=130 mL, ESV=50 mL, systolic peak=120 mmHg, diastolic=10 mmHg. "
+        "Construct 4 phases as numpy arrays and concatenate into a closed loop. "
+        "Plot as a smooth closed curve. Label EDV, ESV, stroke volume, valve events. "
+        "ax.set_xlabel('Ventricular Volume (mL)'); ax.set_ylabel('Ventricular Pressure (mmHg)'). "
+        "figsize=(6, 5). ax.grid(alpha=0.3). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("microbiology", "growth_curve", "scipy"): (
+        "Generate a bacterial growth curve using numpy and matplotlib (4-phase piecewise model). "
+        "import numpy as np; import matplotlib.pyplot as plt. "
+        "Piecewise log(CFU/mL) vs time: "
+        "  Lag phase (0–2 hr): t1=np.linspace(0,2,50), y1=np.ones(50)*3. "
+        "  Exponential phase (2–8 hr): t2=np.linspace(2,8,100), y2=3+(6/6)*(t2-2). "
+        "  Stationary phase (8–14 hr): t3=np.linspace(8,14,60), y3=np.ones(60)*9. "
+        "  Death phase (14–20 hr): t4=np.linspace(14,20,60), y4=9-0.3*(t4-14). "
+        "t_all=np.concatenate([t1,t2,t3,t4]); y_all=np.concatenate([y1,y2,y3,y4]). "
+        "plt.plot(t_all, y_all, 'b-', linewidth=2.5). "
+        "Phase boundary dashed verticals at t=2,8,14. "
+        "Annotate phase names above curve: 'Lag', 'Exponential', 'Stationary', 'Death'. "
+        "x-axis: 'Time (hours)', 0–20. y-axis: 'log(CFU/mL)', 2–10. "
+        "figsize=(7, 5). ax.grid(alpha=0.3). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+
+    # ── networkx tool-type prompts ────────────────────────────────────────────
+    ("biochemistry", "metabolic_pathway", "networkx"): (
+        "Generate a metabolic pathway diagram using networkx DiGraph and matplotlib. "
+        "import networkx as nx; import matplotlib.pyplot as plt. "
+        "G = nx.DiGraph(). Add nodes for each metabolite (e.g., 'Glucose', 'Pyruvate', 'Acetyl-CoA'). "
+        "Add directed edges for each reaction step. "
+        "Use nx.spring_layout(G, seed=42) or explicit hierarchical top-to-bottom positions. "
+        "Draw nodes: nx.draw_networkx_nodes(G,pos,node_shape='o',node_size=2500, "
+        "  node_color='lightsteelblue'). "
+        "Draw edge arrows: nx.draw_networkx_edges(G,pos,arrowstyle='->',arrowsize=20, "
+        "  edge_color='#444'). "
+        "Draw node labels: nx.draw_networkx_labels(G,pos,font_size=9). "
+        "Add enzyme name labels at edge midpoints: for each edge (u,v), compute midpoint of "
+        "  pos[u] and pos[v], ax.text(mid_x, mid_y, enzyme_name, color='darkorange', fontsize=8). "
+        "Show cofactors (ATP, NADH, CoA) as smaller side nodes with dashed edges. "
+        "Cofactor node color: 'lightyellow'. Product node color: 'lightgreen'. "
+        "figsize=(10, 7). ax.axis('off'). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("physiology", "feedback_loop", "networkx"): (
+        "Generate a homeostatic feedback loop using networkx DiGraph and matplotlib FancyBboxPatch. "
+        "import networkx as nx; import matplotlib.pyplot as plt; "
+        "from matplotlib.patches import FancyBboxPatch; from matplotlib.patches import FancyArrowPatch. "
+        "Nodes: ['Stimulus', 'Receptor / Sensor', 'Afferent Pathway', "
+        "        'Integrating Centre', 'Efferent Pathway', 'Effector', 'Response']. "
+        "Arrange in a circular or clockwise flow using explicit positions dict. "
+        "Draw each node as FancyBboxPatch(xy, width=0.3, height=0.1, boxstyle='round,pad=0.02'). "
+        "Connect boxes with curved ax.annotate arrows: "
+        "  ax.annotate('', xy=target_centre, xytext=source_centre, "
+        "              arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.2')). "
+        "Label the feedback direction (Negative / Positive) prominently in the diagram centre. "
+        "Show 'Set Point' as a reference box or dashed circle if negative feedback. "
+        "ax.axis('off'). ax.set_aspect('equal'). figsize=(8, 6). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("microbiology", "infection_cycle", "networkx"): (
+        "Generate a pathogen infection/replication cycle diagram using networkx DiGraph and matplotlib. "
+        "import networkx as nx; import matplotlib.pyplot as plt; "
+        "from matplotlib.patches import FancyBboxPatch. "
+        "Standard 5 nodes: 'Attachment', 'Entry / Penetration', 'Replication', 'Assembly', 'Release'. "
+        "G = nx.DiGraph(). Add edges: Attachment→Entry, Entry→Replication, Replication→Assembly, "
+        "  Assembly→Release, Release→Attachment (complete the cycle). "
+        "pos = nx.circular_layout(G). "
+        "Draw each node as a FancyBboxPatch rectangle centred at pos[node]. "
+        "Draw directed curved edges as ax.annotate arrows between rectangle borders. "
+        "Node colour: '#FFCCCC' (light coral). Edge colour: '#990000'. "
+        "Annotate each edge with the biological event name if relevant (e.g., 'receptor binding'). "
+        "ax.axis('off'). ax.set_aspect('equal'). figsize=(7, 7). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("pathology", "disease_progression", "networkx"): (
+        "Generate a disease staging/progression flow diagram using networkx DiGraph and matplotlib. "
+        "import networkx as nx; import matplotlib.pyplot as plt; "
+        "from matplotlib.patches import FancyBboxPatch. "
+        "Create nodes for each stage (e.g., 'Normal', 'Grade I / Mild', 'Grade II / Moderate', "
+        "  'Grade III / Severe', 'End-Stage'). "
+        "Connect stages as a linear left-to-right digraph. "
+        "Fixed horizontal positions: pos = {node: (i*2, 0) for i, node in enumerate(stages)}. "
+        "Draw each node as FancyBboxPatch with colour coding: "
+        "  Normal='#90EE90'(green), early='#FFFF99'(yellow), "
+        "  intermediate='#FFA500'(orange), end-stage='#FF6B6B'(red). "
+        "Draw directed edges as ax.annotate arrows between stage box borders. "
+        "Annotate key histological/clinical features below each stage box (ax.text). "
+        "CRITICAL: Do NOT label the disease name if identification is the question. "
+        "ax.axis('off'). figsize=(11, 4). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
     ),
 }
 

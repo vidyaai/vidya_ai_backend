@@ -158,10 +158,14 @@ YOUR TASK:
       - Do NOT include output values, boolean expressions, or specific input values
       - Describe ONLY: what components, how they connect, what nodes are named
    c) For claude_code_tool: Specify domain, diagram_type, and tool_type (matplotlib/networkx)
-   d) For MEDICAL questions: ALWAYS use claude_code_tool with tool_type="matplotlib" — never circuitikz
-      - action_potential, feedback_loop, pressure_volume_loop → matplotlib line/curve plots
-      - metabolic_pathway, enzyme_kinetics, dose_response, pharmacokinetics → matplotlib plots
-      - anatomical_diagram, cross_section, histology, bacterial_structure → matplotlib patch-based diagrams
+   d) For MEDICAL questions: use the most specific specialist tool — never circuitikz
+      - neurokit2_tool      → action_potential (neuronal AP waveform), cardiac_loop (P-V loop)
+      - scipy_curve_tool    → dose_response, pharmacokinetics, enzyme_kinetics,
+                               pressure_volume_loop, growth_curve
+      - networkx_pathway_tool → metabolic_pathway, feedback_loop, infection_cycle,
+                                 disease_progression
+      - imagen_tool          → anatomical_diagram, histology, bacterial_structure, histopathology
+        (falls back to claude_code_tool with matplotlib if imagen unavailable)
    e) Rephrase question naturally to reference "the diagram below" or "shown below"
 
 WHEN TO ADD DIAGRAMS:
@@ -183,11 +187,11 @@ WHEN TO ADD DIAGRAMS:
 ❌ DO NOT ADD for medical questions that only ask to explain or describe mechanisms without a visual component
 
 PROFESSOR'S JUDGMENT:
-Ask: "If I were teaching this in class, would I draw this on the board?"
+Ask: "If I were drafting the question, would I include this diagram?"
 
 CRITICAL RULES:
 1. NEVER mention page numbers or source references
-2. Generate diagrams with CORRECT values, labels, and units from the question
+2. Generate diagrams with CORRECT values, labels, and units from the question BUT DONOT include the answer information (e.g., labels, computed reactions, deflections, waveforms) — that is for the student to fill in
 3. Rephrase naturally: "For the beam shown below" NOT "image from page 20"
 4. PRESERVE ALL numerical values and given data in the rephrased question
 
