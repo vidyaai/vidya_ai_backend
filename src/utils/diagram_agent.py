@@ -288,6 +288,135 @@ QUESTION TYPE AUTO-CONVERSION:
 When the question requires students to draw, determine, or analyze output waveforms, counter states,
 or timing diagrams, the question type SHOULD be "diagram-analysis" (not "short-answer" or "numerical").
 If you detect such a question, note this in your response so the system can update the type.
+
+DIAGRAM-REQUIRED-IN-ANSWER QUESTIONS:
+Questions with type "diagram-required-in-answer" require the student to draw/sketch/create a diagram as their answer.
+These questions may also benefit from a QUESTION diagram (to show the problem setup), just like any other question type.
+Treat them the same as any question when deciding whether to add a question-level diagram.
+A separate system will generate the ANSWER KEY diagram — you only handle the question-level diagram.
+"""
+
+        # Append subject-specific prompt additions from registry
+        if domain:
+            subject_section = self.prompt_registry.get_agent_system_prompt(
+                domain, diagram_type
+            )
+            if subject_section:
+                base_prompt += f"\n{subject_section}"
+
+        return base_prompt
+
+    def _get_answer_key_agent_prompt(
+        self,
+        domain: str = "",
+        diagram_type: str = "",
+    ) -> str:
+        """
+        Get the system prompt for the ANSWER KEY diagram agent.
+
+        This mirrors _get_agent_prompt() in structure (tool guidance, code practices,
+        medical routing, multi-diagram support) but has the OPPOSITE answer rules:
+        it instructs the agent to show COMPLETE solutions with ALL computed values.
+
+        Args:
+            domain: Classified domain from DomainRouter
+            diagram_type: Classified diagram type from DomainRouter
+
+        Returns:
+            System prompt string for the answer-key diagram agent
+        """
+        base_prompt = """You are an ANSWER KEY diagram agent for educational assignments. Your role: generate instructor reference diagrams that show the COMPLETE, CORRECT solution.
+
+PURPOSE: These diagrams are NEVER shown to students. They are instructor-only answer keys used for grading reference. You MUST always generate a diagram — never skip.
+
+YOUR TASK:
+1. Read the question and correct answer carefully
+2. Choose the appropriate tool to generate the answer-key diagram
+3. Generate a diagram that shows the FULL SOLUTION with ALL values, labels, and results
+
+TOOL SELECTION:
+   a) Choose the appropriate tool:
+      - **circuitikz_tool** ⭐ BEST FOR ALL CIRCUITS: Generates publication-quality circuit diagrams via CircuiTikZ (LaTeX). Use for: ALL electrical circuits, MOSFET/CMOS transistor circuits, analog circuits, digital logic gates, op-amp circuits, BJT circuits, RLC networks, flip-flop circuits, shift registers, counters, sequential logic, encoders/decoders, MUX/DEMUX, register files, ALU/datapath.
+      - **claude_code_tool** (RECOMMENDED for non-circuit diagrams AND timing/waveform): Use Claude to generate matplotlib/networkx code for any technical domain — physics, CS, math, chemistry, biology, mechanical, civil. ALSO use this for timing diagrams and waveforms (with tool_type=matplotlib). Highly versatile.
+      - matplotlib_tool: Direct matplotlib code (ONLY if very simple plot)
+      - networkx_tool: Direct networkx code (ONLY if very simple graph)
+      - For MEDICAL questions: use the most specific specialist tool — never circuitikz
+        - neurokit2_tool      → action_potential, cardiac_loop
+        - scipy_curve_tool    → dose_response, pharmacokinetics, enzyme_kinetics,
+                                 pressure_volume_loop, growth_curve
+        - networkx_pathway_tool → metabolic_pathway, feedback_loop, infection_cycle,
+                                   disease_progression
+        - imagen_tool          → anatomical_diagram, histology, bacterial_structure
+   b) For claude_code_tool: Specify domain, diagram_type, and tool_type (matplotlib/networkx)
+
+MULTI-DIAGRAM ANSWER KEYS (CRITICAL — when an answer needs more than one diagram):
+When an answer requires BOTH a schematic/structure AND a supplementary diagram:
+1. Make TWO tool calls in your response:
+   - FIRST: The primary diagram (e.g. circuitikz for circuit, matplotlib for structure)
+   - SECOND: claude_code_tool with tool_type="matplotlib" for the supplementary diagram
+2. The system will automatically combine both diagrams into one image.
+3. Examples that need two diagrams:
+   - Circuit schematic + complete timing diagram showing all output waveforms
+   - Beam structure + completed SFD/BMD with all values
+   - Sequential logic circuit + state transition diagram with all states filled in
+4. For the supplementary diagram:
+   - Show ALL computed values — this is the answer key
+   - For digital waveforms: use matplotlib ax.step() for rectangular/square-wave style
+   - Include alignment aids (dashed grid lines, clock edges, reference lines)
+
+⚠️ ANSWER SHOWING RULES (CRITICAL — THIS IS AN INSTRUCTOR ANSWER KEY):
+Diagrams MUST show the COMPLETE CORRECT SOLUTION. Show every computed value, output, result.
+
+**Timing / Waveform Diagrams (Electrical, Computer Eng):**
+- Show ALL signals — BOTH inputs AND outputs with correct logic levels
+- Output waveforms (Q, Q1, Q2, Q̄, Y) must show the CORRECT computed values at every clock edge
+- Include propagation delays, setup/hold timing, and correct logic transitions
+- For D flip-flop circuits: show CLK, D, AND the correct Q, Q̄ waveforms
+- For sequential circuits: show ALL input and output waveforms with correct timing
+
+**Counter / State Machine Diagrams (Electrical, Computer Eng):**
+- Show the COMPLETE state transition diagram with ALL states and transitions
+- Include output values at each state
+- For ring/Johnson counters: show the complete state sequence over all clock cycles
+- Show state table with ALL states filled in
+
+**Mechanical / Civil / Physics Diagrams:**
+- Show ALL computed reaction forces with magnitudes and directions
+- Draw complete SFD/BMD with correct values at all key points
+- Show deflection curves with magnitudes
+- For FBDs: show all resolved forces including reactions
+- For ray diagrams: show complete image location, magnification, and type
+
+**CS / Math / Chemistry Diagrams:**
+- Show the FINAL result: sorted array, completed tree, shortest path with distances
+- For BST operations: show the tree AFTER the operation (the answer)
+- Shade/label computed areas, intersection points, derivatives
+- Show complete reaction products and mechanisms
+
+**Medical / Life Sciences Diagrams:**
+- Label ALL phases, enzymes, thresholds, and values
+- Action potential: label all phases, mark threshold, overshoot, resting potential with values
+- Metabolic pathway: label ALL enzyme names and metabolite names
+- Pharmacokinetics: mark Cmax, t½, AUC, MEC values on the curve
+- Dose-response: mark EC50, Emax values
+- Anatomical diagrams: label ALL structures with correct names
+
+DIAGRAM SIZE REQUIREMENTS:
+- Use compact sizes: figsize=(6, 4) or figsize=(5, 4)
+- NEVER use large sizes like (10, 8) or (8, 6)
+- DPI: 100-150
+
+DESCRIPTION QUALITY RULES:
+Your description MUST incorporate information from BOTH the question AND the correct answer.
+  1. Include ALL values from the question text
+  2. Include ALL computed/derived values from the correct answer
+  3. State the diagram type clearly
+  4. Specify every label, annotation, and value that must appear
+
+CODE GENERATION BEST PRACTICES:
+1. Set figure size early: plt.subplots(figsize=(6, 4))
+2. Use tight_layout() before saving
+3. Save with: plt.savefig('output.png', dpi=100, bbox_inches='tight')
 """
 
         # Append subject-specific prompt additions from registry
@@ -1278,6 +1407,80 @@ Examples:
                             f"Question {question_idx} rephrased to: {rephrased_text[:100]}..."
                         )
 
+                    # ── Rephrase correctAnswer and rubric to reference diagram ──
+                    q_type = question.get("type", "")
+                    correct_answer = question.get("correctAnswer", "")
+                    rubric_text = question.get("rubric", "")
+
+                    # Only rephrase text-based answers (not MCQ indices or true/false)
+                    _skip_answer_types = {"multiple-choice", "true-false"}
+                    _is_text_answer = (
+                        q_type not in _skip_answer_types
+                        and isinstance(correct_answer, str)
+                        and len(correct_answer) > 3
+                    )
+
+                    if _is_text_answer and (correct_answer or rubric_text):
+                        try:
+                            answer_rephrase_prompt = f"""A diagram has been generated for the following question. Update the correct answer and rubric so they naturally reference the diagram where appropriate.
+
+Question (rephrased): {question.get("question", question_text)}
+
+Current correct answer:
+{correct_answer}
+
+Current rubric:
+{rubric_text}
+
+INSTRUCTIONS:
+1. Update the correct answer and rubric to reference "the diagram" / "the diagram below" / "the circuit shown" where it makes sense
+2. PRESERVE ALL numerical values, formulas, derivation steps, grading criteria, and point allocations exactly
+3. Do NOT change the substance or meaning — only update references to align with the diagram context
+4. If the answer or rubric already makes sense without referencing the diagram, keep it as-is
+5. Preserve all equation placeholders (like <eq_q_1>, <eq_q_2>, etc.)
+
+Respond in this exact format:
+CORRECT_ANSWER:
+<the updated correct answer>
+RUBRIC:
+<the updated rubric>
+"""
+                            answer_rephrase_response = self.client.chat.completions.create(
+                                model=self.model,
+                                messages=[
+                                    {
+                                        "role": "system",
+                                        "content": "You are a helpful assistant that updates correct answers and rubrics to reference diagrams naturally. Preserve all technical content exactly.",
+                                    },
+                                    {"role": "user", "content": answer_rephrase_prompt},
+                                ],
+                                temperature=0.3,
+                            )
+                            ar_text = answer_rephrase_response.choices[0].message.content.strip()
+
+                            # Parse the structured response
+                            if "CORRECT_ANSWER:" in ar_text and "RUBRIC:" in ar_text:
+                                ca_start = ar_text.index("CORRECT_ANSWER:") + len("CORRECT_ANSWER:")
+                                rubric_start = ar_text.index("RUBRIC:")
+                                new_correct_answer = ar_text[ca_start:rubric_start].strip()
+                                new_rubric = ar_text[rubric_start + len("RUBRIC:"):].strip()
+
+                                if new_correct_answer:
+                                    question["correctAnswer"] = new_correct_answer
+                                if new_rubric:
+                                    question["rubric"] = new_rubric
+                                logger.info(
+                                    f"Q{question_idx}: correctAnswer and rubric rephrased to reference diagram"
+                                )
+                            else:
+                                logger.warning(
+                                    f"Q{question_idx}: Could not parse answer/rubric rephrase response, keeping originals"
+                                )
+                        except Exception as e:
+                            logger.warning(
+                                f"Q{question_idx}: Error rephrasing answer/rubric: {e}; keeping originals"
+                            )
+
                     # Attach diagram data
                     question["diagram"] = {
                         "s3_url": diagram_data.get("s3_url"),
@@ -1361,6 +1564,8 @@ Examples:
                             f"'diagram-analysis' (question requires diagram interaction)"
                         )
 
+                    # ── correctAnswerDiagram generation is handled below, outside the question-diagram branch ──
+
                     logger.info(
                         f"Successfully added diagram to question {question_idx}"
                     )
@@ -1375,6 +1580,18 @@ Examples:
                     f"Agent decided no diagram needed for question {question_idx}: {message.content[:100] if message.content else 'No reason provided'}"
                 )
 
+            # ── Generate correctAnswerDiagram (runs independently of question diagram) ──
+            # DRA questions: MUST generate. diagram-analysis: generate if draw/sketch detected.
+            await self._generate_correct_answer_diagram(
+                question=question,
+                question_idx=question_idx,
+                assignment_id=assignment_id,
+                question_text=equation_resolved_question_text,
+                q_domain=q_domain,
+                q_diagram_type=q_diagram_type,
+                q_ai_suitable=q_ai_suitable,
+            )
+
             return question
 
         except Exception as e:
@@ -1383,6 +1600,720 @@ Examples:
 
             logger.error(f"Traceback: {traceback.format_exc()}")
             return question  # Return unchanged on error
+
+    async def _ai_decide_correct_answer_diagram_needed(
+        self,
+        question_text: str,
+        question_idx: int,
+    ) -> bool:
+        """
+        Use an AI call to decide whether a correctAnswerDiagram should be generated
+        for a diagram-analysis type question.
+
+        Returns True if the question requires the student to produce a diagram
+        (draw, sketch, complete, trace, plot, etc.) and therefore an answer-key
+        diagram would be useful.  Returns False otherwise.
+        """
+        system_prompt = (
+            "You are an expert educational content reviewer. "
+            "Your task is to decide whether a 'diagram-analysis' question requires the student "
+            "to produce, draw, sketch, complete, trace, or plot a diagram as part of their answer. "
+            "Answer with a single JSON object: {\"required\": true} or {\"required\": false}. "
+            "Output ONLY the JSON — no explanation, no markdown fences."
+        )
+        user_prompt = (
+            "Question:\n"
+            f"{question_text}\n\n"
+            "Does answering this question require the student to draw, sketch, complete, "
+            "trace, plot, or otherwise produce a diagram or waveform? "
+            "Respond with {\"required\": true} or {\"required\": false}."
+        )
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0,
+                max_tokens=20,
+            )
+            raw = response.choices[0].message.content or ""
+            # Strip any accidental markdown fences
+            raw = raw.strip().strip("`").strip()
+            result = json.loads(raw)
+            decision = bool(result.get("required", False))
+            if decision:
+                logger.info(
+                    f"Q{question_idx}: AI decided correctAnswerDiagram IS required "
+                    f"(diagram-analysis)"
+                )
+            else:
+                logger.info(
+                    f"Q{question_idx}: AI decided correctAnswerDiagram NOT required "
+                    f"(diagram-analysis)"
+                )
+            return decision
+        except Exception as e:
+            # Fall back to not generating on any error to avoid spurious diagrams
+            logger.warning(
+                f"Q{question_idx}: AI decision for correctAnswerDiagram failed ({e}); "
+                f"defaulting to skip"
+            )
+            return False
+
+    async def _generate_correct_answer_diagram(
+        self,
+        question: Dict[str, Any],
+        question_idx: int,
+        assignment_id: str,
+        question_text: str,
+        q_domain: str,
+        q_diagram_type: str,
+        q_ai_suitable: bool = True,
+    ) -> None:
+        """
+        Generate a correctAnswerDiagram for questions that require it.
+
+        Uses the FULL agent pipeline: GPT-4o picks tool (tool_choice="auto"),
+        imagen retry loop with Gemini review, non-AI fallback, multi-diagram
+        stitching, and Gemini review for code-generated diagrams.
+
+        Decision logic:
+        - diagram-required-in-answer: ALWAYS generate (this is the whole point of DRA)
+        - diagram-analysis, short-answer, numerical: AI decides (via _ai_decide_correct_answer_diagram_needed)
+        - All other types: Skip
+        """
+        if not assignment_id:
+            return
+
+        q_type = question.get("type", "")
+
+        # Determine if we should generate a correctAnswerDiagram
+        should_generate = False
+
+        if q_type == "diagram-required-in-answer":
+            should_generate = True
+            logger.info(
+                f"Q{question_idx}: DRA type — generating correctAnswerDiagram (mandatory)"
+            )
+        elif q_type in ["diagram-analysis", "short-answer", "numerical"]:
+            should_generate = await self._ai_decide_correct_answer_diagram_needed(
+                question_text=question_text,
+                question_idx=question_idx,
+            )
+
+        if not should_generate:
+            return
+
+        try:
+            correct_answer = question.get("correctAnswer", "")
+            answer_qidx = f"{question_idx}_answer"
+            answer_qtext = f"ANSWER KEY: {question_text}"
+
+            # ── A. Build user message via _get_answer_diagram_description ──
+            answer_description = self._get_answer_diagram_description(
+                question_text=question_text,
+                correct_answer=correct_answer,
+                domain=q_domain,
+                diagram_type=q_diagram_type,
+            )
+
+            analysis_prompt = (
+                f"Generate the answer-key diagram for this question.\n\n"
+                f"{answer_description}\n\n"
+                f"Domain classification: {q_domain} / {q_diagram_type}\n\n"
+                f"You MUST generate a diagram — this is an answer key. "
+                f"Choose the appropriate tool and provide a detailed description."
+            )
+
+            # ── B. Call GPT-4o with DIAGRAM_TOOLS ──
+            messages = [
+                {
+                    "role": "system",
+                    "content": self._get_answer_key_agent_prompt(
+                        q_domain, q_diagram_type
+                    ),
+                },
+                {"role": "user", "content": analysis_prompt},
+            ]
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                tools=DIAGRAM_TOOLS,
+                tool_choice="auto",
+                temperature=0.3,
+            )
+
+            message = response.choices[0].message
+
+            if not message.tool_calls:
+                logger.warning(
+                    f"Q{question_idx}: Answer-key agent did not call a tool; "
+                    f"falling back to claude_code_tool"
+                )
+                tool_name = "claude_code_tool"
+                tool_arguments = {
+                    "domain": q_domain or "general",
+                    "diagram_type": q_diagram_type or "diagram",
+                    "tool_type": "matplotlib",
+                    "description": answer_description,
+                }
+                secondary_tool_calls = []
+            else:
+                # ── C. Parse tool call response ──
+                tool_call = message.tool_calls[0]
+                tool_name = tool_call.function.name
+
+                # Parse secondary tool calls (multi-diagram)
+                secondary_tool_calls = []
+                for tc in message.tool_calls[1:]:
+                    try:
+                        sec_args = json.loads(tc.function.arguments)
+                        secondary_tool_calls.append((tc.function.name, sec_args))
+                        logger.info(
+                            f"Q{question_idx} answer: Parsed secondary tool call: {tc.function.name}"
+                        )
+                    except json.JSONDecodeError:
+                        try:
+                            sec_args = _repair_truncated_json(tc.function.arguments)
+                            secondary_tool_calls.append((tc.function.name, sec_args))
+                        except json.JSONDecodeError:
+                            logger.warning(
+                                f"Q{question_idx} answer: Could not parse secondary tool call args"
+                            )
+
+                # Robust JSON parsing with repair
+                try:
+                    tool_arguments = json.loads(tool_call.function.arguments)
+                except json.JSONDecodeError as json_err:
+                    logger.warning(
+                        f"Q{question_idx} answer: JSON parse error, attempting repair: {json_err}"
+                    )
+                    try:
+                        tool_arguments = _repair_truncated_json(
+                            tool_call.function.arguments
+                        )
+                        logger.info(
+                            f"Q{question_idx} answer: JSON repair succeeded"
+                        )
+                    except json.JSONDecodeError:
+                        logger.error(
+                            f"Q{question_idx} answer: JSON repair failed. "
+                            f"Raw args: {tool_call.function.arguments[:200]}"
+                        )
+                        tool_name = "claude_code_tool"
+                        tool_arguments = {
+                            "domain": q_domain or "general",
+                            "diagram_type": q_diagram_type or "diagram",
+                            "tool_type": "matplotlib",
+                            "description": answer_description,
+                        }
+
+            logger.info(
+                f"Q{question_idx} answer: Agent decided to use {tool_name}"
+            )
+
+            # ── D. Determine effective_engine ──
+            effective_engine = self.engine
+            if self.engine in ("ai", "both") and not q_ai_suitable:
+                if self.domain_router.should_override_to_nonai(q_diagram_type):
+                    effective_engine = "nonai"
+                    logger.info(
+                        f"Q{question_idx} answer: ai_suitable=False → overriding to nonai"
+                    )
+
+            diagram_data = None
+            imagen_accepted = False
+
+            # ── E. ENGINE=AI or BOTH: Imagen retry loop ──
+            if effective_engine in ("ai", "both"):
+                imagen_description = tool_arguments.get(
+                    "description",
+                    tool_arguments.get("prompt", answer_description[:300]),
+                )
+                imagen_description = re.sub(
+                    r"<eq\s+\S+>", "", imagen_description
+                ).strip()
+
+                # Prepend subject-specific imagen style guidance
+                style_guidance = self.prompt_registry.get_imagen_description_prompt(
+                    q_domain, q_diagram_type
+                )
+                if style_guidance:
+                    imagen_description = f"{style_guidance}\n\n{imagen_description}"
+
+                logger.info(
+                    f"Q{question_idx} answer: Engine=ai routing to imagen_tool "
+                    f"(agent picked {tool_name})"
+                )
+
+                max_imagen_attempts = 3
+                last_image_bytes = None
+                dimension_failures = 0
+                last_review_result = None
+
+                _ai_save_dir = tempfile.mkdtemp(
+                    prefix=f"ai_answer_{assignment_id}_"
+                )
+
+                for attempt in range(1, max_imagen_attempts + 1):
+                    logger.info(
+                        f"Q{question_idx} answer: Imagen attempt {attempt}/{max_imagen_attempts}"
+                    )
+
+                    current_description = imagen_description
+                    if attempt == max_imagen_attempts and dimension_failures >= 2:
+                        current_description += (
+                            "\n\nIMPORTANT - USE SYMBOLIC LABELS INSTEAD OF NUMERIC DIMENSIONS:\n"
+                            "Do NOT write specific numeric dimension values on the diagram.\n"
+                            "Instead, use symbolic variable names for ALL dimensions."
+                        )
+                        logger.info(
+                            f"Q{question_idx} answer: Attempt {attempt}: switching to symbolic "
+                            f"after {dimension_failures} dimension failures"
+                        )
+
+                    if attempt == 1 or last_image_bytes is None:
+                        diagram_data = await self.diagram_tools.execute_tool_call(
+                            tool_name="imagen_tool",
+                            tool_arguments={
+                                "description": current_description,
+                                "subject": self.subject,
+                            },
+                            assignment_id=assignment_id,
+                            question_idx=answer_qidx,
+                            question_text=answer_qtext,
+                        )
+                    else:
+                        logger.info(
+                            f"Q{question_idx} answer: Fixing existing diagram (attempt {attempt})"
+                        )
+                        diagram_data = await self.diagram_tools.imagen_fix_tool(
+                            image_bytes=last_image_bytes,
+                            issues=last_review_result.get("issues", []),
+                            reason=last_review_result.get("reason", ""),
+                            original_description=current_description,
+                            assignment_id=assignment_id,
+                            question_idx=answer_qidx,
+                            question_text=answer_qtext,
+                        )
+
+                    if diagram_data is None:
+                        logger.warning(
+                            f"Q{question_idx} answer: Imagen failed on attempt {attempt}"
+                        )
+                        last_image_bytes = None
+                        last_review_result = None
+                        continue
+
+                    # Save locally for inspection
+                    _attempt_bytes = diagram_data.get("_image_bytes")
+                    if _attempt_bytes:
+                        _local_path = os.path.join(
+                            _ai_save_dir, f"Q{question_idx}_answer_attempt{attempt}.png"
+                        )
+                        try:
+                            with open(_local_path, "wb") as _f:
+                                _f.write(_attempt_bytes)
+                        except Exception:
+                            pass
+
+                    # Review the generated image
+                    image_bytes_for_review = _attempt_bytes
+                    if image_bytes_for_review is None:
+                        try:
+                            import requests as _req
+                            resp = _req.get(diagram_data["s3_url"], timeout=15)
+                            if resp.status_code == 200:
+                                image_bytes_for_review = resp.content
+                        except Exception:
+                            pass
+
+                    if image_bytes_for_review:
+                        clean_question = re.sub(
+                            r"<eq\s+\S+>", "", question_text
+                        ).strip()
+                        review_result = await self.reviewer.review_diagram(
+                            image_bytes=image_bytes_for_review,
+                            question_text=f"ANSWER KEY for: {clean_question}",
+                            diagram_description=current_description,
+                            user_prompt_context=answer_description,
+                            domain=q_domain,
+                            diagram_type=q_diagram_type,
+                        )
+
+                        if review_result["passed"]:
+                            logger.info(
+                                f"Q{question_idx} answer: Imagen PASSED review on attempt {attempt}"
+                            )
+                            diagram_data.pop("_image_bytes", None)
+                            imagen_accepted = True
+                            break
+                        else:
+                            is_fixable = review_result.get("fixable", False)
+                            last_review_issues = ", ".join(review_result.get("issues", []))
+                            last_review_result = review_result
+
+                            _reason_lower = review_result.get("reason", "").lower()
+                            _issues_lower = last_review_issues.lower()
+                            _dim_keywords = [
+                                "dimension", "label", "unit", "thickness",
+                                "width", "conflicting", "duplicate",
+                            ]
+                            if any(
+                                kw in _reason_lower or kw in _issues_lower
+                                for kw in _dim_keywords
+                            ):
+                                dimension_failures += 1
+
+                            logger.warning(
+                                f"Q{question_idx} answer: Imagen FAILED review attempt "
+                                f"{attempt}/{max_imagen_attempts} (fixable={is_fixable}): "
+                                f"{review_result['reason'][:120]}"
+                            )
+
+                            if is_fixable:
+                                last_image_bytes = image_bytes_for_review
+                            else:
+                                last_image_bytes = None
+                                corrected = review_result.get("corrected_description")
+                                if corrected:
+                                    imagen_description = corrected
+                                    logger.info(
+                                        f"Q{question_idx} answer: Regenerating with "
+                                        f"corrected description"
+                                    )
+                            diagram_data = None
+                    else:
+                        logger.warning(
+                            f"Q{question_idx} answer: No bytes for review, accepting as-is"
+                        )
+                        diagram_data.pop("_image_bytes", None)
+                        imagen_accepted = True
+                        break
+
+                if not imagen_accepted:
+                    logger.warning(
+                        f"Q{question_idx} answer: Imagen failed all attempts, "
+                        f"falling back to nonai"
+                    )
+                    diagram_data = None
+
+                # Clean up temp dir
+                try:
+                    shutil.rmtree(_ai_save_dir, ignore_errors=True)
+                except Exception:
+                    pass
+
+            # ── F. ENGINE=NONAI or AI fallback: Execute code tool ──
+            # Inject subject_guidance for claude_code_tool
+            if tool_name == "claude_code_tool" and not tool_arguments.get(
+                "subject_guidance"
+            ):
+                injected_guidance = self.prompt_registry.get_nonai_tool_prompt(
+                    q_domain, q_diagram_type, "matplotlib"
+                )
+                if injected_guidance:
+                    tool_arguments = dict(tool_arguments)
+                    tool_arguments["subject_guidance"] = injected_guidance
+
+            if effective_engine != "ai" or diagram_data is None:
+                diagram_data = await self.diagram_tools.execute_tool_call(
+                    tool_name=tool_name,
+                    tool_arguments=tool_arguments,
+                    assignment_id=assignment_id,
+                    question_idx=answer_qidx,
+                    question_text=answer_qtext,
+                )
+
+            # Fallback to claude_code_tool if primary tool failed
+            if diagram_data is None and tool_name != "claude_code_tool":
+                logger.warning(
+                    f"Q{question_idx} answer: Primary tool '{tool_name}' failed, "
+                    f"falling back to claude_code_tool"
+                )
+                fallback_args = {
+                    "domain": q_domain or "general",
+                    "diagram_type": q_diagram_type or "diagram",
+                    "tool_type": "matplotlib",
+                    "description": answer_description,
+                }
+                diagram_data = await self.diagram_tools.execute_tool_call(
+                    tool_name="claude_code_tool",
+                    tool_arguments=fallback_args,
+                    assignment_id=assignment_id,
+                    question_idx=answer_qidx,
+                    question_text=answer_qtext,
+                )
+
+            # ── G. Multi-diagram stitching ──
+            if diagram_data and secondary_tool_calls:
+                primary_bytes = diagram_data.pop("_image_bytes", None)
+                if primary_bytes is None:
+                    try:
+                        import requests as _req
+                        resp = _req.get(diagram_data["s3_url"], timeout=15)
+                        if resp.status_code == 200:
+                            primary_bytes = resp.content
+                    except Exception:
+                        pass
+
+                if primary_bytes:
+                    all_image_bytes = [primary_bytes]
+                    all_labels = [self._label_for_tool(tool_name, q_diagram_type)]
+
+                    for sec_tool_name, sec_tool_args in secondary_tool_calls:
+                        if (
+                            sec_tool_name == "claude_code_tool"
+                            and not sec_tool_args.get("subject_guidance")
+                        ):
+                            sec_guidance = self.prompt_registry.get_nonai_tool_prompt(
+                                q_domain,
+                                q_diagram_type,
+                                sec_tool_args.get("tool_type", "matplotlib"),
+                            )
+                            if sec_guidance:
+                                sec_tool_args = dict(sec_tool_args)
+                                sec_tool_args["subject_guidance"] = sec_guidance
+
+                        logger.info(
+                            f"Q{question_idx} answer: Executing secondary tool: {sec_tool_name}"
+                        )
+                        sec_data = await self.diagram_tools.execute_tool_call(
+                            tool_name=sec_tool_name,
+                            tool_arguments=sec_tool_args,
+                            assignment_id=assignment_id,
+                            question_idx=answer_qidx,
+                            question_text=answer_qtext,
+                        )
+                        if sec_data:
+                            sec_bytes = sec_data.pop("_image_bytes", None)
+                            if sec_bytes is None:
+                                try:
+                                    import requests as _req
+                                    resp = _req.get(sec_data["s3_url"], timeout=15)
+                                    if resp.status_code == 200:
+                                        sec_bytes = resp.content
+                                except Exception:
+                                    pass
+                            if sec_bytes:
+                                all_image_bytes.append(sec_bytes)
+                                all_labels.append(
+                                    self._label_for_tool(sec_tool_name, q_diagram_type)
+                                )
+
+                    if len(all_image_bytes) > 1:
+                        try:
+                            stitched = self._stitch_vertical(
+                                all_image_bytes, all_labels
+                            )
+                            stitched_data = (
+                                await self.diagram_tools.diagram_gen.upload_to_s3(
+                                    image_bytes=stitched,
+                                    assignment_id=assignment_id,
+                                    question_index=answer_qidx,
+                                )
+                            )
+                            stitched_data.pop("_image_bytes", None)
+                            diagram_data = stitched_data
+                            logger.info(
+                                f"Q{question_idx} answer: Multi-diagram stitch uploaded "
+                                f"({len(all_image_bytes)} diagrams)"
+                            )
+                        except Exception as _stitch_err:
+                            logger.error(
+                                f"Q{question_idx} answer: Multi-diagram stitch failed: "
+                                f"{_stitch_err}"
+                            )
+                else:
+                    diagram_data.pop("_image_bytes", None)
+
+            # ── H. Gemini review for non-AI/fallback diagrams ──
+            if diagram_data and not (
+                effective_engine in ("ai", "both") and imagen_accepted
+            ):
+                image_bytes_for_review = diagram_data.pop("_image_bytes", None)
+                if image_bytes_for_review is None:
+                    try:
+                        import requests as _req
+                        resp = _req.get(diagram_data["s3_url"], timeout=15)
+                        if resp.status_code == 200:
+                            image_bytes_for_review = resp.content
+                    except Exception:
+                        pass
+
+                if image_bytes_for_review:
+                    description_for_review = tool_arguments.get(
+                        "description", answer_description[:300]
+                    )
+                    clean_question = re.sub(
+                        r"<eq\s+\S+>", "", question_text
+                    ).strip()
+                    review_result = await self.reviewer.review_diagram(
+                        image_bytes=image_bytes_for_review,
+                        question_text=f"ANSWER KEY for: {clean_question}",
+                        diagram_description=description_for_review,
+                        user_prompt_context=answer_description,
+                        domain=q_domain,
+                        diagram_type=q_diagram_type,
+                    )
+
+                    if not review_result["passed"]:
+                        logger.warning(
+                            f"Q{question_idx} answer: Diagram review FAILED: "
+                            f"{review_result['reason'][:120]}"
+                        )
+                        corrected_desc = review_result.get("corrected_description")
+                        if corrected_desc:
+                            logger.info(
+                                f"Q{question_idx} answer: Regenerating with "
+                                f"corrected description"
+                            )
+                            if tool_name == "claude_code_tool":
+                                regen_tool = "claude_code_tool"
+                                regen_args = dict(tool_arguments)
+                                regen_args["description"] = corrected_desc
+                            else:
+                                regen_tool = "circuitikz_tool"
+                                regen_args = {"description": corrected_desc}
+
+                            regen_data = await self.diagram_tools.execute_tool_call(
+                                tool_name=regen_tool,
+                                tool_arguments=regen_args,
+                                assignment_id=assignment_id,
+                                question_idx=answer_qidx,
+                                question_text=answer_qtext,
+                            )
+                            if regen_data:
+                                regen_data.pop("_image_bytes", None)
+                                diagram_data = regen_data
+                                logger.info(
+                                    f"Q{question_idx} answer: Regenerated diagram accepted"
+                                )
+                    else:
+                        logger.info(
+                            f"Q{question_idx} answer: Diagram review PASSED"
+                        )
+
+            # ── I. Store result ──
+            if diagram_data and diagram_data.get("s3_url"):
+                diagram_data.pop("_image_bytes", None)
+                question["correctAnswerDiagram"] = {
+                    "s3_url": diagram_data.get("s3_url"),
+                    "s3_key": diagram_data.get("s3_key"),
+                    "file_id": diagram_data.get("file_id"),
+                    "filename": diagram_data.get("filename"),
+                }
+                logger.info(
+                    f"Q{question_idx}: correctAnswerDiagram generated successfully"
+                )
+            else:
+                logger.warning(
+                    f"Q{question_idx}: correctAnswerDiagram generation failed, "
+                    f"continuing without it"
+                )
+        except Exception as e:
+            logger.warning(
+                f"Q{question_idx}: Error generating correctAnswerDiagram: {e}; "
+                f"continuing without it"
+            )
+
+    def _get_answer_diagram_description(
+        self,
+        question_text: str,
+        correct_answer: str,
+        domain: str,
+        diagram_type: str,
+    ) -> str:
+        """
+        Build a self-contained description for the correct-answer diagram.
+
+        This prompt is completely independent of the question-diagram prompts.
+        It contains NO answer-hiding rules — this is the instructor's answer key.
+        """
+        # Domain-specific guidance for what a complete answer looks like
+        domain_guidance = ""
+        if domain in ("electrical", "electronics", "digital_logic", "vlsi"):
+            if diagram_type in ("waveform", "timing_diagram", "circuit_with_timing"):
+                domain_guidance = (
+                    "Show ALL signal waveforms including computed outputs. "
+                    "Draw both input and output signals with correct timing relationships, "
+                    "propagation delays, and logic levels clearly marked at each clock edge."
+                )
+            elif diagram_type in ("circuit_schematic", "logic_gate", "analog_circuit"):
+                domain_guidance = (
+                    "Show the complete circuit with ALL computed values annotated — "
+                    "node voltages, branch currents, power dissipation, gain values. "
+                    "Label every component with its value."
+                )
+            elif diagram_type in ("flip_flop_circuit", "sequential_circuit", "counter_circuit"):
+                domain_guidance = (
+                    "Show the complete state transition diagram or timing diagram with "
+                    "ALL states, outputs, and transitions filled in. Include state values "
+                    "at each clock cycle."
+                )
+            else:
+                domain_guidance = (
+                    "Show the complete solution with all computed electrical values, "
+                    "waveforms, and annotations."
+                )
+        elif domain in ("mechanical", "civil", "structural"):
+            domain_guidance = (
+                "Show the complete solution: all reaction forces with magnitudes and directions, "
+                "shear force diagram, bending moment diagram, deflection curves, or free body diagram "
+                "with all forces resolved. Label every value with correct units."
+            )
+        elif domain in ("cs", "algorithms", "data_structures"):
+            domain_guidance = (
+                "Show the final result: sorted array, completed tree after operations, "
+                "shortest path with distances, traversal order, or algorithm trace with "
+                "all intermediate states. Label each step clearly."
+            )
+        elif domain in ("medical", "biology", "biochemistry", "pharmacology", "physiology"):
+            domain_guidance = (
+                "Show the complete diagram with ALL labels filled in: enzyme names, "
+                "metabolite names, hormone names, receptor types, pathway steps. "
+                "Include numerical values (Cmax, EC50, t½) if relevant. "
+                "Mark all phases, thresholds, and key points."
+            )
+        elif domain in ("physics", "optics", "thermodynamics"):
+            domain_guidance = (
+                "Show the complete solution: ray diagram with image location, "
+                "force diagram with resultants, energy diagrams with values, "
+                "or phase diagrams with all regions labeled. Include all computed values."
+            )
+        elif domain in ("chemistry", "organic_chemistry"):
+            domain_guidance = (
+                "Show the complete reaction products, mechanism arrows, "
+                "molecular structures with stereochemistry, or energy profile "
+                "with activation energies and intermediate species labeled."
+            )
+        elif domain in ("math", "calculus", "linear_algebra"):
+            domain_guidance = (
+                "Show the complete graph with shaded areas, intersection points, "
+                "critical points, asymptotes, and all computed values labeled. "
+                "Include axis scales and key coordinates."
+            )
+        else:
+            domain_guidance = (
+                "Show the complete solution with all values, labels, and annotations "
+                "that represent the correct answer."
+            )
+
+        description = (
+            f"INSTRUCTOR ANSWER KEY diagram — this is a reference solution, NOT shown to students.\n\n"
+            f"Question: {question_text[:500]}\n\n"
+            f"Correct answer: {correct_answer[:500]}\n\n"
+            f"REQUIREMENTS:\n"
+            f"- {domain_guidance}\n"
+            f"- This diagram must show the COMPLETE, CORRECT solution — every value, label, and result.\n"
+            f"- Use clear, professional formatting suitable for an answer key.\n"
+            f"- Use compact figure size: figsize=(6, 4), dpi=100.\n"
+        )
+        return description
 
     def _stitch_side_by_side(
         self,

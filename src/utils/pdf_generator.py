@@ -1362,12 +1362,25 @@ class AssignmentPDFGenerator:
         # correctAnswer for true/false questions is a bool — convert to string
         if isinstance(raw_answer, bool):
             raw_answer = "True" if raw_answer else "False"
-        if raw_answer:
-            answer_html = self.process_multiline_text(str(raw_answer), equations or None)
+        correct_answer_diagram = question.get("correctAnswerDiagram") or question.get("correct_answer_diagram")
+        if raw_answer or correct_answer_diagram:
+            answer_html = self.process_multiline_text(str(raw_answer), equations or None) if raw_answer else ""
             html += f"""
         <div class="solution-answer">
             <div class="solution-label">Answer</div>
-            <div class="solution-content">{answer_html}</div>
+            <div class="solution-content">{answer_html}</div>"""
+            # Render correct answer diagram inside the answer box
+            if correct_answer_diagram and correct_answer_diagram.get("s3_key"):
+                diagram_url = s3_presign_url(correct_answer_diagram["s3_key"])
+                diagram_base64 = self.download_image_as_base64(diagram_url)
+                if diagram_base64:
+                    caption = correct_answer_diagram.get("description", f"Answer diagram for Question {question_num}")
+                    html += f"""
+            <div class="figure-container" style="margin-top:8px;">
+                <img src="{diagram_base64}" alt="Correct answer diagram" style="max-width:100%; border:1px solid #d1fae5; border-radius:4px;">
+                <div class="figure-caption">{caption}</div>
+            </div>"""
+            html += """
         </div>"""
 
         # Append rubric
@@ -1394,8 +1407,9 @@ class AssignmentPDFGenerator:
                 if isinstance(raw_subq_answer, bool):
                     raw_subq_answer = "True" if raw_subq_answer else "False"
                 subq_rubric = subq.get("rubric", "")
+                subq_answer_diagram = subq.get("correctAnswerDiagram") or subq.get("correct_answer_diagram")
 
-                if raw_subq_q or raw_subq_answer:
+                if raw_subq_q or raw_subq_answer or subq_answer_diagram:
                     html += f"""
         <div style="margin-left:20px; margin-top:10px; padding:8px 12px; background:#f8fafc; border-left:3px solid #94a3b8; border-radius:4px;">
             <div class="solution-label">Part ({part_label})</div>"""
@@ -1412,12 +1426,23 @@ class AssignmentPDFGenerator:
             <div style="font-size:0.92em; color:#1f2937; margin-bottom:6px;">{subq_q_html}</div>"""
 
                     # Answer
-                    if raw_subq_answer:
-                        subq_ans_html = self.process_multiline_text(raw_subq_answer, subq_equations or None)
+                    if raw_subq_answer or subq_answer_diagram:
+                        subq_ans_html = self.process_multiline_text(raw_subq_answer, subq_equations or None) if raw_subq_answer else ""
                         html += f"""
             <div class="solution-answer" style="margin-top:6px;">
                 <div class="solution-label">Answer</div>
-                <div class="solution-content">{subq_ans_html}</div>
+                <div class="solution-content">{subq_ans_html}</div>"""
+                        if subq_answer_diagram and subq_answer_diagram.get("s3_key"):
+                            diagram_url = s3_presign_url(subq_answer_diagram["s3_key"])
+                            diagram_base64 = self.download_image_as_base64(diagram_url)
+                            if diagram_base64:
+                                sub_caption = subq_answer_diagram.get("description", f"Answer diagram for Part ({part_label})")
+                                html += f"""
+                <div class="figure-container" style="margin-top:8px;">
+                    <img src="{diagram_base64}" alt="Correct answer diagram" style="max-width:100%; border:1px solid #d1fae5; border-radius:4px;">
+                    <div class="figure-caption">{sub_caption}</div>
+                </div>"""
+                        html += """
             </div>"""
 
                     # Rubric

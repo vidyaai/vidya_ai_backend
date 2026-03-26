@@ -156,6 +156,14 @@ class AssignmentGenerator:
                 q["hasDiagram"] = False
                 logger.debug(f"Cleaned up hasDiagram flag for question {q.get('id')}")
 
+            # Clean up correctAnswerDiagram if it has no actual S3 URL
+            if q.get("correctAnswerDiagram"):
+                if not q["correctAnswerDiagram"].get("s3_url"):
+                    q["correctAnswerDiagram"] = None
+                    logger.debug(
+                        f"Cleaned up correctAnswerDiagram for question {q.get('id')}"
+                    )
+
             # Recursively clean up subquestions
             if q.get("subquestions"):
                 q["subquestions"] = [cleanup_question(sq) for sq in q["subquestions"]]
@@ -540,8 +548,8 @@ class AssignmentGenerator:
             return """
                     - ALL top-level questions MUST be multi-part questions
                     - Each multi-part question must contain subquestions (Level 2)
-                    - Level 2 subquestions can be: multiple-choice, short-answer, numerical, true-false, code-writing, diagram-analysis, or nested multi-part
-                    - Level 3 subquestions (nested within Level 2 multi-part) can be: multiple-choice, short-answer, numerical, true-false, code-writing, diagram-analysis (NO multi-part at Level 3)
+                    - Level 2 subquestions can be: multiple-choice, short-answer, numerical, true-false, code-writing, diagram-analysis, diagram-required-in-answer, or nested multi-part
+                    - Level 3 subquestions (nested within Level 2 multi-part) can be: multiple-choice, short-answer, numerical, true-false, code-writing, diagram-analysis, diagram-required-in-answer (NO multi-part at Level 3)
                     - Generate diverse subquestion types to test different skills
                     - For any multi-part question, ensure subquestions and nested subquestions are serially numbered (id) like 1, 2, 3.
             """
@@ -624,6 +632,13 @@ class AssignmentGenerator:
                     - Provide a structured marking scheme: domains and marks per domain
                     - Expected response should outline the key steps or findings the student must demonstrate
 
+                    DIAGRAM-REQUIRED-IN-ANSWER QUESTION GUIDELINES (if applicable):
+                    - Use type "diagram-required-in-answer" when the student MUST draw, sketch, plot, or create a diagram/figure as part of their answer
+                    - Examples: "Draw the free body diagram", "Sketch the output waveform", "Plot the dose-response curve", "Draw the metabolic pathway", "Construct the Punnett square"
+                    - The correctAnswer field should describe in text what the correct diagram looks like (key features, labels, relationships)
+                    - The question text should clearly specify what the student needs to draw and any constraints (axes labels, scale, components to include)
+                    - Do NOT use "diagram-analysis" for these — diagram-analysis is for questions where the student INTERPRETS a given diagram
+
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
 
@@ -668,6 +683,13 @@ class AssignmentGenerator:
                     - Include examiner instructions (what to observe/assess)
                     - Provide a structured marking scheme: domains and marks per domain
                     - Expected response should outline the key steps or findings the student must demonstrate
+
+                    DIAGRAM-REQUIRED-IN-ANSWER QUESTION GUIDELINES (if applicable):
+                    - Use type "diagram-required-in-answer" when the student MUST draw, sketch, plot, or create a diagram/figure as part of their answer
+                    - Examples: "Draw the free body diagram", "Sketch the output waveform", "Plot the dose-response curve", "Draw the metabolic pathway", "Construct the Punnett square"
+                    - The correctAnswer field should describe in text what the correct diagram looks like (key features, labels, relationships)
+                    - The question text should clearly specify what the student needs to draw and any constraints (axes labels, scale, components to include)
+                    - Do NOT use "diagram-analysis" for these — diagram-analysis is for questions where the student INTERPRETS a given diagram
 
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
@@ -735,6 +757,13 @@ class AssignmentGenerator:
                       -- If outputType is "algorithm", correctAnswer should be a detailed description of the algorithm steps.
                       -- If outputType is "output", correctAnswer should be the expected output from running the code.
 
+                    DIAGRAM-REQUIRED-IN-ANSWER QUESTION GUIDELINES (if applicable):
+                    - Use type "diagram-required-in-answer" when the student MUST draw, sketch, plot, or create a diagram/figure as part of their answer
+                    - Examples: "Draw the free body diagram", "Sketch the output waveform", "Plot the Bode diagram", "Draw the state diagram", "Construct the Karnaugh map"
+                    - The correctAnswer field should describe in text what the correct diagram looks like (key features, labels, relationships)
+                    - The question text should clearly specify what the student needs to draw and any constraints (axes labels, scale, components to include)
+                    - Do NOT use "diagram-analysis" for these — diagram-analysis is for questions where the student INTERPRETS a given diagram
+
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
 
@@ -797,6 +826,13 @@ class AssignmentGenerator:
                       -- If outputType is "function", correctAnswer should be the full function defination.
                       -- If outputType is "algorithm", correctAnswer should be a detailed description of the algorithm steps.
                       -- If outputType is "output", correctAnswer should be the expected output from running the code.
+
+                    DIAGRAM-REQUIRED-IN-ANSWER QUESTION GUIDELINES (if applicable):
+                    - Use type "diagram-required-in-answer" when the student MUST draw, sketch, plot, or create a diagram/figure as part of their answer
+                    - Examples: "Draw the free body diagram", "Sketch the output waveform", "Plot the Bode diagram", "Draw the state diagram", "Construct the Karnaugh map"
+                    - The correctAnswer field should describe in text what the correct diagram looks like (key features, labels, relationships)
+                    - The question text should clearly specify what the student needs to draw and any constraints (axes labels, scale, components to include)
+                    - Do NOT use "diagram-analysis" for these — diagram-analysis is for questions where the student INTERPRETS a given diagram
 
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
@@ -866,6 +902,13 @@ class AssignmentGenerator:
                       -- If outputType is "algorithm", correctAnswer should be a detailed description of the algorithm steps.
                       -- If outputType is "output", correctAnswer should be the expected output from running the code.
 
+                    DIAGRAM-REQUIRED-IN-ANSWER QUESTION GUIDELINES (if applicable):
+                    - Use type "diagram-required-in-answer" when the student MUST draw, sketch, plot, or create a diagram/figure as part of their answer
+                    - Examples: "Draw the free body diagram", "Sketch the output waveform", "Plot the Bode diagram", "Draw the state diagram", "Construct the Karnaugh map"
+                    - The correctAnswer field should describe in text what the correct diagram looks like (key features, labels, relationships)
+                    - The question text should clearly specify what the student needs to draw and any constraints (axes labels, scale, components to include)
+                    - Do NOT use "diagram-analysis" for these — diagram-analysis is for questions where the student INTERPRETS a given diagram
+
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
 
@@ -926,6 +969,13 @@ class AssignmentGenerator:
                       -- If outputType is "function", correctAnswer should be the full function defination.
                       -- If outputType is "algorithm", correctAnswer should be a detailed description of the algorithm steps.
                       -- If outputType is "output", correctAnswer should be the expected output from running the code.
+
+                    DIAGRAM-REQUIRED-IN-ANSWER QUESTION GUIDELINES (if applicable):
+                    - Use type "diagram-required-in-answer" when the student MUST draw, sketch, plot, or create a diagram/figure as part of their answer
+                    - Examples: "Draw the free body diagram", "Sketch the output waveform", "Plot the Bode diagram", "Draw the state diagram", "Construct the Karnaugh map"
+                    - The correctAnswer field should describe in text what the correct diagram looks like (key features, labels, relationships)
+                    - The question text should clearly specify what the student needs to draw and any constraints (axes labels, scale, components to include)
+                    - Do NOT use "diagram-analysis" for these — diagram-analysis is for questions where the student INTERPRETS a given diagram
 
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
@@ -1231,6 +1281,7 @@ class AssignmentGenerator:
             question.setdefault("rubricType", "overall")
             question.setdefault("code", "")
             question.setdefault("diagram", {"s3_url": None, "s3_key": None})
+            question.setdefault("correctAnswerDiagram", None)
             question.setdefault("optionalParts", False)
             question.setdefault("requiredPartsCount", 0)
             question.setdefault("subquestions", [])
@@ -1261,6 +1312,7 @@ class AssignmentGenerator:
                 sub.setdefault("rubricType", "overall")
                 sub.setdefault("code", "")
                 sub.setdefault("diagram", {"s3_url": None, "s3_key": None})
+                sub.setdefault("correctAnswerDiagram", None)
                 sub.setdefault("rubric", "")
                 sub.setdefault("optionalParts", False)
                 sub.setdefault("requiredPartsCount", 0)
@@ -1297,6 +1349,7 @@ class AssignmentGenerator:
                     nested_sub.setdefault("rubricType", "overall")
                     nested_sub.setdefault("code", "")
                     nested_sub.setdefault("diagram", {"s3_url": None, "s3_key": None})
+                    nested_sub.setdefault("correctAnswerDiagram", None)
                     nested_sub.setdefault("rubric", "")
                     nested_sub.setdefault("optionalParts", False)
                     nested_sub.setdefault("requiredPartsCount", 0)
