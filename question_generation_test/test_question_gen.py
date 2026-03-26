@@ -158,28 +158,35 @@ def main():
         required=False,
         help="List of linked video URLs (space-separated)",
     )
+    # Medical subjects
+    MEDICAL_SUBJECTS = {
+        "anatomy", "physiology", "biochemistry", "pharmacology",
+        "pathology", "microbiology", "surgery", "medicine", "obgyn",
+    }
+    # Medical levels (used internally in generation_options)
+    MEDICAL_LEVELS = {"pre_med", "mbbs_preclinical", "mbbs_clinical", "md"}
+
     parser.add_argument(
         "-subject",
         "--subject",
         required=True,
         choices=[
-            "electrical",
-            "mechanical",
-            "cs",
-            "civil",
-            "math",
-            "physics",
-            "chemistry",
-            "computer_eng",
+            # Engineering
+            "electrical", "mechanical", "cs", "civil", "computer_eng",
+            # PCM
+            "math", "physics", "chemistry",
+            # Medical
+            "anatomy", "physiology", "biochemistry", "pharmacology",
+            "pathology", "microbiology", "surgery", "medicine", "obgyn",
         ],
-        help="Subject area: electrical, mechanical, cs, civil, math, physics, chemistry, computer_eng",
+        help="Subject area (engineering, PCM, or medical)",
     )
     parser.add_argument(
         "-level",
         "--level",
         required=True,
-        choices=["undergrad", "grad"],
-        help="Education level: undergrad or grad",
+        choices=["undergrad", "grad", "pre_med", "mbbs_preclinical", "mbbs_clinical", "md"],
+        help="Education level: undergrad/grad (Engineering/PCM) or pre_med/mbbs_preclinical/mbbs_clinical/md (Medical)",
     )
     parser.add_argument(
         "-pdf_gen",
@@ -235,12 +242,29 @@ def main():
     output_dir = base_dir / f"run{run_number}"
     output_dir.mkdir(exist_ok=True)
 
+    # Determine subject category
+    is_medical = args.subject in MEDICAL_SUBJECTS
+    is_pcm = args.subject in {"math", "physics", "chemistry"}
+    subject_category = "medical" if is_medical else ("pcm" if is_pcm else "engineering")
+
+    # Map level arg to engineeringLevel value
+    level_map = {
+        "undergrad": "undergraduate",
+        "grad": "graduate",
+        "pre_med": "pre_med",
+        "mbbs_preclinical": "mbbs_preclinical",
+        "mbbs_clinical": "mbbs_clinical",
+        "md": "md",
+    }
+    engineering_level = level_map.get(args.level, args.level)
+
     print(f"\n{'='*60}")
     print(f"ASSIGNMENT GENERATION TEST - RUN {run_number}")
     print(f"{'='*60}")
+    print(f"Category: {subject_category}")
     print(f"Subject: {args.subject}")
     print(f"Input prompt: {input_path.name if input_path else 'None'}")
-    print(f"Level: {args.level}")
+    print(f"Level: {args.level} → {engineering_level}")
     print(f"Engine: {args.engine}")
     print(
         f"Model: {args.model} ({'gemini-3-pro-image-preview via AI Studio' if args.model == 'pro' else 'gemini-2.5-flash-image via Vertex AI'})"
@@ -249,20 +273,35 @@ def main():
     print(f"Output directory: {output_dir}")
     print(f"{'='*60}\n")
 
-    # Configure generation options
-    generation_options = {
-        "numQuestions": 4,  # Test with 15 questions for robustness
-        "totalPoints": 40,  # 150 marks total (~10 marks per question)
-        "questionTypes": {
+    # Medical question types vs standard
+    if is_medical:
+        question_types = {
+            "multiple-choice": True,
+            "short-answer": True,
+            "true-false": False,
+            "numerical": False,
+            "clinical-case-study": True,
+            "osce": False,
+            "multi-part": True,
+        }
+    else:
+        question_types = {
             "mcq": False,
             "short-answer": True,
             "numerical": True,
             "true-false": False,
             "fill-in-blanks": False,
-            "diagram-analysis": False,  # Off, but model decides intelligently
-            "multipart": True,  # Enable multipart questions
-        },
-        "engineeringLevel": "graduate" if args.level == "grad" else "undergraduate",
+            "diagram-analysis": False,
+            "multipart": True,
+        }
+
+    # Configure generation options
+    generation_options = {
+        "numQuestions": 4,
+        "totalPoints": 40,
+        "questionTypes": question_types,
+        "subjectCategory": subject_category,
+        "engineeringLevel": engineering_level,
         "engineeringDiscipline": args.subject,
         "difficultyLevel": "mixed",
         "includeRubric": True,
@@ -339,9 +378,11 @@ def main():
             "metadata": {
                 "run_number": run_number,
                 "timestamp": datetime.now().isoformat(),
+                "subject_category": subject_category,
                 "subject": args.subject,
                 "input_prompt": generation_prompt,
                 "level": args.level,
+                "engineering_level": engineering_level,
                 "engine": args.engine,
                 "generation_options": generation_options,
                 "assignment_id": assignment_id,

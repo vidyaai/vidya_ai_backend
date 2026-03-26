@@ -85,6 +85,41 @@ _FALLBACK_TOOL_MAP = {
     ("computer_eng", "logic_circuit"): ("circuitikz_tool", "circuitikz"),
     ("computer_eng", "isa_timing"): ("claude_code_tool", "matplotlib"),
     ("computer_eng", "cache_organization"): ("claude_code_tool", "matplotlib"),
+    # ── Anatomy ─────────────────────────────────────────────────────────────
+    # Spatial/structural diagrams → Gemini imagen (ai_suitable=True), but
+    # if engine=nonai is forced, use matplotlib patches
+    ("anatomy", "anatomical_diagram"): ("claude_code_tool", "matplotlib"),
+    ("anatomy", "cross_section"): ("claude_code_tool", "matplotlib"),
+    ("anatomy", "histology"): ("claude_code_tool", "matplotlib"),
+    # ── Physiology ──────────────────────────────────────────────────────────
+    # Physiological signal waveforms → neurokit2_tool (scipy CubicSpline AP, numpy P-V loop)
+    ("physiology", "action_potential"): ("neurokit2_tool", "neurokit2"),
+    ("physiology", "cardiac_loop"): ("neurokit2_tool", "neurokit2"),
+    # Mathematical curves → scipy_curve_tool (numpy P-V loop phases)
+    ("physiology", "pressure_volume_loop"): ("scipy_curve_tool", "scipy"),
+    # Directed flow diagrams → networkx_pathway_tool
+    ("physiology", "feedback_loop"): ("networkx_pathway_tool", "networkx"),
+    # ── Biochemistry ─────────────────────────────────────────────────────────
+    # Directed graph pathways → networkx_pathway_tool
+    ("biochemistry", "metabolic_pathway"): ("networkx_pathway_tool", "networkx"),
+    # Mathematical kinetics curves → scipy_curve_tool (Michaelis-Menten)
+    ("biochemistry", "enzyme_kinetics"): ("scipy_curve_tool", "scipy"),
+    # ── Pharmacology ─────────────────────────────────────────────────────────
+    # All pharmacology quantitative curves → scipy_curve_tool
+    ("pharmacology", "dose_response"): ("scipy_curve_tool", "scipy"),
+    ("pharmacology", "pharmacokinetics"): ("scipy_curve_tool", "scipy"),
+    # ── Pathology ────────────────────────────────────────────────────────────
+    # Staging flow diagrams → networkx_pathway_tool
+    ("pathology", "disease_progression"): ("networkx_pathway_tool", "networkx"),
+    # Histopathology visual schematics → keep matplotlib (spatial patches)
+    ("pathology", "histopathology"): ("claude_code_tool", "matplotlib"),
+    # ── Microbiology ─────────────────────────────────────────────────────────
+    # Bacterial morphology → keep matplotlib (spatial diagram with patches)
+    ("microbiology", "bacterial_structure"): ("claude_code_tool", "matplotlib"),
+    # Infection/replication cycle → networkx_pathway_tool (circular digraph)
+    ("microbiology", "infection_cycle"): ("networkx_pathway_tool", "networkx"),
+    # Growth curve → scipy_curve_tool (4-phase piecewise logistic model)
+    ("microbiology", "growth_curve"): ("scipy_curve_tool", "scipy"),
 }
 
 # Default fallback for unrecognized domain/diagram_type
@@ -174,7 +209,8 @@ class SubjectSpecificFallbackRouter:
                 "subject_context": subject_guidance,
             }
         else:
-            # For claude_code_tool: pass domain, type, tool_type, and enhanced description
+            # For claude_code_tool + specialist tools (neurokit2_tool, scipy_curve_tool,
+            # networkx_pathway_tool): pass domain, type, tool_type, and enhanced description
             return tool_name, {
                 "domain": domain,
                 "diagram_type": diagram_type,

@@ -695,7 +695,7 @@ class AssignmentPDFGenerator:
                 # Use diagram description as caption if available
                 caption_text = question.get("diagram", {}).get("description", "")
                 if not caption_text:
-                    caption_text = f"Circuit diagram for Question {question_num}"
+                    caption_text = f"Diagram for Question {question_num}"
                 html += f"""
                 <div class="figure-container">
                     <img src="{diagram_base64}" alt="Question diagram">
@@ -779,7 +779,7 @@ class AssignmentPDFGenerator:
                     if diagram_base64:
                         sub_caption = subq.get("diagram", {}).get(
                             "description",
-                            f"Circuit diagram for Part {question_num}.{i+1}",
+                            f"Diagram for Part {question_num}.{i+1}",
                         )
                         html += f"""
                         <div class="figure-container">
@@ -1286,7 +1286,7 @@ class AssignmentPDFGenerator:
 
                 {f'''
                 <div class="instructions">
-                    <p>{self.process_question_text(description)}</p>
+                    <p>{description}</p>
                 </div>
                 ''' if description else ''}
 
@@ -1333,6 +1333,17 @@ class AssignmentPDFGenerator:
             logger.error(f"Error generating assignment PDF: {e}")
             raise
 
+    def process_multiline_text(self, text: str, equations=None) -> str:
+        """Process text line-by-line and join with <br> to preserve newlines in the PDF."""
+        lines = str(text).split('\n')
+        processed_lines = []
+        for line in lines:
+            if equations:
+                processed_lines.append(self.process_question_text_with_equations(line, equations))
+            else:
+                processed_lines.append(self.process_question_text(line))
+        return '<br>'.join(processed_lines)
+
     def generate_solution_question_html(
         self, question: Dict[str, Any], question_num: int
     ) -> str:
@@ -1348,28 +1359,34 @@ class AssignmentPDFGenerator:
 
         # Append correct answer
         raw_answer = question.get("correctAnswer") or question.get("correct_answer", "")
-        if raw_answer:
-            if equations:
-                answer_html = self.process_question_text_with_equations(
-                    raw_answer, equations
-                )
-            else:
-                answer_html = self.process_question_text(raw_answer)
+        # correctAnswer for true/false questions is a bool — convert to string
+        if isinstance(raw_answer, bool):
+            raw_answer = "True" if raw_answer else "False"
+        correct_answer_diagram = question.get("correctAnswerDiagram") or question.get("correct_answer_diagram")
+        if raw_answer or correct_answer_diagram:
+            answer_html = self.process_multiline_text(str(raw_answer), equations or None) if raw_answer else ""
             html += f"""
         <div class="solution-answer">
             <div class="solution-label">Answer</div>
-            <div class="solution-content">{answer_html}</div>
+            <div class="solution-content">{answer_html}</div>"""
+            # Render correct answer diagram inside the answer box
+            if correct_answer_diagram and correct_answer_diagram.get("s3_key"):
+                diagram_url = s3_presign_url(correct_answer_diagram["s3_key"])
+                diagram_base64 = self.download_image_as_base64(diagram_url)
+                if diagram_base64:
+                    caption = correct_answer_diagram.get("description", f"Answer diagram for Question {question_num}")
+                    html += f"""
+            <div class="figure-container" style="margin-top:8px;">
+                <img src="{diagram_base64}" alt="Correct answer diagram" style="max-width:100%; border:1px solid #d1fae5; border-radius:4px;">
+                <div class="figure-caption">{caption}</div>
+            </div>"""
+            html += """
         </div>"""
 
         # Append rubric
         rubric = question.get("rubric", "")
         if rubric:
-            if equations:
-                rubric_html = self.process_question_text_with_equations(
-                    rubric, equations
-                )
-            else:
-                rubric_html = self.process_question_text(rubric)
+            rubric_html = self.process_multiline_text(rubric, equations or None)
             html += f"""
         <div class="solution-rubric">
             <div class="solution-label">Grading Rubric</div>
@@ -1386,9 +1403,13 @@ class AssignmentPDFGenerator:
                 raw_subq_answer = subq.get("correctAnswer") or subq.get(
                     "correct_answer", ""
                 )
+                # correctAnswer for true/false subquestions may be a bool
+                if isinstance(raw_subq_answer, bool):
+                    raw_subq_answer = "True" if raw_subq_answer else "False"
                 subq_rubric = subq.get("rubric", "")
+                subq_answer_diagram = subq.get("correctAnswerDiagram") or subq.get("correct_answer_diagram")
 
-                if raw_subq_q or raw_subq_answer:
+                if raw_subq_q or raw_subq_answer or subq_answer_diagram:
                     html += f"""
         <div style="margin-left:20px; margin-top:10px; padding:8px 12px; background:#f8fafc; border-left:3px solid #94a3b8; border-radius:4px;">
             <div class="solution-label">Part ({part_label})</div>"""
@@ -1405,27 +1426,28 @@ class AssignmentPDFGenerator:
             <div style="font-size:0.92em; color:#1f2937; margin-bottom:6px;">{subq_q_html}</div>"""
 
                     # Answer
-                    if raw_subq_answer:
-                        if subq_equations:
-                            subq_ans_html = self.process_question_text_with_equations(
-                                raw_subq_answer, subq_equations
-                            )
-                        else:
-                            subq_ans_html = self.process_question_text(raw_subq_answer)
+                    if raw_subq_answer or subq_answer_diagram:
+                        subq_ans_html = self.process_multiline_text(raw_subq_answer, subq_equations or None) if raw_subq_answer else ""
                         html += f"""
             <div class="solution-answer" style="margin-top:6px;">
                 <div class="solution-label">Answer</div>
-                <div class="solution-content">{subq_ans_html}</div>
+                <div class="solution-content">{subq_ans_html}</div>"""
+                        if subq_answer_diagram and subq_answer_diagram.get("s3_key"):
+                            diagram_url = s3_presign_url(subq_answer_diagram["s3_key"])
+                            diagram_base64 = self.download_image_as_base64(diagram_url)
+                            if diagram_base64:
+                                sub_caption = subq_answer_diagram.get("description", f"Answer diagram for Part ({part_label})")
+                                html += f"""
+                <div class="figure-container" style="margin-top:8px;">
+                    <img src="{diagram_base64}" alt="Correct answer diagram" style="max-width:100%; border:1px solid #d1fae5; border-radius:4px;">
+                    <div class="figure-caption">{sub_caption}</div>
+                </div>"""
+                        html += """
             </div>"""
 
                     # Rubric
                     if subq_rubric:
-                        if subq_equations:
-                            subq_rub_html = self.process_question_text_with_equations(
-                                subq_rubric, subq_equations
-                            )
-                        else:
-                            subq_rub_html = self.process_question_text(subq_rubric)
+                        subq_rub_html = self.process_multiline_text(subq_rubric, subq_equations or None)
                         html += f"""
             <div class="solution-rubric" style="margin-top:6px;">
                 <div class="solution-label">Grading Rubric</div>
@@ -1524,7 +1546,7 @@ class AssignmentPDFGenerator:
 
                 {f'''
                 <div class="instructions">
-                    <p>{self.process_question_text(description)}</p>
+                    <p>{description}</p>
                 </div>
                 ''' if description else ''}
 

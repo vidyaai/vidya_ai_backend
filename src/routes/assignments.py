@@ -681,6 +681,7 @@ async def get_shared_assignments(
                     "total_points": assignment.total_points,
                     "total_questions": assignment.total_questions,
                     "status": assignment.status,
+                    "subject_category": assignment.subject_category,
                     "engineering_level": assignment.engineering_level,
                     "engineering_discipline": assignment.engineering_discipline,
                     "question_types": assignment.question_types,
@@ -869,6 +870,7 @@ async def get_assignment(
             "total_points": assignment.total_points,
             "total_questions": assignment.total_questions,
             "status": assignment.status,
+            "subject_category": assignment.subject_category,
             "engineering_level": assignment.engineering_level,
             "engineering_discipline": assignment.engineering_discipline,
             "question_types": assignment.question_types,
@@ -924,6 +926,7 @@ async def create_assignment(
             course_id=assignment_data.course_id,
             due_date=assignment_data.due_date,
             status=assignment_data.status,
+            subject_category=assignment_data.subject_category,
             engineering_level=assignment_data.engineering_level,
             engineering_discipline=assignment_data.engineering_discipline,
             question_types=assignment_data.question_types,
@@ -1701,6 +1704,9 @@ async def generate_assignment(
             user_id=user_id,
             title=generate_data.title or "AI Generated Assignment",
             description=generate_data.description or "Generating...",
+            subject_category=generate_data.generation_options.get(
+                "subjectCategory", "engineering"
+            ),
             engineering_level=generate_data.generation_options.get(
                 "engineeringLevel", "undergraduate"
             ),
@@ -1817,6 +1823,9 @@ async def generate_assignment_stream(
         user_id=user_id,
         title=generate_data.title or "AI Generated Assignment",
         description=generate_data.description or "Generating...",
+        subject_category=generate_data.generation_options.get(
+            "subjectCategory", "engineering"
+        ),
         engineering_level=generate_data.generation_options.get(
             "engineeringLevel", "undergraduate"
         ),
@@ -1917,6 +1926,7 @@ async def generate_assignment_stream(
                                 "total_points": a.total_points,
                                 "total_questions": a.total_questions,
                                 "status": a.status,
+                                "subject_category": a.subject_category,
                                 "engineering_level": a.engineering_level,
                                 "engineering_discipline": a.engineering_discipline,
                                 "question_types": a.question_types,
@@ -3591,6 +3601,7 @@ async def download_assignment_pdf(
             "questions": assignment.questions or [],
             "total_points": assignment.total_points,
             "total_questions": assignment.total_questions,
+            "subject_category": assignment.subject_category,
             "engineering_level": assignment.engineering_level,
             "engineering_discipline": assignment.engineering_discipline,
             "created_at": assignment.created_at,
@@ -3713,6 +3724,7 @@ async def download_solution_pdf(
             "questions": assignment.questions or [],
             "total_points": assignment.total_points,
             "total_questions": assignment.total_questions,
+            "subject_category": assignment.subject_category,
             "engineering_level": assignment.engineering_level,
             "engineering_discipline": assignment.engineering_discipline,
             "created_at": assignment.created_at,
