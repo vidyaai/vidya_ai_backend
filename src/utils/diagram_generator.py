@@ -48,6 +48,7 @@ class DiagramGenerator:
             "nx",
             "graphviz",
             "math",
+            "textwrap",
         }
 
         # Dangerous patterns to strip from code
