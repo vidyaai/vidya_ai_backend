@@ -250,7 +250,16 @@ DIAGRAM_TOOLS = [
                     },
                     "subject": {
                         "type": "string",
-                        "enum": ["anatomy", "histology", "pathology", "microbiology", "biochemistry", "physiology", "pharmacology", "general"],
+                        "enum": [
+                            "anatomy",
+                            "histology",
+                            "pathology",
+                            "microbiology",
+                            "biochemistry",
+                            "physiology",
+                            "pharmacology",
+                            "general",
+                        ],
                         "description": "Medical subject domain for the diagram",
                     },
                 },
@@ -716,6 +725,7 @@ class DiagramTools:
             if not subject_guidance:
                 if not hasattr(self, "_registry"):
                     from utils.subject_prompt_registry import SubjectPromptRegistry
+
                     self._registry = SubjectPromptRegistry()
                 subject_guidance = self._registry.get_nonai_tool_prompt(
                     domain, diagram_type, "neurokit2"
@@ -765,6 +775,7 @@ class DiagramTools:
             if not subject_guidance:
                 if not hasattr(self, "_registry"):
                     from utils.subject_prompt_registry import SubjectPromptRegistry
+
                     self._registry = SubjectPromptRegistry()
                 subject_guidance = self._registry.get_nonai_tool_prompt(
                     domain, diagram_type, "scipy"
@@ -814,6 +825,7 @@ class DiagramTools:
             if not subject_guidance:
                 if not hasattr(self, "_registry"):
                     from utils.subject_prompt_registry import SubjectPromptRegistry
+
                     self._registry = SubjectPromptRegistry()
                 subject_guidance = self._registry.get_nonai_tool_prompt(
                     domain, diagram_type, "networkx"
@@ -1023,7 +1035,9 @@ class DiagramTools:
             elif tool_name == "networkx_pathway_tool":
                 return await self.networkx_pathway_tool(
                     domain=tool_arguments.get("domain", "biochemistry"),
-                    diagram_type=tool_arguments.get("diagram_type", "metabolic_pathway"),
+                    diagram_type=tool_arguments.get(
+                        "diagram_type", "metabolic_pathway"
+                    ),
                     description=tool_arguments.get("description", ""),
                     assignment_id=assignment_id,
                     question_idx=question_idx,

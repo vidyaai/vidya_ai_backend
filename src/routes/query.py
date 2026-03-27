@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 import os
+import json
 from sqlalchemy.orm import Session
 from utils.db import get_db
 from controllers.db_helpers import (
@@ -24,13 +26,21 @@ from controllers.conversation_manager import (
     get_merged_conversation_history,
 )
 from utils.youtube_utils import download_transcript_api, grab_youtube_frame
+from utils.cache import (
+    get_cached_query_embedding,
+    cache_query_embedding,
+    get_cached_rag_results,
+    cache_rag_results,
+)
 
 # from utils.youtube_frame_capturer import capture_youtube_frame  # Disabled - YouTube frame capture not working
 from utils.ml_models import OpenAIVisionClient
+from utils.context_extraction import extract_relevant_context, truncate_to_token_limit
 from schemas import VideoQuery
 from utils.firebase_auth import get_current_user
-from models import User, Video, VideoSummary
+from models import User, Video, VideoSummary, TranscriptChunk
 from services.summary_service import SummaryService, QueryRouter
+from utils.text_utils import normalize_ai_response
 
 
 router = APIRouter(prefix="/api/query", tags=["Query"])
@@ -131,8 +141,25 @@ async def process_query(
 
         # Build context based on query type and summary availability
         # Phase 1+2 Combined: Uses both semantic chunks and hierarchical summaries
-        context_for_llm = transcript_to_use  # Default fallback
-        retrieval_strategy = "full_transcript"  # Default
+
+        # Check if chunks are available for RAG
+        chunks_available = (
+            db.query(TranscriptChunk)
+            .filter(TranscriptChunk.video_id == video_id)
+            .count()
+            > 0
+        )
+
+        # Default fallback: Use smart extraction instead of full transcript
+        if not chunks_available and not video_summary and transcript_to_use:
+            context_for_llm = extract_relevant_context(
+                transcript_to_use, query, max_tokens=3000
+            )
+            retrieval_strategy = "fallback_extraction"
+            logger.info(f"Using fallback extraction (no chunks/summary available yet)")
+        else:
+            context_for_llm = transcript_to_use  # Original fallback
+            retrieval_strategy = "full_transcript"
 
         if video_summary:
             if query_type == "broad":
@@ -163,10 +190,14 @@ async def process_query(
                         f"Using semantic chunks context (top-5 relevant chunks)"
                     )
                 else:
-                    # Fallback to full transcript if no chunks available yet
+                    # Fallback: Use smart keyword extraction when chunks not available
                     logger.warning(
-                        f"No chunks available for video {video_id}, using full transcript"
+                        f"No chunks available for video {video_id}, using smart extraction fallback"
                     )
+                    context_for_llm = extract_relevant_context(
+                        transcript_to_use, query, max_tokens=3000
+                    )
+                    retrieval_strategy = "fallback_extraction"
 
         # Check if question is relevant to video content
         video_record = db.query(Video).filter(Video.id == video_id).first()
@@ -243,6 +274,13 @@ async def process_query(
             web_sources = web_result.get("sources", [])
             used_web_search = web_result.get("used_web_search", False)
 
+        # Normalize AI response for consistent frontend rendering
+        logger.info(f"📝 BEFORE normalization (first 300 chars): {response[:300]}")
+        logger.info(f"📝 BEFORE normalization (repr): {repr(response[:150])}")
+        response = normalize_ai_response(response)
+        logger.info(f"📝 AFTER normalization (first 300 chars): {response[:300]}")
+        logger.info(f"📝 AFTER normalization (repr): {repr(response[:150])}")
+
         # Store conversation turn in database
         session_id_used = store_conversation_turn(
             db=db,
@@ -272,3 +310,234 @@ async def process_query(
         raise HTTPException(
             status_code=500, detail=f"Failed to process query: {str(e)}"
         )
+
+
+@router.post("/video/stream")
+async def process_query_stream(
+    query_request: VideoQuery,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Stream AI responses word-by-word for better UX.
+
+    Returns Server-Sent Events (SSE) with JSON chunks:
+    - {"type": "metadata", "data": {"used_web_search": bool, "sources": []}}
+    - {"type": "content", "data": "text chunk"}
+    - {"type": "done"}
+    """
+
+    async def generate_stream():
+        try:
+            video_id = query_request.video_id
+            query = query_request.query
+            timestamp = query_request.timestamp
+            is_image_query = query_request.is_image_query
+
+            # Get user from database
+            user = (
+                db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
+            )
+            if not user:
+                user = User(
+                    firebase_uid=current_user["uid"],
+                    email=current_user.get("email"),
+                    name=current_user.get("name"),
+                )
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+
+            # Check daily question limit
+            usage_check = check_usage_limits(
+                db, user.id, "question_per_video", video_id=video_id
+            )
+            if not usage_check["allowed"]:
+                subscription = get_user_subscription(db, user.id)
+                plan_name = (
+                    subscription.plan.name
+                    if subscription and subscription.plan
+                    else "Free"
+                )
+
+                error_msg = {
+                    "type": "error",
+                    "data": {
+                        "error": "limit_reached",
+                        "message": usage_check["reason"],
+                        "current_plan": plan_name,
+                    },
+                }
+                yield f"data: {json.dumps(error_msg)}\n\n"
+                return
+
+            vision_client = OpenAIVisionClient()
+
+            # Get conversation history (with caching optimization)
+            conversation_context = get_merged_conversation_history(
+                db=db,
+                video_id=video_id,
+                firebase_uid=current_user["uid"],
+                session_id=query_request.session_id,
+                client_history=query_request.conversation_history or [],
+            )
+
+            # Get transcript (with caching)
+            transcript_to_use = None
+            formatting_status_info = get_formatting_status(db, video_id)
+            if formatting_status_info["status"] == "completed":
+                transcript_to_use = formatting_status_info["formatted_transcript"]
+            if not transcript_to_use:
+                transcript_info = get_transcript_cache(db, video_id)
+                if transcript_info and transcript_info.get("transcript_data"):
+                    transcript_to_use = transcript_info["transcript_data"]
+                else:
+                    transcript_data, json_data = download_transcript_api(video_id)
+                    transcript_to_use = transcript_data
+                    update_transcript_cache(db, video_id, transcript_data, json_data)
+
+            # Initialize services
+            summary_service = SummaryService()
+            query_router = QueryRouter()
+
+            # Check if summary exists (trigger generation if missing)
+            video_summary = summary_service.get_summary(db, video_id)
+            if not video_summary and transcript_to_use:
+                logger.info(f"[STREAM] No summary, triggering background generation")
+                download_executor.submit(
+                    generate_summary_background, video_id, transcript_to_use
+                )
+
+            # Classify query type
+            query_type = query_router.classify_query(query)
+            logger.info(f"[STREAM] Query classified as: {query_type}")
+
+            # Build context based on query type (uses caching)
+            chunks_available = (
+                db.query(TranscriptChunk)
+                .filter(TranscriptChunk.video_id == video_id)
+                .count()
+                > 0
+            )
+
+            if not chunks_available and not video_summary and transcript_to_use:
+                context_for_llm = extract_relevant_context(
+                    transcript_to_use, query, max_tokens=3000
+                )
+                retrieval_strategy = "fallback_extraction"
+            else:
+                context_for_llm = transcript_to_use
+
+            if video_summary:
+                if query_type == "broad":
+                    context_for_llm = query_router.build_context_from_summary(
+                        video_summary
+                    )
+                    retrieval_strategy = "summary_only"
+                elif query_type == "hybrid":
+                    context_for_llm = query_router.build_hybrid_context(
+                        db, video_id, query, video_summary, transcript_to_use
+                    )
+                    retrieval_strategy = "hybrid_semantic"
+                elif query_type == "specific":
+                    semantic_context = query_router.build_semantic_context(
+                        db, video_id, query, top_k=5
+                    )
+                    if semantic_context:
+                        context_for_llm = semantic_context
+                        retrieval_strategy = "semantic_chunks"
+                    else:
+                        context_for_llm = extract_relevant_context(
+                            transcript_to_use, query, max_tokens=3000
+                        )
+                        retrieval_strategy = "fallback_extraction"
+
+            # Check question relevance
+            video_record = db.query(Video).filter(Video.id == video_id).first()
+            video_title = video_record.title if video_record else ""
+
+            relevance_check = vision_client.check_question_relevance(
+                question=query,
+                transcript_excerpt=transcript_to_use[:1000]
+                if transcript_to_use
+                else "",
+                video_title=video_title,
+                conversation_history=conversation_context,
+            )
+
+            if (
+                not relevance_check.get("is_relevant", True)
+                and relevance_check.get("confidence", 0) > 0.7
+            ):
+                redirect_msg = {
+                    "type": "content",
+                    "data": relevance_check.get(
+                        "suggested_redirect",
+                        "I'm here to help you understand this specific video. Could you ask about something from the video content?",
+                    ),
+                }
+                yield f"data: {json.dumps(redirect_msg)}\n\n"
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                return
+
+            # Image queries not supported for streaming (rare case)
+            if is_image_query:
+                error_msg = {
+                    "type": "error",
+                    "data": "Streaming not supported for image queries",
+                }
+                yield f"data: {json.dumps(error_msg)}\n\n"
+                return
+
+            # Stream the response!
+            full_response = ""
+            for chunk_json in vision_client.ask_with_web_augmentation_stream(
+                prompt=query,
+                context=context_for_llm,
+                conversation_history=conversation_context,
+                video_title=video_title,
+                enable_search=True,
+            ):
+                yield f"data: {chunk_json}\n\n"
+
+                # Collect full response for storage
+                try:
+                    chunk_data = json.loads(chunk_json)
+                    if chunk_data.get("type") == "content":
+                        full_response += chunk_data.get("data", "")
+                except:
+                    pass
+
+            # Store conversation turn in database
+            if full_response:
+                from utils.text_utils import normalize_ai_response
+
+                full_response = normalize_ai_response(full_response)
+
+                store_conversation_turn(
+                    db=db,
+                    video_id=video_id,
+                    user_id=user.id,
+                    firebase_uid=current_user["uid"],
+                    user_message=query,
+                    ai_response=full_response,
+                    timestamp=timestamp,
+                    session_id=query_request.session_id,
+                )
+
+            # Increment usage
+            increment_usage(db, user.id, "question_per_video", 1, video_id=video_id)
+
+        except Exception as e:
+            logger.error(f"[STREAM] Error: {e}")
+            error_msg = {"type": "error", "data": str(e)}
+            yield f"data: {json.dumps(error_msg)}\n\n"
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        },
+    )

@@ -71,6 +71,8 @@ jobs:
             TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}
             GOOGLE_CSE_API_KEY=${{ secrets.GOOGLE_CSE_API_KEY }}
             GOOGLE_CSE_ID=${{ secrets.GOOGLE_CSE_ID }}
+            REDIS_URL=redis://localhost:6379/0
             EOF
+            sudo systemctl start redis-server
             alembic upgrade head
             sudo systemctl start vidyaai_backend_gunicorn

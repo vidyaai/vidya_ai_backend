@@ -138,10 +138,10 @@ if attempt == max_imagen_attempts and dimension_failures >= 2:
 if image_bytes_for_review:
     # Line 682: Use CURRENT description (may be corrected), not original
     description_for_review = current_description
-    
+
     # Line 685-689: Strip <eq> placeholders to prevent false label-mismatch failures
     clean_question_for_review = re.sub(r"<eq\s+\S+>", "", equation_resolved_question_text).strip()
-    
+
     # LINE 686-693: GEMINI REVIEW CALL
     review_result = await self.reviewer.review_diagram(
         image_bytes=image_bytes_for_review,
@@ -159,11 +159,11 @@ if image_bytes_for_review:
 ```python
 if review_result["passed"]:
     logger.info(f"Gemini diagram PASSED review on attempt {attempt} for Q{question_idx}: {review_result['reason'][:100]}")
-    
+
     # For engine=both, keep AI bytes for stitching later
     if self.engine == "both":
         _ai_image_bytes_for_stitch = image_bytes_for_review
-    
+
     # Remove _image_bytes before attaching to question (transient key)
     diagram_data.pop("_image_bytes", None)
     imagen_accepted = True
@@ -176,19 +176,19 @@ else:
     is_fixable = review_result.get("fixable", False)
     last_review_issues = ", ".join(review_result.get("issues", []))
     last_review_result = review_result
-    
+
     # DIMENSION/LABEL FAILURE DETECTION (lines 717-738)
     _reason_lower = review_result.get("reason", "").lower()
     _issues_lower = last_review_issues.lower()
-    _dim_keywords = ["dimension", "label", "unit", "thickness", "width", 
+    _dim_keywords = ["dimension", "label", "unit", "thickness", "width",
                      "conflicting", "duplicate", "wrong axis", "mm", "cm"]
     if any(kw in _reason_lower or kw in _issues_lower for kw in _dim_keywords):
         dimension_failures += 1
         logger.info(f"Dimension-related failure #{dimension_failures} for Q{question_idx}")
-    
+
     logger.warning(f"Gemini diagram FAILED review on attempt {attempt}/{max_imagen_attempts} "
                    f"for Q{question_idx} (fixable={is_fixable}): {review_result['reason'][:120]}")
-    
+
     # FIXABLE VS STRUCTURAL DECISION (lines 740-766)
     if is_fixable:
         # ✓ Structure is good, just TEXT/LABEL/UNIT issues
@@ -243,11 +243,11 @@ review_result = await self.reviewer.review_diagram(
 if not review_result["passed"]:
     logger.warning(f"Diagram review FAILED for Q{question_idx}: {review_result['reason']}  "
                    f"Issues: {review_result['issues']}")
-    
+
     corrected_desc = review_result.get("corrected_description")
     if corrected_desc:
         logger.info(f"Regenerating Q{question_idx} with corrected description: {corrected_desc[:120]}...")
-        
+
         # PRESERVE ORIGINAL TOOL (important for matplotlib diagrams with LaTeX)
         if tool_name == "claude_code_tool":
             regen_tool = "claude_code_tool"
@@ -259,9 +259,9 @@ if not review_result["passed"]:
         else:
             regen_tool = "circuitikz_tool"
             regen_args = {"description": corrected_desc}
-        
+
         logger.info(f"Regenerating Q{question_idx} using {regen_tool} (original tool preserved)")
-        
+
         regen_data = await self.diagram_tools.execute_tool_call(
             tool_name=regen_tool,
             tool_arguments=regen_args,
@@ -269,7 +269,7 @@ if not review_result["passed"]:
             question_idx=question_idx,
             question_text=equation_resolved_question_text,
         )
-        
+
         if regen_data:
             regen_data.pop("_image_bytes", None)  # Pop transient key
             diagram_data = regen_data
@@ -324,6 +324,6 @@ To add Gemini review to correctAnswerDiagram:
 1. **Extract image bytes** after tool execution (same pattern as lines 663-670)
 2. **Call reviewer** with same parameters as lines 686-693
 3. **Handle PASS**: Attach to question (lines 1650-1657)
-4. **Handle FAIL**: 
+4. **Handle FAIL**:
    - If `fixable=true`: Use imagen_fix_tool or just log warning
    - If `fixable=false`: Regenerate with corrected_description (same pattern as lines 1180-1211)

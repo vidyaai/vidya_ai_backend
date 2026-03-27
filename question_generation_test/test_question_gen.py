@@ -160,8 +160,15 @@ def main():
     )
     # Medical subjects
     MEDICAL_SUBJECTS = {
-        "anatomy", "physiology", "biochemistry", "pharmacology",
-        "pathology", "microbiology", "surgery", "medicine", "obgyn",
+        "anatomy",
+        "physiology",
+        "biochemistry",
+        "pharmacology",
+        "pathology",
+        "microbiology",
+        "surgery",
+        "medicine",
+        "obgyn",
     }
     # Medical levels (used internally in generation_options)
     MEDICAL_LEVELS = {"pre_med", "mbbs_preclinical", "mbbs_clinical", "md"}
@@ -172,12 +179,25 @@ def main():
         required=True,
         choices=[
             # Engineering
-            "electrical", "mechanical", "cs", "civil", "computer_eng",
+            "electrical",
+            "mechanical",
+            "cs",
+            "civil",
+            "computer_eng",
             # PCM
-            "math", "physics", "chemistry",
+            "math",
+            "physics",
+            "chemistry",
             # Medical
-            "anatomy", "physiology", "biochemistry", "pharmacology",
-            "pathology", "microbiology", "surgery", "medicine", "obgyn",
+            "anatomy",
+            "physiology",
+            "biochemistry",
+            "pharmacology",
+            "pathology",
+            "microbiology",
+            "surgery",
+            "medicine",
+            "obgyn",
         ],
         help="Subject area (engineering, PCM, or medical)",
     )
@@ -185,7 +205,14 @@ def main():
         "-level",
         "--level",
         required=True,
-        choices=["undergrad", "grad", "pre_med", "mbbs_preclinical", "mbbs_clinical", "md"],
+        choices=[
+            "undergrad",
+            "grad",
+            "pre_med",
+            "mbbs_preclinical",
+            "mbbs_clinical",
+            "md",
+        ],
         help="Education level: undergrad/grad (Engineering/PCM) or pre_med/mbbs_preclinical/mbbs_clinical/md (Medical)",
     )
     parser.add_argument(
