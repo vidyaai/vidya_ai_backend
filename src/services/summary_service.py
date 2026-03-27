@@ -554,7 +554,12 @@ class QueryRouter:
         return context
 
     def retrieve_relevant_chunks(
-        self, db: Session, video_id: str, query: str, top_k: int = 5, use_hybrid: bool = True
+        self,
+        db: Session,
+        video_id: str,
+        query: str,
+        top_k: int = 5,
+        use_hybrid: bool = True,
     ) -> List[Dict[str, Any]]:
         """
         Retrieve most relevant chunks using database-level vector search with caching.
@@ -574,9 +579,13 @@ class QueryRouter:
         # Check cache first (30 min TTL)
         from utils.cache import get_cached_rag_results, cache_rag_results
 
-        cached_results = get_cached_rag_results(video_id, f"{query}:k{top_k}:h{use_hybrid}")
+        cached_results = get_cached_rag_results(
+            video_id, f"{query}:k{top_k}:h{use_hybrid}"
+        )
         if cached_results:
-            logger.info(f"Cache HIT: RAG results for video {video_id}, query '{query[:50]}...'")
+            logger.info(
+                f"Cache HIT: RAG results for video {video_id}, query '{query[:50]}...'"
+            )
             return cached_results
 
         logger.info(f"Cache MISS: Performing RAG retrieval for video {video_id}")
@@ -584,11 +593,19 @@ class QueryRouter:
         try:
             # Generate query embedding (this is also cached)
             query_embedding = self.embedder.embed_text(query)
-            logger.info(f"[DEBUG] Query embedding shape: {len(query_embedding) if query_embedding else None}")
+            logger.info(
+                f"[DEBUG] Query embedding shape: {len(query_embedding) if query_embedding else None}"
+            )
 
             # Check total chunks for this video
-            total_chunks = db.query(TranscriptChunk).filter(TranscriptChunk.video_id == video_id).count()
-            logger.info(f"[DEBUG] Total chunks in DB for video {video_id}: {total_chunks}")
+            total_chunks = (
+                db.query(TranscriptChunk)
+                .filter(TranscriptChunk.video_id == video_id)
+                .count()
+            )
+            logger.info(
+                f"[DEBUG] Total chunks in DB for video {video_id}: {total_chunks}"
+            )
 
             if use_hybrid:
                 # HYBRID: Get top 20 from dense search, then rerank with BM25
@@ -598,14 +615,18 @@ class QueryRouter:
                     db.query(TranscriptChunk)
                     .filter(TranscriptChunk.video_id == video_id)
                     # Skip .isnot(None) check - pgvector handles null vectors
-                    .order_by(TranscriptChunk.embedding.cosine_distance(query_embedding))
+                    .order_by(
+                        TranscriptChunk.embedding.cosine_distance(query_embedding)
+                    )
                     .limit(20)  # Get top 20 for reranking
                     .all()
                 )
                 logger.info(f"[DEBUG] Dense chunks retrieved: {len(dense_chunks)}")
 
                 if not dense_chunks:
-                    logger.warning(f"No chunks with embeddings found for video {video_id}")
+                    logger.warning(
+                        f"No chunks with embeddings found for video {video_id}"
+                    )
                     return []
 
                 # Step 2: BM25 rerank (only on top 20, not all chunks)
@@ -625,9 +646,16 @@ class QueryRouter:
 
                 # BM25 rerank (with BM25 index caching per video)
                 relevant = self.embedder.hybrid_search(
-                    query, query_embedding, candidates, top_k=top_k, alpha=0.5, cache_key=f"bm25:{video_id}"
+                    query,
+                    query_embedding,
+                    candidates,
+                    top_k=top_k,
+                    alpha=0.5,
+                    cache_key=f"bm25:{video_id}",
                 )
-                logger.info(f"Retrieved {len(relevant)} chunks (hybrid: pgvector + BM25 rerank)")
+                logger.info(
+                    f"Retrieved {len(relevant)} chunks (hybrid: pgvector + BM25 rerank)"
+                )
 
             else:
                 # SEMANTIC ONLY: Pure pgvector similarity search
@@ -635,13 +663,17 @@ class QueryRouter:
                     db.query(TranscriptChunk)
                     .filter(TranscriptChunk.video_id == video_id)
                     # Skip .isnot(None) check - pgvector handles null vectors
-                    .order_by(TranscriptChunk.embedding.cosine_distance(query_embedding))
+                    .order_by(
+                        TranscriptChunk.embedding.cosine_distance(query_embedding)
+                    )
                     .limit(top_k)
                     .all()
                 )
 
                 if not semantic_chunks:
-                    logger.warning(f"No chunks with embeddings found for video {video_id}")
+                    logger.warning(
+                        f"No chunks with embeddings found for video {video_id}"
+                    )
                     return []
 
                 relevant = []
@@ -657,10 +689,14 @@ class QueryRouter:
                             "embedding": chunk.embedding,
                         }
                     )
-                logger.info(f"Retrieved {len(relevant)} chunks (pure semantic: pgvector)")
+                logger.info(
+                    f"Retrieved {len(relevant)} chunks (pure semantic: pgvector)"
+                )
 
             # Cache results before returning (30 min TTL)
-            cache_rag_results(video_id, f"{query}:k{top_k}:h{use_hybrid}", relevant, ttl=1800)
+            cache_rag_results(
+                video_id, f"{query}:k{top_k}:h{use_hybrid}", relevant, ttl=1800
+            )
 
             return relevant
 

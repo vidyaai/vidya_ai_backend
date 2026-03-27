@@ -143,9 +143,12 @@ async def process_query(
         # Phase 1+2 Combined: Uses both semantic chunks and hierarchical summaries
 
         # Check if chunks are available for RAG
-        chunks_available = db.query(TranscriptChunk).filter(
-            TranscriptChunk.video_id == video_id
-        ).count() > 0
+        chunks_available = (
+            db.query(TranscriptChunk)
+            .filter(TranscriptChunk.video_id == video_id)
+            .count()
+            > 0
+        )
 
         # Default fallback: Use smart extraction instead of full transcript
         if not chunks_available and not video_summary and transcript_to_use:
@@ -332,7 +335,9 @@ async def process_query_stream(
             is_image_query = query_request.is_image_query
 
             # Get user from database
-            user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
+            user = (
+                db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
+            )
             if not user:
                 user = User(
                     firebase_uid=current_user["uid"],
@@ -350,7 +355,9 @@ async def process_query_stream(
             if not usage_check["allowed"]:
                 subscription = get_user_subscription(db, user.id)
                 plan_name = (
-                    subscription.plan.name if subscription and subscription.plan else "Free"
+                    subscription.plan.name
+                    if subscription and subscription.plan
+                    else "Free"
                 )
 
                 error_msg = {
@@ -358,8 +365,8 @@ async def process_query_stream(
                     "data": {
                         "error": "limit_reached",
                         "message": usage_check["reason"],
-                        "current_plan": plan_name
-                    }
+                        "current_plan": plan_name,
+                    },
                 }
                 yield f"data: {json.dumps(error_msg)}\n\n"
                 return
@@ -406,9 +413,12 @@ async def process_query_stream(
             logger.info(f"[STREAM] Query classified as: {query_type}")
 
             # Build context based on query type (uses caching)
-            chunks_available = db.query(TranscriptChunk).filter(
-                TranscriptChunk.video_id == video_id
-            ).count() > 0
+            chunks_available = (
+                db.query(TranscriptChunk)
+                .filter(TranscriptChunk.video_id == video_id)
+                .count()
+                > 0
+            )
 
             if not chunks_available and not video_summary and transcript_to_use:
                 context_for_llm = extract_relevant_context(
@@ -420,7 +430,9 @@ async def process_query_stream(
 
             if video_summary:
                 if query_type == "broad":
-                    context_for_llm = query_router.build_context_from_summary(video_summary)
+                    context_for_llm = query_router.build_context_from_summary(
+                        video_summary
+                    )
                     retrieval_strategy = "summary_only"
                 elif query_type == "hybrid":
                     context_for_llm = query_router.build_hybrid_context(
@@ -446,7 +458,9 @@ async def process_query_stream(
 
             relevance_check = vision_client.check_question_relevance(
                 question=query,
-                transcript_excerpt=transcript_to_use[:1000] if transcript_to_use else "",
+                transcript_excerpt=transcript_to_use[:1000]
+                if transcript_to_use
+                else "",
                 video_title=video_title,
                 conversation_history=conversation_context,
             )
@@ -460,7 +474,7 @@ async def process_query_stream(
                     "data": relevance_check.get(
                         "suggested_redirect",
                         "I'm here to help you understand this specific video. Could you ask about something from the video content?",
-                    )
+                    ),
                 }
                 yield f"data: {json.dumps(redirect_msg)}\n\n"
                 yield f"data: {json.dumps({'type': 'done'})}\n\n"
@@ -470,7 +484,7 @@ async def process_query_stream(
             if is_image_query:
                 error_msg = {
                     "type": "error",
-                    "data": "Streaming not supported for image queries"
+                    "data": "Streaming not supported for image queries",
                 }
                 yield f"data: {json.dumps(error_msg)}\n\n"
                 return
@@ -497,6 +511,7 @@ async def process_query_stream(
             # Store conversation turn in database
             if full_response:
                 from utils.text_utils import normalize_ai_response
+
                 full_response = normalize_ai_response(full_response)
 
                 store_conversation_turn(
@@ -524,5 +539,5 @@ async def process_query_stream(
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",  # Disable nginx buffering
-        }
+        },
     )

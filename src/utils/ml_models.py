@@ -103,7 +103,9 @@ class OpenAIVisionClient:
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def ask_text_only_stream(self, prompt, context="", conversation_history=None) -> Iterator[str]:
+    def ask_text_only_stream(
+        self, prompt, context="", conversation_history=None
+    ) -> Iterator[str]:
         """
         Stream AI response word-by-word for better UX.
 
@@ -158,7 +160,7 @@ class OpenAIVisionClient:
                 messages=messages,
                 max_tokens=1500,
                 temperature=0.3,
-                stream=True  # Enable streaming
+                stream=True,  # Enable streaming
             )
 
             for chunk in stream:
@@ -812,9 +814,7 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
             )
             contextualized_prompt = rewrite_result["rewritten_query"]
 
-            logger.info(
-                f"[STREAM] Query: '{prompt}' → '{contextualized_prompt}'"
-            )
+            logger.info(f"[STREAM] Query: '{prompt}' → '{contextualized_prompt}'")
 
             # Decide if web search is needed
             used_web_search = False
@@ -849,14 +849,16 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
                         sources = [r.get("url", "") for r in search_results]
 
                         # Send metadata first
-                        yield json.dumps({
-                            "type": "metadata",
-                            "data": {
-                                "used_web_search": True,
-                                "sources": sources,
-                                "search_query": search_query
+                        yield json.dumps(
+                            {
+                                "type": "metadata",
+                                "data": {
+                                    "used_web_search": True,
+                                    "sources": sources,
+                                    "search_query": search_query,
+                                },
                             }
-                        }) + "\n"
+                        ) + "\n"
 
                         # Stream synthesized answer
                         # Note: synthesize_with_web_results doesn't support streaming yet
@@ -874,43 +876,34 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
                         words = answer.split(" ")
                         for i, word in enumerate(words):
                             chunk = word + (" " if i < len(words) - 1 else "")
-                            yield json.dumps({
-                                "type": "content",
-                                "data": chunk
-                            }) + "\n"
+                            yield json.dumps({"type": "content", "data": chunk}) + "\n"
 
                         yield json.dumps({"type": "done"}) + "\n"
                         return
 
             # No web search - stream from video content only
-            yield json.dumps({
-                "type": "metadata",
-                "data": {
-                    "used_web_search": False,
-                    "sources": [],
-                    "search_query": ""
+            yield json.dumps(
+                {
+                    "type": "metadata",
+                    "data": {
+                        "used_web_search": False,
+                        "sources": [],
+                        "search_query": "",
+                    },
                 }
-            }) + "\n"
+            ) + "\n"
 
             # Stream response
             for chunk in self.ask_text_only_stream(
-                contextualized_prompt,
-                context,
-                conversation_history
+                contextualized_prompt, context, conversation_history
             ):
-                yield json.dumps({
-                    "type": "content",
-                    "data": chunk
-                }) + "\n"
+                yield json.dumps({"type": "content", "data": chunk}) + "\n"
 
             yield json.dumps({"type": "done"}) + "\n"
 
         except Exception as e:
             logger.error(f"[STREAM] Error: {e}")
-            yield json.dumps({
-                "type": "error",
-                "data": str(e)
-            }) + "\n"
+            yield json.dumps({"type": "error", "data": str(e)}) + "\n"
 
 
 class OpenAIQuizClient:

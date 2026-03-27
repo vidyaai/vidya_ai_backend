@@ -17,14 +17,18 @@ from controllers.config import logger
 # Try to import redis, but don't fail if not available
 try:
     import redis
+
     REDIS_AVAILABLE = True
 except ImportError:
-    logger.warning("⚠️ Redis module not installed. Caching disabled. Install with: pip install redis")
+    logger.warning(
+        "⚠️ Redis module not installed. Caching disabled. Install with: pip install redis"
+    )
     REDIS_AVAILABLE = False
     redis = None
 
 # Initialize Redis client (lazy loading)
 _redis_client = None
+
 
 def get_redis_client():
     """Get or create Redis client (returns None if Redis not available)"""
@@ -37,12 +41,12 @@ def get_redis_client():
     if _redis_client is None:
         try:
             _redis_client = redis.Redis(
-                host='localhost',
+                host="localhost",
                 port=6379,
                 db=0,
                 decode_responses=False,  # We'll handle encoding
                 socket_connect_timeout=2,
-                socket_timeout=2
+                socket_timeout=2,
             )
             # Test connection
             _redis_client.ping()
@@ -167,6 +171,7 @@ def cached(prefix: str, ttl: int = 3600, key_func=None):
         ttl: Time to live in seconds
         key_func: Optional function to generate cache key from args
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -191,10 +196,12 @@ def cached(prefix: str, ttl: int = 3600, key_func=None):
             return result
 
         return wrapper
+
     return decorator
 
 
 # Specialized caching functions for common use cases
+
 
 def cache_query_embedding(query: str, embedding: List[float], ttl: int = 7200):
     """
@@ -205,15 +212,15 @@ def cache_query_embedding(query: str, embedding: List[float], ttl: int = 7200):
         embedding: Embedding vector
         ttl: Time to live (default 2 hours)
     """
-    key = generate_cache_key('embedding', query)
-    cache_set(key, {'query': query, 'embedding': embedding}, ttl)
+    key = generate_cache_key("embedding", query)
+    cache_set(key, {"query": query, "embedding": embedding}, ttl)
 
 
 def get_cached_query_embedding(query: str) -> Optional[List[float]]:
     """Get cached query embedding"""
-    key = generate_cache_key('embedding', query)
+    key = generate_cache_key("embedding", query)
     result = cache_get(key)
-    return result['embedding'] if result else None
+    return result["embedding"] if result else None
 
 
 def cache_rag_results(video_id: str, query: str, results: List[Dict], ttl: int = 1800):
@@ -226,13 +233,13 @@ def cache_rag_results(video_id: str, query: str, results: List[Dict], ttl: int =
         results: Retrieved chunks
         ttl: Time to live (default 30 minutes)
     """
-    key = generate_cache_key('rag', video_id, query)
+    key = generate_cache_key("rag", video_id, query)
     cache_set(key, results, ttl)
 
 
 def get_cached_rag_results(video_id: str, query: str) -> Optional[List[Dict]]:
     """Get cached RAG results"""
-    key = generate_cache_key('rag', video_id, query)
+    key = generate_cache_key("rag", video_id, query)
     return cache_get(key)
 
 

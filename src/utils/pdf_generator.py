@@ -1335,14 +1335,16 @@ class AssignmentPDFGenerator:
 
     def process_multiline_text(self, text: str, equations=None) -> str:
         """Process text line-by-line and join with <br> to preserve newlines in the PDF."""
-        lines = str(text).split('\n')
+        lines = str(text).split("\n")
         processed_lines = []
         for line in lines:
             if equations:
-                processed_lines.append(self.process_question_text_with_equations(line, equations))
+                processed_lines.append(
+                    self.process_question_text_with_equations(line, equations)
+                )
             else:
                 processed_lines.append(self.process_question_text(line))
-        return '<br>'.join(processed_lines)
+        return "<br>".join(processed_lines)
 
     def generate_solution_question_html(
         self, question: Dict[str, Any], question_num: int
@@ -1362,9 +1364,15 @@ class AssignmentPDFGenerator:
         # correctAnswer for true/false questions is a bool — convert to string
         if isinstance(raw_answer, bool):
             raw_answer = "True" if raw_answer else "False"
-        correct_answer_diagram = question.get("correctAnswerDiagram") or question.get("correct_answer_diagram")
+        correct_answer_diagram = question.get("correctAnswerDiagram") or question.get(
+            "correct_answer_diagram"
+        )
         if raw_answer or correct_answer_diagram:
-            answer_html = self.process_multiline_text(str(raw_answer), equations or None) if raw_answer else ""
+            answer_html = (
+                self.process_multiline_text(str(raw_answer), equations or None)
+                if raw_answer
+                else ""
+            )
             html += f"""
         <div class="solution-answer">
             <div class="solution-label">Answer</div>
@@ -1374,7 +1382,9 @@ class AssignmentPDFGenerator:
                 diagram_url = s3_presign_url(correct_answer_diagram["s3_key"])
                 diagram_base64 = self.download_image_as_base64(diagram_url)
                 if diagram_base64:
-                    caption = correct_answer_diagram.get("description", f"Answer diagram for Question {question_num}")
+                    caption = correct_answer_diagram.get(
+                        "description", f"Answer diagram for Question {question_num}"
+                    )
                     html += f"""
             <div class="figure-container" style="margin-top:8px;">
                 <img src="{diagram_base64}" alt="Correct answer diagram" style="max-width:100%; border:1px solid #d1fae5; border-radius:4px;">
@@ -1407,7 +1417,9 @@ class AssignmentPDFGenerator:
                 if isinstance(raw_subq_answer, bool):
                     raw_subq_answer = "True" if raw_subq_answer else "False"
                 subq_rubric = subq.get("rubric", "")
-                subq_answer_diagram = subq.get("correctAnswerDiagram") or subq.get("correct_answer_diagram")
+                subq_answer_diagram = subq.get("correctAnswerDiagram") or subq.get(
+                    "correct_answer_diagram"
+                )
 
                 if raw_subq_q or raw_subq_answer or subq_answer_diagram:
                     html += f"""
@@ -1427,7 +1439,13 @@ class AssignmentPDFGenerator:
 
                     # Answer
                     if raw_subq_answer or subq_answer_diagram:
-                        subq_ans_html = self.process_multiline_text(raw_subq_answer, subq_equations or None) if raw_subq_answer else ""
+                        subq_ans_html = (
+                            self.process_multiline_text(
+                                raw_subq_answer, subq_equations or None
+                            )
+                            if raw_subq_answer
+                            else ""
+                        )
                         html += f"""
             <div class="solution-answer" style="margin-top:6px;">
                 <div class="solution-label">Answer</div>
@@ -1436,7 +1454,10 @@ class AssignmentPDFGenerator:
                             diagram_url = s3_presign_url(subq_answer_diagram["s3_key"])
                             diagram_base64 = self.download_image_as_base64(diagram_url)
                             if diagram_base64:
-                                sub_caption = subq_answer_diagram.get("description", f"Answer diagram for Part ({part_label})")
+                                sub_caption = subq_answer_diagram.get(
+                                    "description",
+                                    f"Answer diagram for Part ({part_label})",
+                                )
                                 html += f"""
                 <div class="figure-container" style="margin-top:8px;">
                     <img src="{diagram_base64}" alt="Correct answer diagram" style="max-width:100%; border:1px solid #d1fae5; border-radius:4px;">
@@ -1447,7 +1468,9 @@ class AssignmentPDFGenerator:
 
                     # Rubric
                     if subq_rubric:
-                        subq_rub_html = self.process_multiline_text(subq_rubric, subq_equations or None)
+                        subq_rub_html = self.process_multiline_text(
+                            subq_rubric, subq_equations or None
+                        )
                         html += f"""
             <div class="solution-rubric" style="margin-top:6px;">
                 <div class="solution-label">Grading Rubric</div>

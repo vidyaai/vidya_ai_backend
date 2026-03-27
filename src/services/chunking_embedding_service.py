@@ -29,9 +29,12 @@ from utils.cache import (
 # BM25 for keyword-based retrieval
 try:
     from rank_bm25 import BM25Okapi
+
     BM25_AVAILABLE = True
 except ImportError:
-    logger.warning("rank-bm25 not installed. Hybrid retrieval will use cosine similarity only.")
+    logger.warning(
+        "rank-bm25 not installed. Hybrid retrieval will use cosine similarity only."
+    )
     BM25_AVAILABLE = False
 
 # LRU cache for BM25 indexes (stores last 100 video indexes)
@@ -175,11 +178,19 @@ class EmbeddingService:
 
         # Dense retrieval (semantic)
         dense_results = self.find_most_similar(query_embedding, candidates, top_k=20)
-        dense_map = {r.get("chunk_index", i): {"rank": i, **r} for i, r in enumerate(dense_results)}
+        dense_map = {
+            r.get("chunk_index", i): {"rank": i, **r}
+            for i, r in enumerate(dense_results)
+        }
 
         # Sparse retrieval (BM25) - with caching
-        bm25_results = self._bm25_search(query, candidates, top_k=20, cache_key=cache_key)
-        bm25_map = {r.get("chunk_index", i): {"rank": i, **r} for i, r in enumerate(bm25_results)}
+        bm25_results = self._bm25_search(
+            query, candidates, top_k=20, cache_key=cache_key
+        )
+        bm25_map = {
+            r.get("chunk_index", i): {"rank": i, **r}
+            for i, r in enumerate(bm25_results)
+        }
 
         # Reciprocal Rank Fusion (RRF)
         rrf_scores = {}
@@ -193,7 +204,7 @@ class EmbeddingService:
                 "rrf_dense": rrf_score,
                 "rrf_bm25": 0.0,
                 "dense_score": data.get("similarity", 0),
-                "bm25_score": 0.0
+                "bm25_score": 0.0,
             }
 
         # Process BM25 results
@@ -208,21 +219,19 @@ class EmbeddingService:
                     "rrf_dense": 0.0,
                     "rrf_bm25": rrf_score,
                     "dense_score": 0.0,
-                    "bm25_score": data.get("bm25_score", 0)
+                    "bm25_score": data.get("bm25_score", 0),
                 }
 
         # Calculate combined RRF score
         for chunk_idx in rrf_scores:
             rrf_scores[chunk_idx]["rrf_combined"] = (
-                alpha * rrf_scores[chunk_idx]["rrf_dense"] +
-                (1 - alpha) * rrf_scores[chunk_idx]["rrf_bm25"]
+                alpha * rrf_scores[chunk_idx]["rrf_dense"]
+                + (1 - alpha) * rrf_scores[chunk_idx]["rrf_bm25"]
             )
 
         # Sort by combined score
         sorted_results = sorted(
-            rrf_scores.values(),
-            key=lambda x: x["rrf_combined"],
-            reverse=True
+            rrf_scores.values(), key=lambda x: x["rrf_combined"], reverse=True
         )
 
         # Extract chunk data with scores
@@ -238,9 +247,7 @@ class EmbeddingService:
         return final_results
 
     def _get_or_build_bm25_index(
-        self,
-        candidates: List[Dict[str, Any]],
-        cache_key: Optional[str] = None
+        self, candidates: List[Dict[str, Any]], cache_key: Optional[str] = None
     ):
         """
         Get cached BM25 index or build new one.
@@ -278,7 +285,7 @@ class EmbeddingService:
         query: str,
         candidates: List[Dict[str, Any]],
         top_k: int = 5,
-        cache_key: Optional[str] = None
+        cache_key: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         BM25 keyword search over candidates with caching.
@@ -318,7 +325,7 @@ class EmbeddingService:
     def _tokenize(self, text: str) -> List[str]:
         """Simple tokenization for BM25."""
         # Lowercase and split on non-alphanumeric
-        return re.findall(r'\w+', text.lower())
+        return re.findall(r"\w+", text.lower())
 
 
 class SemanticChunker:

@@ -27,7 +27,7 @@ def s3_presign_url(bucket_key: str, expires_in: int = 3600) -> str:
     params = {"Bucket": AWS_S3_BUCKET, "Key": bucket_key}
 
     # For video files, set explicit Content-Type in response
-    if bucket_key.endswith(('.mp4', '.webm', '.mov', '.avi', '.mkv')):
+    if bucket_key.endswith((".mp4", ".webm", ".mov", ".avi", ".mkv")):
         params["ResponseContentType"] = "video/mp4"  # Use mp4 for compatibility
         params["ResponseCacheControl"] = "max-age=3600"
 
