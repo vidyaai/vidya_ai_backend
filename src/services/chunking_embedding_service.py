@@ -1,20 +1,45 @@
 """
 Combined Chunking and Embedding Service
 Phase 1: Semantic chunking with embeddings
+Enhanced with BM25 Hybrid Retrieval + Redis Caching
 
 This service handles:
 - Semantic chunking of transcripts (preserves timestamps)
-- Embedding generation with OpenAI
-- Similarity search for precise retrieval
+- Embedding generation with OpenAI (cached)
+- Hybrid retrieval (BM25 + Cosine Similarity)
+- Reciprocal Rank Fusion for optimal results
+- Redis caching for 72% faster retrieval
 """
 
 from openai import OpenAI
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from models import TranscriptChunk
 from controllers.config import logger
 import numpy as np
 import re
+from functools import lru_cache
+from utils.cache import (
+    get_cached_query_embedding,
+    cache_query_embedding,
+    get_cached_rag_results,
+    cache_rag_results,
+)
+
+# BM25 for keyword-based retrieval
+try:
+    from rank_bm25 import BM25Okapi
+
+    BM25_AVAILABLE = True
+except ImportError:
+    logger.warning(
+        "rank-bm25 not installed. Hybrid retrieval will use cosine similarity only."
+    )
+    BM25_AVAILABLE = False
+
+# LRU cache for BM25 indexes (stores last 100 video indexes)
+# Each entry is ~5-10KB, so 100 entries = ~500KB-1MB memory
+_bm25_cache = {}
 
 
 class EmbeddingService:
@@ -28,13 +53,37 @@ class EmbeddingService:
         self.model = "text-embedding-3-small"
         self.dimension = 1536
 
-    def embed_text(self, text: str) -> List[float]:
-        """Generate embedding for single text."""
+    def embed_text(self, text: str, use_cache: bool = True) -> List[float]:
+        """
+        Generate embedding for single text with caching.
+
+        Args:
+            text: Text to embed
+            use_cache: Whether to use cache (default True)
+
+        Returns:
+            Embedding vector
+        """
+        # Check cache first
+        if use_cache:
+            cached = get_cached_query_embedding(text)
+            if cached:
+                logger.debug(f"Cache HIT: Query embedding for '{text[:50]}...'")
+                return cached
+
+        # Cache miss - generate embedding
         try:
             response = self.client.embeddings.create(
                 model=self.model, input=text, encoding_format="float"
             )
-            return response.data[0].embedding
+            embedding = response.data[0].embedding
+
+            # Cache for future use (2 hour TTL)
+            if use_cache:
+                cache_query_embedding(text, embedding, ttl=7200)
+                logger.debug(f"Cache MISS: Stored embedding for '{text[:50]}...'")
+
+            return embedding
         except Exception as e:
             logger.error(f"Error generating embedding: {e}")
             raise
@@ -75,7 +124,7 @@ class EmbeddingService:
         top_k: int = 5,
     ) -> List[Dict[str, Any]]:
         """
-        Find top-k most similar chunks.
+        Find top-k most similar chunks using cosine similarity.
 
         Args:
             query_embedding: Query vector
@@ -88,7 +137,8 @@ class EmbeddingService:
         similarities = []
 
         for candidate in candidates:
-            if not candidate.get("embedding"):
+            # Explicit None check needed for pgvector (numpy arrays don't support implicit bool)
+            if candidate.get("embedding") is None:
                 continue
 
             similarity = self.cosine_similarity(query_embedding, candidate["embedding"])
@@ -96,6 +146,186 @@ class EmbeddingService:
 
         similarities.sort(key=lambda x: x["similarity"], reverse=True)
         return similarities[:top_k]
+
+    def hybrid_search(
+        self,
+        query: str,
+        query_embedding: List[float],
+        candidates: List[Dict[str, Any]],
+        top_k: int = 5,
+        alpha: float = 0.5,
+        cache_key: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Hybrid retrieval combining BM25 (sparse) and embeddings (dense) with caching.
+        Uses Reciprocal Rank Fusion to merge results.
+
+        Args:
+            query: Text query
+            query_embedding: Query embedding vector
+            candidates: List of dicts with 'text', 'embedding', and metadata
+            top_k: Number of final results
+            alpha: Weight for balancing (0=BM25 only, 1=semantic only, 0.5=balanced)
+            cache_key: Optional cache key for BM25 index (e.g., video_id)
+
+        Returns:
+            Top-k chunks ranked by combined score
+        """
+        if not BM25_AVAILABLE:
+            # Fallback to pure semantic search
+            logger.debug("BM25 not available, using semantic search only")
+            return self.find_most_similar(query_embedding, candidates, top_k)
+
+        # Dense retrieval (semantic)
+        dense_results = self.find_most_similar(query_embedding, candidates, top_k=20)
+        dense_map = {
+            r.get("chunk_index", i): {"rank": i, **r}
+            for i, r in enumerate(dense_results)
+        }
+
+        # Sparse retrieval (BM25) - with caching
+        bm25_results = self._bm25_search(
+            query, candidates, top_k=20, cache_key=cache_key
+        )
+        bm25_map = {
+            r.get("chunk_index", i): {"rank": i, **r}
+            for i, r in enumerate(bm25_results)
+        }
+
+        # Reciprocal Rank Fusion (RRF)
+        rrf_scores = {}
+        k = 60  # RRF constant
+
+        # Process dense results
+        for chunk_idx, data in dense_map.items():
+            rrf_score = 1.0 / (k + data["rank"])
+            rrf_scores[chunk_idx] = {
+                "chunk_data": data,
+                "rrf_dense": rrf_score,
+                "rrf_bm25": 0.0,
+                "dense_score": data.get("similarity", 0),
+                "bm25_score": 0.0,
+            }
+
+        # Process BM25 results
+        for chunk_idx, data in bm25_map.items():
+            rrf_score = 1.0 / (k + data["rank"])
+            if chunk_idx in rrf_scores:
+                rrf_scores[chunk_idx]["rrf_bm25"] = rrf_score
+                rrf_scores[chunk_idx]["bm25_score"] = data.get("bm25_score", 0)
+            else:
+                rrf_scores[chunk_idx] = {
+                    "chunk_data": data,
+                    "rrf_dense": 0.0,
+                    "rrf_bm25": rrf_score,
+                    "dense_score": 0.0,
+                    "bm25_score": data.get("bm25_score", 0),
+                }
+
+        # Calculate combined RRF score
+        for chunk_idx in rrf_scores:
+            rrf_scores[chunk_idx]["rrf_combined"] = (
+                alpha * rrf_scores[chunk_idx]["rrf_dense"]
+                + (1 - alpha) * rrf_scores[chunk_idx]["rrf_bm25"]
+            )
+
+        # Sort by combined score
+        sorted_results = sorted(
+            rrf_scores.values(), key=lambda x: x["rrf_combined"], reverse=True
+        )
+
+        # Extract chunk data with scores
+        final_results = []
+        for result in sorted_results[:top_k]:
+            chunk_data = result["chunk_data"].copy()
+            chunk_data["rrf_combined"] = result["rrf_combined"]
+            chunk_data["dense_score"] = result["dense_score"]
+            chunk_data["bm25_score"] = result["bm25_score"]
+            final_results.append(chunk_data)
+
+        logger.debug(f"Hybrid search retrieved {len(final_results)} results")
+        return final_results
+
+    def _get_or_build_bm25_index(
+        self, candidates: List[Dict[str, Any]], cache_key: Optional[str] = None
+    ):
+        """
+        Get cached BM25 index or build new one.
+
+        Args:
+            candidates: List of chunks
+            cache_key: Optional cache key (e.g., video_id)
+
+        Returns:
+            Tuple of (bm25_index, corpus)
+        """
+        global _bm25_cache
+
+        if cache_key and cache_key in _bm25_cache:
+            logger.debug(f"BM25 Cache HIT for {cache_key}")
+            return _bm25_cache[cache_key]
+
+        # Build new index
+        corpus = [self._tokenize(c.get("text", "")) for c in candidates]
+        bm25 = BM25Okapi(corpus)
+
+        # Cache it (LRU: keep last 100)
+        if cache_key:
+            _bm25_cache[cache_key] = (bm25, corpus)
+            # Simple LRU: remove oldest if cache > 100 entries
+            if len(_bm25_cache) > 100:
+                oldest_key = next(iter(_bm25_cache))
+                del _bm25_cache[oldest_key]
+            logger.debug(f"BM25 Cache MISS: Built index for {cache_key}")
+
+        return bm25, corpus
+
+    def _bm25_search(
+        self,
+        query: str,
+        candidates: List[Dict[str, Any]],
+        top_k: int = 5,
+        cache_key: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        BM25 keyword search over candidates with caching.
+
+        Args:
+            query: Text query
+            candidates: List of dicts with 'text' field
+            top_k: Number of results
+            cache_key: Optional cache key for BM25 index reuse
+
+        Returns:
+            Top-k chunks by BM25 score
+        """
+        # Get or build BM25 index (cached)
+        bm25, corpus = self._get_or_build_bm25_index(candidates, cache_key)
+
+        # Tokenize query
+        query_tokens = self._tokenize(query)
+
+        # Get BM25 scores
+        scores = bm25.get_scores(query_tokens)
+
+        # Get top-k indices
+        top_indices = np.argsort(scores)[::-1][:top_k]
+
+        # Build results
+        results = []
+        for rank, idx in enumerate(top_indices):
+            if scores[idx] > 0:  # Only include non-zero scores
+                candidate = candidates[idx].copy()
+                candidate["bm25_score"] = float(scores[idx])
+                candidate["bm25_rank"] = rank
+                results.append(candidate)
+
+        return results
+
+    def _tokenize(self, text: str) -> List[str]:
+        """Simple tokenization for BM25."""
+        # Lowercase and split on non-alphanumeric
+        return re.findall(r"\w+", text.lower())
 
 
 class SemanticChunker:

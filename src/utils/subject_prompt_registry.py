@@ -203,6 +203,127 @@ COMPUTER ENGINEERING DIAGRAM RULES:
   if students are asked to derive it
 - Show ONLY the problem setup — students must work out the SOLUTION
 """,
+    # ─── Medical subjects ───────────────────────────────────────────────────
+    "anatomy": """
+ANATOMY DIAGRAM RULES:
+- Anatomical diagrams: show regional or systemic anatomy with standard directional labels
+- Use imagen_tool for anatomical illustrations; claude_code_tool with matplotlib for schematic cross-sections
+- Label: structures using correct anatomical terminology (Latin/English as appropriate)
+- For cross-sections (e.g., spinal cord, limb): show all relevant layers/compartments with labels
+- For nerve/vessel courses: show trajectory with key branching points and relationships labeled
+- For osteology: show bone landmarks (processes, foramina, facets) with labels
+- For histology slides: label cell types, layers, and distinct structural features
+- Include orientation indicators (superior/inferior, medial/lateral, anterior/posterior)
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label the structure being asked about ("identify this structure")
+- For nerve/vessel identification questions: show the diagram and leave target structures with "?" labels
+- For surface anatomy: show landmarks, NOT the answer to "mark the position of X"
+- Show ONLY the problem setup; students must identify or annotate the answers
+""",
+    "physiology": """
+PHYSIOLOGY DIAGRAM RULES:
+- Functional diagrams: organ system flow diagrams, feedback loops, signal transduction pathways
+
+═══ TOOL SELECTION ═══
+- neurokit2_tool  → action_potential (neuronal AP waveform), cardiac_loop (P-V loop)
+- scipy_curve_tool → pressure_volume_loop (cardiac P-V loop), growth-related curves
+- networkx_pathway_tool → feedback_loop (homeostatic feedback circuit)
+- claude_code_tool (matplotlib) → lung compliance curves, organ system flow diagrams,
+    and any physiology diagram NOT covered by the specialist tools above
+
+- For action potential: use neurokit2_tool — scipy CubicSpline waveform with threshold/resting lines
+- For cardiac P-V loop: use neurokit2_tool or scipy_curve_tool — 4-phase closed loop with valve annotations
+- For feedback loops: use networkx_pathway_tool — FancyBboxPatch nodes with circular directed edges
+- Label axes with CORRECT units: time in ms, membrane potential in mV, volume in mL, pressure in mmHg
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label numerical values if the question asks students to calculate or identify them
+- For action potential: show the waveform setup, NOT the ionic basis if students must explain it
+- For cardiac loops: show the graph, NOT the calculated stroke volume or ejection fraction
+- Show ONLY the problem setup — students must derive the physiological explanation
+""",
+    "biochemistry": """
+BIOCHEMISTRY DIAGRAM RULES:
+- Metabolic pathway diagrams: show substrates, products, enzymes, and cofactors as labeled nodes/arrows
+
+═══ TOOL SELECTION ═══
+- scipy_curve_tool    → enzyme_kinetics (Michaelis-Menten curve with Vmax/Km markers)
+- networkx_pathway_tool → metabolic_pathway (DiGraph with oval metabolite nodes, enzyme edge labels)
+- claude_code_tool (matplotlib) → Lineweaver-Burk plots, molecular structure schematics,
+    ETC/glycolysis diagrams where custom layout is needed
+
+- For enzyme kinetics: use scipy_curve_tool — exact v=Vmax*S/(Km+S) with numpy; Km and Vmax annotations
+- For metabolic pathways: use networkx_pathway_tool — DiGraph with oval nodes, enzyme labels on edges,
+    cofactor side-nodes in lighter colour
+- For Lineweaver-Burk: use claude_code_tool with 1/[S] vs 1/V axes, x-intercept = −1/Km, y-intercept = 1/Vmax
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label the enzyme name if the question asks students to identify the enzyme at a step
+- For pathway diagrams: show the pathway with key intermediates, NOT the answer to "what is the product of this step?"
+- For kinetics plots: show the graph, NOT the calculated Km or Vmax if students must determine them
+- Show ONLY the problem setup — students must complete or interpret the pathway
+""",
+    "pharmacology": """
+PHARMACOLOGY DIAGRAM RULES:
+
+═══ TOOL SELECTION ═══
+- scipy_curve_tool    → dose_response (sigmoid via scipy.special.expit), pharmacokinetics (PK model)
+- imagen_tool          → receptor mechanism illustrations, drug-receptor structural diagrams
+- claude_code_tool (matplotlib) → Lineweaver-Burk-style plots, any other pharmacology diagram
+
+- For dose-response curves: use scipy_curve_tool — y=100*expit(x) sigmoid; EC50 and Emax marked;
+    for agonist/antagonist comparison overlay two curves with correct relative EC50/Emax shifts
+- For pharmacokinetics: use scipy_curve_tool — one-compartment oral absorption model;
+    Cmax/tmax/AUC/t½ all annotated; IV vs oral overlay where relevant
+- For drug mechanism (receptor level): use imagen_tool
+- For drug receptor interaction overview: claude_code_tool with labeled arrow diagram
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label EC50 / ED50 values if the question asks students to determine them from the graph
+- For shifted curves (antagonists): show both curves, NOT the numerical shift value if students must calculate it
+- For pharmacokinetics: show the graph, NOT the half-life calculation if that is the question
+- Show ONLY the problem setup — students must read values or interpret the pharmacodynamics
+""",
+    "pathology": """
+PATHOLOGY DIAGRAM RULES:
+- Histopathology diagrams: describe tissue section with key pathological features labeled
+- Use imagen_tool for histopathology illustrations; claude_code_tool for disease progression charts
+- For histology: label cell type, tissue layer, key abnormal features (e.g., necrosis type, inflammatory infiltrate)
+- For disease progression charts: show stages/grades as labeled boxes connected by arrows with progression criteria
+- For gross pathology: describe macroscopic features (colour, texture, size, borders) in labels
+- For oncology staging: show TNM or grade progression as a labeled flow diagram
+- For immunofluorescence patterns: describe pattern (linear, granular, mesangial) with structure labels
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label the diagnosis if the question asks students to "identify the pathological finding"
+- For histology images: show the tissue features with neutral labels, NOT the full diagnosis
+- For disease progression: show the stages, NOT the answer to "what is the next stage?"
+- Show ONLY the problem setup — students must interpret the histopathological findings
+""",
+    "microbiology": """
+MICROBIOLOGY DIAGRAM RULES:
+
+═══ TOOL SELECTION ═══
+- scipy_curve_tool       → growth_curve (4-phase piecewise: lag/exponential/stationary/death)
+- networkx_pathway_tool  → infection_cycle (circular 5-node directed cycle)
+- imagen_tool             → bacterial_structure (morphology and ultrastructure illustrations)
+- claude_code_tool (matplotlib) → antibiotic mechanism diagrams, Gram stain workflows,
+    serology/ELISA steps, and any other microbiology diagram not listed above
+
+- For bacterial growth curves: use scipy_curve_tool — piecewise log(CFU/mL) vs time with
+    phase boundary dashed verticals; annotate Lag, Exponential, Stationary, Death regions
+- For infection/replication cycles: use networkx_pathway_tool — circular DiGraph with
+    5 steps (Attachment, Entry, Replication, Assembly, Release) and directed arrows
+- For bacterial cell structure: use imagen_tool for realism;
+    claude_code_tool if a schematic cross-section is explicitly requested
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label the organism name if the question asks students to "identify the organism from the diagram"
+- For infection cycles: show the cycle steps, NOT the answer to "what is the virulence factor responsible?"
+- For culture growth curves: show the curve, NOT the calculated generation time if students must calculate it
+- Show ONLY the problem setup — students must identify or analyse the microbiological findings
+""",
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -466,6 +587,105 @@ _IMAGEN_DESCRIPTION_PROMPTS = {
         "Show gates as: AND (D-shape), OR (curved), NOT (triangle with bubble), "
         "NAND (D-shape with bubble), NOR (curved with bubble). "
         "Label all inputs and outputs. Inputs on left, outputs on right."
+    ),
+    # ─── Medical subjects ────────────────────────────────────────────────────
+    ("anatomy", "anatomical_diagram"): (
+        "Draw a schematic anatomical diagram. Use clean line-art style. "
+        "Label all visible structures with leader lines and correct anatomical terminology. "
+        "Include directional indicators (superior/inferior, medial/lateral, anterior/posterior). "
+        "Colour-code or differentiate tissue types (muscle, bone, nerve, vessel) if helpful. "
+        "Do NOT label structures that are the subject of identification questions."
+    ),
+    ("anatomy", "cross_section"): (
+        "Draw an anatomical cross-section (transverse, sagittal, or coronal as specified). "
+        "Show all compartments/layers with labeled boundaries. "
+        "Use standard anatomical shading conventions: bone (white/stippled), muscle (pink), fat (yellow). "
+        "Label key structures with leader lines. Include a small orientation inset diagram."
+    ),
+    ("anatomy", "histology"): (
+        "Draw a schematic histology diagram (light microscopy appearance). "
+        "Show tissue layers and cell types clearly. Label cell nuclei, cytoplasm, and key organelles if relevant. "
+        "Label each layer/cell type with standard histological terminology. "
+        "Include magnification indicator or scale bar. "
+        "CRITICAL: Do NOT label the tissue name or diagnosis if that is what students must identify."
+    ),
+    ("physiology", "action_potential"): (
+        "Draw an action potential graph. X-axis: time (ms), Y-axis: membrane potential (mV). "
+        "Show threshold line (~-55 mV), resting potential (~-70 mV), depolarization peak (~+30 mV), "
+        "repolarization, and hyperpolarization. Label all phases and key voltage levels. "
+        "Use a clean single-line waveform on a white background. "
+        "CRITICAL: If the question asks students to identify a specific phase or its ionic basis, "
+        "do NOT label that phase — use a '?' callout instead."
+    ),
+    ("physiology", "feedback_loop"): (
+        "Draw a homeostatic feedback loop diagram. Show boxes for: stimulus, receptor/sensor, "
+        "afferent pathway, integrating centre (e.g., hypothalamus), efferent pathway, effector, response. "
+        "Connect with directional arrows. Label the feedback type (negative/positive). "
+        "Include the set point and deviation indicators. "
+        "CRITICAL: If the question asks students to identify the feedback type, a specific hormone/messenger, "
+        "or the effector organ, do NOT label that element — leave it as a blank '?' node."
+    ),
+    ("physiology", "pressure_volume_loop"): (
+        "Draw a cardiac pressure-volume loop. X-axis: ventricular volume (mL), "
+        "Y-axis: ventricular pressure (mmHg). Show four phases: isovolumetric contraction, "
+        "ejection, isovolumetric relaxation, filling. Label EDV, ESV, stroke volume, "
+        "mitral valve opening/closing, aortic valve opening/closing points. "
+        "CRITICAL: If the question asks students to calculate or identify stroke volume, EDV, ESV, "
+        "or a specific valve event, do NOT annotate that value — omit its label from the diagram."
+    ),
+    ("biochemistry", "metabolic_pathway"): (
+        "Draw a metabolic pathway diagram. Show intermediates as labeled oval nodes. "
+        "Show reactions as arrows between nodes. Label enzyme names above/below arrows. "
+        "Show cofactors (NAD+/NADH, ATP/ADP, CoA) as labeled side branches. "
+        "Use colour to distinguish input substrates (blue), output products (red), and intermediates (white). "
+        "CRITICAL: Do NOT label enzymes that are the subject of identification questions."
+    ),
+    ("biochemistry", "enzyme_kinetics"): (
+        "Draw a Michaelis-Menten enzyme kinetics curve. "
+        "X-axis: substrate concentration [S] (mM), Y-axis: reaction velocity V (μmol/min). "
+        "Show a hyperbolic curve reaching Vmax asymptote. "
+        "Mark Vmax with a dashed horizontal line. Mark Km at V = Vmax/2 with dashed lines to both axes. "
+        "Label Vmax, Km, and both axes with units. "
+        "CRITICAL: If the question asks students to determine Km, Vmax, or inhibitor type, "
+        "do NOT mark or label those values — show the curve shape only without those annotations."
+    ),
+    ("pharmacology", "dose_response"): (
+        "Draw a dose-response curve. X-axis: log dose (or log concentration), "
+        "Y-axis: % maximum response (0–100%). Show a sigmoid (S-shaped) curve. "
+        "Mark EC50 or ED50 at 50% response with dashed lines to both axes. "
+        "Label Emax, EC50, and the curve (drug name if specified). "
+        "If comparing two drugs or agonist/antagonist, label each curve distinctly. "
+        "CRITICAL: If the question asks students to determine EC50/ED50, potency, or Emax, "
+        "do NOT mark those values on the graph — show the curve(s) without EC50/Emax markers."
+    ),
+    ("pharmacology", "pharmacokinetics"): (
+        "Draw a plasma concentration-time curve. X-axis: time (hours), "
+        "Y-axis: plasma drug concentration (μg/mL or ng/mL). "
+        "Show curve with labeled Cmax, tmax, AUC (shaded region), and elimination phase. "
+        "Mark t½ (half-life) with dashed lines. If comparing IV vs oral, overlay both curves with labels. "
+        "CRITICAL: If the question asks students to calculate Cmax, tmax, AUC, or t½, "
+        "do NOT annotate those values — show the curve shape without those markers."
+    ),
+    ("pathology", "disease_progression"): (
+        "Draw a disease progression/staging flow diagram. "
+        "Show stages as labeled rectangular boxes connected by directional arrows. "
+        "Label each stage with its name, key histological or clinical features. "
+        "Use colour coding (normal=green, early=yellow, late=orange, end-stage=red). "
+        "CRITICAL: Do NOT reveal the diagnosis if students must identify it."
+    ),
+    ("microbiology", "bacterial_structure"): (
+        "Draw a labeled bacterial cell diagram. Show and label: cell wall, plasma membrane, "
+        "cytoplasm, nucleoid (chromosome), ribosomes, flagella (if present), pili, capsule (if present), plasmid. "
+        "Differentiate Gram-positive (thick peptidoglycan, no outer membrane) vs "
+        "Gram-negative (thin peptidoglycan + outer membrane) if specified. "
+        "CRITICAL: Do NOT label the species name if identification is asked."
+    ),
+    ("microbiology", "infection_cycle"): (
+        "Draw a pathogen infection/replication cycle diagram. Show steps as labeled boxes: "
+        "attachment → entry → replication → assembly → release. "
+        "Use directional arrows between steps. Label key virulence factors at relevant steps. "
+        "Show host cell schematically. "
+        "CRITICAL: Do NOT label the pathogen name if identification is the question."
     ),
 }
 
@@ -954,6 +1174,423 @@ _NONAI_TOOL_PROMPTS = {
         "Show ALU as central block with labeled inputs (A, B, operation select) and output. "
         "Internal logic gates if detailed, or block-level if architectural. "
         "Label all signals and bus widths. Standard IEEE gate symbols."
+    ),
+    # ─── Medical subjects ────────────────────────────────────────────────────
+    ("anatomy", "anatomical_diagram", "matplotlib"): (
+        "Draw a schematic anatomical diagram using matplotlib. "
+        "Use Polygon and Circle patches for organ/structure outlines. "
+        "Label structures with ax.annotate() and leader lines. "
+        "Use anatomical colour conventions: bone=white/grey, muscle=pink/red, fat=yellow, nerve=yellow/white, vessel=red (artery)/blue (vein). "
+        "figsize=(8, 7). ax.axis('off'). Clean white background."
+    ),
+    ("anatomy", "cross_section", "matplotlib"): (
+        "Draw an anatomical cross-section using matplotlib.patches. "
+        "Show concentric or layered regions for each compartment. "
+        "Use FancyBboxPatch or Polygon for each layer. "
+        "Label each region with ax.annotate(). Include a small orientation legend. "
+        "figsize=(7, 7). ax.set_aspect('equal'). ax.axis('off')."
+    ),
+    ("physiology", "action_potential", "matplotlib"): (
+        "Draw an action potential curve using matplotlib. "
+        "x-axis: 'Time (ms)', range 0–5 ms. y-axis: 'Membrane Potential (mV)', range -90 to +40. "
+        "Draw the waveform: resting (-70 mV), threshold (-55 mV dashed line), depolarization rise, +30 mV peak, repolarization, hyperpolarization, return to rest. "
+        "Add dashed horizontal lines for threshold and resting potential. Label phases as text annotations. "
+        "CRITICAL: If the question asks students to identify a specific phase or its ionic mechanism, "
+        "omit that phase's text annotation — leave it blank or use a '?' label. "
+        "figsize=(7, 5). Include grid (alpha=0.3)."
+    ),
+    ("physiology", "pressure_volume_loop", "matplotlib"): (
+        "Draw a cardiac pressure-volume (P-V) loop using matplotlib. "
+        "x-axis: 'Ventricular Volume (mL)', y-axis: 'Ventricular Pressure (mmHg)'. "
+        "Draw a closed loop rectangle with rounded corners representing the four phases. "
+        "Label EDV, ESV, stroke volume (horizontal arrow), systolic and diastolic pressures. "
+        "Add dashed vertical lines at EDV and ESV. "
+        "CRITICAL: If the question asks students to calculate stroke volume, identify EDV/ESV, "
+        "or determine a specific valve event, omit the corresponding label from the diagram. "
+        "figsize=(6, 5)."
+    ),
+    ("biochemistry", "metabolic_pathway", "matplotlib"): (
+        "Draw a metabolic pathway using matplotlib. "
+        "Represent each metabolite as an oval (Ellipse patch) with its name inside. "
+        "Connect metabolites with directional arrows (ax.annotate arrowprops). "
+        "Label enzyme names above each arrow. Show cofactors (ATP, NADH, CoA) as smaller side-branch ovals. "
+        "Use colour: substrate=light blue, product=light green, enzyme=orange label. "
+        "CRITICAL: Do NOT label enzyme names if students must identify them — use '?' in place of the enzyme label. "
+        "figsize=(10, 6). ax.axis('off')."
+    ),
+    ("biochemistry", "enzyme_kinetics", "matplotlib"): (
+        "Draw a Michaelis-Menten enzyme kinetics curve using matplotlib. "
+        "x-axis: '[S] (mM)', y-axis: 'v (μmol/min)'. Plot a hyperbolic curve approaching Vmax. "
+        "Draw a dashed horizontal line at Vmax and label it. "
+        "Mark Km at V=Vmax/2: draw dashed vertical and horizontal lines from the curve to both axes. "
+        "Label Vmax and Km. "
+        "CRITICAL: If the question asks students to determine Km or Vmax, "
+        "omit those dashed marker lines and labels — show the hyperbolic curve shape only. "
+        "figsize=(6, 5). Include grid (alpha=0.3)."
+    ),
+    ("pharmacology", "dose_response", "matplotlib"): (
+        "Draw a dose-response curve using matplotlib. "
+        "x-axis: 'Log Dose' (or 'Log [Drug] (M)'), y-axis: '% Maximum Response', range 0–100. "
+        "Plot a sigmoid (S-shaped) curve using logistic function. "
+        "Mark EC50 at 50% response with dashed lines to both axes. Label EC50, Emax. "
+        "If comparing two drugs: overlay curves with different colours and a legend. "
+        "CRITICAL: If the question asks students to determine EC50/ED50, Emax, or potency ratio, "
+        "omit those dashed marker lines and labels — show the sigmoid curve(s) without EC50/Emax markers. "
+        "figsize=(6, 5). Include grid (alpha=0.3)."
+    ),
+    ("pharmacology", "pharmacokinetics", "matplotlib"): (
+        "Draw a plasma concentration-time curve using matplotlib. "
+        "x-axis: 'Time (hours)', y-axis: 'Plasma Concentration (μg/mL)'. "
+        "Plot absorption rise then exponential decline. "
+        "Mark Cmax and tmax with dashed lines and labels. Shade AUC region (alpha=0.2). "
+        "Mark t½ on the elimination phase with a dashed horizontal line. "
+        "CRITICAL: If the question asks students to calculate Cmax, tmax, AUC, or t½, "
+        "omit those annotations — show the curve shape without those markers. "
+        "figsize=(7, 5). Include grid (alpha=0.3)."
+    ),
+    ("microbiology", "bacterial_structure", "matplotlib"): (
+        "Draw a labeled bacterial cell diagram using matplotlib.patches. "
+        "Draw cell body as an Ellipse. Add Patch layers for: cell wall (outer), membrane (inner), cytoplasm fill. "
+        "Add Ellipse for nucleoid, small circles for ribosomes, lines for flagella and pili, outer layer for capsule if relevant. "
+        "Label all structures with ax.annotate() leader lines. "
+        "figsize=(8, 6). ax.set_aspect('equal'). ax.axis('off')."
+    ),
+    ("microbiology", "infection_cycle", "matplotlib"): (
+        "Draw a pathogen infection/replication cycle using matplotlib. "
+        "Represent each step as a FancyBboxPatch with the step name. "
+        "Connect steps with curved directional arrows (ax.annotate with connectionstyle='arc3,rad=0.3'). "
+        "Steps: Attachment → Entry → Replication → Assembly → Release. "
+        "Add small labels for key virulence factors at relevant steps. "
+        "CRITICAL: Do NOT label the virulence factor or pathogen name if identification is the question — "
+        "use '?' instead. "
+        "figsize=(8, 6). ax.axis('off')."
+    ),
+    ("microbiology", "growth_curve", "matplotlib"): (
+        "Draw a bacterial growth curve using matplotlib. "
+        "x-axis: 'Time (hours)', y-axis: 'log(CFU/mL)' or 'OD600'. "
+        "Plot a sigmoid-like curve with four labeled phases: Lag, Exponential (Log), Stationary, Decline (Death). "
+        "Mark phase boundaries with dashed vertical lines. Label each phase with a text annotation. "
+        "CRITICAL: If the question asks students to identify a specific phase or calculate generation time, "
+        "omit that phase label or the calculated value. "
+        "figsize=(7, 5). Include grid (alpha=0.3)."
+    ),
+    # Missing anatomy/histology nonai prompt
+    ("anatomy", "histology", "matplotlib"): (
+        "Draw a schematic histology diagram using matplotlib. "
+        "Use ax.add_patch() with FancyBboxPatch or Ellipse shapes to represent cell layers. "
+        "Show 2-4 distinct tissue layers as horizontal bands with different fill colours. "
+        "Add cell nuclei as small dark Ellipse patches within each layer. "
+        "Label each layer with ax.annotate() leader lines. "
+        "CRITICAL: Do NOT label the tissue or cell type names if that is what students must identify. "
+        "figsize=(7, 6). ax.axis('off'). ax.set_aspect('equal')."
+    ),
+    # Missing pathology/disease_progression nonai prompt
+    ("pathology", "disease_progression", "matplotlib"): (
+        "Draw a disease progression/staging diagram using matplotlib. "
+        "Draw each stage as a FancyBboxPatch. Arrange stages left-to-right or in a flow. "
+        "Connect stages with thick directional arrows. "
+        "Colour-code stages: normal=green, early=yellow, progressive=orange, end-stage=red. "
+        "Label each box with stage name and key features. "
+        "CRITICAL: Do NOT label the disease name if students must identify it. "
+        "figsize=(10, 5). ax.axis('off')."
+    ),
+    ("pathology", "histopathology", "matplotlib"): (
+        "Draw a schematic histopathology diagram using matplotlib. "
+        "Show abnormal tissue architecture using layered FancyBboxPatch shapes. "
+        "Indicate cellular changes: enlarged nuclei (larger dark Ellipse patches), "
+        "irregular cell shapes (Polygon patches), loss of normal layer organisation. "
+        "Label key pathological features with ax.annotate() leader lines. "
+        "CRITICAL: Do NOT write the disease name as a label if identification is asked. "
+        "figsize=(7, 6). ax.axis('off')."
+    ),
+    # ── Missing cardiac_loop matplotlib baseline ──────────────────────────────
+    ("physiology", "cardiac_loop", "matplotlib"): (
+        "Draw a cardiac pressure-volume (P-V) loop using matplotlib. "
+        "x-axis: 'Ventricular Volume (mL)', y-axis: 'Ventricular Pressure (mmHg)'. "
+        "Construct 4 phases as line segments forming a closed counterclockwise loop: "
+        "  Phase 1 (ventricular filling): low pressure ~10 mmHg, volume increases ESV→EDV. "
+        "  Phase 2 (isovolumetric contraction): pressure rises 10→80 mmHg, volume constant at EDV=130. "
+        "  Phase 3 (ejection): parabolic; volume decreases 130→50 mL, pressure rises to ~120 then falls to 80. "
+        "  Phase 4 (isovolumetric relaxation): pressure drops 80→10 mmHg, volume constant at ESV=50. "
+        "Label on x-axis: 'EDV=130 mL', 'ESV=50 mL'. "
+        "Add horizontal bracket labeled 'SV = EDV − ESV'. "
+        "Mark 'Aortic valve opens' and 'Aortic valve closes' at transition corners. "
+        "Mark 'Mitral valve opens' and 'Mitral valve closes' at other corners. "
+        "Add dashed vertical lines at EDV and ESV. figsize=(6, 5). Include grid (alpha=0.3). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    # ── neurokit2 tool-type prompts ───────────────────────────────────────────
+    ("physiology", "action_potential", "neurokit2"): (
+        "Generate a neuronal action potential waveform using scipy and matplotlib. "
+        "import numpy as np; import matplotlib.pyplot as plt; from scipy.interpolate import CubicSpline. "
+        "Model piecewise: resting=-70, threshold=-55, peak=+30, trough=-80. "
+        "Time points t=[0,0.5,1.0,1.5,2.5,5.0] ms. "
+        "Voltage v=[-70,-70,-55,+30,-80,-70] mV — smooth with CubicSpline(t,v). "
+        "t_fine = np.linspace(0,5,500). Plot v_fine = cs(t_fine). "
+        "x-axis: 'Time (ms)', 0–5. y-axis: 'Membrane Potential (mV)', −90 to +40. "
+        "Add dashed horizontal lines: threshold at -55 (label 'Threshold −55 mV'), "
+        "resting at -70 (label 'Resting Potential −70 mV'). "
+        "Annotate phase regions with ax.text: 'Depolarisation', 'Repolarisation', 'Hyperpolarisation'. "
+        "figsize=(7, 5). ax.grid(alpha=0.3). ax.set_facecolor('#f9f9f9'). "
+        "plt.title('Neuronal Action Potential'). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("physiology", "cardiac_loop", "neurokit2"): (
+        "Generate a cardiac pressure-volume (P-V) loop using numpy and matplotlib. "
+        "import numpy as np; import matplotlib.pyplot as plt. "
+        "Model: EDV=130 mL, ESV=50 mL, peak_pressure=120 mmHg, baseline_pressure=10 mmHg. "
+        "Phase 1 – filling: v1=np.linspace(50,130,100), p1=np.ones(100)*10. "
+        "Phase 2 – isovolumetric contraction: v2=np.ones(50)*130, p2=np.linspace(10,80,50). "
+        "Phase 3 – ejection: v3=np.linspace(130,50,100), "
+        "  p3 = 80 + 40*np.sin(np.linspace(0,np.pi,100))  # parabolic rise-fall. "
+        "Phase 4 – isovolumetric relaxation: v4=np.ones(50)*50, p4=np.linspace(80,10,50). "
+        "v_all = np.concatenate([v1,v2,v3,v4]); p_all = np.concatenate([p1,p2,p3,p4]). "
+        "plt.plot(v_all, p_all, 'b-', linewidth=2.5). "
+        "Label: annotate('EDV=130',(130,5)), annotate('ESV=50',(50,5)). "
+        "Dashed verticals at x=50 and x=130. Arrow bracket 'SV = 80 mL'. "
+        "ax.set_xlabel('Ventricular Volume (mL)'); ax.set_ylabel('Ventricular Pressure (mmHg)'). "
+        "figsize=(6,5). ax.grid(alpha=0.3). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    # ── scipy tool-type prompts ───────────────────────────────────────────────
+    ("pharmacology", "dose_response", "scipy"): (
+        "Generate a dose-response sigmoid curve using scipy.special.expit and matplotlib. "
+        "from scipy.special import expit; import numpy as np; import matplotlib.pyplot as plt. "
+        "x = np.linspace(-3, 3, 300)  # log10 of dose. "
+        "y = 100 * expit(x)  # where x=0 → 50% (EC50 at dose=1 arbitrary unit). "
+        "For drug comparisons: plot two curves with different EC50 shifts on same axes. "
+        "x-axis: 'Log [Drug] (M)' or 'Log Dose'. y-axis: '% Maximum Response', range 0–105. "
+        "Mark EC50 with dashed lines to X and Y axes, label 'EC50 = log10(1) = 0'. "
+        "Add horizontal dashed line: Emax = 100%, label 'Emax'. "
+        "figsize=(6, 5). ax.grid(alpha=0.3). Legend if multiple curves. "
+        "plt.title('Dose-Response Curve'). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("pharmacology", "pharmacokinetics", "scipy"): (
+        "Generate a pharmacokinetics plasma concentration-time curve using numpy and matplotlib. "
+        "import numpy as np; import matplotlib.pyplot as plt. "
+        "One-compartment oral absorption model: "
+        "  Ka=1.2, Ke=0.2, Vd=30, F=0.8, D=500  # Ka/hr, Ke/hr, Vd in L, D in mg. "
+        "  C = (F*D*Ka) / (Vd*(Ka-Ke)) * (np.exp(-Ke*t) - np.exp(-Ka*t))  # μg/mL. "
+        "t = np.linspace(0.001, 24, 500) hours. "
+        "x-axis: 'Time (hours)'. y-axis: 'Plasma Concentration (μg/mL)'. "
+        "Mark Cmax: find index of max C; add dashed lines to both axes, label 'Cmax'. "
+        "Mark tmax: x-value at Cmax, dashed vertical line, label 'tmax'. "
+        "Shade AUC: ax.fill_between(t, C, alpha=0.15, color='lightblue', label='AUC'). "
+        "For IV vs oral: overlay IV curve C_iv = (D/Vd)*np.exp(-Ke*t) in different colour. "
+        "figsize=(7, 5). ax.grid(alpha=0.3). Legend. "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("biochemistry", "enzyme_kinetics", "scipy"): (
+        "Generate a Michaelis-Menten enzyme kinetics curve using numpy and matplotlib. "
+        "import numpy as np; import matplotlib.pyplot as plt. "
+        "Vmax=10, Km=0.5  # μmol/min and mM. "
+        "S = np.linspace(0, 5, 500)  # mM. "
+        "v = Vmax * S / (Km + S). "
+        "x-axis: '[S] (mM)', 0–5. y-axis: 'v (μmol/min)', 0 to 1.1*Vmax. "
+        "Add dashed horizontal: y=Vmax, label 'Vmax = {Vmax}'. "
+        "Mark Km: at v=Vmax/2; ax.plot([0,Km],[Vmax/2,Vmax/2],'--', color='grey'); "
+        "  ax.plot([Km,Km],[0,Vmax/2],'--', color='grey'); "
+        "  ax.text(Km,-0.5,'Km',ha='center'); ax.text(-0.15,Vmax/2,'Vmax/2',ha='right'). "
+        "For inhibitor comparisons: plot competitive (same Vmax, Km×2) and/or non-competitive "
+        "  (Vmax/2, same Km) in different colours with legend. "
+        "figsize=(6, 5). ax.grid(alpha=0.3). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("physiology", "pressure_volume_loop", "scipy"): (
+        "Generate a cardiac pressure-volume (P-V) loop using numpy and matplotlib. "
+        "import numpy as np; import matplotlib.pyplot as plt. "
+        "Model: EDV=130 mL, ESV=50 mL, systolic BP=120 mmHg, diastolic baseline=10 mmHg. "
+        "Phase 1 – filling: v1=np.linspace(50,130,100), p1=np.ones(100)*10. "
+        "Phase 2 – isovolumetric contraction: v2=np.ones(50)*130, p2=np.linspace(10,80,50). "
+        "Phase 3 – ejection: v3=np.linspace(130,50,100), "
+        "  p3 = 80 + 40*np.sin(np.linspace(0,np.pi,100)). "
+        "Phase 4 – isovolumetric relaxation: v4=np.ones(50)*50, p4=np.linspace(80,10,50). "
+        "v_all=np.concatenate([v1,v2,v3,v4]); p_all=np.concatenate([p1,p2,p3,p4]). "
+        "plt.plot(v_all, p_all, 'b-', linewidth=2.5). "
+        "ax.axvline(130,ls='--',color='grey',alpha=0.7); ax.axvline(50,ls='--',color='grey',alpha=0.7). "
+        "Annotate EDV, ESV, SV on x-axis. Note valve events at corners. "
+        "ax.set_xlabel('Ventricular Volume (mL)'); ax.set_ylabel('Ventricular Pressure (mmHg)'). "
+        "figsize=(6, 5). ax.grid(alpha=0.3). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("physiology", "cardiac_loop", "scipy"): (
+        "Generate a cardiac pressure-volume (P-V) loop using numpy and matplotlib. "
+        "import numpy as np; import matplotlib.pyplot as plt. "
+        "Model: EDV=130 mL, ESV=50 mL, systolic peak=120 mmHg, diastolic=10 mmHg. "
+        "Construct 4 phases as numpy arrays and concatenate into a closed loop. "
+        "Plot as a smooth closed curve. Label EDV, ESV, stroke volume, valve events. "
+        "ax.set_xlabel('Ventricular Volume (mL)'); ax.set_ylabel('Ventricular Pressure (mmHg)'). "
+        "figsize=(6, 5). ax.grid(alpha=0.3). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    ("microbiology", "growth_curve", "scipy"): (
+        "Generate a bacterial growth curve using numpy and matplotlib (4-phase piecewise model). "
+        "import numpy as np; import matplotlib.pyplot as plt. "
+        "Piecewise log(CFU/mL) vs time: "
+        "  Lag phase (0–2 hr): t1=np.linspace(0,2,50), y1=np.ones(50)*3. "
+        "  Exponential phase (2–8 hr): t2=np.linspace(2,8,100), y2=3+(6/6)*(t2-2). "
+        "  Stationary phase (8–14 hr): t3=np.linspace(8,14,60), y3=np.ones(60)*9. "
+        "  Death phase (14–20 hr): t4=np.linspace(14,20,60), y4=9-0.3*(t4-14). "
+        "t_all=np.concatenate([t1,t2,t3,t4]); y_all=np.concatenate([y1,y2,y3,y4]). "
+        "plt.plot(t_all, y_all, 'b-', linewidth=2.5). "
+        "Phase boundary dashed verticals at t=2,8,14. "
+        "Annotate phase names above curve: 'Lag', 'Exponential', 'Stationary', 'Death'. "
+        "x-axis: 'Time (hours)', 0–20. y-axis: 'log(CFU/mL)', 2–10. "
+        "figsize=(7, 5). ax.grid(alpha=0.3). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    # ── networkx tool-type prompts ────────────────────────────────────────────
+    ("microbiology", "infection_cycle", "networkx"): (
+        "Generate a pathogen infection/replication cycle diagram using matplotlib + FancyBboxPatch. "
+        "import numpy as np, matplotlib.pyplot as plt, matplotlib.patches as mpatches, textwrap. "
+        "NODES: define as an ordered clockwise list (e.g. "
+        "  ['Attachment', 'Entry / Penetration', 'Replication', 'Assembly', 'Release']). "
+        "  n = len(nodes). "
+        "  SCALE = max(2.8, n * 0.42). "
+        "  FIG_DIM = max(9.0, SCALE * 2.4). "
+        "  MARGIN = SCALE + 2.0. "
+        "  fig, ax = plt.subplots(figsize=(FIG_DIM, FIG_DIM)). "
+        "  pos = {nodes[i]: (SCALE*np.cos(2*np.pi*i/n - np.pi/2), SCALE*np.sin(2*np.pi*i/n - np.pi/2)) "
+        "          for i in range(n)}. "
+        "EDGES: ONLY sequential [(nodes[i], nodes[(i+1)%n]) for i in range(n)] — NO skipping nodes. "
+        "DRAW ORDER (arrows below cards): "
+        "  (1) Arrows FIRST (zorder=1): ax.annotate('', xy=pos[dst], xytext=pos[src], "
+        "        arrowprops=dict(arrowstyle='->', color='#990000', lw=1.8, mutation_scale=18, "
+        "          connectionstyle='arc3,rad=0.25'), zorder=1). "
+        "  (2) FancyBboxPatch SECOND (zorder=3), BOX_W=1.5, BOX_H=0.65: "
+        "        p = mpatches.FancyBboxPatch((x-BOX_W/2,y-BOX_H/2), BOX_W, BOX_H, "
+        "          boxstyle='round,pad=0.12', facecolor='#FFCCCC', edgecolor='#990000', lw=1.8); "
+        "        p.set_zorder(3); ax.add_patch(p). "
+        "  (3) Text labels LAST (zorder=4): wrap to width=12, fontsize=9, fontweight='bold'. "
+        "  (4) Optional edge event labels: ax.text(midpoint, event_name, fontsize=8, color='#660000', zorder=2). "
+        "ax.set_xlim(-MARGIN,MARGIN); ax.set_ylim(-MARGIN,MARGIN); ax.set_aspect('equal'); ax.axis('off'). "
+        "plt.tight_layout(pad=1.5). plt.savefig('output.png', dpi=150, bbox_inches='tight', facecolor='white')."
+    ),
+    ("pathology", "disease_progression", "networkx"): (
+        "Generate a disease staging/progression flow diagram using networkx DiGraph and matplotlib. "
+        "import networkx as nx; import matplotlib.pyplot as plt; "
+        "from matplotlib.patches import FancyBboxPatch. "
+        "Create nodes for each stage (e.g., 'Normal', 'Grade I / Mild', 'Grade II / Moderate', "
+        "  'Grade III / Severe', 'End-Stage'). "
+        "Connect stages as a linear left-to-right digraph. "
+        "Fixed horizontal positions: pos = {node: (i*2, 0) for i, node in enumerate(stages)}. "
+        "DRAW ORDER (critical — prevents arrows appearing on top of cards): "
+        "  (1) draw all ax.annotate arrows first (add zorder=1 inside arrowprops dict), "
+        "  (2) add FancyBboxPatch per node with patch.set_zorder(3), colour-coded: "
+        "  Normal='#90EE90'(green), early='#FFFF99'(yellow), "
+        "  intermediate='#FFA500'(orange), end-stage='#FF6B6B'(red), "
+        "  (3) add ax.text labels last with zorder=4. "
+        "Annotate key histological/clinical features below each stage box (ax.text). "
+        "CRITICAL: Do NOT label the disease name if identification is the question. "
+        "ax.axis('off'). figsize=(11, 4). "
+        "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
+    ),
+    # ── Physiology ─────────────────────────────────────────────────────────────
+    ("physiology", "feedback_loop", "networkx"): (
+        "Generate a physiological FEEDBACK LOOP diagram (matplotlib + FancyBboxPatch). "
+        "TWO-COLUMN LAYOUT — size scales with node count (see STEP 1). "
+        "Draw the circular loop ONLY in ax_loop. Draw any key/mechanism list ONLY in ax_key. "
+        "\n"
+        "STEP 1 — NODES + DYNAMIC SIZING: "
+        "  import textwrap, numpy as np, matplotlib.pyplot as plt, matplotlib.patches as mpatches. "
+        "  nodes = ['NodeA', 'NodeB', ..., 'NodeN']  # ordered clockwise. "
+        "  n = len(nodes). "
+        "  # Scale circle radius and canvas with number of nodes: "
+        "  SCALE = max(2.8, n * 0.42)          # e.g. n=7->2.94, n=10->4.2, n=12->5.04. "
+        "  FIG_H = max(8.0, SCALE * 2.4)       # canvas height in inches. "
+        "  FIG_W = FIG_H * 1.75               # width (3:1 loop:key split). "
+        "  MARGIN = SCALE + 2.0               # axes limits = SCALE + box half-width buffer. "
+        "  fig, (ax_loop, ax_key) = plt.subplots(1, 2, figsize=(FIG_W, FIG_H), "
+        "    gridspec_kw={'width_ratios': [3, 1]}). "
+        "  pos = {nodes[i]: (SCALE*np.cos(2*np.pi*i/n - np.pi/2), "
+        "                    SCALE*np.sin(2*np.pi*i/n - np.pi/2)) for i in range(n)}. "
+        "  wrapped = {nd: textwrap.fill(nd, 12) for nd in nodes}. "
+        "\n"
+        "STEP 2 — EDGES. ONLY sequential pairs — NO skipping nodes: "
+        "  edges = [(nodes[i], nodes[(i+1) % n]) for i in range(n)]. "
+        "  *** NEVER add an edge between non-consecutive nodes — it draws a crossing diagonal. *** "
+        "\n"
+        "STEP 3 — DRAW ORDER (arrows below cards): "
+        "  BOX_W, BOX_H = 1.5, 0.65. "
+        "  (a) Arrows FIRST (zorder=1): "
+        "      for src, dst in edges: "
+        "        ax_loop.annotate('', xy=pos[dst], xytext=pos[src], "
+        "          arrowprops=dict(arrowstyle='->', color='#CC0000', lw=1.8, "
+        "            mutation_scale=18, connectionstyle='arc3,rad=0.25'), zorder=1). "
+        "  (b) FancyBboxPatch SECOND (zorder=3): "
+        "      for nd in nodes: "
+        "        x, y = pos[nd]. "
+        "        p = mpatches.FancyBboxPatch((x-BOX_W/2, y-BOX_H/2), BOX_W, BOX_H, "
+        "          boxstyle='round,pad=0.12', facecolor='#FFEEDD', edgecolor='#CC4400', lw=1.8). "
+        "        p.set_zorder(3); ax_loop.add_patch(p). "
+        "  (c) Text labels LAST (zorder=4): "
+        "      ax_loop.text(x, y, wrapped[nd], ha='center', va='center', fontsize=9, "
+        "        fontweight='bold', zorder=4). "
+        "  (d) Central concept (if any): ax_loop.text(0, 0, '...', ha='center', va='center', "
+        "        fontsize=11, fontweight='bold', color='#884400', "
+        "        bbox=dict(boxstyle='round,pad=0.3', facecolor='#FFFFAA', edgecolor='#CC8800', lw=2), "
+        "        zorder=5). "
+        "\n"
+        "STEP 4 — AXES: "
+        "  ax_loop.set_xlim(-MARGIN, MARGIN); ax_loop.set_ylim(-MARGIN, MARGIN). "
+        "  ax_loop.set_aspect('equal'); ax_loop.axis('off'). "
+        "  ax_key.axis('off'). "
+        "  plt.tight_layout(pad=1.5). "
+        "  plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')."
+    ),
+    ("physiology", "feedback_loop", "matplotlib"): (
+        "Generate a FEEDBACK LOOP diagram using matplotlib with TWO subplots. "
+        "import textwrap, numpy as np, matplotlib.patches as mpatches. "
+        "NODES: define as an ordered clockwise list. "
+        "  n = len(nodes). "
+        "  SCALE = max(2.8, n * 0.42). "
+        "  FIG_H = max(8.0, SCALE * 2.4); FIG_W = FIG_H * 1.75. "
+        "  MARGIN = SCALE + 2.0. "
+        "  fig, (ax_loop, ax_key) = plt.subplots(1, 2, figsize=(FIG_W, FIG_H), "
+        "    gridspec_kw={'width_ratios': [3, 1]}). "
+        "  pos = {nodes[i]: (SCALE*np.cos(2*np.pi*i/n-np.pi/2), SCALE*np.sin(2*np.pi*i/n-np.pi/2)) for i in range(n)}. "
+        "EDGES: ONLY sequential [(nodes[i], nodes[(i+1)%n]) for i in range(n)] — NO skipping. "
+        "DRAW ORDER: "
+        "  (1) Arrows first (zorder=1): ax_loop.annotate('', xy=pos[dst], xytext=pos[src], "
+        "        arrowprops=dict(arrowstyle='->', color='#CC0000', lw=1.8, mutation_scale=18, "
+        "        connectionstyle='arc3,rad=0.25'), zorder=1). "
+        "  (2) FancyBboxPatch per node (zorder=3): BOX_W=1.5, BOX_H=0.65. "
+        "        p = mpatches.FancyBboxPatch((x-BOX_W/2, y-BOX_H/2), BOX_W, BOX_H, "
+        "          boxstyle='round,pad=0.12', facecolor='#FFEEDD', edgecolor='#CC4400', lw=1.8). "
+        "        p.set_zorder(3); ax_loop.add_patch(p). "
+        "  (3) Text labels last (zorder=4): wrap to width=12, fontsize=9, fontweight='bold'. "
+        "  (4) Central concept: ax_loop.text(0,0,...) yellow bbox, zorder=5. "
+        "ax_loop.set_xlim(-MARGIN, MARGIN); ax_loop.set_ylim(-MARGIN, MARGIN); "
+        "ax_loop.set_aspect('equal'); ax_loop.axis('off'). ax_key.axis('off'). "
+        "plt.tight_layout(pad=1.5). plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')."
+    ),
+    # ── Biochemistry ────────────────────────────────────────────────────────────
+    ("biochemistry", "metabolic_pathway", "networkx"): (
+        "Generate a METABOLIC PATHWAY diagram using networkx DiGraph + matplotlib. figsize=(12, 8). "
+        "Wrap all node labels: import textwrap; label = textwrap.fill(raw, 14). "
+        "Layout: try nx.nx_agraph.graphviz_layout(G, prog='dot') first; "
+        "fallback to nx.spring_layout(G, k=2.5, seed=42). "
+        "node_size=4000, font_size=9. "
+        "Edge labels (enzyme names): nx.draw_networkx_edge_labels with font_size=8 — short abbreviations. "
+        "All text: bbox=dict(boxstyle='round,pad=0.2', facecolor='white', edgecolor='gray', alpha=0.85). "
+        "ax.axis('off'). plt.tight_layout(pad=2.0). "
+        "plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')."
+    ),
+    ("microbiology", "disease_progression", "networkx"): (
+        "Generate a DISEASE PROGRESSION diagram using networkx DiGraph + matplotlib. "
+        "figsize=(12, 5) for linear <=5 stages, (14, 8) for branching. "
+        "Wrap stage labels: import textwrap; label = textwrap.fill(raw, 12). "
+        "Linear layout: pos = {nodes[i]: (i*3, 0) for i in range(len(nodes))}. "
+        "DRAW ORDER (critical — prevents arrows appearing on top of cards): "
+        "  (1) draw all ax.annotate curved arrows first (zorder=1 in arrowprops), "
+        "  (2) add FancyBboxPatch per node (width=2.0, height=0.8) with patch.set_zorder(3), "
+        "      colour-coded from green (normal) to red (severe), "
+        "  (3) add ax.text stage labels (font_size=9, zorder=4). "
+        "NEVER call nx.draw_networkx_nodes()/nx.draw_networkx_edges() — use FancyBboxPatch + ax.annotate exclusively. "
+        "Feature annotations BELOW each box at y=-0.9 with fontsize=8. "
+        "ax.axis('off'). plt.tight_layout(pad=2.0). "
+        "plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')."
     ),
 }
 
@@ -1853,6 +2490,180 @@ COMPUTER ENGINEERING DIAGRAM REVIEW RULES
   • Signal transitions aligned vertically where simultaneous
   • Setup time, hold time marked if relevant
   • Propagation delay indicated if asked
+""",
+    # ── Medical sciences ────────────────────────────────────────────────────
+    "anatomy": r"""
+═══════════════════════════════════════════════════════════════════════════════
+ANATOMY DIAGRAM REVIEW RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+▶ LABELS & TERMINOLOGY
+  • All visible structures must be labeled with correct anatomical terminology
+  • Directional indicators (superior/inferior, medial/lateral, anterior/posterior, proximal/distal)
+    must be correct and present where the diagram type requires them
+  • Labels must NOT overlap with drawing elements — use leader lines
+  • Abbreviations must match standard anatomical convention (e.g., LV = Left Ventricle, not arbitrary)
+
+▶ COLOUR CONVENTIONS
+  • Bone/cartilage: white or pale grey (stippled shading acceptable)
+  • Muscle: pink or red (matching depth/type if labelled)
+  • Fat/adipose: yellow
+  • Nerve: yellow or white with thin outline
+  • Artery: red
+  • Vein: blue or purple
+  • Lymphatic: green (when shown)
+
+▶ STRUCTURAL ACCURACY
+  • Relative proportions of organs/structures must be approximately correct
+  • Organs must be shown in anatomically correct spatial relationships
+  • For layered cross-sections: layer order must be anatomically accurate (e.g., skin → subcutaneous fat → fascia → muscle)
+
+▶ ANSWER HIDING
+  • If the question asks students to IDENTIFY or LABEL a structure:
+    - The corresponding label must NOT appear in the diagram
+    - Use a blank arrow or numbered callout instead
+  • If the question asks students to TRACE a pathway or NAME a nerve/vessel:
+    - Do NOT label the pathway/nerve/vessel being asked about
+
+▶ CROSS-SECTION SPECIFICS
+  • Include a small orientation inset (e.g., axial/sagittal/coronal indicator)
+  • Show correct relative sizes of compartments
+  • Left/right orientation must match anatomical convention (patient's left = diagram right for axial views)
+
+▶ HISTOLOGY SPECIFICS
+  • Cell layers must be distinct and clearly separated
+  • Cell nuclei: small, dark, correctly positioned within cell
+  • Scale bar or magnification indicator must be present if shown in original question
+  • Do NOT label cell type / tissue name if that is what students must identify
+""",
+    "physiology": r"""
+═══════════════════════════════════════════════════════════════════════════════
+PHYSIOLOGY DIAGRAM REVIEW RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+▶ ACTION POTENTIAL PLOTS
+  • x-axis must be time (ms), y-axis must be membrane potential (mV)
+  • Resting potential: ~–70 mV; threshold: ~–55 mV (dashed line); peak: ~+30 mV
+  • Phases must be correctly sequenced: rest → depolarization → peak → repolarization → hyperpolarization → rest
+  • Dashed reference lines for threshold and resting potential must be present
+  • Phase labels (depolarization, repolarization, etc.) must be correctly positioned
+  • ANSWER HIDING: Do NOT show the phase name/arrow that students are asked to identify
+
+▶ PRESSURE-VOLUME LOOPS
+  • x-axis: ventricular volume (mL), y-axis: ventricular pressure (mmHg)
+  • Four phases of the cardiac cycle must be correctly labeled: isovolumetric contraction, ejection, isovolumetric relaxation, filling
+  • EDV and ESV must be marked (vertical dashed lines)
+  • Stroke volume = EDV − ESV (shown as horizontal arrow or bracket)
+  • Mitral and aortic valve events at correct corners
+  • ANSWER HIDING: Do NOT draw a modified loop (e.g., afterload/preload change) if that is what students must predict
+
+▶ FEEDBACK LOOP DIAGRAMS
+  • Must include: stimulus, sensor/receptor, afferent pathway, control centre (integrating centre), efferent pathway, effector, response
+  • Negative vs positive feedback must be clearly labeled
+  • Set point must be indicated
+  • Arrows must show correct directional flow
+
+▶ AXES & UNITS
+  • All axes must have correct units (mV, mmHg, mL, s, ms, Hz)
+  • Grid lines acceptable at alpha=0.3
+  • Font size ≥ 10 pt for readability
+""",
+    "biochemistry": r"""
+═══════════════════════════════════════════════════════════════════════════════
+BIOCHEMISTRY DIAGRAM REVIEW RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+▶ METABOLIC PATHWAY DIAGRAMS
+  • Each intermediate metabolite must be shown as a labeled oval/node
+  • Enzyme name must be labeled on or adjacent to each reaction arrow
+  • Cofactors (ATP, ADP, NAD+, NADH, CoA, Pi) shown as side branches with correct directionality
+  • Irreversible reactions: single-headed arrow; reversible: double-headed arrow
+  • ANSWER HIDING: If students must name an enzyme or metabolite, leave that label blank/numbered
+
+▶ ENZYME KINETICS CURVES
+  • x-axis: [S] with concentration units (e.g., mM, μM); y-axis: reaction velocity V (μmol/min or equivalent)
+  • Curve must be hyperbolic (Michaelis-Menten) reaching Vmax asymptote
+  • Vmax: horizontal dashed line clearly labeled
+  • Km: marked at V = Vmax/2 with dashed lines to both axes, clearly labeled
+  • For inhibitor comparisons: correctly show competitive (same Vmax, higher Km) or non-competitive (lower Vmax, same Km)
+  • ANSWER HIDING: Do NOT label Vmax or Km values if students are asked to calculate them from given data
+
+▶ ACCURACY
+  • Pathway direction (anabolic vs catabolic) must match the question context
+  • Regulatory enzyme steps (committed steps) may be marked if given in question
+""",
+    "pharmacology": r"""
+═══════════════════════════════════════════════════════════════════════════════
+PHARMACOLOGY DIAGRAM REVIEW RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+▶ DOSE-RESPONSE CURVES
+  • x-axis: log dose or log[Drug] with units; y-axis: % maximum response (0–100%)
+  • Curve shape must be sigmoid (S-shaped logistic function), not linear
+  • EC50 (or ED50) marked at 50% response with dashed lines to both axes, labeled
+  • Emax (100% response) horizontal dashed line, labeled
+  • For agonist/antagonist comparison: correct relative positions (competitive antagonist shifts curve right; non-competitive lowers Emax)
+  • ANSWER HIDING: Do NOT label EC50 values if students must read them off or calculate them
+
+▶ PHARMACOKINETICS CURVES
+  • x-axis: time with units (hours); y-axis: plasma drug concentration with units (μg/mL, ng/mL)
+  • Curve shape: absorption rise (first-order) followed by elimination decline (exponential)
+  • Cmax (peak concentration) and tmax (time to peak) labeled with dashed lines to axes
+  • AUC region shaded (alpha=0.2) if reference in question
+  • t½ marked on elimination slope with dashed line
+  • For IV vs oral: IV curve starts high and declines; oral curve has a rising phase
+  • ANSWER HIDING: Do NOT show AUC value, t½ value, or Cmax value if students must calculate them
+
+▶ DRUG NAMING
+  • Drug names must be spelled correctly (use INN names)
+  • Do NOT include mechanism of action text if students must describe it
+""",
+    "pathology": r"""
+═══════════════════════════════════════════════════════════════════════════════
+PATHOLOGY DIAGRAM REVIEW RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+▶ DISEASE PROGRESSION DIAGRAMS
+  • Stages must flow in correct pathological sequence (e.g., Normal → Hyperplasia → Dysplasia → CIS → Invasive)
+  • Colour coding must progress logically (green→yellow→orange→red for severity)
+  • Each stage box must include key pathological features (cellular/histological changes)
+  • Stage names must be clinically standard (TNM staging, WHO grading, etc.)
+  • ANSWER HIDING: Do NOT write the disease diagnosis label if students must identify it
+    (use a neutral title like "Disease X Progression" or "Progression Stages")
+
+▶ HISTOPATHOLOGY DIAGRAMS
+  • Show architectural distortion: enlarged, irregular nuclei; high N:C ratio; loss of polarity
+  • Normal tissue shown for comparison on same diagram (if relevant)
+  • Do NOT annotate "malignant" / "carcinoma" / specific diagnosis if that is what students must identify
+
+▶ GENERAL
+  • Microscopic vs macroscopic view must be clearly distinguished
+  • Scale bar or level indicator (low/high magnification) should be present if relevant
+""",
+    "microbiology": r"""
+═══════════════════════════════════════════════════════════════════════════════
+MICROBIOLOGY DIAGRAM REVIEW RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+▶ BACTERIAL STRUCTURE DIAGRAMS
+  • Must label: cell wall, plasma membrane, cytoplasm, nucleoid, ribosomes
+  • Optional (if relevant): capsule, flagella, pili, plasmid, outer membrane (Gram-negative)
+  • Gram-positive: thick peptidoglycan layer, NO outer membrane
+  • Gram-negative: thin peptidoglycan, WITH outer membrane (lipopolysaccharide)
+  • ANSWER HIDING: Do NOT label the Gram-type or species name if students must identify it
+
+▶ INFECTION/REPLICATION CYCLE DIAGRAMS
+  • Steps must be in correct biological sequence for the pathogen type
+  • Correct terminology: adsorption/attachment → penetration/entry → uncoating → replication → assembly → release
+  • Bacteriophage cycles: lytic (immediate) vs lysogenic (integration) clearly differentiated
+  • ANSWER HIDING: Do NOT label the pathogen species or the step name/mechanism if students must identify it
+
+▶ GROWTH CURVE DIAGRAMS
+  • Four phases must be labeled: Lag, Exponential (Log), Stationary, Death (Decline)
+  • x-axis: time (hours); y-axis: log(CFU/mL) or OD600
+  • Phase boundaries shown with dashed vertical lines
+  • Annotations may note generation time during exponential phase
+  • ANSWER HIDING: Do NOT include specific CFU numbers or time values if students must calculate them
 """,
 }
 

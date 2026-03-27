@@ -156,6 +156,14 @@ class AssignmentGenerator:
                 q["hasDiagram"] = False
                 logger.debug(f"Cleaned up hasDiagram flag for question {q.get('id')}")
 
+            # Clean up correctAnswerDiagram if it has no actual S3 URL
+            if q.get("correctAnswerDiagram"):
+                if not q["correctAnswerDiagram"].get("s3_url"):
+                    q["correctAnswerDiagram"] = None
+                    logger.debug(
+                        f"Cleaned up correctAnswerDiagram for question {q.get('id')}"
+                    )
+
             # Recursively clean up subquestions
             if q.get("subquestions"):
                 q["subquestions"] = [cleanup_question(sq) for sq in q["subquestions"]]
@@ -540,8 +548,8 @@ class AssignmentGenerator:
             return """
                     - ALL top-level questions MUST be multi-part questions
                     - Each multi-part question must contain subquestions (Level 2)
-                    - Level 2 subquestions can be: multiple-choice, short-answer, numerical, true-false, code-writing, diagram-analysis, or nested multi-part
-                    - Level 3 subquestions (nested within Level 2 multi-part) can be: multiple-choice, short-answer, numerical, true-false, code-writing, diagram-analysis (NO multi-part at Level 3)
+                    - Level 2 subquestions can be: multiple-choice, short-answer, numerical, true-false, code-writing, diagram-analysis, diagram-required-in-answer, or nested multi-part
+                    - Level 3 subquestions (nested within Level 2 multi-part) can be: multiple-choice, short-answer, numerical, true-false, code-writing, diagram-analysis, diagram-required-in-answer (NO multi-part at Level 3)
                     - Generate diverse subquestion types to test different skills
                     - For any multi-part question, ensure subquestions and nested subquestions are serially numbered (id) like 1, 2, 3.
             """
@@ -556,6 +564,7 @@ class AssignmentGenerator:
 
         # Extract key options
         num_questions = generation_options.get("numQuestions", 5)
+        subject_category = generation_options.get("subjectCategory", "engineering")
         engineering_level = generation_options.get("engineeringLevel", "")
         engineering_discipline = generation_options.get("engineeringDiscipline", "")
         question_types = generation_options.get("questionTypes", {})
@@ -578,8 +587,122 @@ class AssignmentGenerator:
             "video_transcripts"
         ) or content_sources.get("document_texts")
 
-        # Use different prompts based on whether discipline is specified (engineering vs general)
-        if engineering_discipline:
+        # Use different prompts based on subject category / discipline
+        if subject_category == "medical" and engineering_discipline:
+            # Medical-specific prompt
+            level_display = {
+                "pre_med": "Pre-Med",
+                "mbbs_preclinical": "MBBS Pre-Clinical (Year 1–2)",
+                "mbbs_clinical": "MBBS Clinical (Year 3–5)",
+                "md": "MD / Postgraduate",
+            }.get(engineering_level, engineering_level or "medical student")
+
+            if has_custom_prompt and not has_video_or_docs:
+                prompt = f"""
+                    Generate {num_questions} medical assignment questions STRICTLY based on the topic specified in the PRIMARY TOPIC INSTRUCTIONS below.
+
+                    Assignment Requirements:
+                    - Academic Level: {level_display}
+                    - Medical Subject: {engineering_discipline}
+                    - Question Types: {', '.join(enabled_types)}
+                    - Difficulty Level: {difficulty_level}
+                    - Number of questions: {num_questions}
+                    - Total points: {total_points}
+
+                    Content Context:
+                    {content_context}
+
+                    CRITICAL INSTRUCTIONS:
+                    1. You MUST generate questions ONLY on the specific topic mentioned in the PRIMARY TOPIC INSTRUCTIONS above
+                    2. DO NOT generate questions on random topics within {engineering_discipline}
+                    3. The questions must be appropriate for {level_display} students
+                    4. Test clinical reasoning, applied knowledge, and understanding of the SPECIFIC concept requested
+                    5. Include a mix of question types: {', '.join(enabled_types)}
+                    6. Include clear, unambiguous questions with proper answer keys and marking rubrics
+
+                    CLINICAL CASE STUDY QUESTION GUIDELINES (if applicable):
+                    - Present a realistic patient scenario: age, sex, presenting complaint, history, examination findings
+                    - Include relevant investigations (lab values, imaging, ECG) with normal ranges where appropriate
+                    - Questions should test diagnosis, investigations, management, and mechanisms
+                    - Correct answer must include clinical reasoning, not just the diagnosis label
+
+                    OSCE / CLINICAL SKILLS QUESTION GUIDELINES (if applicable):
+                    - Clearly specify the clinical skill or station type (e.g., history taking, examination, procedure)
+                    - Include examiner instructions (what to observe/assess)
+                    - Provide a structured marking scheme: domains and marks per domain
+                    - Expected response should outline the key steps or findings the student must demonstrate
+
+                    DIAGRAM-REQUIRED-IN-ANSWER QUESTION GUIDELINES (if applicable):
+                    - Use type "diagram-required-in-answer" when the student MUST draw, sketch, plot, or create a diagram/figure as part of their answer
+                    - Examples: "Draw the free body diagram", "Sketch the output waveform", "Plot the dose-response curve", "Draw the metabolic pathway", "Construct the Punnett square"
+                    - The correctAnswer field should describe in text what the correct diagram looks like (key features, labels, relationships)
+                    - The question text should clearly specify what the student needs to draw and any constraints (axes labels, scale, components to include)
+                    - Do NOT use "diagram-analysis" for these — diagram-analysis is for questions where the student INTERPRETS a given diagram
+
+                    MULTI-PART QUESTION GUIDELINES:
+                    {self._get_multipart_instructions(enabled_types)}
+
+                    CRITICAL - SUBQUESTION REQUIREMENTS:
+                    - EVERY subquestion at ALL levels MUST include:
+                      * correctAnswer: The correct answer for that subquestion
+                      * rubric: Detailed grading guidelines for that subquestion
+                    - Do NOT leave correctAnswer or rubric empty for subquestions
+
+                    The response will be automatically structured according to the provided JSON schema.
+                """
+            else:
+                prompt = f"""
+                    Generate {num_questions} medical assignment questions based on the provided content.
+
+                    Assignment Requirements:
+                    - Academic Level: {level_display}
+                    - Medical Subject: {engineering_discipline}
+                    - Question Types: {', '.join(enabled_types)}
+                    - Difficulty Level: {difficulty_level}
+                    - Number of questions: {num_questions}
+                    - Total points: {total_points}
+
+                    Content Context:
+                    {content_context}
+
+                    Please generate questions that:
+                    1. Are appropriate for {level_display} students in {engineering_discipline}
+                    2. Test understanding of key concepts from the provided Content Context; DO NOT deviate to unrelated topics
+                    3. Include a mix of question types: {', '.join(enabled_types)}
+                    4. Include clear, unambiguous questions with detailed answer keys and marking rubrics
+                    5. Use correct medical terminology throughout
+
+                    CLINICAL CASE STUDY QUESTION GUIDELINES (if applicable):
+                    - Present a realistic patient scenario: age, sex, presenting complaint, history, examination findings
+                    - Include relevant investigations (lab values, imaging, ECG) with normal ranges where appropriate
+                    - Questions should test diagnosis, investigations, management, and mechanisms
+                    - Correct answer must include clinical reasoning, not just the diagnosis label
+
+                    OSCE / CLINICAL SKILLS QUESTION GUIDELINES (if applicable):
+                    - Clearly specify the clinical skill or station type (e.g., history taking, examination, procedure)
+                    - Include examiner instructions (what to observe/assess)
+                    - Provide a structured marking scheme: domains and marks per domain
+                    - Expected response should outline the key steps or findings the student must demonstrate
+
+                    DIAGRAM-REQUIRED-IN-ANSWER QUESTION GUIDELINES (if applicable):
+                    - Use type "diagram-required-in-answer" when the student MUST draw, sketch, plot, or create a diagram/figure as part of their answer
+                    - Examples: "Draw the free body diagram", "Sketch the output waveform", "Plot the dose-response curve", "Draw the metabolic pathway", "Construct the Punnett square"
+                    - The correctAnswer field should describe in text what the correct diagram looks like (key features, labels, relationships)
+                    - The question text should clearly specify what the student needs to draw and any constraints (axes labels, scale, components to include)
+                    - Do NOT use "diagram-analysis" for these — diagram-analysis is for questions where the student INTERPRETS a given diagram
+
+                    MULTI-PART QUESTION GUIDELINES:
+                    {self._get_multipart_instructions(enabled_types)}
+
+                    CRITICAL - SUBQUESTION REQUIREMENTS:
+                    - EVERY subquestion at ALL levels MUST include:
+                      * correctAnswer: The correct answer for that subquestion
+                      * rubric: Detailed grading guidelines for that subquestion
+                    - Do NOT leave correctAnswer or rubric empty for subquestions
+
+                    The response will be automatically structured according to the provided JSON schema.
+                """
+        elif engineering_discipline:
             # Engineering-specific prompt
             if has_custom_prompt and not has_video_or_docs:
                 # Custom prompt only - make it the PRIMARY focus
@@ -623,11 +746,23 @@ class AssignmentGenerator:
                     CORRECTANSWER AND MULTIPLECORRECTANSWERS FIELD GUIDELINES:
                     - correctAnswer is the complete correct answer for the question or subquestion expected from the student. It should be a fully formed answer, not just keywords
                     - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+                    - for numerical questions, correctAnswer must include the complete step-by-step derivation followed by the final answer. Use newlines to separate each step. Format as:
+                      Step 1: [state given values and formula]
+                      Step 2: [substitute values and simplify]
+                      ...
+                      Final answer: [value with units]
                     - for code questions, correctAnswer should depend on outputType.
                       -- If outputType is "code", correctAnswer should be the full code.
                       -- If outputType is "function", correctAnswer should be the full function defination.
                       -- If outputType is "algorithm", correctAnswer should be a detailed description of the algorithm steps.
                       -- If outputType is "output", correctAnswer should be the expected output from running the code.
+
+                    DIAGRAM-REQUIRED-IN-ANSWER QUESTION GUIDELINES (if applicable):
+                    - Use type "diagram-required-in-answer" when the student MUST draw, sketch, plot, or create a diagram/figure as part of their answer
+                    - Examples: "Draw the free body diagram", "Sketch the output waveform", "Plot the Bode diagram", "Draw the state diagram", "Construct the Karnaugh map"
+                    - The correctAnswer field should describe in text what the correct diagram looks like (key features, labels, relationships)
+                    - The question text should clearly specify what the student needs to draw and any constraints (axes labels, scale, components to include)
+                    - Do NOT use "diagram-analysis" for these — diagram-analysis is for questions where the student INTERPRETS a given diagram
 
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
@@ -681,11 +816,23 @@ class AssignmentGenerator:
                     CORRECTANSWER AND MULTIPLECORRECTANSWERS FIELD GUIDELINES:
                     - correctAnswer is the complete correct answer for the question or subquestion expected from the student. It should be a fully formed answer, not just keywords
                     - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+                    - for numerical questions, correctAnswer must include the complete step-by-step derivation followed by the final answer. Use newlines to separate each step. Format as:
+                      Step 1: [state given values and formula]
+                      Step 2: [substitute values and simplify]
+                      ...
+                      Final answer: [value with units]
                     - for code questions, correctAnswer should depend on outputType.
                       -- If outputType is "code", correctAnswer should be the full code.
                       -- If outputType is "function", correctAnswer should be the full function defination.
                       -- If outputType is "algorithm", correctAnswer should be a detailed description of the algorithm steps.
                       -- If outputType is "output", correctAnswer should be the expected output from running the code.
+
+                    DIAGRAM-REQUIRED-IN-ANSWER QUESTION GUIDELINES (if applicable):
+                    - Use type "diagram-required-in-answer" when the student MUST draw, sketch, plot, or create a diagram/figure as part of their answer
+                    - Examples: "Draw the free body diagram", "Sketch the output waveform", "Plot the Bode diagram", "Draw the state diagram", "Construct the Karnaugh map"
+                    - The correctAnswer field should describe in text what the correct diagram looks like (key features, labels, relationships)
+                    - The question text should clearly specify what the student needs to draw and any constraints (axes labels, scale, components to include)
+                    - Do NOT use "diagram-analysis" for these — diagram-analysis is for questions where the student INTERPRETS a given diagram
 
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
@@ -744,11 +891,23 @@ class AssignmentGenerator:
                     CORRECTANSWER AND MULTIPLECORRECTANSWERS FIELD GUIDELINES:
                     - correctAnswer is the complete correct answer for the question or subquestion expected from the student. It should be a fully formed answer, not just keywords
                     - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+                    - for numerical questions, correctAnswer must include the complete step-by-step derivation followed by the final answer. Use newlines to separate each step. Format as:
+                      Step 1: [state given values and formula]
+                      Step 2: [substitute values and simplify]
+                      ...
+                      Final answer: [value with units]
                     - for code questions, correctAnswer should depend on outputType.
                       -- If outputType is "code", correctAnswer should be the full code.
                       -- If outputType is "function", correctAnswer should be the full function defination.
                       -- If outputType is "algorithm", correctAnswer should be a detailed description of the algorithm steps.
                       -- If outputType is "output", correctAnswer should be the expected output from running the code.
+
+                    DIAGRAM-REQUIRED-IN-ANSWER QUESTION GUIDELINES (if applicable):
+                    - Use type "diagram-required-in-answer" when the student MUST draw, sketch, plot, or create a diagram/figure as part of their answer
+                    - Examples: "Draw the free body diagram", "Sketch the output waveform", "Plot the Bode diagram", "Draw the state diagram", "Construct the Karnaugh map"
+                    - The correctAnswer field should describe in text what the correct diagram looks like (key features, labels, relationships)
+                    - The question text should clearly specify what the student needs to draw and any constraints (axes labels, scale, components to include)
+                    - Do NOT use "diagram-analysis" for these — diagram-analysis is for questions where the student INTERPRETS a given diagram
 
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
@@ -800,11 +959,23 @@ class AssignmentGenerator:
                     CORRECTANSWER AND MULTIPLECORRECTANSWERS FIELD GUIDELINES:
                     - correctAnswer is the complete correct answer for the question or subquestion expected from the student. It should be a fully formed answer, not just keywords
                     - for MCQ, provide correctAnswer as index (like "0", "1", "2", "3"). if multiple correct, set allowMultipleCorrect to true and provide multipleCorrectAnswers as array of indices
+                    - for numerical questions, correctAnswer must include the complete step-by-step derivation followed by the final answer. Use newlines to separate each step. Format as:
+                      Step 1: [state given values and formula]
+                      Step 2: [substitute values and simplify]
+                      ...
+                      Final answer: [value with units]
                     - for code questions, correctAnswer should depend on outputType.
                       -- If outputType is "code", correctAnswer should be the full code.
                       -- If outputType is "function", correctAnswer should be the full function defination.
                       -- If outputType is "algorithm", correctAnswer should be a detailed description of the algorithm steps.
                       -- If outputType is "output", correctAnswer should be the expected output from running the code.
+
+                    DIAGRAM-REQUIRED-IN-ANSWER QUESTION GUIDELINES (if applicable):
+                    - Use type "diagram-required-in-answer" when the student MUST draw, sketch, plot, or create a diagram/figure as part of their answer
+                    - Examples: "Draw the free body diagram", "Sketch the output waveform", "Plot the Bode diagram", "Draw the state diagram", "Construct the Karnaugh map"
+                    - The correctAnswer field should describe in text what the correct diagram looks like (key features, labels, relationships)
+                    - The question text should clearly specify what the student needs to draw and any constraints (axes labels, scale, components to include)
+                    - Do NOT use "diagram-analysis" for these — diagram-analysis is for questions where the student INTERPRETS a given diagram
 
                     MULTI-PART QUESTION GUIDELINES:
                     {self._get_multipart_instructions(enabled_types)}
@@ -838,8 +1009,47 @@ class AssignmentGenerator:
 
     def _get_system_prompt(self, generation_options: Dict[str, Any]) -> str:
         """Get the system prompt for AI generation"""
+        subject_category = generation_options.get("subjectCategory", "engineering")
         engineering_level = generation_options.get("engineeringLevel", "")
         engineering_discipline = generation_options.get("engineeringDiscipline", "")
+
+        if subject_category == "medical" and engineering_discipline:
+            level_display = {
+                "pre_med": "Pre-Med",
+                "mbbs_preclinical": "MBBS Pre-Clinical (Year 1–2)",
+                "mbbs_clinical": "MBBS Clinical (Year 3–5)",
+                "md": "MD / Postgraduate",
+            }.get(engineering_level, engineering_level or "medical student")
+            return f"""You are an expert medical educator specializing in {engineering_discipline} at the {level_display} level.
+
+            Your task is to create high-quality medical assignment questions that:
+            1. STRICTLY follow any PRIMARY TOPIC INSTRUCTIONS provided by the user - this is your TOP priority
+            2. Test deep understanding of the SPECIFIC medical concepts requested
+            3. Require clinical reasoning, critical thinking, and applied knowledge
+            4. Are appropriate for the specified academic level ({level_display})
+            5. Follow medical education best practices (clinical relevance, patient safety awareness)
+            6. Include clear, unambiguous questions with detailed answer keys and marking rubrics
+            7. Provide educational value beyond simple recall — emphasise application and analysis
+
+            CRITICAL: If the user provides PRIMARY TOPIC INSTRUCTIONS, you MUST generate questions ONLY on that specific topic.
+
+            Medical Education Guidelines:
+            - Use correct anatomical, physiological, pharmacological, and clinical terminology
+            - Calibrate difficulty to the academic level: Pre-Med (foundational concepts) → MBBS Pre-Clinical (mechanisms, pathways) → MBBS Clinical (applied, patient-centred) → MD/PG (advanced, research-level)
+            - Clinical Case Study questions: include realistic patient scenarios with history, examination, investigations; test diagnosis, management, and mechanism explanation
+            - OSCE questions: provide examiner instructions and a structured marking scheme
+            - Every question MUST be self-contained — do NOT reference external figures, tables, or diagrams not included in the question text
+            - Avoid culturally biased or ambiguous clinical scenarios
+            - Ensure drug names, dosages, and lab reference ranges are clinically accurate
+
+            MANDATORY FOR MULTI-PART QUESTIONS:
+            - EVERY subquestion at ALL nesting levels MUST have:
+              * A complete correctAnswer
+              * A detailed rubric for grading
+            - Never leave subquestion answers or rubrics empty
+
+            The response will be automatically structured according to the provided JSON schema.
+        """
 
         # Use different system prompts based on whether discipline is specified (engineering vs general)
         if engineering_discipline:
@@ -1071,6 +1281,7 @@ class AssignmentGenerator:
             question.setdefault("rubricType", "overall")
             question.setdefault("code", "")
             question.setdefault("diagram", {"s3_url": None, "s3_key": None})
+            question.setdefault("correctAnswerDiagram", None)
             question.setdefault("optionalParts", False)
             question.setdefault("requiredPartsCount", 0)
             question.setdefault("subquestions", [])
@@ -1101,6 +1312,7 @@ class AssignmentGenerator:
                 sub.setdefault("rubricType", "overall")
                 sub.setdefault("code", "")
                 sub.setdefault("diagram", {"s3_url": None, "s3_key": None})
+                sub.setdefault("correctAnswerDiagram", None)
                 sub.setdefault("rubric", "")
                 sub.setdefault("optionalParts", False)
                 sub.setdefault("requiredPartsCount", 0)
@@ -1137,6 +1349,7 @@ class AssignmentGenerator:
                     nested_sub.setdefault("rubricType", "overall")
                     nested_sub.setdefault("code", "")
                     nested_sub.setdefault("diagram", {"s3_url": None, "s3_key": None})
+                    nested_sub.setdefault("correctAnswerDiagram", None)
                     nested_sub.setdefault("rubric", "")
                     nested_sub.setdefault("optionalParts", False)
                     nested_sub.setdefault("requiredPartsCount", 0)
@@ -1174,6 +1387,16 @@ class AssignmentGenerator:
             else:
                 return f"{engineering_level.title()} {engineering_discipline.title()} Assignment"
 
+    # Human-readable display names for academic level keys
+    _LEVEL_DISPLAY_NAMES = {
+        "undergraduate": "Undergraduate",
+        "graduate": "Graduate",
+        "pre_med": "Pre-Med",
+        "mbbs_preclinical": "MBBS Pre-Clinical",
+        "mbbs_clinical": "MBBS Clinical",
+        "md": "MD/Postgraduate",
+    }
+
     def _generate_description(
         self, generation_options: Dict[str, Any], content_sources: Dict[str, Any]
     ) -> str:
@@ -1182,14 +1405,19 @@ class AssignmentGenerator:
         engineering_discipline = generation_options.get("engineeringDiscipline", "")
         num_questions = generation_options.get("numQuestions", 5)
 
+        # Convert raw level key (e.g. mbbs_preclinical) to a human-readable name
+        level_display = self._LEVEL_DISPLAY_NAMES.get(
+            engineering_level, engineering_level
+        )
+
         # Build description based on available options
-        if engineering_level and engineering_discipline:
+        if level_display and engineering_discipline:
             description_parts = [
-                f"AI-generated {engineering_level}-level {engineering_discipline} assignment",
+                f"AI-generated {level_display}-level {engineering_discipline} assignment",
             ]
-        elif engineering_level:
+        elif level_display:
             description_parts = [
-                f"AI-generated {engineering_level}-level assignment",
+                f"AI-generated {level_display}-level assignment",
             ]
         elif engineering_discipline:
             description_parts = [

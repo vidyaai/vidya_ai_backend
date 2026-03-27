@@ -16,6 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
+from pgvector.sqlalchemy import Vector
 from utils.db import Base
 
 
@@ -195,12 +196,15 @@ class Assignment(Base):
     status = Column(String, default="draft")  # "draft", "published", "archived"
 
     # Assignment configuration
+    subject_category = Column(
+        String, default="engineering"
+    )  # "engineering", "pcm", "medical"
     engineering_level = Column(
         String, default="undergraduate"
-    )  # "undergraduate", "graduate"
+    )  # "undergraduate", "graduate", "pre_med", "mbbs_preclinical", "mbbs_clinical", "md"
     engineering_discipline = Column(
         String, default="general"
-    )  # "general", "electrical", etc.
+    )  # "general", "electrical", ..., "anatomy", "physiology", etc.
     question_types = Column(JSONB, nullable=True)  # Array of question types used
     ai_penalty_percentage = Column(
         Float, default=50.0
@@ -556,7 +560,7 @@ class TranscriptChunk(Base):
     end_seconds = Column(Float, nullable=True)
 
     # Embedding (1536 dimensions for text-embedding-3-small)
-    embedding = Column(JSON, nullable=True)
+    embedding = Column(Vector(1536), nullable=True)
 
     # Metadata
     word_count = Column(Integer, nullable=True)

@@ -44,6 +44,18 @@ _CODE_BETTER_TYPES = frozenset(
         "fsm_diagram",
         "cdc_diagram",
         "circuit_with_timing",
+        # Medical sciences — precise scientific plots, not AI-generatable
+        "action_potential",
+        "cardiac_loop",
+        "feedback_loop",
+        "pressure_volume_loop",
+        "metabolic_pathway",
+        "enzyme_kinetics",
+        "dose_response",
+        "pharmacokinetics",
+        "disease_progression",
+        "infection_cycle",
+        "growth_curve",
     }
 )
 
@@ -61,6 +73,12 @@ math: function_plot, geometric_construction, vector_field, 3d_surface, number_li
 physics: ray_diagram, field_lines, wave_diagram, optics_setup, energy_level_diagram, phase_diagram, spring_mass, pendulum
 chemistry: molecular_structure, reaction_mechanism, lab_apparatus, titration_curve, orbital_diagram, phase_diagram, chromatography
 computer_eng: cpu_block_diagram, memory_hierarchy, pipeline_diagram, alu_circuit, logic_circuit, isa_timing, cache_organization
+anatomy: anatomical_diagram, cross_section, histology
+physiology: action_potential, feedback_loop, pressure_volume_loop, cardiac_loop
+biochemistry: metabolic_pathway, enzyme_kinetics
+pharmacology: dose_response, pharmacokinetics
+pathology: disease_progression, histopathology
+microbiology: bacterial_structure, infection_cycle, growth_curve
 
 COMPLEXITY:
 - simple: single concept, few components
@@ -68,12 +86,15 @@ COMPLEXITY:
 - complex: many components, complex interactions
 
 AI_SUITABLE (whether Gemini image gen works well — True for spatial/structural, False for precise mathematical plots and data structures):
-- True: circuit_schematic, free_body_diagram, truss_diagram, ray_diagram, molecular_structure, cpu_block_diagram, lab_apparatus, mechanism_linkage, optics_setup, field_lines, energy_level_diagram, wave_diagram, spring_mass, pendulum, truss_frame, cross_section, retaining_wall, beam_diagram, orbital_diagram, reaction_mechanism, pipeline_diagram, memory_hierarchy, logic_circuit, alu_circuit, block_diagram, geometric_construction, fluid_flow
-- False: all plots (bode_plot, iv_curve, function_plot, stress_strain_curve, titration_curve, pv_diagram, titration_curve), data structures (binary_tree, linked_list, graph_network, sorting_visualization, stack_queue, hash_table), timing_diagram, automata_fsm, flowchart, 3d_surface, number_line, matrix_visualization, isa_timing, cache_organization, waveform, chromatography, sequential_circuit, flip_flop_circuit, counter_circuit, shift_register, fsm_diagram, cdc_diagram, circuit_with_timing
+- True: circuit_schematic, free_body_diagram, truss_diagram, ray_diagram, molecular_structure, cpu_block_diagram, lab_apparatus, mechanism_linkage, optics_setup, field_lines, energy_level_diagram, wave_diagram, spring_mass, pendulum, truss_frame, cross_section, retaining_wall, beam_diagram, orbital_diagram, reaction_mechanism, pipeline_diagram, memory_hierarchy, logic_circuit, alu_circuit, block_diagram, geometric_construction, fluid_flow, anatomical_diagram, histology, bacterial_structure
+- False: all plots (bode_plot, iv_curve, function_plot, stress_strain_curve, titration_curve, pv_diagram, titration_curve), data structures (binary_tree, linked_list, graph_network, sorting_visualization, stack_queue, hash_table), timing_diagram, automata_fsm, flowchart, 3d_surface, number_line, matrix_visualization, isa_timing, cache_organization, waveform, chromatography, sequential_circuit, flip_flop_circuit, counter_circuit, shift_register, fsm_diagram, cdc_diagram, circuit_with_timing, action_potential, feedback_loop, pressure_volume_loop, cardiac_loop, metabolic_pathway, enzyme_kinetics, dose_response, pharmacokinetics, disease_progression, histopathology, infection_cycle, growth_curve
 
 PREFERRED_TOOL (for nonai path):
 - circuitikz: circuit_schematic, sequential_circuit, flip_flop_circuit, counter_circuit, shift_register, cdc_diagram (best for ALL electrical circuits with precise pin labels)
-- matplotlib: most diagram types, timing_diagram, waveform, bode_plot, iv_curve, fsm_diagram
+- neurokit2: action_potential, cardiac_loop (scipy-based physiological signal waveforms)
+- scipy: dose_response, pharmacokinetics, enzyme_kinetics, pressure_volume_loop, growth_curve (scipy/numpy mathematical curves)
+- networkx_pathway: metabolic_pathway, feedback_loop, infection_cycle, disease_progression (directed flow graphs)
+- matplotlib: most diagram types, timing_diagram, waveform, bode_plot, iv_curve, fsm_diagram, and medical types not covered above
 - networkx: binary_tree, linked_list, graph_network, automata_fsm, stack_queue, hash_table
 - graphviz: flowchart, automata_fsm
 - circuit_with_timing: Use circuitikz for the circuit + matplotlib for the timing → preferred_tool = circuitikz (primary)
@@ -335,6 +356,125 @@ class DomainRouter:
             ]
         ):
             return "physics"
+        # ── Medical sciences — checked BEFORE chemistry so that:
+        #    1. "biochemistry" hint is not caught by "chemistry" substring check
+        #    2. "anatomical" text is not caught by chemistry's "atom" keyword
+        if "anatomy" in hint or any(
+            kw in q
+            for kw in [
+                "anatomical",
+                "anatomy",
+                "organ",
+                "bone",
+                "tissue",
+                "muscle",
+                "nerve",
+                "histology",
+                "cross-section",
+                "sagittal",
+                "coronal",
+                "transverse section",
+                "ligament",
+                "tendon",
+            ]
+        ):
+            return "anatomy"
+        if "physiology" in hint or any(
+            kw in q
+            for kw in [
+                "action potential",
+                "membrane potential",
+                "resting potential",
+                "depolarization",
+                "repolarization",
+                "excitation-contraction",
+                "sarcoplasmic reticulum",
+                "cardiac cycle",
+                "pressure-volume",
+                "homeostasis",
+                "feedback loop",
+                "cardiac output",
+                "stroke volume",
+                "heart rate",
+                "renal physiology",
+            ]
+        ):
+            return "physiology"
+        if "biochemistry" in hint or any(
+            kw in q
+            for kw in [
+                "metabolic pathway",
+                "glycolysis",
+                "krebs cycle",
+                "citric acid cycle",
+                "electron transport",
+                "enzyme kinetics",
+                "michaelis",
+                "vmax",
+                "km",
+                "metabolite",
+                "atp synthesis",
+                "nadh",
+                "coenzyme",
+                "biochemical",
+            ]
+        ):
+            return "biochemistry"
+        if "pharmacology" in hint or any(
+            kw in q
+            for kw in [
+                "dose-response",
+                "dose response",
+                "ec50",
+                "ed50",
+                "pharmacokinetics",
+                "pharmacodynamics",
+                "plasma concentration",
+                "bioavailability",
+                "half-life",
+                "agonist",
+                "antagonist",
+                "receptor binding",
+                "therapeutic index",
+            ]
+        ):
+            return "pharmacology"
+        if "pathology" in hint or any(
+            kw in q
+            for kw in [
+                "histopathology",
+                "disease progression",
+                "cancer staging",
+                "neoplasia",
+                "necrosis",
+                "inflammation",
+                "pathogenesis",
+                "tumour",
+                "tumor",
+                "malignant",
+                "benign",
+            ]
+        ):
+            return "pathology"
+        if "microbiology" in hint or any(
+            kw in q
+            for kw in [
+                "bacterial",
+                "bacteria",
+                "gram stain",
+                "gram-positive",
+                "gram-negative",
+                "infection cycle",
+                "replication cycle",
+                "pathogen",
+                "virulence",
+                "antibiotic",
+                "antimicrobial",
+                "growth curve",
+                "colony forming",
+            ]
+        ):
+            return "microbiology"
         if "chemistry" in hint or any(
             kw in q
             for kw in [
@@ -413,6 +553,123 @@ class DomainRouter:
                 diagram_type = "timing_diagram"
                 preferred_tool = "matplotlib"
                 ai_suitable = False
+
+        elif domain in (
+            "anatomy",
+            "physiology",
+            "biochemistry",
+            "pharmacology",
+            "pathology",
+            "microbiology",
+        ):
+            # Medical sciences: all plots use matplotlib; structural diagrams use imagen
+            _medical_type_map = {
+                "anatomy": ("anatomical_diagram", True),  # structural → ai_suitable
+                "physiology": ("action_potential", False),
+                "biochemistry": ("metabolic_pathway", False),
+                "pharmacology": ("dose_response", False),
+                "pathology": ("disease_progression", False),
+                "microbiology": (
+                    "bacterial_structure",
+                    True,
+                ),  # structural → ai_suitable
+            }
+            _q = q
+            # Refine diagram type based on keywords
+            if domain == "anatomy":
+                if any(
+                    kw in _q
+                    for kw in ["histology", "histological", "microscopy", "slide"]
+                ):
+                    diagram_type = "histology"
+                    ai_suitable = True
+                elif any(
+                    kw in _q
+                    for kw in [
+                        "cross section",
+                        "cross-section",
+                        "transverse",
+                        "sagittal",
+                        "coronal",
+                    ]
+                ):
+                    diagram_type = "cross_section"
+                    ai_suitable = True
+                else:
+                    diagram_type = "anatomical_diagram"
+                    ai_suitable = True
+            elif domain == "physiology":
+                if any(
+                    kw in _q
+                    for kw in [
+                        "pressure",
+                        "volume",
+                        "p-v loop",
+                        "pv loop",
+                        "cardiac loop",
+                    ]
+                ):
+                    diagram_type = "pressure_volume_loop"
+                elif any(kw in _q for kw in ["feedback", "homeostasis", "set point"]):
+                    diagram_type = "feedback_loop"
+                else:
+                    diagram_type = "action_potential"
+                ai_suitable = False
+            elif domain == "biochemistry":
+                if any(kw in _q for kw in ["kinetics", "michaelis", "vmax", "km"]):
+                    diagram_type = "enzyme_kinetics"
+                else:
+                    diagram_type = "metabolic_pathway"
+                ai_suitable = False
+            elif domain == "pharmacology":
+                if any(
+                    kw in _q
+                    for kw in [
+                        "concentration",
+                        "time",
+                        "plasma",
+                        "half-life",
+                        "t½",
+                        "cmax",
+                        "auc",
+                    ]
+                ):
+                    diagram_type = "pharmacokinetics"
+                else:
+                    diagram_type = "dose_response"
+                ai_suitable = False
+            elif domain == "pathology":
+                if any(
+                    kw in _q
+                    for kw in ["histopathology", "microscopy", "biopsy", "slide"]
+                ):
+                    diagram_type = "histopathology"
+                    ai_suitable = True
+                else:
+                    diagram_type = "disease_progression"
+                    ai_suitable = False
+            elif domain == "microbiology":
+                if any(
+                    kw in _q
+                    for kw in [
+                        "growth curve",
+                        "growth rate",
+                        "bacterial growth",
+                        "lag phase",
+                        "log phase",
+                    ]
+                ):
+                    diagram_type = "growth_curve"
+                    ai_suitable = False
+                elif any(
+                    kw in _q for kw in ["infection", "replication", "cycle", "pathogen"]
+                ):
+                    diagram_type = "infection_cycle"
+                    ai_suitable = False
+                else:
+                    diagram_type = "bacterial_structure"
+                    ai_suitable = True
+            preferred_tool = "matplotlib"
 
         return {
             "domain": domain,
