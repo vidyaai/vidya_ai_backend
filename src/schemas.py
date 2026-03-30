@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -765,3 +765,21 @@ class CourseMaterialOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UserProfileResponse(BaseModel):
+    user_type: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class UserProfileUpdate(BaseModel):
+    user_type: str
+
+    @field_validator("user_type")
+    @classmethod
+    def validate_user_type(cls, v: str) -> str:
+        if v not in ("professor", "student"):
+            raise ValueError("user_type must be 'professor' or 'student'")
+        return v

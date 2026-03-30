@@ -309,6 +309,7 @@ class User(Base):
     firebase_uid = Column(String, unique=True, nullable=False, index=True)
     email = Column(String, nullable=True)
     name = Column(String, nullable=True)
+    user_type = Column(String(20), nullable=True)  # 'professor' or 'student'
     stripe_customer_id = Column(String, nullable=True, unique=True)
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
