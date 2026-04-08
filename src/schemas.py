@@ -677,6 +677,9 @@ class CourseCreate(BaseModel):
     description: Optional[str] = None
     course_code: Optional[str] = None
     semester: Optional[str] = None
+    subject_category: Optional[str] = "engineering"
+    engineering_level: Optional[str] = None
+    engineering_discipline: Optional[str] = None
 
 
 class CourseUpdate(BaseModel):
@@ -685,6 +688,9 @@ class CourseUpdate(BaseModel):
     course_code: Optional[str] = None
     semester: Optional[str] = None
     is_active: Optional[bool] = None
+    subject_category: Optional[str] = None
+    engineering_level: Optional[str] = None
+    engineering_discipline: Optional[str] = None
 
 
 class CourseOut(BaseModel):
@@ -699,6 +705,9 @@ class CourseOut(BaseModel):
     enrollment_count: int = 0
     assignment_count: int = 0
     material_count: int = 0
+    subject_category: Optional[str] = None
+    engineering_level: Optional[str] = None
+    engineering_discipline: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
