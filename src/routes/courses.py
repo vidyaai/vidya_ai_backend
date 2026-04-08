@@ -74,6 +74,9 @@ def _course_to_out(course: Course, db: Session) -> dict:
         "enrollment_count": enrollment_count,
         "assignment_count": assignment_count,
         "material_count": material_count,
+        "subject_category": course.subject_category,
+        "engineering_level": course.engineering_level,
+        "engineering_discipline": course.engineering_discipline,
         "created_at": course.created_at,
         "updated_at": course.updated_at,
     }
@@ -182,6 +185,9 @@ def create_course(
         description=data.description,
         course_code=data.course_code,
         semester=data.semester,
+        subject_category=data.subject_category,
+        engineering_level=data.engineering_level,
+        engineering_discipline=data.engineering_discipline,
     )
     db.add(course)
     db.commit()
