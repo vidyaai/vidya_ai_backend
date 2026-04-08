@@ -443,9 +443,15 @@ class Course(Base):
     enrollment_code = Column(
         String, nullable=True, unique=True
     )  # Optional self-enrollment code
-    subject_category = Column(String, nullable=True, default="engineering")  # "engineering", "pcm", "medical"
-    engineering_level = Column(String, nullable=True)  # "undergraduate", "graduate", "pre_med", etc.
-    engineering_discipline = Column(String, nullable=True)  # "electrical", "cs", "math", "anatomy", etc.
+    subject_category = Column(
+        String, nullable=True, default="engineering"
+    )  # "engineering", "pcm", "medical"
+    engineering_level = Column(
+        String, nullable=True
+    )  # "undergraduate", "graduate", "pre_med", etc.
+    engineering_discipline = Column(
+        String, nullable=True
+    )  # "electrical", "cs", "math", "anatomy", etc.
 
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
