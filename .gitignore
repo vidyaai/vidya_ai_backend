@@ -47,8 +47,5 @@ vidyaai_env/
 *.mp3
 *.sql
 
-# Generated images
-question_generation_test/review_images/
-question_generation_test/question_papers*/
 video_chat_test/data/
 fcc_crystal_paper/
