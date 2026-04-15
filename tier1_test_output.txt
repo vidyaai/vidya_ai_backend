@@ -1,0 +1,579 @@
+2026-03-23 22:09:39,820 - botocore.credentials - INFO - Found credentials in shared credentials file: ~/.aws/credentials
+2026-03-23 22:09:39,898 - controllers.config - INFO - S3 client initialized for bucket: uservideodownloads980
+2026-03-23 22:09:39,898 - controllers.config - INFO - Deepgram client initialized.
+================================================================================
+COMPLETE VIDEO RAG PIPELINE TEST
+================================================================================
+Video: /home/ubuntu/Pingu/vidya_ai_backend/video_chat_test/data/test_video.mp4
+Test ID: test_1774303780
+Timestamp: 2026-03-23T22:09:40.567344
+================================================================================
+
+[1/7] Extracting audio...
+   ℹ️  Audio already exists: /home/ubuntu/Pingu/vidya_ai_backend/video_chat_test/data/test_video_audio.mp3
+   ✅ Audio extracted: /home/ubuntu/Pingu/vidya_ai_backend/video_chat_test/data/test_video_audio.mp3 (32.14 MB)
+   ⏱️  Time: 0.00s
+
+[2/7] Generating transcript with Deepgram...
+   Transcribing with Deepgram...
+2026-03-23 22:09:53,151 - httpx - INFO - HTTP Request: POST https://api.deepgram.com/v1/listen?model=nova-2&paragraphs=true&punctuate=true&smart_format=true&utterances=true "HTTP/1.1 200 OK"
+   ✅ Transcript generated
+   ⏱️  Time: 16.57s
+   📝 Words: 6569
+   📊 Segments: 1906
+
+   Preview: February. Preparation Hello? Very good evening. Am I audible? Hey. Anirban Mondul is a student name. Right? Anirban? Okay. And you are right now is a student of Saint Teresa School from. Right? Yeah. ...
+
+[3/7] Formatting transcript...
+2026-03-23 22:09:57,212 - controllers.config - INFO - Formatting text with OpenAI...
+2026-03-23 22:09:57,212 - controllers.config - INFO - Formatting 267 chunks with OpenAI (max 15 concurrent) for video_id: test_1774303780...
+2026-03-23 22:09:58,150 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:58,420 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:58,479 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:58,537 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:58,744 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:58,804 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,028 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,036 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,050 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,097 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,130 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,152 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,172 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,189 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,272 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,337 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,388 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,490 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,551 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,796 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,809 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,815 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,834 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,941 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:09:59,963 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:00,146 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:00,206 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:00,304 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:00,342 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:00,423 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:00,447 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:00,474 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:00,477 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:00,605 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:00,720 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:00,732 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:00,775 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,052 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,083 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,109 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,129 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,154 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,256 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,334 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,344 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,373 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,471 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,559 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,584 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,670 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,821 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,888 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,950 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:01,957 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,031 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,048 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,164 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,203 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,464 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,537 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,580 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,588 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,618 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,709 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,738 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,907 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,924 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:02,994 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,094 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,179 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,218 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,343 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,359 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,436 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,563 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,775 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,834 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,846 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,869 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,884 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,889 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,980 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:03,983 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,091 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,100 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,225 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,245 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,280 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,379 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,429 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,489 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,537 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,539 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,558 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,743 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,779 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:04,945 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,024 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,162 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,213 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,227 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,296 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,297 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,389 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,576 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,673 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,742 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,780 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,815 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,857 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,960 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,975 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:05,991 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,145 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,176 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,205 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,263 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,264 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,314 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,374 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,375 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,388 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,567 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,623 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,886 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,934 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,937 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,947 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:06,988 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,037 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,098 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,100 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,180 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,186 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,234 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,359 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,501 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,570 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,617 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,798 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,853 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,864 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,919 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:07,961 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:08,081 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:08,107 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:08,196 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:08,222 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:08,256 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:08,296 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:08,353 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:08,390 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:08,608 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:08,628 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:08,650 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:08,733 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:08,801 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,103 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,108 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,180 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,201 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,371 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,406 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,494 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,509 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,539 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,706 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,716 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,769 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,907 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:09,946 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:10,098 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:10,251 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:10,365 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:10,370 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:10,510 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:10,584 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:10,693 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:10,704 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:10,708 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:10,725 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:10,798 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:10,812 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:10,860 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:11,075 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:11,094 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:11,196 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:11,305 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:11,346 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:11,379 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:11,387 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:11,491 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:11,626 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:11,705 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:11,746 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:11,881 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:11,887 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,005 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,015 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,081 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,154 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,161 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,219 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,377 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,458 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,470 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,558 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,599 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,659 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,705 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,777 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,898 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,940 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,948 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:12,990 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,077 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,086 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,095 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,182 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,234 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,259 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,383 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,419 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,452 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,473 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,498 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,508 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,663 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:13,815 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,004 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,025 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,092 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,227 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,293 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,412 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,496 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,585 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,599 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,613 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,690 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,707 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,766 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,775 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,808 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:14,914 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,003 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,003 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,049 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,233 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,339 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,358 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,538 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,590 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,777 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,779 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,805 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,805 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,806 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,925 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,948 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:15,992 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:16,046 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:16,136 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:16,152 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:16,334 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:16,402 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:16,573 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:16,585 - controllers.config - INFO - ✓ All 267 chunks formatted successfully
+2026-03-23 22:10:16,588 - controllers.config - INFO - Formatted transcript created (not saved to file)
+   ✅ Transcript formatted
+   ⏱️  Time: 19.38s
+   📄 Length: 43181 characters
+
+[4/7] Generating video summary...
+   ℹ️  Video already exists, reusing: test_1774303780
+   ✅ Updated transcript for existing video
+2026-03-23 22:10:16,602 - controllers.config - INFO - Generating summary for video test_1774303780
+2026-03-23 22:10:18,477 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:20,141 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:21,628 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:22,681 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:24,083 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:25,040 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:26,437 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:28,904 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:30,230 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:31,490 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:32,986 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:34,428 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:34,437 - controllers.config - INFO - Summary created for video test_1774303780 with 10 sections
+   ✅ Summary generated
+   ⏱️  Time: 17.85s
+   📊 Sections: 10
+   🏷️  Topics: 7
+
+   Overview: The video features a counseling session for students and parents, focusing on the importance of early education and preparation for future careers, su...
+
+[5/7] Generating chunks and embeddings...
+2026-03-23 22:10:34,447 - controllers.config - INFO - [Phase 1] Processing transcript for video test_1774303780
+2026-03-23 22:10:34,449 - controllers.config - INFO - Created 19 semantic chunks
+2026-03-23 22:10:35,514 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-03-23 22:10:35,674 - controllers.config - INFO - Generated 19 embeddings (batch 1)
+2026-03-23 22:10:35,674 - controllers.config - INFO - Generated 19 embeddings
+2026-03-23 22:10:35,726 - controllers.config - INFO - [Phase 1] Stored 19 chunks for video test_1774303780
+   ✅ Chunks generated
+   ⏱️  Time: 1.29s
+   📦 Chunks: 19
+   ⚡ Avg time/chunk: 0.068s
+
+[6/7] Testing queries...
+
+   Testing 5 questions...
+   ----------------------------------------------------------------------------
+
+   [1/5] What is the name of the student and the counsellor?
+2026-03-23 22:10:35,996 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-03-23 22:10:36,016 - controllers.config - ERROR - Error retrieving chunks with pgvector: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+2026-03-23 22:10:37,832 - controllers.config - INFO - Fallback: Found 'name' at pos 251, extracted 11637 chars (4299 tokens)
+2026-03-23 22:10:37,832 - controllers.config - INFO - 🔍 System prompt check - Contains 'LaTeX ONLY': True
+2026-03-23 22:10:37,832 - controllers.config - INFO - 🔍 System prompt check - Contains 'NEVER use HTML': True
+2026-03-23 22:10:41,523 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:41,528 - controllers.config - INFO - 🤖 AI Response (first 500 chars): Great question! The student's name is **Anirban Mondul**, and the counselor's name is **Sadiq Mohammed**. You can find this information at the beginning of the video, specifically around $03:50$ where they introduce themselves. 
+
+Does that help? Want to know more about their conversation or any specific part of the video? 😊
+2026-03-23 22:10:41,528 - controllers.config - INFO - 🔍 Response contains 'MathML': False
+2026-03-23 22:10:41,528 - controllers.config - INFO - 🔍 Response contains '<math': False
+2026-03-23 22:10:41,529 - controllers.config - INFO - 🔍 Response contains '\(': False
+      Strategy: Fallback
+      Response time: 5802ms
+      Context length: 11637 chars
+      Response: Great question! The student's name is **Anirban Mondul**, and the counselor's name is **Sadiq Mohamm...
+
+   [2/5] What is this conversation about?
+2026-03-23 22:10:42,207 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-03-23 22:10:42,226 - controllers.config - ERROR - Error retrieving chunks with pgvector: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+2026-03-23 22:10:42,233 - controllers.config - INFO - Fallback: Found 'conversation' at pos 10492, extracted 10935 chars (5463 tokens)
+2026-03-23 22:10:42,233 - controllers.config - INFO - 🔍 System prompt check - Contains 'LaTeX ONLY': True
+2026-03-23 22:10:42,233 - controllers.config - INFO - 🔍 System prompt check - Contains 'NEVER use HTML': True
+2026-03-23 22:10:50,469 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:50,473 - controllers.config - INFO - 🤖 AI Response (first 500 chars): This conversation seems to revolve around education, particularly focusing on the challenges and experiences of students preparing for competitive exams in India. Here are some key points that stand out:
+
+- **Importance of Subjects**: The discussion touches on the significance of subjects like physics and math, especially for aspiring doctors and engineers. There's an emphasis on how a strong foundation in math can impact understanding physics.
+
+- **Educational Systems**: The conversation mentio
+2026-03-23 22:10:50,473 - controllers.config - INFO - 🔍 Response contains 'MathML': False
+2026-03-23 22:10:50,473 - controllers.config - INFO - 🔍 Response contains '<math': False
+2026-03-23 22:10:50,474 - controllers.config - INFO - 🔍 Response contains '\(': False
+      Strategy: Fallback
+      Response time: 8945ms
+      Context length: 10935 chars
+      Response: This conversation seems to revolve around education, particularly focusing on the challenges and exp...
+
+   [3/5] What are the main topics discussed?
+2026-03-23 22:10:50,795 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-03-23 22:10:50,813 - controllers.config - ERROR - Error retrieving chunks with pgvector: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+2026-03-23 22:10:50,818 - controllers.config - INFO - Fallback: Found 'are' at pos 287, extracted 11637 chars (4308 tokens)
+2026-03-23 22:10:50,819 - controllers.config - INFO - 🔍 System prompt check - Contains 'LaTeX ONLY': True
+2026-03-23 22:10:50,819 - controllers.config - INFO - 🔍 System prompt check - Contains 'NEVER use HTML': True
+2026-03-23 22:10:56,402 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:10:56,406 - controllers.config - INFO - 🤖 AI Response (first 500 chars): Great question! The video covers several key topics, mainly focused on education and student preparation. Here’s a breakdown of the main points discussed:
+
+- **Importance of Early Education** ($07:17 - 08:15$): The speaker emphasizes how crucial it is for students to start preparing early for their future careers, like becoming doctors or engineers.
+
+- **Counseling and Support** ($08:46 - 09:43$): The speaker introduces themselves as an education counselor and talks about the need for guidance i
+2026-03-23 22:10:56,406 - controllers.config - INFO - 🔍 Response contains 'MathML': False
+2026-03-23 22:10:56,406 - controllers.config - INFO - 🔍 Response contains '<math': False
+2026-03-23 22:10:56,406 - controllers.config - INFO - 🔍 Response contains '\(': False
+      Strategy: Fallback
+      Response time: 5932ms
+      Context length: 11637 chars
+      Response: Great question! The video covers several key topics, mainly focused on education and student prepara...
+
+   [4/5] Summarize the key points of this conversation
+2026-03-23 22:10:57,393 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-03-23 22:10:57,453 - controllers.config - ERROR - Error retrieving chunks with pgvector: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+2026-03-23 22:10:57,459 - controllers.config - INFO - Fallback: Found 'key' at pos 21941, extracted 11078 chars (5487 tokens)
+2026-03-23 22:10:57,459 - controllers.config - INFO - 🔍 System prompt check - Contains 'LaTeX ONLY': True
+2026-03-23 22:10:57,459 - controllers.config - INFO - 🔍 System prompt check - Contains 'NEVER use HTML': True
+2026-03-23 22:11:08,146 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:11:08,151 - controllers.config - INFO - 🤖 AI Response (first 500 chars): Sure! Let's break down the key points from the conversation:
+
+1. **Gravitational Force**:
+   - The gravitational force of the Moon is **one-sixth** that of Earth's gravity. This means that if something weighs 36 kg on Earth, it would weigh only 6 kg on the Moon. This concept is discussed around $56:16$ to $56:51$.
+
+2. **Human Bones**:
+   - The conversation shifts to human anatomy, specifically the bones in the ear (stapes, incus, and malleus) and the femur, which is the longest bone in the body.
+2026-03-23 22:11:08,151 - controllers.config - INFO - 🔍 Response contains 'MathML': False
+2026-03-23 22:11:08,151 - controllers.config - INFO - 🔍 Response contains '<math': False
+2026-03-23 22:11:08,151 - controllers.config - INFO - 🔍 Response contains '\(': False
+      Strategy: Fallback
+      Response time: 11745ms
+      Context length: 11078 chars
+      Response: Sure! Let's break down the key points from the conversation:
+
+1. **Gravitational Force**:
+   - The g...
+
+   [5/5] What concerns does the student have?
+2026-03-23 22:11:08,455 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-03-23 22:11:08,474 - controllers.config - ERROR - Error retrieving chunks with pgvector: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+2026-03-23 22:11:08,479 - controllers.config - INFO - Fallback: Found 'concerns' at pos 30887, extracted 10913 chars (4737 tokens)
+2026-03-23 22:11:08,480 - controllers.config - INFO - 🔍 System prompt check - Contains 'LaTeX ONLY': True
+2026-03-23 22:11:08,480 - controllers.config - INFO - 🔍 System prompt check - Contains 'NEVER use HTML': True
+2026-03-23 22:11:14,354 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-23 22:11:14,355 - controllers.config - INFO - 🤖 AI Response (first 500 chars): It looks like the student has a few concerns related to their classes and the overall learning experience. Here are some key points based on the transcript:
+
+- **Class Timing and Structure**: The student seems to be discussing the timing of classes, mentioning specific time slots like $06:30$ to $07:30$ and $07:30$ to $08:30$. They express a need for clarity on when classes will take place and how they can fit into their schedule.
+
+- **Completion Levels and Performance**: There’s a mention of co
+2026-03-23 22:11:14,356 - controllers.config - INFO - 🔍 Response contains 'MathML': False
+2026-03-23 22:11:14,356 - controllers.config - INFO - 🔍 Response contains '<math': False
+2026-03-23 22:11:14,356 - controllers.config - INFO - 🔍 Response contains '\(': False
+      Strategy: Fallback
+      Response time: 6205ms
+      Context length: 10913 chars
+      Response: It looks like the student has a few concerns related to their classes and the overall learning exper...
+
+[7/7] Generating results...
+
+================================================================================
+RESULTS SUMMARY
+================================================================================
+
+⏱️  Processing Times:
+--------------------------------------------------------------------------------
+  audio_extraction              :   0.00s
+  transcript_generation         :  16.57s
+  transcript_formatting         :  19.38s
+  summary_generation            :  17.85s
+  chunk_generation              :   1.29s
+--------------------------------------------------------------------------------
+  TOTAL PROCESSING              :  55.09s
+
+📊 Query Results:
+--------------------------------------------------------------------------------
+#   Strategy        Type       Time (ms)    Context   
+--------------------------------------------------------------------------------
+1   Fallback        hybrid     5802         11637     
+2   Fallback        hybrid     8945         10935     
+3   Fallback        broad      5932         11637     
+4   Fallback        broad      11745        11078     
+5   Fallback        hybrid     6205         10913     
+--------------------------------------------------------------------------------
+AVG                            7726         11240     
+
+
+📝 Detailed Responses:
+================================================================================
+
+[Q1] What is the name of the student and the counsellor?
+Strategy: Fallback | Type: hybrid | Time: 5802ms
+--------------------------------------------------------------------------------
+Great question! The student's name is **Anirban Mondul**, and the counselor's name is **Sadiq Mohammed**. You can find this information at the beginning of the video, specifically around $03:50$ where they introduce themselves. 
+
+Does that help? Want to know more about their conversation or any specific part of the video? 😊
+--------------------------------------------------------------------------------
+
+[Q2] What is this conversation about?
+Strategy: Fallback | Type: hybrid | Time: 8945ms
+--------------------------------------------------------------------------------
+This conversation seems to revolve around education, particularly focusing on the challenges and experiences of students preparing for competitive exams in India. Here are some key points that stand out:
+
+- **Importance of Subjects**: The discussion touches on the significance of subjects like physics and math, especially for aspiring doctors and engineers. There's an emphasis on how a strong foundation in math can impact understanding physics.
+
+- **Educational Systems**: The conversation mentions different educational boards like CBSE and ICSE, highlighting the differences in syllabi and how they prepare students for competitive exams.
+
+- **Student Experiences**: There are references to personal experiences of students, such as Devdatta Maji, who achieved a high rank in exams despite initial doubts. This part emphasizes resilience and support from family.
+
+- **Learning Platforms**: The conversation also discusses digital learning platforms like InfinityLearn, which aim to provide resources and support for students.
+
+- **Scholarships and Fees**: Towards the end, there's a discussion about scholarships based on performance and the financial aspects of education, including fees and payment plans.
+
+Overall, the conversation is a mix of educational guidance, personal stories, and insights into the challenges faced by students in their academic journeys. Does that help clarify things? Would you like to dive deeper into any specific part of the conversation? 😊
+--------------------------------------------------------------------------------
+
+[Q3] What are the main topics discussed?
+Strategy: Fallback | Type: broad | Time: 5932ms
+--------------------------------------------------------------------------------
+Great question! The video covers several key topics, mainly focused on education and student preparation. Here’s a breakdown of the main points discussed:
+
+- **Importance of Early Education** ($07:17 - 08:15$): The speaker emphasizes how crucial it is for students to start preparing early for their future careers, like becoming doctors or engineers.
+
+- **Counseling and Support** ($08:46 - 09:43$): The speaker introduces themselves as an education counselor and talks about the need for guidance in students' educational journeys.
+
+- **Quality of Education** ($09:17 - 10:07$): There's a discussion about the decline in learning quality and the importance of professional learning for success.
+
+- **Scholarship and Admission Opportunities** ($12:02 - 12:53$): The speaker mentions scholarship opportunities and the need for financial decisions regarding education.
+
+- **Focus on Math and Science** ($19:12 - 20:32$): The importance of math in various fields, especially for aspiring doctors, is highlighted, along with the need for strong foundational knowledge.
+
+- **Student Success Stories** ($30:33 - 32:48$): The video features an interview with a successful student, Devdatta Maji, discussing her journey and the support she received from her family.
+
+- **Technology in Education** ($34:01 - 34:15$): The role of technology in helping students understand difficult concepts is briefly mentioned.
+
+Does that give you a good overview? Would you like to dive deeper into any specific topic? 😊
+--------------------------------------------------------------------------------
+
+[Q4] Summarize the key points of this conversation
+Strategy: Fallback | Type: broad | Time: 11745ms
+--------------------------------------------------------------------------------
+Sure! Let's break down the key points from the conversation:
+
+1. **Gravitational Force**:
+   - The gravitational force of the Moon is **one-sixth** that of Earth's gravity. This means that if something weighs 36 kg on Earth, it would weigh only 6 kg on the Moon. This concept is discussed around $56:16$ to $56:51$.
+
+2. **Human Bones**:
+   - The conversation shifts to human anatomy, specifically the bones in the ear (stapes, incus, and malleus) and the femur, which is the longest bone in the body. This is mentioned around $56:52$ to $57:20$.
+
+3. **Photosynthesis**:
+   - The process of photosynthesis is explained as how green plants use chlorophyll, sunlight, water, and carbon dioxide to produce food (glucose) while releasing oxygen. This is covered from $58:30$ to $59:27$.
+
+4. **Planets in the Solar System**:
+   - Venus is identified as the hottest planet, despite Mercury being closest to the Sun. The explanation involves how Venus has a thick atmosphere that traps heat, while Mercury has extreme temperature fluctuations. This discussion occurs between $59:27$ and $60:17$.
+
+5. **Muscle Types**:
+   - The conversation touches on the three types of muscles: **skeletal**, **smooth**, and **cardiac** muscles. This is discussed from $67:31$ to $69:19$.
+
+6. **Educational Methodology**:
+   - There’s a discussion about the effectiveness of teaching methods and the importance of understanding concepts rather than just memorizing facts. This is highlighted around $68:01$ to $70:49$.
+
+7. **Class Structure and Schedule**:
+   - The conversation also includes details about class schedules, user IDs, and the importance of attending classes for subjects like math and science. This is mentioned from $76:06$ to $78:57$.
+
+8. **Student Engagement**:
+   - The teacher emphasizes the importance of asking questions and being engaged in learning, encouraging students to clarify their doubts. This is noted in several parts, particularly around $61:06$ to $62:04$.
+
+Overall, the conversation covers a range of educational topics, from science concepts to teaching methodologies, while also focusing on student engagement and understanding. Does this summary help? Would you like to dive deeper into any specific topic? 😊
+--------------------------------------------------------------------------------
+
+[Q5] What concerns does the student have?
+Strategy: Fallback | Type: hybrid | Time: 6205ms
+--------------------------------------------------------------------------------
+It looks like the student has a few concerns related to their classes and the overall learning experience. Here are some key points based on the transcript:
+
+- **Class Timing and Structure**: The student seems to be discussing the timing of classes, mentioning specific time slots like $06:30$ to $07:30$ and $07:30$ to $08:30$. They express a need for clarity on when classes will take place and how they can fit into their schedule.
+
+- **Completion Levels and Performance**: There’s a mention of completion levels and performance reports, indicating that the student might be concerned about their progress and how it compares to others, especially in terms of national and state-level rankings ($99:05 - 100:03$).
+
+- **Doubts About Specific Topics**: The student has questions about particular subjects, like the automatic drive, and seems to seek help with understanding these topics better ($104:18 - 104:23$).
+
+- **Financial Concerns**: There’s a discussion about fees and payment structures, with the student inquiring about registration amounts and monthly payments. They seem to be concerned about the affordability of the program and the overall cost ($109:17 - 111:52$).
+
+Does that help clarify their concerns? If you'd like to dive deeper into any specific area, just let me know! 😊
+--------------------------------------------------------------------------------
+
+💾 Results saved to: test_results_test_1774303780.json
+
+================================================================================
+✅ Complete test finished successfully!
+================================================================================

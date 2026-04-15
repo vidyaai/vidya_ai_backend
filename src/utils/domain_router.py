@@ -59,61 +59,69 @@ _CODE_BETTER_TYPES = frozenset(
     }
 )
 
-_CLASSIFICATION_PROMPT = """You are a subject-domain classifier for educational diagrams.
-
-Given a question, classify it into ONE of these 8 domains and select the most specific diagram type.
-
-DOMAINS AND DIAGRAM TYPES:
-
-electrical: circuit_schematic, bode_plot, iv_curve, waveform, block_diagram, timing_diagram, sequential_circuit, flip_flop_circuit, counter_circuit, shift_register, fsm_diagram, cdc_diagram, circuit_with_timing
-mechanical: free_body_diagram, beam_diagram, truss_diagram, stress_strain_curve, pv_diagram, fluid_flow, mechanism_linkage
-cs: binary_tree, linked_list, graph_network, sorting_visualization, flowchart, automata_fsm, stack_queue, hash_table
-civil: truss_frame, cross_section, retaining_wall, flow_network, contour_map, soil_profile
-math: function_plot, geometric_construction, vector_field, 3d_surface, number_line, coordinate_geometry, matrix_visualization
-physics: ray_diagram, field_lines, wave_diagram, optics_setup, energy_level_diagram, phase_diagram, spring_mass, pendulum
-chemistry: molecular_structure, reaction_mechanism, lab_apparatus, titration_curve, orbital_diagram, phase_diagram, chromatography
-computer_eng: cpu_block_diagram, memory_hierarchy, pipeline_diagram, alu_circuit, logic_circuit, isa_timing, cache_organization
-anatomy: anatomical_diagram, cross_section, histology
-physiology: action_potential, feedback_loop, pressure_volume_loop, cardiac_loop
-biochemistry: metabolic_pathway, enzyme_kinetics
-pharmacology: dose_response, pharmacokinetics
-pathology: disease_progression, histopathology
-microbiology: bacterial_structure, infection_cycle, growth_curve
-
-COMPLEXITY:
-- simple: single concept, few components
-- moderate: multiple components with interactions
-- complex: many components, complex interactions
-
-AI_SUITABLE (whether Gemini image gen works well — True for spatial/structural, False for precise mathematical plots and data structures):
-- True: circuit_schematic, free_body_diagram, truss_diagram, ray_diagram, molecular_structure, cpu_block_diagram, lab_apparatus, mechanism_linkage, optics_setup, field_lines, energy_level_diagram, wave_diagram, spring_mass, pendulum, truss_frame, cross_section, retaining_wall, beam_diagram, orbital_diagram, reaction_mechanism, pipeline_diagram, memory_hierarchy, logic_circuit, alu_circuit, block_diagram, geometric_construction, fluid_flow, anatomical_diagram, histology, bacterial_structure
-- False: all plots (bode_plot, iv_curve, function_plot, stress_strain_curve, titration_curve, pv_diagram, titration_curve), data structures (binary_tree, linked_list, graph_network, sorting_visualization, stack_queue, hash_table), timing_diagram, automata_fsm, flowchart, 3d_surface, number_line, matrix_visualization, isa_timing, cache_organization, waveform, chromatography, sequential_circuit, flip_flop_circuit, counter_circuit, shift_register, fsm_diagram, cdc_diagram, circuit_with_timing, action_potential, feedback_loop, pressure_volume_loop, cardiac_loop, metabolic_pathway, enzyme_kinetics, dose_response, pharmacokinetics, disease_progression, histopathology, infection_cycle, growth_curve
-
-PREFERRED_TOOL (for nonai path):
-- circuitikz: circuit_schematic, sequential_circuit, flip_flop_circuit, counter_circuit, shift_register, cdc_diagram (best for ALL electrical circuits with precise pin labels)
-- neurokit2: action_potential, cardiac_loop (scipy-based physiological signal waveforms)
-- scipy: dose_response, pharmacokinetics, enzyme_kinetics, pressure_volume_loop, growth_curve (scipy/numpy mathematical curves)
-- networkx_pathway: metabolic_pathway, feedback_loop, infection_cycle, disease_progression (directed flow graphs)
-- matplotlib: most diagram types, timing_diagram, waveform, bode_plot, iv_curve, fsm_diagram, and medical types not covered above
-- networkx: binary_tree, linked_list, graph_network, automata_fsm, stack_queue, hash_table
-- graphviz: flowchart, automata_fsm
-- circuit_with_timing: Use circuitikz for the circuit + matplotlib for the timing → preferred_tool = circuitikz (primary)
-
-IMPORTANT CLASSIFICATION RULES:
-- If a question involves flip-flops, shift registers, counters, or sequential logic with gates → diagram_type = sequential_circuit or flip_flop_circuit
-- If a question asks for BOTH a circuit diagram AND a timing/waveform diagram → diagram_type = circuit_with_timing
-- circuit_with_timing means: the circuit schematic uses circuitikz AND the timing waveform uses matplotlib (two outputs)
-- For questions about D flip-flops, JK flip-flops, SR latches etc → flip_flop_circuit or sequential_circuit, NOT block_diagram
-- For questions about shift registers → shift_register, NOT block_diagram
+_CLASSIFICATION_PROMPT = """You are an educational diagram classifier. Given a question from any academic subject,
+determine what diagram would best help a student understand the concept being tested,
+and provide specific drawing instructions for the code generator.
 
 Respond with ONLY valid JSON — no markdown, no explanation:
 {
-  "domain": "<one of the 8 domain IDs>",
-  "diagram_type": "<specific type from the domain's list>",
+  "domain": "<academic subject domain, free-form, e.g. materials_science, quantum_computing, orbital_mechanics, electrical_engineering, etc.>",
+  "diagram_type": "<specific diagram type that best illustrates this question, free-form, e.g. bcc_unit_cell, feynman_diagram, circuit_schematic, binary_tree, etc.>",
   "complexity": "simple|moderate|complex",
   "ai_suitable": true|false,
-  "preferred_tool": "matplotlib|networkx|graphviz|svg"
-}"""
+  "preferred_tool": "matplotlib|circuitikz|tikz|rdkit|plotly|networkx|graphviz",
+  "subject_guidance": "<3-5 sentences: what to draw, what to label, and what NOT to include to avoid revealing the answer to the student>"
+}
+
+TOOL SELECTION (pick the best tool for the diagram type, regardless of subject):
+- circuitikz: any circuit diagram — electrical, electronic, analog, digital, quantum circuits with components and wires
+- tikz: physics diagrams (ray diagrams, Feynman diagrams, force/free-body diagrams, field lines), 3D crystal unit cells and lattice structures, mathematical geometry, chemical structural formulas (Lewis structures), any diagram needing LaTeX publication quality
+- rdkit: 2D molecular structures from chemistry — organic molecules, drug structures, amino acids, reaction mechanisms drawn as skeletal formulas
+- plotly: 3D spatial diagrams — 3D crystal unit cells with atom spheres, molecular orbitals, 3D surface plots, 3D vector fields
+- networkx: graphs, trees, linked lists, state machines, dependency graphs, automata
+- graphviz: flowcharts, hierarchical diagrams, automata with automatic layout
+- matplotlib: 2D scientific plots, waveforms, timing diagrams, phase diagrams, action potentials, dose-response curves, any 2D diagram not better served by the tools above
+
+AI_SUITABLE:
+- false: any diagram where exact component positions, numeric values, or precise layout matter
+  (circuit schematics, data structures, plots, timing diagrams, molecular structures, crystal structures)
+- true: conceptual spatial/structural diagrams where approximate artistic rendering is acceptable
+
+SUBJECT_GUIDANCE rules (most important field):
+- Reference exact values, component names, and structures mentioned in this specific question
+- Specify what visual elements to include and roughly how to arrange them
+- CRITICAL: explicitly state what to omit to avoid answer leaks — no computed results,
+  no formulas showing calculated values, no output signal values, no quantities the student
+  is asked to find or identify. If the question asks a student to identify or calculate X,
+  the diagram must NOT show or imply X.
+- For plots/graphs: do NOT add region labels that interpret what regions mean
+  (e.g., "Feasible", "Infeasible", "Stable", "Unstable", "High Security", "Optimal").
+  Show axes, curves, and data points only; let the student interpret.
+- For reaction/process flowcharts: show the structural steps and node labels only;
+  do NOT annotate individual arrows with specific products, equations, or outcomes
+  that the student is asked to derive.
+- For comparison charts (bar, pie, scatter): do NOT title or annotate with the conclusion
+  (e.g., "neuromorphic uses less energy"). Show raw unlabeled data for the student to compare.
+- End the guidance with one sentence starting "Do NOT show:" listing the 2-3 most
+  answer-revealing elements specific to this question.
+
+VISUAL SPECIFICATION REQUIREMENT:
+If the diagram type has a common incorrect default that a code generator might produce,
+subject_guidance MUST include explicit DRAW and DO NOT DRAW instructions that describe:
+1. The exact visual features that must appear (specific shapes, relationships, structures)
+2. The common wrong default to avoid (what a generic generator would produce instead)
+
+Keep these instructions general and derived from the question text — do not hardcode
+domain-specific examples. Describe the visual distinction in plain geometric terms:
+e.g. "DRAW: elliptical orbit tangent to both circles. DO NOT DRAW: circular orbit."
+
+CLASSIFICATION RULES:
+- Flip-flops, shift registers, counters, sequential logic → circuitikz, ai_suitable=false
+- Circuit + timing waveform together → diagram_type=circuit_with_timing, circuitikz
+- Crystal structures (BCC, FCC, HCP, unit cells) → tikz or plotly, ai_suitable=false
+- Molecular/chemical structures → rdkit (2D skeletal) or tikz (Lewis structures)
+- 3D structural diagrams → plotly or tikz
+- Any plot with precise data → matplotlib, ai_suitable=false"""
 
 
 class DomainRouter:
@@ -126,7 +134,7 @@ class DomainRouter:
 
     def __init__(self, client: Optional[OpenAI] = None):
         self.client = client or OpenAI()
-        self.model = "gpt-4o-mini"
+        self.model = "gpt-4o"
 
     def classify(
         self,
@@ -158,7 +166,7 @@ class DomainRouter:
                     {"role": "user", "content": user_message},
                 ],
                 temperature=0.0,
-                max_tokens=150,
+                max_tokens=400,
             )
 
             raw = response.choices[0].message.content.strip()
@@ -179,6 +187,7 @@ class DomainRouter:
             complexity = result.get("complexity", "moderate")
             ai_suitable = result.get("ai_suitable", True)
             preferred_tool = result.get("preferred_tool", "matplotlib")
+            subject_guidance = result.get("subject_guidance", "")
 
             logger.info(
                 f"DomainRouter classified: domain={domain}, type={diagram_type}, "
@@ -191,6 +200,7 @@ class DomainRouter:
                 "complexity": complexity,
                 "ai_suitable": ai_suitable,
                 "preferred_tool": preferred_tool,
+                "subject_guidance": subject_guidance,
             }
 
         except Exception as e:
@@ -294,6 +304,30 @@ class DomainRouter:
             )
         ):
             return "cs"
+        if "materials" in hint or any(
+            kw in q
+            for kw in [
+                "bcc",
+                "fcc",
+                "hcp",
+                "crystal",
+                "unit cell",
+                "lattice",
+                "packing",
+                "miller indices",
+                "grain boundary",
+                "dislocation",
+                "slip plane",
+                "atomic packing",
+                "coordination number",
+                "crystal structure",
+                "hexagonal close",
+                "face-centered",
+                "body-centered",
+                "simple cubic",
+            ]
+        ):
+            return "materials_science"
         if "mechanical" in hint or any(
             kw in q
             for kw in [
@@ -621,4 +655,5 @@ class DomainRouter:
             "complexity": "moderate",
             "ai_suitable": ai_suitable,
             "preferred_tool": preferred_tool,
+            "subject_guidance": "Draw a clear, labeled educational diagram showing the key components. Do not include computed answer values or formulas that reveal the solution.",
         }

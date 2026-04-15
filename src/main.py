@@ -78,10 +78,12 @@ app.add_middleware(
     allow_origins=[
         "https://vidyaai.co",
         "http://localhost:3000",
+        "http://localhost:3001",
         "http://localhost:5173",
         "https://www.vidyaai.co",
         "http://54.153.26.252:3000",  # EC2 frontend
-        "http://54.153.26.252:8000",  # EC2 backend
+        "http://54.153.26.252:3001",  # EC2 frontend (alt port)
+        "http://54.153.26.252:8001",  # EC2 backend
     ],
     allow_credentials=True,
     allow_methods=["*"],

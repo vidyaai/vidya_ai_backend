@@ -229,14 +229,89 @@ DIAGRAM DESCRIPTION (used to generate it): {diagram_description}
 
 CHECK ONLY THE FOLLOWING — DO NOT check topology, circuit correctness, or domain knowledge:
 
-1. **ANSWER LEAK CHECK**: Does the diagram reveal the answer to the question? Look for:
-   - Output values shown ("Output = 0", "Y = 1")
-   - Boolean expressions displayed on the diagram
-   - Input values shown ("A=1", "B=0") instead of just variable names
-   - Truth tables embedded in the diagram
-   - Signal values (0/1) annotated on wires
-   - Formulas or equations that solve the problem
-   If ANY answer is visible, this is a FAIL.
+0. **DIAGRAM TYPE CORRECTNESS CHECK** (highest priority):
+   Read the QUESTION and DIAGRAM DESCRIPTION to identify the REQUIRED diagram type
+   (e.g., "right-angled triangle", "BCC unit cell", "Hohmann transfer orbit",
+   "free body diagram", "bar chart", "sequence diagram", "Bloch sphere").
+
+   Look at the image: is the diagram actually showing that type?
+
+   FAIL if the diagram shows a FUNDAMENTALLY DIFFERENT type of structure than requested:
+   - Wrong geometric shape (equilateral instead of right-angled triangle)
+   - Wrong crystal structure type (FCC lattice instead of BCC lattice)
+   - Wrong orbit type (circular orbit instead of elliptical transfer orbit)
+   - Wrong chart type (pie chart instead of bar chart)
+   - Completely wrong domain (circuit diagram shown for a biology question)
+   - Normal insulator band structure shown instead of topological insulator band structure
+
+   This is a fixable=NO failure — the diagram must be regenerated from scratch.
+   For wrong_type failures, CORRECTED_DESCRIPTION is MANDATORY and must contain all four:
+   1. "WRONG: [exact name of what was shown]"
+   2. "CORRECT: [exact name of what must be shown]"
+   3. "VISUAL FEATURES: [2-3 specific visual differences the eye can see]"
+   4. "DO NOT: [the specific wrong default to avoid]"
+   Example: "WRONG: normal semiconductor band structure with parabolic gap. CORRECT: topological
+   insulator band structure. VISUAL FEATURES: valence band crosses ABOVE conduction band (band
+   inversion); linear Dirac cone at k=0 crossing through the gap; two band sets (bulk + surface).
+   DO NOT draw simple parabolic bands with a gap at zone center."
+   Set FAILURE_TYPE: wrong_type
+
+   DO NOT fail for incorrect wiring, component placement, or design rule violations
+   within the correct diagram type — those are topology checks, not type checks.
+
+1. **ANSWER LEAK CHECK** (applies to ALL subjects — not just circuits):
+   Step 1 — Identify the TARGET: Read the QUESTION and determine what the student
+   is being asked to FIND, IDENTIFY, EXPLAIN, CALCULATE, or DESCRIBE. This is the "target".
+   Step 2 — Check the diagram: Does the diagram directly show or trivially reveal the target?
+
+   PRINCIPLE: The diagram must show SETUP and CONTEXT. It must NOT show the CONCLUSION.
+
+   IMPORTANT EXCEPTIONS — these are NEVER answer leaks:
+   - Quantum gate and qubit names: "Data qubit", "Ancilla qubit", "H", "CNOT", "X", "Z", "T", "S",
+     "Toffoli", "Hadamard", "measurement gate", "control qubit", "target qubit", "ancilla bit".
+   - Band structure axis labels: "Valence Band", "Conduction Band", "E" (energy axis), "k" (momentum
+     axis), "E_F" (Fermi energy), "E_g" (band gap label) — these identify axes/regions used to READ
+     the answer, not the answer itself.
+   - Crystal/lattice component labels: "lattice point", "unit cell", "corner atom", "body-center atom",
+     "face-center atom", "basis vector a", "basis vector b", "basis vector c".
+   - Orbital mechanics structural labels: "perihelion", "aphelion", "semi-major axis a",
+     "transfer ellipse", "orbit path", "space probe", "planet".
+   - Game theory structural labels: player node names (Player 1, Player 2), strategy branch labels
+     (High, Low, Cooperate, Defect) — but NOT solution labels (Nash Equilibrium, Pareto Frontier).
+   - Node names (Vout, Vin, VDD), axis labels (Energy, Momentum, Temperature, Frequency),
+     species names (He-3, He-4, proton, neutron), geometric labels (angle A, side c, hypotenuse).
+   - Physical quantities given as SETUP context in the question (not as the answer).
+   - Structural labels that identify WHAT a component IS, not the ANSWER to the question.
+
+   THESE ARE answer leaks (conclude the student's task):
+   - "Z2 Topological Invariant", "Band Inversion", or region labeled "Topological"/"Trivial"
+   - "Systematic absences" in a crystallography legend or annotation
+   - "Pareto Frontier", "Pareto Front", "Nash Equilibrium", "Dominant Strategy" labels
+   - Shell element products (C, O, Ne, Si, Fe) in stellar nucleosynthesis if students must identify them
+   - "Syndrome Table", "Logical Qubit Encoding Path", or any annotation naming what a QEC circuit DOES
+   - "Feasible Region", "Infeasible Region", "Stable", "Unstable", "Optimal" region labels
+
+   ONLY fail for labels that name the CONCLUSION the student must derive, not component names.
+
+   FAIL if the diagram shows the target answer through ANY of these patterns:
+   - LABELS: Any text label, annotation, or region name that names or interprets the
+     answer the student is supposed to derive (e.g., "Feasible", "Infeasible", "Stable",
+     "Unstable", "Optimal", "Threshold Region", "Detection occurs here", "Fusion viable").
+   - PRODUCTS/OUTCOMES: In flowcharts or reaction diagrams, the specific outputs/products
+     on each step fully labeled when the question asks the student to identify those steps
+     or products.
+   - FORMULAS: A formula or equation rendered as text on the diagram that encodes the
+     relationship the student must explain or derive.
+   - CONCLUSIONS: A title, caption, or annotation that states the conclusion of a
+     comparison or analysis (e.g., "A uses less energy than B", "X is more accurate").
+   - COMPUTED VALUES: Specific numerical answers, thresholds, or equilibrium values
+     annotated when the student must calculate or determine those values.
+
+   If the diagram reveals the target answer → FAIL with fixable=NO. In CORRECTED_DESCRIPTION,
+   you MUST explicitly list the exact label text(s) to remove, e.g.:
+   "Remove the label 'Feasible Region' and the annotation '5 m/s'. Keep all input values
+   and structural labels. [rest of description]"
+   Always name the offending labels verbatim — do not paraphrase them.
 
 2. **LABEL PRESENCE CHECK**: Structural components explicitly named in the QUESTION text
    must appear as visible labels in the diagram. This applies universally to all subjects.
@@ -257,6 +332,14 @@ CHECK ONLY THE FOLLOWING — DO NOT check topology, circuit correctness, or doma
    QUESTION text. Then verify each one appears CORRECTLY in the diagram image. Any
    mismatch between what the question states and what the diagram shows is a FAIL
    with FIXABLE=NO (the diagram must be regenerated from scratch).
+
+   When data_mismatch is detected, CORRECTED_DESCRIPTION is MANDATORY. Use this format
+   for each mismatch found:
+     "MISMATCH [n]: diagram shows [X] but question requires [Y].
+      VISUAL FIX: [exact visual change needed, e.g. 'plane must be parallel to yz-axis',
+      'near-perihelion sector must be ~3x smaller area than near-aphelion sector',
+      'payoff for (Low,High) must be exactly (2,4) not (3,3)']"
+   List every mismatch as a separate numbered entry. Be quantitatively specific.
 
    What to compare (domain-generic examples):
    ── Electrical / Computer Engineering ──
@@ -328,14 +411,26 @@ TOLERANCE GUIDELINES:
   * Minor font size inconsistencies — PASS
   * Slightly cramped but still readable labels — PASS
   * Any circuit topology you personally disagree with — PASS (not your job to verify)
+  * Redundant or duplicate labels (the same label appearing twice on one element) — PASS, do not fail for this
+  * Minor label redundancy that doesn't cause genuine confusion (e.g., "Incoming Space Probe" on a trajectory already showing a probe path) — PASS
+  * A label that names what an element IS (e.g., "Space Probe", "Orbit Path", "Transfer Ellipse") even if it seems obvious — PASS, these are structural identifiers not answer leaks
 
 RESPOND IN THIS EXACT FORMAT:
 
 VERDICT: PASS or FAIL
+FAILURE_TYPE: none|wrong_type|answer_leak|missing_labels|data_mismatch|readability
 FIXABLE: YES or NO
 REASON: <one sentence explanation>
 ISSUES: <comma-separated list of SPECIFIC label/readability issues found; write "none" if PASS>
 CORRECTED_DESCRIPTION: <if FAIL due to missing/wrong labels, write a complete self-contained description that explicitly names all components from the question; write "none" if PASS>
+
+FAILURE_TYPE values:
+- none: diagram passed
+- wrong_type: diagram is the wrong fundamental type (Check 0)
+- answer_leak: diagram reveals the answer (Check 1)
+- missing_labels: required structural labels absent (Check 2)
+- readability: text illegible (Check 3)
+- data_mismatch: specific values/sequences don't match question (Check 4)
 
 FIXABLE GUIDELINES:
 - YES if the diagram structure is visible but has PURE TEXT errors (wrong/missing labels, illegible text)
@@ -351,30 +446,57 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
         lines = result_text.strip().split("\n")
 
         verdict = "PASS"
+        failure_type = "none"
         reason = "Review completed"
         issues = []
         corrected_desc = None
         fixable = False
 
+        # Known field prefixes — used to detect where one field ends and the next begins
+        _FIELD_PREFIXES = (
+            "VERDICT:", "FAILURE_TYPE:", "FIXABLE:", "REASON:", "ISSUES:", "CORRECTED_DESCRIPTION:"
+        )
+
+        current_field = None
+        field_lines: Dict[str, list] = {}
+
         for line in lines:
-            line = line.strip()
-            if line.upper().startswith("VERDICT:"):
-                verdict = line.split(":", 1)[1].strip().upper()
-            elif line.upper().startswith("FIXABLE:"):
-                fixable_str = line.split(":", 1)[1].strip().upper()
-                fixable = "YES" in fixable_str
-            elif line.upper().startswith("REASON:"):
-                reason = line.split(":", 1)[1].strip()
-            elif line.upper().startswith("ISSUES:"):
-                issues_str = line.split(":", 1)[1].strip()
-                if issues_str.lower() != "none":
-                    issues = [i.strip() for i in issues_str.split(",") if i.strip()]
-            elif line.upper().startswith("CORRECTED_DESCRIPTION:"):
-                desc = line.split(":", 1)[1].strip()
-                if desc.lower() != "none":
-                    corrected_desc = desc
+            stripped = line.strip()
+            upper = stripped.upper()
+            matched = next((p for p in _FIELD_PREFIXES if upper.startswith(p)), None)
+            if matched:
+                current_field = matched.rstrip(":")
+                value_part = stripped[len(matched):].strip()
+                field_lines.setdefault(current_field, [])
+                if value_part:
+                    field_lines[current_field].append(value_part)
+            elif current_field and stripped:
+                # Continuation line for the current field
+                field_lines[current_field].append(stripped)
+
+        def _get(key: str) -> str:
+            return " ".join(field_lines.get(key, [])).strip()
+
+        if "VERDICT" in field_lines:
+            verdict = _get("VERDICT").upper()
+        if "FAILURE_TYPE" in field_lines:
+            failure_type = _get("FAILURE_TYPE").lower()
+        if "FIXABLE" in field_lines:
+            fixable = "YES" in _get("FIXABLE").upper()
+        if "REASON" in field_lines:
+            reason = _get("REASON")
+        if "ISSUES" in field_lines:
+            issues_str = _get("ISSUES")
+            if issues_str.lower() != "none":
+                issues = [i.strip() for i in issues_str.split(",") if i.strip()]
+        if "CORRECTED_DESCRIPTION" in field_lines:
+            desc = _get("CORRECTED_DESCRIPTION")
+            if desc.lower() != "none":
+                corrected_desc = desc
 
         passed = "PASS" in verdict
+        if passed:
+            failure_type = "none"
 
         logger.info(
             f"Gemini diagram review: {'PASSED' if passed else 'FAILED'} — {reason}"
@@ -386,6 +508,7 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
 
         return {
             "passed": passed,
+            "failure_type": failure_type,
             "reason": reason,
             "corrected_description": corrected_desc,
             "issues": issues,

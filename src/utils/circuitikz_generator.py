@@ -949,6 +949,19 @@ These diagrams are for STUDENT ASSIGNMENTS. The student must solve the problem.
 - DO show circuit structure and given parameters ONLY
 - DO label all inputs with variable names (A, B, C) NOT specific values
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+LABEL EVERY NAMED COMPONENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Every structural component named in the description MUST have that exact name
+as a visible \node label in the final circuit diagram.
+- If the description says "ancilla qubit", label it "ancilla qubit"
+- If the description says "measurement gate", label it "measurement gate"
+Do NOT substitute with symbols or numbers unless the question uses them.
+Aesthetic trade-offs do NOT justify omitting a required label.
+
+READABILITY: Use font=\footnotesize minimum in dense circuits (>8 components).
+If labels would overlap, use [yshift=4pt] or [xshift=6pt] to offset — never drop a label.
+
 Return ONLY the complete LaTeX document. Nothing else."""
 
     def _build_user_prompt(
@@ -1038,6 +1051,23 @@ Return ONLY the complete LaTeX document starting with \\documentclass."""
 
             if "\\documentclass" not in latex:
                 raise ValueError("Claude did not return valid LaTeX document")
+
+            # Replace any Claude-generated \usetikzlibrary{...} with the canonical set
+            # that includes all decoration libraries — prevents "decoration library" errors.
+            # If Claude added none, inject one before \begin{document}.
+            import re as _re
+            _CANONICAL_TIKZLIB = (
+                r"\usetikzlibrary{arrows.meta, calc, decorations, decorations.pathmorphing, "
+                r"decorations.markings, shapes.geometric, positioning, fit, patterns, backgrounds}"
+            )
+            if _re.search(r"\\usetikzlibrary\{", latex):
+                latex = _re.sub(
+                    r"\\usetikzlibrary\{[^}]*\}", lambda m: _CANONICAL_TIKZLIB, latex
+                )
+            else:
+                latex = latex.replace(
+                    r"\begin{document}", _CANONICAL_TIKZLIB + "\n\\begin{document}"
+                )
 
             logger.info(f"Claude generated {len(latex)} chars of CircuiTikZ LaTeX")
             return latex

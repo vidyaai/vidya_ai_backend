@@ -21,6 +21,54 @@ from utils.fallback_router import SubjectSpecificFallbackRouter
 from pylatexenc.latex2text import LatexNodes2Text
 
 
+def _extract_required_labels(question_text: str) -> list:
+    """
+    Extract structural component names from question text that must appear as
+    labels in the generated diagram. Excludes answer terms (things the student
+    must find/calculate) to avoid contaminating the description with leaks.
+    """
+    seen: set = set()
+    result: list = []
+
+    def add(label: str) -> None:
+        label = label.strip().rstrip(".,;:")
+        if label and 2 <= len(label) <= 50 and label.lower() not in seen:
+            seen.add(label.lower())
+            result.append(label)
+
+    # Collect answer terms (should NOT be injected as required labels)
+    answer_terms: set = set()
+    for m in re.finditer(
+        r"\b(?:find|calculate|determine|explain|describe|compute|derive|prove|identify)\s+(?:the\s+)?([A-Za-z][A-Za-z\s\-]{1,35}?)(?:\s*[,\.;]|\s+and\s|$)",
+        question_text, re.IGNORECASE
+    ):
+        answer_terms.add(m.group(1).strip().lower())
+
+    # Quoted terms
+    for m in re.findall(r'"([^"]{2,40})"', question_text):
+        add(m)
+    for m in re.findall(r"'([^']{2,40})'", question_text):
+        add(m)
+
+    # Terms after "label", "labeled", "show the", "mark the", "indicate the"
+    for m in re.finditer(
+        r"\b(?:label(?:ed|s|ing)?|show\s+the|mark\s+the|indicate\s+the|include\s+the)\s+(?:the\s+)?"
+        r"([A-Za-z][A-Za-z\s\-₀₁₂₃₄₅₆₇₈₉]{1,35}?)(?:\s*[,\.;]|\s+and\s|\s+in\s|\s+at\s|\s+on\s|$)",
+        question_text, re.IGNORECASE
+    ):
+        add(m.group(1))
+
+    # Mathematical subscript variables (Δv, r₁, v₂, L₁, etc.)
+    for m in re.findall(r"[ΔΩαβγδλμπωθφψ]\w*[₀₁₂₃₄₅₆₇₈₉]*", question_text):
+        add(m)
+    for m in re.findall(r"[A-Z][a-z]?[₀₁₂₃₄₅₆₇₈₉]+", question_text):
+        add(m)
+
+    # Filter out answer terms
+    result = [l for l in result if l.lower() not in answer_terms]
+    return result[:12]
+
+
 def _repair_truncated_json(s: str) -> dict:
     """
     Attempt to repair truncated / malformed JSON from OpenAI tool call arguments.
@@ -147,7 +195,10 @@ YOUR TASK:
 3. If YES, generate the diagram:
    a) Choose the appropriate tool:
       - **circuitikz_tool** ⭐ BEST FOR ALL CIRCUITS: Generates publication-quality circuit diagrams via CircuiTikZ (LaTeX). Output is identical to Sedra & Smith / Mano textbook diagrams. Use for: ALL electrical circuits, MOSFET/CMOS transistor circuits, analog circuits, digital logic gates, op-amp circuits, BJT circuits, RLC networks, D/JK/SR/T flip-flop circuits, shift registers, counters, sequential logic, encoders/decoders, MUX/DEMUX, register files, ALU/datapath, CDC. ALWAYS use this for any circuit schematic.
-      - **claude_code_tool** (RECOMMENDED for non-circuit diagrams AND timing/waveform): Use Claude to generate matplotlib/networkx code for any technical domain — physics, CS, math, chemistry, biology, mechanical, civil. ALSO use this for timing diagrams and waveforms (with tool_type=matplotlib). Highly versatile.
+      - **tikz_tool** ⭐ BEST FOR: physics ray/optics diagrams, Feynman diagrams, free body diagrams with vector arrows, spring-mass systems, field lines, 3D crystal unit cells (BCC/FCC/HCP), geometric constructions, Lewis structures. PREFER over claude_code_tool for these cases. Falls back to claude_code_tool if compilation fails.
+      - **plotly_tool** ⭐ BEST FOR: true 3D diagrams — 3D crystal unit cells with atom spheres at exact lattice positions, 3D molecular orbitals, 3D potential energy surfaces. PREFER over claude_code_tool when 3D perspective is essential. Falls back to claude_code_tool if export fails.
+      - **rdkit_tool** ⭐ BEST FOR: 2D molecular skeletal formulas — organic chemistry structures, drug molecules, amino acids, nucleotides. PREFER over claude_code_tool for any molecular structure diagram. Falls back to claude_code_tool if SMILES conversion fails.
+      - **claude_code_tool** (general-purpose fallback for non-circuit diagrams AND timing/waveform): Use when no specialist tool above is a better fit. Works for: 2D scientific plots, waveforms, timing diagrams, data structures, flowcharts, phase diagrams, action potentials, metabolic pathways, and any domain not covered by specialists. Use tool_type=matplotlib/networkx.
       - matplotlib_tool: Direct matplotlib code (ONLY if very simple plot)
       - schemdraw_tool: AVOID entirely — produces unprofessional layouts
       - svg_circuit_tool: DEPRECATED — use circuitikz_tool instead
@@ -194,6 +245,43 @@ CRITICAL RULES:
 2. Generate diagrams with CORRECT values, labels, and units from the question BUT DONOT include the answer information (e.g., labels, computed reactions, deflections, waveforms) — that is for the student to fill in
 3. Rephrase naturally: "For the beam shown below" NOT "image from page 20"
 4. PRESERVE ALL numerical values and given data in the rephrased question
+5. LABEL EVERY NAMED COMPONENT: Every structural component named in the description MUST have
+   that exact name as a visible text label in the final diagram.
+   - "ancilla qubit" in description → label it "ancilla qubit"
+   - "lattice point" in description → label it "lattice point"
+   - "body-center atom" in description → label it "body-center atom"
+   Do not substitute with symbols, numbers, or abbreviations unless the question itself uses that
+   notation. Aesthetic trade-offs do NOT justify dropping labels.
+
+DIAGRAM SUBTYPE PRECISION:
+Always use the most specific subtype name in descriptions — the description must uniquely determine
+the visual geometry even without seeing the question.
+- Not "band structure" → "linear Dirac cone dispersion (V-shaped, touching at Dirac point, NOT parabolic)"
+  OR "normal insulator band structure (parabolic valence and conduction bands with gap, no surface states)"
+  OR "topological insulator band structure (bulk parabolic bands with gap PLUS linear Dirac surface
+  states crossing through the gap)"
+- Not "crystal structure" → "FCC unit cell" or "BCC unit cell" or "simple cubic unit cell"
+- Not "stellar interior" → "concentric onion-shell cross-section with layers from outside to center:
+  H → He → C → O → Ne → Mg → Si → Fe core"
+- Not "CRISPR pathway" → "two-column side-by-side comparison: left column = pathway A sequential
+  steps top-to-bottom, right column = pathway B sequential steps — NOT a flowchart or concept map"
+- Not "orbit diagram" → "Hohmann transfer orbit: two concentric ellipses sharing one focus, inner
+  orbit = circular departure orbit, outer orbit = circular arrival orbit, Δv arrows tangential at
+  periapsis and apoapsis"
+- Not "error correction diagram" → specify exact quantum circuit topology required
+
+GEOMETRIC PRECISION FOR COMMON DIAGRAM TYPES:
+- Miller planes (hkl): (h,k,l) plane intercepts x-axis at 1/h, y-axis at 1/k, z-axis at 1/l
+  (index 0 = axis not intercepted = plane is parallel to that axis).
+  (100) = parallel to yz-plane. (110) = diagonal in xy-plane. (111) = equal intercepts on all three.
+- Kepler's 2nd law: near-perihelion sector is narrow (small area), near-aphelion is wide (large area).
+  For equal time intervals, the area ratio must be visually obvious — minimum 3:1 ratio.
+- Hohmann transfer: two concentric ellipses sharing one focus. Δv arrows must be tangential (prograde).
+- Dirac cone dispersion: LINEAR (V-shaped) with the two cones touching at a single point — NOT parabolic.
+- Game theory payoff matrix/tree: use EXACT payoff values from the question text. NEVER substitute
+  generic placeholders (a, b, c or 1, 2, 3) when the question specifies actual numbers.
+- FSM / state diagrams: use EXACT state names and transition labels from the question text.
+- Stellar nucleosynthesis onion shell layers (outside to center): H → He → C → O → Ne → Mg → Si → Fe.
 
 ⚠️ ANSWER HIDING IN DIAGRAMS (CRITICAL — THIS IS A STUDENT ASSIGNMENT):
 Diagrams must NEVER reveal the answer to the question. Students must work out the answer themselves.
@@ -337,7 +425,10 @@ YOUR TASK:
 TOOL SELECTION:
    a) Choose the appropriate tool:
       - **circuitikz_tool** ⭐ BEST FOR ALL CIRCUITS: Generates publication-quality circuit diagrams via CircuiTikZ (LaTeX). Use for: ALL electrical circuits, MOSFET/CMOS transistor circuits, analog circuits, digital logic gates, op-amp circuits, BJT circuits, RLC networks, flip-flop circuits, shift registers, counters, sequential logic, encoders/decoders, MUX/DEMUX, register files, ALU/datapath.
-      - **claude_code_tool** (RECOMMENDED for non-circuit diagrams AND timing/waveform): Use Claude to generate matplotlib/networkx code for any technical domain — physics, CS, math, chemistry, biology, mechanical, civil. ALSO use this for timing diagrams and waveforms (with tool_type=matplotlib). Highly versatile.
+      - **tikz_tool** ⭐ BEST FOR: physics ray/optics diagrams, Feynman diagrams, free body diagrams, spring-mass systems, 3D crystal unit cells (BCC/FCC/HCP), geometric constructions, Lewis structures. PREFER over claude_code_tool for these.
+      - **plotly_tool** ⭐ BEST FOR: true 3D diagrams — 3D crystal unit cells with atom spheres, 3D molecular orbitals, 3D surfaces. PREFER over claude_code_tool when 3D perspective is essential.
+      - **rdkit_tool** ⭐ BEST FOR: 2D molecular skeletal formulas — organic chemistry, drug molecules, amino acids. PREFER over claude_code_tool for any molecular structure.
+      - **claude_code_tool** (general-purpose fallback): Use when no specialist tool above applies. Works for: 2D plots, waveforms, timing diagrams, data structures, flowcharts, phase diagrams, action potentials, and any domain not covered by specialists. Use tool_type=matplotlib/networkx.
       - matplotlib_tool: Direct matplotlib code (ONLY if very simple plot)
       - networkx_tool: Direct networkx code (ONLY if very simple graph)
       - For MEDICAL questions: use the most specific specialist tool — never circuitikz
@@ -522,6 +613,7 @@ CODE GENERATION BEST PRACTICES:
             q_diagram_type = classification["diagram_type"]
             q_ai_suitable = classification["ai_suitable"]
             q_preferred_tool = classification["preferred_tool"]
+            q_subject_guidance = classification.get("subject_guidance", "")
             logger.info(
                 f"Q{question_idx} classified: domain={q_domain}, type={q_diagram_type}, "
                 f"ai_suitable={q_ai_suitable}, preferred_tool={q_preferred_tool}"
@@ -558,14 +650,21 @@ This is a STRONG HINT that a diagram would add educational value. Consider gener
                 else "INTELLIGENT mode (generate when helpful)"
             )
 
+            preferred_tool_hint = (
+                f"\nRecommended tool: {q_preferred_tool} "
+                f"(selected by domain classifier for best accuracy with {q_diagram_type})"
+                if q_preferred_tool
+                else ""
+            )
+
             analysis_prompt = f"""Analyze this question and decide if a diagram would help students visualize and understand the problem:
 
 Question Type: {question_type}
 Question Text: {equation_resolved_question_text}
-Domain classification: {q_domain} / {q_diagram_type}{llm_diagram_hint}
+Domain classification: {q_domain} / {q_diagram_type}{preferred_tool_hint}{llm_diagram_hint}
 
 If a diagram would genuinely enhance understanding:
-1. Choose the appropriate tool for this domain
+1. Choose the appropriate tool for this domain — prefer the recommended tool above when specified
 2. Provide an accurate description of what to draw
 3. Call the tool
 
@@ -932,7 +1031,9 @@ Mode: {mode_description}
                 if tool_name == "claude_code_tool" and not tool_arguments.get(
                     "subject_guidance"
                 ):
-                    injected_guidance = self.prompt_registry.get_nonai_tool_prompt(
+                    # Prefer dynamic guidance from DomainRouter (works for any subject);
+                    # fall back to registry for known domains.
+                    injected_guidance = q_subject_guidance or self.prompt_registry.get_nonai_tool_prompt(
                         q_domain, q_diagram_type, "matplotlib"
                     )
                     if injected_guidance:
@@ -942,6 +1043,15 @@ Mode: {mode_description}
                             f"Q{question_idx}: Injected {q_domain}/{q_diagram_type} subject_guidance "
                             f"into claude_code_tool ({len(injected_guidance)} chars)"
                         )
+                elif tool_name in ("tikz_tool", "plotly_tool") and not tool_arguments.get(
+                    "subject_guidance"
+                ) and q_subject_guidance:
+                    tool_arguments = dict(tool_arguments)
+                    tool_arguments["subject_guidance"] = q_subject_guidance
+                    logger.info(
+                        f"Q{question_idx}: Injected subject_guidance into {tool_name} "
+                        f"({len(q_subject_guidance)} chars)"
+                    )
                 elif tool_name == "svg_circuit_tool" and not tool_arguments.get(
                     "subject_context"
                 ):
@@ -951,6 +1061,34 @@ Mode: {mode_description}
                     if injected_ctx:
                         tool_arguments = dict(tool_arguments)
                         tool_arguments["subject_context"] = injected_ctx
+
+                # ── Inject REQUIRED LABELS into description ──────────────────
+                # Extract structural component names from the question and prepend
+                # as mandatory labels so the generator cannot omit them.
+                _required_labels = _extract_required_labels(equation_resolved_question_text)
+                if _required_labels and "description" in tool_arguments:
+                    tool_arguments = dict(tool_arguments)
+                    label_prefix = (
+                        "MANDATORY LABELS — every item below MUST appear as visible text in the diagram:\n"
+                        + "\n".join(f"  \u2022 {lbl}" for lbl in _required_labels)
+                        + "\nThe diagram will FAIL automated review if any of these are missing.\n\n"
+                    )
+                    tool_arguments["description"] = label_prefix + tool_arguments["description"]
+                    logger.info(
+                        f"Q{question_idx}: Injected {len(_required_labels)} required labels: "
+                        f"{', '.join(_required_labels)}"
+                    )
+
+                # ── Warn on unresolved <eq> placeholders in description ──────
+                # Unresolved math placeholders (e.g. <eq q1_eq2>) in the description
+                # cause generators to substitute generic values, producing data_mismatch.
+                # The description should always derive from equation_resolved_question_text.
+                if "description" in tool_arguments and "<eq " in tool_arguments.get("description", ""):
+                    logger.warning(
+                        f"Q{question_idx}: Unresolved <eq> placeholder detected in diagram description. "
+                        "Generator will not have access to actual values — data_mismatch likely. "
+                        "Ensure descriptions are built from equation_resolved_question_text."
+                    )
 
                 # Run nonai when: engine=nonai, engine=both (always), or engine=ai as fallback
                 if effective_engine != "ai" or diagram_data is None:
@@ -1250,6 +1388,12 @@ Mode: {mode_description}
                         # Could not get primary bytes — skip secondary calls
                         diagram_data.pop("_image_bytes", None)
 
+                # Default so _current_args is always defined at the save point below.
+                # The review loop overwrites this with dict(tool_arguments) and then
+                # updates it to regen_args after each regeneration, so it always
+                # reflects the description used for the final accepted diagram.
+                _current_args = tool_arguments
+
                 if diagram_data:
                     # ── Diagram Review Step ──────────────────────────────
                     # Skip review if engine=ai/both already reviewed in the Imagen retry loop
@@ -1259,98 +1403,202 @@ Mode: {mode_description}
                             f"already reviewed in Imagen retry loop"
                         )
                     else:
-                        image_bytes_for_review = diagram_data.pop("_image_bytes", None)
+                        # ── Multi-round review+regeneration loop (max 3 attempts) ──
+                        _MAX_NONAI_REVIEW = 3
+                        _current_args = dict(tool_arguments)
+                        _current_tool = tool_name
 
-                        if image_bytes_for_review is None:
-                            # Fallback: download from S3 presigned URL
+                        # Strip <eq> placeholders once — reused in every iteration
+                        clean_question_for_review = re.sub(
+                            r"<eq\s+\S+>", "", equation_resolved_question_text
+                        ).strip()
+
+                        # Accumulated leaked label descriptions across answer_leak attempts
+                        _accumulated_leak_reasons: list[str] = []
+
+                        # Get image bytes for the initial diagram
+                        _review_bytes = diagram_data.pop("_image_bytes", None)
+                        if _review_bytes is None:
                             try:
                                 import requests as _req
-
                                 resp = _req.get(diagram_data["s3_url"], timeout=15)
                                 if resp.status_code == 200:
-                                    image_bytes_for_review = resp.content
+                                    _review_bytes = resp.content
                             except Exception as dl_err:
                                 logger.warning(
                                     f"Could not download diagram for review: {dl_err}"
                                 )
 
-                        if image_bytes_for_review:
-                            description_for_review = tool_arguments.get(
-                                "description", equation_resolved_question_text[:300]
-                            )
-                            # Strip <eq> placeholders to prevent false label-mismatch failures
-                            clean_question_for_review = re.sub(
-                                r"<eq\s+\S+>", "", equation_resolved_question_text
-                            ).strip()
-                            review_result = await self.reviewer.review_diagram(
-                                image_bytes=image_bytes_for_review,
-                                question_text=clean_question_for_review,
-                                diagram_description=description_for_review,
-                                user_prompt_context=getattr(
-                                    self, "_generation_prompt", ""
-                                ),
-                                domain=q_domain,
-                                diagram_type=q_diagram_type,
-                            )
-
-                            if not review_result["passed"]:
-                                logger.warning(
-                                    f"Diagram review FAILED for Q{question_idx}: {review_result['reason']}  "
-                                    f"Issues: {review_result['issues']}"
-                                )
-                                corrected_desc = review_result.get(
-                                    "corrected_description"
-                                )
-                                if corrected_desc:
-                                    logger.info(
-                                        f"Regenerating Q{question_idx} with corrected description: "
-                                        f"{corrected_desc[:120]}..."
-                                    )
-                                    # Preserve the original tool for regeneration so matplotlib
-                                    # diagrams don't degrade to SVG (which can't render LaTeX
-                                    # and produces overlapping text for plots/iv_curves).
-                                    if tool_name == "claude_code_tool":
-                                        regen_tool = "claude_code_tool"
-                                        regen_args = dict(tool_arguments)
-                                        regen_args["description"] = (
-                                            corrected_desc
-                                            + " Do NOT include any computed answer values, "
-                                            "specific numeric results, or parameters that reveal "
-                                            "the solution."
-                                        )
-                                    else:
-                                        regen_tool = "circuitikz_tool"
-                                        regen_args = {"description": corrected_desc}
-                                    logger.info(
-                                        f"Regenerating Q{question_idx} using {regen_tool} "
-                                        f"(original tool preserved)"
-                                    )
-                                    regen_data = await self.diagram_tools.execute_tool_call(
-                                        tool_name=regen_tool,
-                                        tool_arguments=regen_args,
-                                        assignment_id=assignment_id,
-                                        question_idx=question_idx,
-                                        question_text=equation_resolved_question_text,
-                                    )
-                                    if regen_data:
-                                        # Pop transient key before attaching
-                                        regen_data.pop("_image_bytes", None)
-                                        diagram_data = regen_data
-                                        logger.info(
-                                            f"Regenerated diagram accepted for Q{question_idx}"
-                                        )
-                                    else:
-                                        logger.warning(
-                                            f"Regeneration failed for Q{question_idx}; keeping original diagram"
-                                        )
-                            else:
-                                logger.info(
-                                    f"Diagram review PASSED for Q{question_idx}: {review_result['reason']}"
-                                )
-                        else:
+                        if not _review_bytes:
                             logger.warning(
                                 f"No image bytes available for review of Q{question_idx}; skipping review"
                             )
+                        else:
+                            for _review_attempt in range(_MAX_NONAI_REVIEW):
+                                description_for_review = _current_args.get(
+                                    "description", equation_resolved_question_text[:300]
+                                )
+                                review_result = await self.reviewer.review_diagram(
+                                    image_bytes=_review_bytes,
+                                    question_text=clean_question_for_review,
+                                    diagram_description=description_for_review,
+                                    user_prompt_context=getattr(
+                                        self, "_generation_prompt", ""
+                                    ),
+                                    domain=q_domain,
+                                    diagram_type=q_diagram_type,
+                                )
+
+                                if review_result["passed"]:
+                                    logger.info(
+                                        f"Diagram review PASSED for Q{question_idx} "
+                                        f"(attempt {_review_attempt + 1}): {review_result['reason']}"
+                                    )
+                                    break
+
+                                logger.warning(
+                                    f"Diagram review FAILED for Q{question_idx} "
+                                    f"(attempt {_review_attempt + 1}/{_MAX_NONAI_REVIEW}): "
+                                    f"{review_result['reason']}  Issues: {review_result['issues']}"
+                                )
+
+                                if _review_attempt == _MAX_NONAI_REVIEW - 1:
+                                    logger.warning(
+                                        f"All {_MAX_NONAI_REVIEW} review attempts failed for "
+                                        f"Q{question_idx}; keeping last diagram"
+                                    )
+                                    break
+
+                                # Build corrected description for next attempt
+                                failure_type = review_result.get("failure_type", "answer_leak")
+                                corrected_desc = review_result.get("corrected_description")
+
+                                # Accumulate answer_leak reasons so each regen attempt
+                                # knows ALL labels that have leaked so far
+                                if failure_type == "answer_leak":
+                                    _accumulated_leak_reasons.append(review_result["reason"])
+
+                                if not corrected_desc:
+                                    original_desc = _current_args.get("description", description_for_review)
+                                    reason = review_result["reason"]
+
+                                    if failure_type == "wrong_type":
+                                        corrected_desc = (
+                                            f"CRITICAL: The previous diagram showed the wrong type. {reason}. "
+                                            f"Regenerate from scratch showing the CORRECT diagram type. {original_desc}"
+                                        )
+                                    elif failure_type == "missing_labels":
+                                        issues_str = review_result.get("issues", "")
+                                        if isinstance(issues_str, list):
+                                            issues_str = ", ".join(issues_str)
+                                        issue_line = (
+                                            f" Specifically these labels are missing: {issues_str}."
+                                            if issues_str and issues_str.lower() != "none" else ""
+                                        )
+                                        corrected_desc = (
+                                            f"{original_desc} "
+                                            f"IMPORTANT: The diagram is missing required labels.{issue_line} {reason}. "
+                                            "Add each missing label as visible text at the appropriate location in the diagram."
+                                        )
+                                    elif failure_type == "data_mismatch":
+                                        corrected_desc = (
+                                            f"{original_desc} "
+                                            f"IMPORTANT: Values or sequences in the diagram don't match the question. {reason}. "
+                                            "Regenerate using EXACTLY the values and sequences specified."
+                                        )
+                                    else:  # answer_leak or default
+                                        corrected_desc = (
+                                            f"{original_desc} "
+                                            f"IMPORTANT correction needed: {reason}. "
+                                            "Do NOT include region labels (Feasible/Infeasible, "
+                                            "Stable/Unstable, Optimal, etc.), formula annotations, "
+                                            "reaction product labels, threshold markers, or any text "
+                                            "that reveals the answer. Show structure and context only."
+                                        )
+                                    logger.info(
+                                        f"Q{question_idx}: No corrected_description from reviewer — "
+                                        f"building fallback for failure_type={failure_type}"
+                                    )
+
+                                # For answer_leak: prepend ALL accumulated leak reasons so
+                                # Claude knows every label that has leaked across all attempts
+                                if failure_type == "answer_leak" and len(_accumulated_leak_reasons) > 1:
+                                    all_leaks = "; ".join(_accumulated_leak_reasons)
+                                    corrected_desc = (
+                                        f"CUMULATIVE LEAK CORRECTIONS (all must be fixed): {all_leaks}. "
+                                        + corrected_desc
+                                    )
+                                    logger.info(
+                                        f"Q{question_idx}: Prepending {len(_accumulated_leak_reasons)} "
+                                        f"accumulated leak reasons to corrected_description"
+                                    )
+
+                                # Preserve original tool — never downgrade to SVG
+                                if _current_tool == "claude_code_tool":
+                                    regen_tool = "claude_code_tool"
+                                    regen_args = dict(_current_args)
+                                    regen_args["description"] = corrected_desc
+                                    # For wrong_type: inject corrected_desc as subject_guidance
+                                    # so it appears in the most prominent position Claude reads
+                                    if failure_type == "wrong_type":
+                                        regen_args["subject_guidance"] = corrected_desc
+                                    # For answer_leak: pass the failed diagram as reference image
+                                    # so Claude can see exactly which labels to remove
+                                    elif failure_type == "answer_leak" and _review_bytes:
+                                        regen_args["reference_image_bytes"] = _review_bytes
+                                        logger.info(
+                                            f"Q{question_idx}: Passing reference image to Claude "
+                                            f"for surgical answer-leak fix"
+                                        )
+                                elif _current_tool in ("tikz_tool", "plotly_tool"):
+                                    regen_tool = _current_tool
+                                    regen_args = dict(_current_args)
+                                    regen_args["description"] = corrected_desc
+                                    if failure_type == "wrong_type":
+                                        regen_args["subject_guidance"] = corrected_desc
+                                else:
+                                    regen_tool = "circuitikz_tool"
+                                    regen_args = {"description": corrected_desc}
+
+                                logger.info(
+                                    f"Regenerating Q{question_idx} "
+                                    f"(attempt {_review_attempt + 2}/{_MAX_NONAI_REVIEW}) "
+                                    f"using {regen_tool}"
+                                )
+                                regen_data = await self.diagram_tools.execute_tool_call(
+                                    tool_name=regen_tool,
+                                    tool_arguments=regen_args,
+                                    assignment_id=assignment_id,
+                                    question_idx=question_idx,
+                                    question_text=equation_resolved_question_text,
+                                )
+
+                                if regen_data:
+                                    _review_bytes = regen_data.pop("_image_bytes", None)
+                                    if _review_bytes is None:
+                                        try:
+                                            import requests as _req
+                                            resp = _req.get(regen_data["s3_url"], timeout=15)
+                                            if resp.status_code == 200:
+                                                _review_bytes = resp.content
+                                        except Exception as dl_err:
+                                            logger.warning(
+                                                f"Could not download regen diagram for review: {dl_err}"
+                                            )
+                                    diagram_data = regen_data
+                                    _current_args = regen_args
+                                    if not _review_bytes:
+                                        logger.warning(
+                                            f"No image bytes after regen attempt "
+                                            f"{_review_attempt + 2}; stopping review loop"
+                                        )
+                                        break
+                                else:
+                                    logger.warning(
+                                        f"Regen attempt {_review_attempt + 2} failed for "
+                                        f"Q{question_idx}; keeping previous diagram"
+                                    )
+                                    break
                     # ── End review step ───────────────────────────────────
 
                     # Tool succeeded, now ask agent to rephrase question
@@ -1487,6 +1735,11 @@ RUBRIC:
                         "s3_key": diagram_data.get("s3_key"),
                         "file_id": diagram_data.get("file_id"),
                         "filename": diagram_data.get("filename"),
+                        # Generation context for offline re-review (review_only.py).
+                        # No effect on generation — metadata only.
+                        "domain": q_domain,
+                        "diagram_type": q_diagram_type,
+                        "description": _current_args.get("description", ""),
                     }
                     question["hasDiagram"] = True
 
