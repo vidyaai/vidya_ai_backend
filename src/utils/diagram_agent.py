@@ -110,6 +110,14 @@ def _repair_truncated_json(s: str) -> dict:
     raise json.JSONDecodeError("Unable to repair JSON", s, 0)
 
 
+def _format_issues(issues_val) -> str:
+    if isinstance(issues_val, list):
+        issues_val = ", ".join(issues_val)
+    if issues_val and issues_val.lower() != "none":
+        return f" Specifically: {issues_val}."
+    return ""
+
+
 class DiagramAnalysisAgent:
     """AI agent that analyzes questions and generates diagrams via tool calls"""
 
@@ -1079,16 +1087,24 @@ Mode: {mode_description}
                         f"{', '.join(_required_labels)}"
                     )
 
-                # ── Warn on unresolved <eq> placeholders in description ──────
+                # ── Block unresolved <eq> placeholders in description ────────
                 # Unresolved math placeholders (e.g. <eq q1_eq2>) in the description
                 # cause generators to substitute generic values, producing data_mismatch.
-                # The description should always derive from equation_resolved_question_text.
-                if "description" in tool_arguments and "<eq " in tool_arguments.get("description", ""):
-                    logger.warning(
-                        f"Q{question_idx}: Unresolved <eq> placeholder detected in diagram description. "
-                        "Generator will not have access to actual values — data_mismatch likely. "
-                        "Ensure descriptions are built from equation_resolved_question_text."
+                # Retry resolution against the question, then substitute a safe
+                # pointer for any placeholder still surviving.
+                _desc = tool_arguments.get("description", "")
+                if "<eq " in _desc:
+                    resolved_desc = self._resolve_equation_placeholders(question, _desc)
+                    resolved_desc, n_substituted = re.subn(
+                        r"<eq\s+[^>]+>", "[see question text]", resolved_desc
                     )
+                    if n_substituted:
+                        logger.error(
+                            f"Q{question_idx}: Substituted {n_substituted} unresolved <eq> "
+                            f"placeholder(s) in diagram description with '[see question text]'."
+                        )
+                    tool_arguments = dict(tool_arguments)
+                    tool_arguments["description"] = resolved_desc
 
                 # Run nonai when: engine=nonai, engine=both (always), or engine=ai as fallback
                 if effective_engine != "ai" or diagram_data is None:
@@ -1101,9 +1117,10 @@ Mode: {mode_description}
                     )
 
                 # ── Phase 4: Subject-specific fallback routing ─────────────────
-                # If primary tool failed, use FallbackRouter to pick the right tool
+                # If primary tool failed, use FallbackRouter to pick the right tool.
+                # circuitikz_tool is included so that pdflatex compile failures
+                # can fall back to matplotlib/plotly (still code-rendered, not AI image gen).
                 if diagram_data is None and tool_name not in (
-                    "circuitikz_tool",
                     "svg_circuit_tool",
                     "claude_code_tool",
                 ):
@@ -1301,8 +1318,10 @@ Mode: {mode_description}
                             resp = _req.get(diagram_data["s3_url"], timeout=15)
                             if resp.status_code == 200:
                                 primary_bytes = resp.content
-                        except Exception:
-                            pass
+                        except Exception as _fetch_err:
+                            logger.warning(
+                                f"Q{question_idx}: failed to fetch primary diagram bytes from S3: {_fetch_err}"
+                            )
 
                     if primary_bytes:
                         all_image_bytes = [primary_bytes]
@@ -1344,8 +1363,10 @@ Mode: {mode_description}
                                         resp = _req.get(sec_data["s3_url"], timeout=15)
                                         if resp.status_code == 200:
                                             sec_bytes = resp.content
-                                    except Exception:
-                                        pass
+                                    except Exception as _fetch_err:
+                                        logger.warning(
+                                            f"Q{question_idx}: failed to fetch secondary diagram bytes from S3: {_fetch_err}"
+                                        )
                                 if sec_bytes:
                                     all_image_bytes.append(sec_bytes)
                                     all_labels.append(
@@ -1473,6 +1494,21 @@ Mode: {mode_description}
                                 failure_type = review_result.get("failure_type", "answer_leak")
                                 corrected_desc = review_result.get("corrected_description")
 
+                                # Review errors (timeout, init failure, malformed response)
+                                # indicate we have no actionable feedback — keep the
+                                # previous diagram and exit the regen loop.
+                                if failure_type == "review_error":
+                                    logger.error(
+                                        f"Q{question_idx}: Reviewer error — cannot regen without feedback"
+                                    )
+                                    break
+
+                                # Reviewer omitted mandatory CORRECTED_DESCRIPTION.
+                                # Treat as absent so the fallback builder runs
+                                # with issues context.
+                                if review_result.get("needs_reprompt"):
+                                    corrected_desc = None
+
                                 # Accumulate answer_leak reasons so each regen attempt
                                 # knows ALL labels that have leaked so far
                                 if failure_type == "answer_leak":
@@ -1481,20 +1517,14 @@ Mode: {mode_description}
                                 if not corrected_desc:
                                     original_desc = _current_args.get("description", description_for_review)
                                     reason = review_result["reason"]
+                                    issue_line = _format_issues(review_result.get("issues", ""))
 
                                     if failure_type == "wrong_type":
                                         corrected_desc = (
-                                            f"CRITICAL: The previous diagram showed the wrong type. {reason}. "
+                                            f"CRITICAL: The previous diagram showed the wrong type. {reason}.{issue_line} "
                                             f"Regenerate from scratch showing the CORRECT diagram type. {original_desc}"
                                         )
                                     elif failure_type == "missing_labels":
-                                        issues_str = review_result.get("issues", "")
-                                        if isinstance(issues_str, list):
-                                            issues_str = ", ".join(issues_str)
-                                        issue_line = (
-                                            f" Specifically these labels are missing: {issues_str}."
-                                            if issues_str and issues_str.lower() != "none" else ""
-                                        )
                                         corrected_desc = (
                                             f"{original_desc} "
                                             f"IMPORTANT: The diagram is missing required labels.{issue_line} {reason}. "
@@ -1503,13 +1533,13 @@ Mode: {mode_description}
                                     elif failure_type == "data_mismatch":
                                         corrected_desc = (
                                             f"{original_desc} "
-                                            f"IMPORTANT: Values or sequences in the diagram don't match the question. {reason}. "
+                                            f"IMPORTANT: Values or sequences in the diagram don't match the question.{issue_line} {reason}. "
                                             "Regenerate using EXACTLY the values and sequences specified."
                                         )
                                     else:  # answer_leak or default
                                         corrected_desc = (
                                             f"{original_desc} "
-                                            f"IMPORTANT correction needed: {reason}. "
+                                            f"IMPORTANT correction needed: {reason}.{issue_line} "
                                             "Do NOT include region labels (Feasible/Infeasible, "
                                             "Stable/Unstable, Optimal, etc.), formula annotations, "
                                             "reaction product labels, threshold markers, or any text "

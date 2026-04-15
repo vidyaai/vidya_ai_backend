@@ -88,10 +88,11 @@ class GeminiDiagramReviewer:
                   a full regeneration due to structural/layout problems)
         """
         if not self._ensure_initialized():
-            logger.warning("Gemini reviewer not initialized — passing through")
+            logger.error("Gemini reviewer not initialized — failing closed")
             return {
-                "passed": True,
-                "reason": "Gemini reviewer not available — skipped",
+                "passed": False,
+                "failure_type": "review_error",
+                "reason": "Gemini reviewer not available",
                 "corrected_description": None,
                 "issues": [],
                 "fixable": False,
@@ -121,7 +122,7 @@ class GeminiDiagramReviewer:
                     [review_prompt, image_part],
                     generation_config={
                         "temperature": 0.1,
-                        "max_output_tokens": 800,
+                        "max_output_tokens": 2048,
                     },
                     # request_options={"timeout": 60},  # 60 second timeout
                 )
@@ -135,10 +136,12 @@ class GeminiDiagramReviewer:
                 logger.error(f"Gemini diagram review cancelled (timeout): {e}")
                 logger.error(f"Traceback: {traceback.format_exc()}")
 
-                # Don't retry on timeout - just fail fast
+                # Fail closed on timeout — do NOT pass through a potentially
+                # broken diagram. The regen loop will keep the prior image.
                 return {
-                    "passed": True,
-                    "reason": f"Review skipped due to timeout after {attempt + 1} attempt(s)",
+                    "passed": False,
+                    "failure_type": "review_error",
+                    "reason": f"Review timed out after {attempt + 1} attempt(s)",
                     "corrected_description": None,
                     "issues": [],
                     "fixable": False,
@@ -171,11 +174,13 @@ class GeminiDiagramReviewer:
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 break
 
-        # Fallback return with proper error reference
+        # Fail closed on unrecoverable reviewer error — a silent pass would
+        # accept whatever diagram we currently have, masking real failures.
         error_msg = str(last_error) if last_error else "Unknown error"
         return {
-            "passed": True,
-            "reason": f"Review skipped due to error: {error_msg}",
+            "passed": False,
+            "failure_type": "review_error",
+            "reason": f"Review failed: {error_msg}",
             "corrected_description": None,
             "issues": [],
             "fixable": False,
@@ -415,6 +420,22 @@ TOLERANCE GUIDELINES:
   * Minor label redundancy that doesn't cause genuine confusion (e.g., "Incoming Space Probe" on a trajectory already showing a probe path) — PASS
   * A label that names what an element IS (e.g., "Space Probe", "Orbit Path", "Transfer Ellipse") even if it seems obvious — PASS, these are structural identifiers not answer leaks
 
+LENIENCY RULES — automatically PASS these even if technically imperfect:
+1. MINOR MISSING LABELS: If at most ONE secondary/supporting label is absent (e.g., a
+   supplementary axis title, a supporting annotation, or a decorative dimension label)
+   AND all structurally essential components named in the QUESTION are present and labeled
+   → PASS. Only fail missing_labels when a component CENTRAL to the question is entirely
+   absent. A label is "secondary" if removing it does not prevent a student from using the
+   diagram to answer the question.
+2. STANDARD FORMULA LEAKS: A well-known formula or physical law visible on the diagram
+   (e.g., F=ma, V=IR, E=mc², PV=nRT) that every student at this level already knows
+   → PASS. Only fail answer_leak when the formula or expression encodes the SPECIFIC
+   COMPUTED RESULT the question asks for (e.g., showing the exact numerical answer).
+3. CONTEXTUAL RESTATEMENT: A label or annotation that merely restates information
+   ALREADY GIVEN in the question text (not something the student must derive) → PASS.
+   Example: a diagram labeling "Given: L=4m" when the question already states L=4m is
+   not an answer leak — it is a contextual reminder.
+
 RESPOND IN THIS EXACT FORMAT:
 
 VERDICT: PASS or FAIL
@@ -445,7 +466,9 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
         """Parse the structured review response."""
         lines = result_text.strip().split("\n")
 
-        verdict = "PASS"
+        # Default FAIL — if VERDICT is missing or malformed, we want to fail
+        # closed rather than silently accept the diagram.
+        verdict = "FAIL"
         failure_type = "none"
         reason = "Review completed"
         issues = []
@@ -498,6 +521,70 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
         if passed:
             failure_type = "none"
 
+        # Output-truncation heuristic: a long REASON with an empty ISSUES list
+        # when one is structurally expected is almost always a max_output_tokens
+        # cutoff. Surface it so we can tell from logs.
+        if not passed and not issues and len(reason) > 400:
+            logger.warning(
+                "Reviewer response looks truncated "
+                "(long REASON, empty ISSUES) — consider raising max_output_tokens"
+            )
+
+        # ── Leniency overrides ──────────────────────────────────────────────
+        # These mirror the LENIENCY RULES in the prompt and catch cases where
+        # Gemini still returns FAIL despite the guidance.
+        if not passed:
+            if failure_type == "missing_labels" and len(issues) <= 1 and fixable:
+                # At most one secondary label missing and it's fixable → accept
+                logger.info(
+                    f"LENIENT_PASS: missing_labels with ≤1 issue ({issues}) — "
+                    "treating as pass"
+                )
+                passed = True
+                failure_type = "none"
+
+            elif failure_type == "answer_leak" and fixable:
+                # Fixable answer_leak means Gemini itself judged it correctable
+                # in-place (not a structural regen). Check if reason matches the
+                # patterns covered by LENIENCY RULES 2/3.
+                _lenient_leak_keywords = (
+                    "standard formula",
+                    "well-known",
+                    "already given",
+                    "already stated",
+                    "restates",
+                    "general formula",
+                    "common formula",
+                    "universal law",
+                    "physical law",
+                    "given in the question",
+                    "given value",
+                )
+                reason_lower = reason.lower()
+                if any(kw in reason_lower for kw in _lenient_leak_keywords):
+                    logger.info(
+                        f"LENIENT_PASS: answer_leak reason matches standard-formula/"
+                        f"contextual-restatement pattern — treating as pass. "
+                        f"Reason: {reason}"
+                    )
+                    passed = True
+                    failure_type = "none"
+
+        # For wrong_type and data_mismatch the prompt REQUIRES a
+        # CORRECTED_DESCRIPTION. If the reviewer omitted it, flag the
+        # regen loop so it builds a fallback with the issues context
+        # instead of silently using the generic template.
+        needs_reprompt = (
+            not passed
+            and failure_type in ("wrong_type", "data_mismatch")
+            and not corrected_desc
+        )
+        if needs_reprompt:
+            logger.warning(
+                f"Reviewer returned failure_type={failure_type} without "
+                "mandatory CORRECTED_DESCRIPTION — flagging needs_reprompt"
+            )
+
         logger.info(
             f"Gemini diagram review: {'PASSED' if passed else 'FAILED'} — {reason}"
         )
@@ -513,4 +600,5 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
             "corrected_description": corrected_desc,
             "issues": issues,
             "fixable": fixable,
+            "needs_reprompt": needs_reprompt,
         }

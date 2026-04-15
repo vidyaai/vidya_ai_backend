@@ -29,6 +29,7 @@ from typing import Optional
 
 from anthropic import Anthropic
 from controllers.config import logger
+from utils.latex_repair import canonicalize_tikzlibrary, repair_latex
 
 try:
     from pdf2image import convert_from_path
@@ -142,19 +143,18 @@ class TikZGenerator:
         # Replace any \usetikzlibrary{...} lines Claude generated with the
         # canonical set — prevents hallucinated library names (e.g. pathmotions)
         # from causing pdflatex failures.
-        _CANONICAL_TIKZLIB = (
-            r"\usetikzlibrary{arrows.meta, calc, decorations, decorations.pathmorphing, "
-            r"decorations.markings, shapes.geometric, positioning, fit, patterns, 3d, backgrounds}"
-        )
-        latex = re.sub(r"\\usetikzlibrary\{[^}]*\}", lambda m: _CANONICAL_TIKZLIB, latex)
+        latex = canonicalize_tikzlibrary(latex)
 
         # Strip trailing whitespace inside [...] option lists — prevents
         # "/tikz/key " (with trailing space) unknown-key errors in pgfkeys.
-        latex = re.sub(
-            r"\[([^\[\]]*)\]",
-            lambda m: "[" + re.sub(r"\s+,", ",", m.group(1).rstrip()) + "]",
-            latex,
-        )
+        try:
+            latex = re.sub(
+                r"\[([^\[\]]*)\]",
+                lambda m: "[" + re.sub(r"\s+,", ",", m.group(1).rstrip()) + "]",
+                latex,
+            )
+        except re.error as e:
+            logger.warning(f"option-list trim regex failed: {e}")
 
         return latex
 
@@ -209,21 +209,33 @@ class TikZGenerator:
                     timeout=60,
                     env=pdflatex_env,
                 )
-                if result.returncode != 0:
-                    error_lines = [
-                        l
-                        for l in result.stdout.splitlines()
-                        if l.startswith("!") or "Error" in l or "error" in l
-                    ]
-                    error_summary = "\n".join(error_lines[:10]) or result.stdout[-500:]
-                    debug_tex = os.path.join(tempfile.gettempdir(), "debug_tikz.tex")
-                    with open(debug_tex, "w") as f:
-                        f.write(latex_src)
-                    logger.error(
-                        f"pdflatex pass {_pass + 1} failed (rc={result.returncode}):\n"
-                        f"{error_summary}\nDebug LaTeX saved to {debug_tex}"
-                    )
-                    raise RuntimeError(f"pdflatex compilation failed:\n{error_summary}")
+                if result.returncode == 0:
+                    break
+
+                error_lines = [
+                    l
+                    for l in result.stdout.splitlines()
+                    if l.startswith("!") or "Error" in l or "error" in l
+                ]
+                error_summary = "\n".join(error_lines[:10]) or result.stdout[-500:]
+                debug_tex = os.path.join(tempfile.gettempdir(), "debug_tikz.tex")
+                with open(debug_tex, "w") as f:
+                    f.write(latex_src)
+                logger.error(
+                    f"pdflatex pass {_pass + 1} failed (rc={result.returncode}):\n"
+                    f"{error_summary}\nDebug LaTeX saved to {debug_tex}"
+                )
+
+                if _pass == 0:
+                    repaired = repair_latex(latex_src, ("tikzpicture",))
+                    if repaired != latex_src:
+                        logger.info("pdflatex pass 1 failed — applying deterministic repairs and retrying")
+                        latex_src = repaired
+                        with open(tex_file, "w", encoding="utf-8") as fh:
+                            fh.write(latex_src)
+                        continue
+
+                raise RuntimeError(f"pdflatex compilation failed:\n{error_summary}")
 
             if not os.path.isfile(pdf_file):
                 raise RuntimeError("pdflatex ran but produced no PDF")

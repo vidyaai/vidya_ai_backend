@@ -31,6 +31,11 @@ from typing import Optional
 
 from anthropic import Anthropic
 from controllers.config import logger
+from utils.latex_repair import (
+    CANONICAL_TIKZLIBRARIES,
+    canonicalize_tikzlibrary,
+    repair_latex,
+)
 
 try:
     from pdf2image import convert_from_path
@@ -1055,18 +1060,12 @@ Return ONLY the complete LaTeX document starting with \\documentclass."""
             # Replace any Claude-generated \usetikzlibrary{...} with the canonical set
             # that includes all decoration libraries — prevents "decoration library" errors.
             # If Claude added none, inject one before \begin{document}.
-            import re as _re
-            _CANONICAL_TIKZLIB = (
-                r"\usetikzlibrary{arrows.meta, calc, decorations, decorations.pathmorphing, "
-                r"decorations.markings, shapes.geometric, positioning, fit, patterns, backgrounds}"
-            )
-            if _re.search(r"\\usetikzlibrary\{", latex):
-                latex = _re.sub(
-                    r"\\usetikzlibrary\{[^}]*\}", lambda m: _CANONICAL_TIKZLIB, latex
-                )
+            if re.search(r"\\usetikzlibrary\{", latex):
+                latex = canonicalize_tikzlibrary(latex)
             else:
                 latex = latex.replace(
-                    r"\begin{document}", _CANONICAL_TIKZLIB + "\n\\begin{document}"
+                    r"\begin{document}",
+                    CANONICAL_TIKZLIBRARIES + "\n\\begin{document}",
                 )
 
             logger.info(f"Claude generated {len(latex)} chars of CircuiTikZ LaTeX")
@@ -1147,24 +1146,34 @@ Return ONLY the complete LaTeX document starting with \\documentclass."""
                     timeout=60,
                     env=pdflatex_env,
                 )
-                if result.returncode != 0:
-                    # Extract the useful error lines from pdflatex output
-                    error_lines = [
-                        l
-                        for l in result.stdout.splitlines()
-                        if l.startswith("!") or "Error" in l or "error" in l
-                    ]
-                    error_summary = "\n".join(error_lines[:10]) or result.stdout[-500:]
-                    logger.error(
-                        f"pdflatex pass {_pass+1} failed (rc={result.returncode}):\n"
-                        f"{error_summary}"
-                    )
-                    # Save .tex for debugging
-                    debug_tex = os.path.join(tempfile.gettempdir(), "debug_circuit.tex")
-                    with open(debug_tex, "w") as f:
-                        f.write(latex_src)
-                    logger.info(f"Debug LaTeX saved to {debug_tex}")
-                    raise RuntimeError(f"pdflatex compilation failed:\n{error_summary}")
+                if result.returncode == 0:
+                    break
+
+                error_lines = [
+                    l
+                    for l in result.stdout.splitlines()
+                    if l.startswith("!") or "Error" in l or "error" in l
+                ]
+                error_summary = "\n".join(error_lines[:10]) or result.stdout[-500:]
+                logger.error(
+                    f"pdflatex pass {_pass+1} failed (rc={result.returncode}):\n"
+                    f"{error_summary}"
+                )
+                debug_tex = os.path.join(tempfile.gettempdir(), "debug_circuit.tex")
+                with open(debug_tex, "w") as f:
+                    f.write(latex_src)
+                logger.info(f"Debug LaTeX saved to {debug_tex}")
+
+                if _pass == 0:
+                    repaired = repair_latex(latex_src, ("circuitikz", "tikzpicture"))
+                    if repaired != latex_src:
+                        logger.info("pdflatex pass 1 failed — applying deterministic repairs and retrying")
+                        latex_src = repaired
+                        with open(tex_file, "w", encoding="utf-8") as fh:
+                            fh.write(latex_src)
+                        continue
+
+                raise RuntimeError(f"pdflatex compilation failed:\n{error_summary}")
 
             if not os.path.isfile(pdf_file):
                 raise RuntimeError("pdflatex ran successfully but no PDF produced")
