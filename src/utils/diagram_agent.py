@@ -64,9 +64,116 @@ def _extract_required_labels(question_text: str) -> list:
     for m in re.findall(r"[A-Z][a-z]?[₀₁₂₃₄₅₆₇₈₉]+", question_text):
         add(m)
 
+    # Game-theory action/strategy labels (e.g., "actions are X and Y",
+    # "strategies: High, Low")
+    for m in re.finditer(
+        r"\b(?:actions?|strategies?)\s*(?:are|:)\s*"
+        r"([A-Z][a-z]+(?:\s*(?:and|,)\s*[A-Z][a-z]+)*)",
+        question_text, re.IGNORECASE,
+    ):
+        for part in re.split(r"\s*(?:and|,)\s*", m.group(1)):
+            add(part.strip())
+
     # Filter out answer terms
     result = [l for l in result if l.lower() not in answer_terms]
     return result[:12]
+
+
+# ── Domain-specific terms that are ALWAYS forbidden when they appear as
+# diagram labels (regardless of the question's correct answer).  These are
+# concepts that name a CONCLUSION, not a structural component.
+_GLOBAL_FORBIDDEN_CONCEPTS: set = {
+    # Game theory / optimisation — solution names
+    "pareto frontier", "pareto front", "nash equilibrium", "dominant strategy",
+    "feasible region", "infeasible region", "stable", "unstable", "optimal",
+    # Crystallography / diffraction — derived relationships
+    "systematic absences", "forbidden reflections",
+    "miller indices", "path difference", "bragg condition", "bragg's law",
+    "constructive interference",
+    # Topological insulators / band structure — conclusions
+    "band inversion", "z2 topological invariant", "spin-momentum locking",
+    "linear dispersion", "dirac cone",
+    # QEC / quantum circuits — conclusions
+    "threshold", "threshold region", "critical threshold",
+    "logical operator", "logical qubit encoding path", "syndrome table",
+    # Quantum cryptography — attack/detection conclusions
+    "eavesdropping", "eavesdropping detection",
+    # Biochemistry — editing / activity regions
+    "base editing window",
+    # Kepler / orbital mechanics — visual conclusions
+    "equal areas",
+    # Neuromorphic / neuroscience — synaptic outcomes
+    "potentiation", "depression", "long-term potentiation",
+    "long-term depression", "ltp", "ltd",
+    "threshold potential", "integration threshold", "membrane leakage",
+    # Neuromorphic architecture labels that reveal the answer
+    "conventional architecture", "von neumann architecture",
+    # Stellar nucleosynthesis — named cycles / outcomes
+    "pp chain", "proton-proton chain", "cno cycle",
+    "onion shell model", "onion-shell model",
+}
+
+
+def _extract_forbidden_terms(
+    question_text: str, correct_answer: str, domain: str = ""
+) -> list:
+    """
+    Build a per-question list of terms that MUST NOT appear as labels,
+    legend entries, annotations, or note boxes in the student diagram.
+
+    Scope is intentionally narrow — a term is only forbidden if it
+    genuinely names the conclusion the student must derive, never a
+    structural component. An overly broad list causes false positives
+    that make the generator strip legitimate labels.
+
+    Sources:
+      1. Acronyms from ``correct_answer`` that do NOT appear in
+         ``question_text``. An acronym referenced by the question
+         (e.g., "describe the RuvC domain") is structural context,
+         not an answer to hide.
+      2. Curated global concepts, but only if the full concept phrase
+         appears in ``correct_answer`` — not merely in the question.
+    """
+    seen: set = set()
+    result: list = []
+    q_lower = question_text.lower()
+    a_lower = (correct_answer or "").lower()
+
+    def _add(term: str) -> None:
+        term = term.strip().rstrip(".,;:")
+        if term and 2 <= len(term) <= 60 and term.lower() not in seen:
+            seen.add(term.lower())
+            result.append(term)
+
+    if correct_answer:
+        # Acronyms (≥2 uppercase letters, e.g., "TRIM", "RuvC", "HNH")
+        # present in the answer but NOT referenced by the question.
+        for m in re.findall(r"\b[A-Z][A-Za-z]*[A-Z]\b", correct_answer):
+            if m.lower() not in q_lower:
+                _add(m)
+
+        # Capitalised conceptual nouns (single words ≥8 chars or multi-word
+        # phrases ≥10 chars) present in the answer but NOT in the question.
+        # The length gate avoids common short names ("Tree", "Line", "Bob").
+        # "Not in question" is the key discriminator — a term named by the
+        # question is structural context, not an answer-revealing label.
+        for m in re.findall(r"\b[A-Z][a-z]{7,}\b", correct_answer):
+            if m.lower() not in q_lower:
+                _add(m)
+        for m in re.findall(
+            r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}\b", correct_answer
+        ):
+            if len(m) >= 10 and m.lower() not in q_lower:
+                _add(m)
+
+    # Curated global concepts — require the full phrase to appear in the
+    # answer. This prevents a question that mentions "threshold" as
+    # structural context from forbidding the word "threshold".
+    for concept in _GLOBAL_FORBIDDEN_CONCEPTS:
+        if concept in a_lower:
+            _add(concept)
+
+    return result[:15]
 
 
 def _repair_truncated_json(s: str) -> dict:
@@ -608,6 +715,23 @@ CODE GENERATION BEST PRACTICES:
                 question, question_text
             )
 
+            # ── Extract correct answer for forbidden-terms analysis ──────
+            correct_answer_raw = question.get("correctAnswer", "")
+            # For MCQ, resolve index to option text so forbidden list is useful
+            if question_type == "multiple-choice" and isinstance(correct_answer_raw, str) and len(correct_answer_raw) <= 2:
+                options = question.get("options", [])
+                idx_map = {chr(65 + i): opt for i, opt in enumerate(options)}
+                correct_answer_raw = idx_map.get(correct_answer_raw.upper(), correct_answer_raw)
+            _forbidden_terms = _extract_forbidden_terms(
+                equation_resolved_question_text,
+                correct_answer_raw if isinstance(correct_answer_raw, str) else str(correct_answer_raw),
+            )
+            if _forbidden_terms:
+                logger.info(
+                    f"Q{question_idx}: Extracted {len(_forbidden_terms)} forbidden terms: "
+                    f"{', '.join(_forbidden_terms[:8])}{'...' if len(_forbidden_terms) > 8 else ''}"
+                )
+
             logger.info(
                 f"Analyzing question {question_idx}: {equation_resolved_question_text[:100]}..."
             )
@@ -1087,6 +1211,23 @@ Mode: {mode_description}
                         f"{', '.join(_required_labels)}"
                     )
 
+                # ── Inject FORBIDDEN LABELS into description ──────────────────
+                # Append answer-derived forbidden terms so the generator knows
+                # which labels/annotations/legend entries must NOT appear.
+                if _forbidden_terms and "description" in tool_arguments:
+                    tool_arguments = dict(tool_arguments)
+                    forbidden_suffix = (
+                        "\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, "
+                        "annotations, note boxes, or titles — these reveal the answer):\n"
+                        + "\n".join(f"  \u2022 {t}" for t in _forbidden_terms)
+                        + "\nThe diagram will FAIL review if any of these appear."
+                    )
+                    tool_arguments["description"] = tool_arguments["description"] + forbidden_suffix
+                    logger.info(
+                        f"Q{question_idx}: Injected {len(_forbidden_terms)} forbidden labels "
+                        f"into description"
+                    )
+
                 # ── Block unresolved <eq> placeholders in description ────────
                 # Unresolved math placeholders (e.g. <eq q1_eq2>) in the description
                 # cause generators to substitute generic values, producing data_mismatch.
@@ -1434,8 +1575,14 @@ Mode: {mode_description}
                             r"<eq\s+\S+>", "", equation_resolved_question_text
                         ).strip()
 
-                        # Accumulated leaked label descriptions across answer_leak attempts
+                        # Accumulated leaked label descriptions across answer_leak attempts.
+                        # Seed with the forbidden-terms list so even the first regen
+                        # attempt knows which answer terms to avoid.
                         _accumulated_leak_reasons: list[str] = []
+                        if _forbidden_terms:
+                            _accumulated_leak_reasons.append(
+                                "Known answer terms to avoid: " + ", ".join(_forbidden_terms[:10])
+                            )
 
                         # Get image bytes for the initial diagram
                         _review_bytes = diagram_data.pop("_image_bytes", None)
@@ -1468,6 +1615,7 @@ Mode: {mode_description}
                                     ),
                                     domain=q_domain,
                                     diagram_type=q_diagram_type,
+                                    forbidden_labels=_forbidden_terms or None,
                                 )
 
                                 if review_result["passed"]:
@@ -1528,7 +1676,9 @@ Mode: {mode_description}
                                         corrected_desc = (
                                             f"{original_desc} "
                                             f"IMPORTANT: The diagram is missing required labels.{issue_line} {reason}. "
-                                            "Add each missing label as visible text at the appropriate location in the diagram."
+                                            "Add each missing label as visible text at the appropriate location in the diagram. "
+                                            "Ensure ALL labels are fully visible and not clipped by diagram boundaries. "
+                                            "Use smaller font or reposition labels near edges if needed."
                                         )
                                     elif failure_type == "data_mismatch":
                                         corrected_desc = (

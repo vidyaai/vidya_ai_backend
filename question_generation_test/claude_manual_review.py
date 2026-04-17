@@ -94,7 +94,15 @@ def main():
         for i, q in enumerate(questions, 1):
             diag = q.get("diagram") or {}
             url = diag.get("s3_url", "")
-            q_text = re.sub(r"<eq\s+\S+>", "", q.get("question", q.get("text", "")))
+            # Substitute <eq id> placeholders with the per-question equations[]
+            # entries so the reviewer sees concrete values (matches pdf_generator.py).
+            raw_q_text = q.get("question", q.get("text", ""))
+            eq_lookup = {e["id"]: e.get("latex", "") for e in q.get("equations", [])}
+            q_text = re.sub(
+                r"<eq\s+(\S+?)>",
+                lambda m: eq_lookup.get(m.group(1), ""),
+                raw_q_text,
+            )
 
             if not url:
                 paper_results.append({"q": i, "verdict": "NO_IMAGE", "reason": "No S3 URL", "issues": ""})

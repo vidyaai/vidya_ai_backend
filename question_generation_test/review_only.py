@@ -56,8 +56,17 @@ async def review_paper(paper_path: Path, reviewer: GeminiDiagramReviewer) -> lis
             results.append({"q": i + 1, "status": "DOWNLOAD_FAIL", "failure_type": "-", "reason": ""})
             continue
 
-        # Strip <eq qN_eqM> placeholders — same as the inline reviewer does
-        clean_q_text = re.sub(r"<eq\s+\S+>", "", q_text).strip()
+        # Substitute <eq qN_eqM> placeholders with their LaTeX from the
+        # question's `equations` field. This matches what diagram_agent.py
+        # does via equation_resolved_question_text and what pdf_generator.py
+        # does for the student-facing PDF. Falling back to stripping would
+        # show the reviewer a question with gaps like "payoffs: , , , and ."
+        eq_lookup = {e["id"]: e.get("latex", "") for e in q.get("equations", [])}
+        clean_q_text = re.sub(
+            r"<eq\s+(\S+?)>",
+            lambda m: eq_lookup.get(m.group(1), ""),
+            q_text,
+        ).strip()
 
         # Use the description exactly as saved during generation — this matches
         # what diagram_agent.py passes to the inline reviewer at the final attempt,

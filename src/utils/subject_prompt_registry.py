@@ -94,6 +94,17 @@ COMPUTER SCIENCE DIAGRAM RULES:
 - For sorting: show the initial array, NOT intermediate or final sorted states
 - For FSM/automata: show the state machine diagram, but do NOT mark the answer
   to "what string does this accept?" or "what is the final state?"
+- For BB84 Bloch sphere diagrams showing the encoding alphabet (question is
+  about Alice's transmitted states or the four encoding bases): show all
+  four states |0⟩, |1⟩, |+⟩, |−⟩ with clear labels. For BB84 questions
+  about a single-state preparation, angle illustration, or a specific
+  measurement, show only the components the question requires — do NOT
+  add the full four-state alphabet when it would crowd out the required
+  geometry (polar/azimuthal angles, axis labels). In either case, do NOT
+  include eavesdropping detection labels or note boxes stating conclusions
+  about cloning/entanglement.
+- For quantum error correction: do NOT label "Threshold" lines, "Logical Operator"
+  annotations, or "Syndrome Table" entries if students must identify them.
 - Diagrams show the PROBLEM SETUP — students must work out the SOLUTION
 """,
     "civil": """
@@ -158,6 +169,15 @@ PHYSICS DIAGRAM RULES:
   if the question asks students to calculate them
 - For projectile motion: show the setup, NOT the trajectory if asked to "determine the path"
 - For free body diagrams: show the setup, NOT the net force or acceleration result
+- For Kepler's second law (equal areas): draw the elliptical orbit with TWO sectors
+  clearly marked but shade only ONE sector. Label the other sector with "?" or "Area = ?".
+  Do NOT draw both sectors with visually identical size/shading — the student must prove
+  they are equal.
+- For stellar nucleosynthesis (identify products/stages/shells): draw the structural layout
+  (layers, arrows, reaction paths) but replace the KEY product/element labels with "?"
+  placeholders. The student must identify what is produced at each stage.
+- For plasma confinement: do NOT label drift directions, stability boundaries, or threshold
+  values if the student must determine them.
 """,
     "chemistry": """
 CHEMISTRY DIAGRAM RULES:
@@ -177,6 +197,10 @@ CHEMISTRY DIAGRAM RULES:
 - For titration curves: do NOT label the pH at the equivalence point if asked to "determine" it
 - For molecular orbital diagrams: do NOT fill in electron configurations if students must do it
 - For lab setups: show the apparatus, NOT the expected measurement readings
+- For crystallography / X-ray diffraction (systematic absences): render ALL candidate
+  reflection positions as same-size, same-style dots with (hkl) coordinate labels only.
+  Do NOT use dot size, colour, or presence/absence to distinguish allowed from forbidden
+  reflections — the student must determine which are systematically absent.
 - Diagrams show the PROBLEM SETUP — students must determine the OUTCOME
 """,
     "computer_eng": """
@@ -262,6 +286,11 @@ BIOCHEMISTRY DIAGRAM RULES:
 - Do NOT label the enzyme name if the question asks students to identify the enzyme at a step
 - For pathway diagrams: show the pathway with key intermediates, NOT the answer to "what is the product of this step?"
 - For kinetics plots: show the graph, NOT the calculated Km or Vmax if students must determine them
+- For CRISPR-Cas9 structural questions (identifying domains, features): generate a DETAILED
+  schematic showing at minimum the Cas9 protein outline, guide RNA, target DNA strand, and
+  PAM site. Use "?" placeholders for domains the student must identify (e.g., do NOT label
+  "RuvC", "HNH", or "Bridge Helix" if those are the answer). Do NOT generate a simple
+  arrow-and-box diagram — the question requires molecular-level detail.
 - Show ONLY the problem setup — students must complete or interpret the pathway
 """,
     "pharmacology": """

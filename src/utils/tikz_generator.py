@@ -97,7 +97,13 @@ ANSWER-LEAK PREVENTION (CRITICAL):
 - If the question asks students to calculate a value: do not show that value in
   the diagram.
 - If the question asks students to draw something: show only the setup/context,
-  not the answer."""
+  not the answer.
+- If the description includes a FORBIDDEN LABELS section, do not render those
+  specific terms as text labels, legend entries, annotations, titles, or note
+  boxes. Where such a label would normally sit beside a structural element,
+  use "?" as a placeholder so the element itself remains visible. Do NOT
+  remove structural components, and do NOT replace numerical values that are
+  explicitly given in the question — those are problem inputs, not answers."""
 
 
 class TikZGenerator:

@@ -7,6 +7,7 @@ Used when engine=ai is selected. This reviewer uses Google's Gemini 2.5 Pro
 Same interface as DiagramReviewer but powered by Gemini.
 """
 
+import asyncio
 import base64
 import os
 import json
@@ -65,6 +66,7 @@ class GeminiDiagramReviewer:
         user_prompt_context: str = "",
         domain: str = "",
         diagram_type: str = "",
+        forbidden_labels: list | None = None,
     ) -> Dict[str, Any]:
         """
         Review a generated diagram image using Gemini 2.5 Pro vision.
@@ -99,8 +101,9 @@ class GeminiDiagramReviewer:
             }
 
         last_error = None  # Track last error for final fallback
+        MAX_ATTEMPTS = 4
 
-        for attempt in range(2):
+        for attempt in range(MAX_ATTEMPTS):
             try:
                 from vertexai.generative_models import Part, Image
                 import google.api_core.exceptions
@@ -112,6 +115,7 @@ class GeminiDiagramReviewer:
                     user_prompt_context,
                     domain=domain,
                     diagram_type=diagram_type,
+                    forbidden_labels=forbidden_labels,
                 )
 
                 # Create image part from bytes
@@ -128,7 +132,7 @@ class GeminiDiagramReviewer:
                 )
 
                 result_text = response.text.strip()
-                return self._parse_review_result(result_text)
+                return self._parse_review_result(result_text, forbidden_labels=forbidden_labels)
 
             except google.api_core.exceptions.Cancelled as e:
                 # Handle cancelled/timeout errors specifically
@@ -150,6 +154,24 @@ class GeminiDiagramReviewer:
             except Exception as e:
                 last_error = e
                 err_str = str(e)
+
+                # Quota / rate-limit (429 RESOURCE_EXHAUSTED) — back off and
+                # retry. Gemini's per-minute quota recovers quickly, so a few
+                # seconds of sleep is usually enough. Use exponential backoff
+                # capped at 30s so a burst of failures does not stall the run.
+                is_rate_limit = (
+                    "429" in err_str
+                    or "RESOURCE_EXHAUSTED" in err_str
+                    or "Resource exhausted" in err_str
+                )
+                if is_rate_limit and attempt < MAX_ATTEMPTS - 1:
+                    delay = min(2 ** attempt * 3, 30)
+                    logger.warning(
+                        f"Gemini reviewer rate-limited (429) — backing off "
+                        f"{delay}s before retry {attempt + 2}/{MAX_ATTEMPTS}"
+                    )
+                    await asyncio.sleep(delay)
+                    continue
 
                 # gRPC broken pipe / UNAVAILABLE — drop the channel and retry once
                 is_connection_error = (
@@ -193,6 +215,7 @@ class GeminiDiagramReviewer:
         user_prompt_context: str,
         domain: str = "",
         diagram_type: str = "",
+        forbidden_labels: list | None = None,
     ) -> str:
         # Subject style hint — not a new pass/fail rule, just visual guidance
         style_hint_section = ""
@@ -223,6 +246,16 @@ ASSIGNMENT CONTEXT (the user's original prompt — for STYLE ONLY):
 The QUESTION text is the ONLY authoritative source for what components must be present.
 """
 
+        forbidden_section = ""
+        if forbidden_labels:
+            forbidden_list = "\n".join(f"  - {t}" for t in forbidden_labels)
+            forbidden_section = f"""
+QUESTION-SPECIFIC FORBIDDEN LABELS (auto-derived from the correct answer):
+{forbidden_list}
+If ANY of these terms appear as text labels, legend entries, annotations, or note boxes
+in the diagram, this is an AUTOMATIC FAIL (answer_leak) regardless of the exception list.
+"""
+
         return f"""You are a strict diagram quality reviewer for an educational platform.
 
 Review the attached diagram image and assess its quality.
@@ -230,7 +263,7 @@ Review the attached diagram image and assess its quality.
 QUESTION: {question_text}
 
 DIAGRAM DESCRIPTION (used to generate it): {diagram_description}
-{style_hint_section}{context_section}
+{style_hint_section}{context_section}{forbidden_section}
 
 CHECK ONLY THE FOLLOWING — DO NOT check topology, circuit correctness, or domain knowledge:
 
@@ -297,6 +330,18 @@ CHECK ONLY THE FOLLOWING — DO NOT check topology, circuit correctness, or doma
    - "Feasible Region", "Infeasible Region", "Stable", "Unstable", "Optimal" region labels
 
    ONLY fail for labels that name the CONCLUSION the student must derive, not component names.
+
+   VISUAL-ONLY LEAK RULES (no text needed — the rendering itself reveals the answer):
+   - If the question asks to prove/demonstrate Kepler's second law (equal areas in equal times)
+     and the diagram shows two sectors with visually equal size/shading → answer_leak.
+     Correct: one sector shaded, the other marked with "?" or "Area = ?".
+   - If the question asks to identify systematic absences or forbidden reflections and the
+     diagram uses different dot sizes, colours, or presence/absence to distinguish allowed
+     from forbidden peaks → answer_leak.
+     Correct: all candidate reflection positions as same-size, same-style dots with (hkl) labels.
+   - If the question asks to identify stages, shells, or products (e.g., nucleosynthesis) and
+     ALL of them are labeled with their names → answer_leak.
+     Correct: at least the key answer labels should be replaced with "?" placeholders.
 
    FAIL if the diagram shows the target answer through ANY of these patterns:
    - LABELS: Any text label, annotation, or region name that names or interprets the
@@ -462,7 +507,7 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
 "Show only the diagram structure with generic input labels and output label. Do NOT show any computed values, boolean expressions, or truth tables."
 """
 
-    def _parse_review_result(self, result_text: str) -> Dict[str, Any]:
+    def _parse_review_result(self, result_text: str, forbidden_labels: list | None = None) -> Dict[str, Any]:
         """Parse the structured review response."""
         lines = result_text.strip().split("\n")
 
@@ -534,7 +579,31 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
         # These mirror the LENIENCY RULES in the prompt and catch cases where
         # Gemini still returns FAIL despite the guidance.
         if not passed:
-            if failure_type == "missing_labels" and len(issues) <= 1 and fixable:
+            if failure_type == "missing_labels" and forbidden_labels and issues:
+                # If every "missing" issue names a forbidden term, the absence
+                # is intentional (the generator was told not to render it).
+                # Drop those issues before deciding whether the fail stands.
+                _fl_lower = [fl.lower() for fl in forbidden_labels]
+                _remaining = []
+                for i in issues:
+                    i_low = i.lower()
+                    if not any(fl in i_low for fl in _fl_lower):
+                        _remaining.append(i)
+                if not _remaining:
+                    logger.info(
+                        f"LENIENT_PASS: missing_labels only names forbidden "
+                        f"terms ({issues}) — intentional omission, treating as pass"
+                    )
+                    passed = True
+                    failure_type = "none"
+                elif len(_remaining) < len(issues):
+                    logger.info(
+                        f"missing_labels: dropped {len(issues) - len(_remaining)} "
+                        f"forbidden-term issue(s); {len(_remaining)} real issue(s) remain"
+                    )
+                    issues = _remaining
+
+            if not passed and failure_type == "missing_labels" and len(issues) <= 1 and fixable:
                 # At most one secondary label missing and it's fixable → accept
                 logger.info(
                     f"LENIENT_PASS: missing_labels with ≤1 issue ({issues}) — "
@@ -561,7 +630,14 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
                     "given value",
                 )
                 reason_lower = reason.lower()
-                if any(kw in reason_lower for kw in _lenient_leak_keywords):
+                # Guard: do NOT apply leniency if the reason mentions any
+                # question-specific forbidden label — those are real leaks.
+                _mentions_forbidden = False
+                if forbidden_labels:
+                    _mentions_forbidden = any(
+                        fl.lower() in reason_lower for fl in forbidden_labels
+                    )
+                if not _mentions_forbidden and any(kw in reason_lower for kw in _lenient_leak_keywords):
                     logger.info(
                         f"LENIENT_PASS: answer_leak reason matches standard-formula/"
                         f"contextual-restatement pattern — treating as pass. "
@@ -569,6 +645,11 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
                     )
                     passed = True
                     failure_type = "none"
+                elif _mentions_forbidden:
+                    logger.info(
+                        f"LENIENT_PASS blocked: reason mentions a forbidden label — "
+                        f"keeping FAIL. Reason: {reason}"
+                    )
 
         # For wrong_type and data_mismatch the prompt REQUIRES a
         # CORRECTED_DESCRIPTION. If the reviewer omitted it, flag the
