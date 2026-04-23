@@ -1467,7 +1467,6 @@ _NONAI_TOOL_PROMPTS = {
         "CRITICAL: Do NOT write the disease name as a label if identification is asked. "
         "figsize=(7, 6). ax.axis('off')."
     ),
-
     # ── Missing cardiac_loop matplotlib baseline ──────────────────────────────
     ("physiology", "cardiac_loop", "matplotlib"): (
         "Draw a cardiac pressure-volume (P-V) loop using matplotlib. "
@@ -1484,7 +1483,6 @@ _NONAI_TOOL_PROMPTS = {
         "Add dashed vertical lines at EDV and ESV. figsize=(6, 5). Include grid (alpha=0.3). "
         "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
     ),
-
     # ── neurokit2 tool-type prompts ───────────────────────────────────────────
     ("physiology", "action_potential", "neurokit2"): (
         "Generate a neuronal action potential waveform using scipy and matplotlib. "
@@ -1518,7 +1516,6 @@ _NONAI_TOOL_PROMPTS = {
         "figsize=(6,5). ax.grid(alpha=0.3). "
         "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
     ),
-
     # ── scipy tool-type prompts ───────────────────────────────────────────────
     ("pharmacology", "dose_response", "scipy"): (
         "Generate a dose-response sigmoid curve using scipy.special.expit and matplotlib. "
@@ -1607,7 +1604,6 @@ _NONAI_TOOL_PROMPTS = {
         "figsize=(7, 5). ax.grid(alpha=0.3). "
         "plt.savefig('output.png', dpi=150, bbox_inches='tight')."
     ),
-
     # ── networkx tool-type prompts ────────────────────────────────────────────
     ("microbiology", "infection_cycle", "networkx"): (
         "Generate a pathogen infection/replication cycle diagram using matplotlib + FancyBboxPatch. "

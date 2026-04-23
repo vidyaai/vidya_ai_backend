@@ -16,6 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
+from pgvector.sqlalchemy import Vector
 from utils.db import Base
 
 
@@ -308,6 +309,7 @@ class User(Base):
     firebase_uid = Column(String, unique=True, nullable=False, index=True)
     email = Column(String, nullable=True)
     name = Column(String, nullable=True)
+    user_type = Column(String(20), nullable=True)  # 'professor' or 'student'
     stripe_customer_id = Column(String, nullable=True, unique=True)
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
@@ -441,6 +443,15 @@ class Course(Base):
     enrollment_code = Column(
         String, nullable=True, unique=True
     )  # Optional self-enrollment code
+    subject_category = Column(
+        String, nullable=True, default="engineering"
+    )  # "engineering", "pcm", "medical"
+    engineering_level = Column(
+        String, nullable=True
+    )  # "undergraduate", "graduate", "pre_med", etc.
+    engineering_discipline = Column(
+        String, nullable=True
+    )  # "electrical", "cs", "math", "anatomy", etc.
 
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
@@ -559,7 +570,7 @@ class TranscriptChunk(Base):
     end_seconds = Column(Float, nullable=True)
 
     # Embedding (1536 dimensions for text-embedding-3-small)
-    embedding = Column(JSON, nullable=True)
+    embedding = Column(Vector(1536), nullable=True)
 
     # Metadata
     word_count = Column(Integer, nullable=True)

@@ -262,7 +262,10 @@ async def get_youtube_info(
                 formatting_executor.submit(
                     format_transcript_background, video_id, json_data
                 )
-                formatting_message = "AI transcript formatting started in background"
+                # format_transcript_background handles both formatting AND chunk/summary generation
+                formatting_message = (
+                    "AI transcript formatting and RAG processing started in background"
+                )
             else:
                 formatting_message = "No JSON data available for formatting"
         elif status["status"] == "failed":
@@ -271,7 +274,10 @@ async def get_youtube_info(
                 formatting_executor.submit(
                     format_transcript_background, video_id, json_data
                 )
-                formatting_message = "Retrying AI transcript formatting in background"
+                # format_transcript_background handles both formatting AND chunk/summary generation
+                formatting_message = (
+                    "Retrying AI transcript formatting and RAG processing in background"
+                )
             else:
                 formatting_message = (
                     f"Formatting status: {status['status']} - {status['message']}"

@@ -1406,7 +1406,9 @@ class AssignmentGenerator:
         num_questions = generation_options.get("numQuestions", 5)
 
         # Convert raw level key (e.g. mbbs_preclinical) to a human-readable name
-        level_display = self._LEVEL_DISPLAY_NAMES.get(engineering_level, engineering_level)
+        level_display = self._LEVEL_DISPLAY_NAMES.get(
+            engineering_level, engineering_level
+        )
 
         # Build description based on available options
         if level_display and engineering_discipline:

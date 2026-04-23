@@ -1884,14 +1884,22 @@ RUBRIC:
                                 ],
                                 temperature=0.3,
                             )
-                            ar_text = answer_rephrase_response.choices[0].message.content.strip()
+                            ar_text = answer_rephrase_response.choices[
+                                0
+                            ].message.content.strip()
 
                             # Parse the structured response
                             if "CORRECT_ANSWER:" in ar_text and "RUBRIC:" in ar_text:
-                                ca_start = ar_text.index("CORRECT_ANSWER:") + len("CORRECT_ANSWER:")
+                                ca_start = ar_text.index("CORRECT_ANSWER:") + len(
+                                    "CORRECT_ANSWER:"
+                                )
                                 rubric_start = ar_text.index("RUBRIC:")
-                                new_correct_answer = ar_text[ca_start:rubric_start].strip()
-                                new_rubric = ar_text[rubric_start + len("RUBRIC:"):].strip()
+                                new_correct_answer = ar_text[
+                                    ca_start:rubric_start
+                                ].strip()
+                                new_rubric = ar_text[
+                                    rubric_start + len("RUBRIC:") :
+                                ].strip()
 
                                 if new_correct_answer:
                                     question["correctAnswer"] = new_correct_answer
@@ -2051,7 +2059,7 @@ RUBRIC:
             "You are an expert educational content reviewer. "
             "Your task is to decide whether a 'diagram-analysis' question requires the student "
             "to produce, draw, sketch, complete, trace, or plot a diagram as part of their answer. "
-            "Answer with a single JSON object: {\"required\": true} or {\"required\": false}. "
+            'Answer with a single JSON object: {"required": true} or {"required": false}. '
             "Output ONLY the JSON — no explanation, no markdown fences."
         )
         user_prompt = (
@@ -2059,7 +2067,7 @@ RUBRIC:
             f"{question_text}\n\n"
             "Does answering this question require the student to draw, sketch, complete, "
             "trace, plot, or otherwise produce a diagram or waveform? "
-            "Respond with {\"required\": true} or {\"required\": false}."
+            'Respond with {"required": true} or {"required": false}.'
         )
 
         try:
@@ -2229,9 +2237,7 @@ RUBRIC:
                         tool_arguments = _repair_truncated_json(
                             tool_call.function.arguments
                         )
-                        logger.info(
-                            f"Q{question_idx} answer: JSON repair succeeded"
-                        )
+                        logger.info(f"Q{question_idx} answer: JSON repair succeeded")
                     except json.JSONDecodeError:
                         logger.error(
                             f"Q{question_idx} answer: JSON repair failed. "
@@ -2245,9 +2251,7 @@ RUBRIC:
                             "description": answer_description,
                         }
 
-            logger.info(
-                f"Q{question_idx} answer: Agent decided to use {tool_name}"
-            )
+            logger.info(f"Q{question_idx} answer: Agent decided to use {tool_name}")
 
             # ── D. Determine effective_engine ──
             effective_engine = self.engine
@@ -2288,9 +2292,7 @@ RUBRIC:
                 dimension_failures = 0
                 last_review_result = None
 
-                _ai_save_dir = tempfile.mkdtemp(
-                    prefix=f"ai_answer_{assignment_id}_"
-                )
+                _ai_save_dir = tempfile.mkdtemp(prefix=f"ai_answer_{assignment_id}_")
 
                 for attempt in range(1, max_imagen_attempts + 1):
                     logger.info(
@@ -2359,6 +2361,7 @@ RUBRIC:
                     if image_bytes_for_review is None:
                         try:
                             import requests as _req
+
                             resp = _req.get(diagram_data["s3_url"], timeout=15)
                             if resp.status_code == 200:
                                 image_bytes_for_review = resp.content
@@ -2387,14 +2390,21 @@ RUBRIC:
                             break
                         else:
                             is_fixable = review_result.get("fixable", False)
-                            last_review_issues = ", ".join(review_result.get("issues", []))
+                            last_review_issues = ", ".join(
+                                review_result.get("issues", [])
+                            )
                             last_review_result = review_result
 
                             _reason_lower = review_result.get("reason", "").lower()
                             _issues_lower = last_review_issues.lower()
                             _dim_keywords = [
-                                "dimension", "label", "unit", "thickness",
-                                "width", "conflicting", "duplicate",
+                                "dimension",
+                                "label",
+                                "unit",
+                                "thickness",
+                                "width",
+                                "conflicting",
+                                "duplicate",
                             ]
                             if any(
                                 kw in _reason_lower or kw in _issues_lower
@@ -2488,6 +2498,7 @@ RUBRIC:
                 if primary_bytes is None:
                     try:
                         import requests as _req
+
                         resp = _req.get(diagram_data["s3_url"], timeout=15)
                         if resp.status_code == 200:
                             primary_bytes = resp.content
@@ -2527,6 +2538,7 @@ RUBRIC:
                             if sec_bytes is None:
                                 try:
                                     import requests as _req
+
                                     resp = _req.get(sec_data["s3_url"], timeout=15)
                                     if resp.status_code == 200:
                                         sec_bytes = resp.content
@@ -2572,6 +2584,7 @@ RUBRIC:
                 if image_bytes_for_review is None:
                     try:
                         import requests as _req
+
                         resp = _req.get(diagram_data["s3_url"], timeout=15)
                         if resp.status_code == 200:
                             image_bytes_for_review = resp.content
@@ -2582,9 +2595,7 @@ RUBRIC:
                     description_for_review = tool_arguments.get(
                         "description", answer_description[:300]
                     )
-                    clean_question = re.sub(
-                        r"<eq\s+\S+>", "", question_text
-                    ).strip()
+                    clean_question = re.sub(r"<eq\s+\S+>", "", question_text).strip()
                     review_result = await self.reviewer.review_diagram(
                         image_bytes=image_bytes_for_review,
                         question_text=f"ANSWER KEY for: {clean_question}",
@@ -2627,9 +2638,7 @@ RUBRIC:
                                     f"Q{question_idx} answer: Regenerated diagram accepted"
                                 )
                     else:
-                        logger.info(
-                            f"Q{question_idx} answer: Diagram review PASSED"
-                        )
+                        logger.info(f"Q{question_idx} answer: Diagram review PASSED")
 
             # ── I. Store result ──
             if diagram_data and diagram_data.get("s3_url"):
@@ -2682,7 +2691,11 @@ RUBRIC:
                     "node voltages, branch currents, power dissipation, gain values. "
                     "Label every component with its value."
                 )
-            elif diagram_type in ("flip_flop_circuit", "sequential_circuit", "counter_circuit"):
+            elif diagram_type in (
+                "flip_flop_circuit",
+                "sequential_circuit",
+                "counter_circuit",
+            ):
                 domain_guidance = (
                     "Show the complete state transition diagram or timing diagram with "
                     "ALL states, outputs, and transitions filled in. Include state values "
@@ -2705,7 +2718,13 @@ RUBRIC:
                 "shortest path with distances, traversal order, or algorithm trace with "
                 "all intermediate states. Label each step clearly."
             )
-        elif domain in ("medical", "biology", "biochemistry", "pharmacology", "physiology"):
+        elif domain in (
+            "medical",
+            "biology",
+            "biochemistry",
+            "pharmacology",
+            "physiology",
+        ):
             domain_guidance = (
                 "Show the complete diagram with ALL labels filled in: enzyme names, "
                 "metabolite names, hormone names, receptor types, pathway steps. "

@@ -588,7 +588,14 @@ class DomainRouter:
                 preferred_tool = "matplotlib"
                 ai_suitable = False
 
-        elif domain in ("anatomy", "physiology", "biochemistry", "pharmacology", "pathology", "microbiology"):
+        elif domain in (
+            "anatomy",
+            "physiology",
+            "biochemistry",
+            "pharmacology",
+            "pathology",
+            "microbiology",
+        ):
             # Medical sciences: all plots use matplotlib; structural diagrams use imagen
             _medical_type_map = {
                 "anatomy": ("anatomical_diagram", True),  # structural → ai_suitable
@@ -596,22 +603,46 @@ class DomainRouter:
                 "biochemistry": ("metabolic_pathway", False),
                 "pharmacology": ("dose_response", False),
                 "pathology": ("disease_progression", False),
-                "microbiology": ("bacterial_structure", True),  # structural → ai_suitable
+                "microbiology": (
+                    "bacterial_structure",
+                    True,
+                ),  # structural → ai_suitable
             }
             _q = q
             # Refine diagram type based on keywords
             if domain == "anatomy":
-                if any(kw in _q for kw in ["histology", "histological", "microscopy", "slide"]):
+                if any(
+                    kw in _q
+                    for kw in ["histology", "histological", "microscopy", "slide"]
+                ):
                     diagram_type = "histology"
                     ai_suitable = True
-                elif any(kw in _q for kw in ["cross section", "cross-section", "transverse", "sagittal", "coronal"]):
+                elif any(
+                    kw in _q
+                    for kw in [
+                        "cross section",
+                        "cross-section",
+                        "transverse",
+                        "sagittal",
+                        "coronal",
+                    ]
+                ):
                     diagram_type = "cross_section"
                     ai_suitable = True
                 else:
                     diagram_type = "anatomical_diagram"
                     ai_suitable = True
             elif domain == "physiology":
-                if any(kw in _q for kw in ["pressure", "volume", "p-v loop", "pv loop", "cardiac loop"]):
+                if any(
+                    kw in _q
+                    for kw in [
+                        "pressure",
+                        "volume",
+                        "p-v loop",
+                        "pv loop",
+                        "cardiac loop",
+                    ]
+                ):
                     diagram_type = "pressure_volume_loop"
                 elif any(kw in _q for kw in ["feedback", "homeostasis", "set point"]):
                     diagram_type = "feedback_loop"
@@ -625,23 +656,48 @@ class DomainRouter:
                     diagram_type = "metabolic_pathway"
                 ai_suitable = False
             elif domain == "pharmacology":
-                if any(kw in _q for kw in ["concentration", "time", "plasma", "half-life", "t½", "cmax", "auc"]):
+                if any(
+                    kw in _q
+                    for kw in [
+                        "concentration",
+                        "time",
+                        "plasma",
+                        "half-life",
+                        "t½",
+                        "cmax",
+                        "auc",
+                    ]
+                ):
                     diagram_type = "pharmacokinetics"
                 else:
                     diagram_type = "dose_response"
                 ai_suitable = False
             elif domain == "pathology":
-                if any(kw in _q for kw in ["histopathology", "microscopy", "biopsy", "slide"]):
+                if any(
+                    kw in _q
+                    for kw in ["histopathology", "microscopy", "biopsy", "slide"]
+                ):
                     diagram_type = "histopathology"
                     ai_suitable = True
                 else:
                     diagram_type = "disease_progression"
                     ai_suitable = False
             elif domain == "microbiology":
-                if any(kw in _q for kw in ["growth curve", "growth rate", "bacterial growth", "lag phase", "log phase"]):
+                if any(
+                    kw in _q
+                    for kw in [
+                        "growth curve",
+                        "growth rate",
+                        "bacterial growth",
+                        "lag phase",
+                        "log phase",
+                    ]
+                ):
                     diagram_type = "growth_curve"
                     ai_suitable = False
-                elif any(kw in _q for kw in ["infection", "replication", "cycle", "pathogen"]):
+                elif any(
+                    kw in _q for kw in ["infection", "replication", "cycle", "pathogen"]
+                ):
                     diagram_type = "infection_cycle"
                     ai_suitable = False
                 else:
