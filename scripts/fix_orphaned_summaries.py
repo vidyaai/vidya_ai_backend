@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Add the src directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from sqlalchemy import text
 from utils.db import SessionLocal

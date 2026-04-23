@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 from openai import OpenAI
+import os
 import sys
-sys.path.insert(0, 'src')
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from utils.system_prompt import SYSTEM_PROMPT_CONVERSATIONAL_INITIAL
 
 client = OpenAI()

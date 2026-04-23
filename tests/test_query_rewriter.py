@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from utils.ml_models import OpenAIVisionClient
 from controllers.config import logger
