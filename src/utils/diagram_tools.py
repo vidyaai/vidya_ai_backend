@@ -1190,26 +1190,84 @@ class DiagramTools:
                 code = re.sub(r"^```[a-z]*\n?", "", code)
                 code = re.sub(r"\n?```$", "", code).strip()
 
-            # Execute in a temp directory
-            with tempfile.TemporaryDirectory() as tmpdir:
-                output_path = os.path.join(tmpdir, "output.png")
-                code = code.replace("'output.png'", f"'{output_path}'").replace('"output.png"', f"'{output_path}'")
-                script_path = os.path.join(tmpdir, "plot.py")
-                with open(script_path, "w", encoding="utf-8") as f:
-                    f.write(code)
+            # Validate syntax before executing; repair with AI if broken
+            import ast
+            for _attempt in range(2):
+                try:
+                    ast.parse(code)
+                    break  # syntax OK
+                except SyntaxError as syn_err:
+                    if _attempt == 1:
+                        raise RuntimeError(f"Plotly execution failed: {syn_err}")
+                    logger.warning(f"Plotly code has syntax error, requesting AI repair: {syn_err}")
+                    repair_response = client.messages.create(
+                        model="claude-opus-4-5",
+                        max_tokens=3000,
+                        system=(
+                            "You are an expert Python debugger. "
+                            "Fix ONLY the syntax errors in the provided Python code. "
+                            "Do not change logic or diagram content. "
+                            "Return ONLY the corrected Python code. No markdown, no explanation."
+                        ),
+                        messages=[{"role": "user", "content": (
+                            f"This Python code has a syntax error:\n{syn_err}\n\n"
+                            f"Fix it:\n{code}"
+                        )}],
+                    )
+                    fixed = repair_response.content[0].text.strip()
+                    if fixed.startswith("```"):
+                        import re
+                        fixed = re.sub(r"^```[a-z]*\n?", "", fixed)
+                        fixed = re.sub(r"\n?```$", "", fixed).strip()
+                    code = fixed
 
-                result = subprocess.run(
-                    ["python", script_path],
-                    capture_output=True, text=True, timeout=60
-                )
-                if result.returncode != 0:
-                    raise RuntimeError(f"Plotly execution failed: {result.stderr[-500:]}")
+            # Execute in a temp directory; retry once with AI repair on runtime error
+            image_bytes: Optional[bytes] = None
+            for _exec_attempt in range(2):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    output_path = os.path.join(tmpdir, "output.png")
+                    run_code = code.replace("'output.png'", f"'{output_path}'").replace('"output.png"', f"'{output_path}'")
+                    script_path = os.path.join(tmpdir, "plot.py")
+                    with open(script_path, "w", encoding="utf-8") as f:
+                        f.write(run_code)
 
-                if not os.path.isfile(output_path):
-                    raise RuntimeError("Plotly code ran but produced no output.png")
+                    result = subprocess.run(
+                        ["python", script_path],
+                        capture_output=True, text=True, timeout=60
+                    )
+                    if result.returncode != 0:
+                        exec_error = result.stderr[-600:] or result.stdout[-600:]
+                        if _exec_attempt == 1:
+                            raise RuntimeError(f"Plotly execution failed: {exec_error}")
+                        logger.warning(f"Plotly execution failed (attempt 1), requesting AI repair: {exec_error[:200]}")
+                        repair_response = client.messages.create(
+                            model="claude-opus-4-5",
+                            max_tokens=3000,
+                            system=(
+                                "You are an expert Python debugger. "
+                                "Fix the runtime error in the provided Python code. "
+                                "Do not change the diagram logic or content. "
+                                "Return ONLY the corrected Python code. No markdown, no explanation."
+                            ),
+                            messages=[{"role": "user", "content": (
+                                f"This Python code raised a runtime error:\n{exec_error}\n\n"
+                                f"Fix it:\n{code}"
+                            )}],
+                        )
+                        fixed = repair_response.content[0].text.strip()
+                        if fixed.startswith("```"):
+                            import re as _re
+                            fixed = _re.sub(r"^```[a-z]*\n?", "", fixed)
+                            fixed = _re.sub(r"\n?```$", "", fixed).strip()
+                        code = fixed
+                        continue
 
-                with open(output_path, "rb") as f:
-                    image_bytes = f.read()
+                    if not os.path.isfile(output_path):
+                        raise RuntimeError("Plotly code ran but produced no output.png")
+
+                    with open(output_path, "rb") as f:
+                        image_bytes = f.read()
+                    break
 
             diagram_data = await self.diagram_gen.upload_to_s3(image_bytes, assignment_id, question_idx)
             diagram_data["_image_bytes"] = image_bytes

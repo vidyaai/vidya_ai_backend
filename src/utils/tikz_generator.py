@@ -29,7 +29,7 @@ from typing import Optional
 
 from anthropic import Anthropic
 from controllers.config import logger
-from utils.latex_repair import canonicalize_tikzlibrary, repair_latex
+from utils.latex_repair import canonicalize_tikzlibrary, repair_latex, _UNCLOSED_GROUP_ERRORS
 
 try:
     from pdf2image import convert_from_path
@@ -164,6 +164,88 @@ class TikZGenerator:
 
         return latex
 
+    async def _ai_repair_latex(self, latex_src: str, error_summary: str) -> str:
+        """
+        Ask Claude to fix a TikZ document that failed pdflatex compilation.
+
+        Sends the failing LaTeX + error message back to Claude and asks it to
+        correct only the compilation errors without changing diagram content.
+        Returns the original source unchanged if the API call fails.
+        """
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=_SYSTEM_PROMPT,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            "The following TikZ LaTeX document failed to compile with pdflatex.\n\n"
+                            f"Compilation error:\n{error_summary}\n\n"
+                            "Fix ONLY the compilation errors. Do not change the diagram content or structure.\n"
+                            "Common causes to check:\n"
+                            "- Replace `({angle}:radius, height)` coordinates with `$(angle:radius) + (0, height)$`\n"
+                            "- Replace `\\macro/N` arithmetic inside coordinates with pre-computed `\\pgfmathsetmacro` values\n"
+                            "- Remove duplicate \\node definitions that use invalid syntax (keep the correct form)\n\n"
+                            "Return ONLY the corrected LaTeX document. No markdown, no explanation.\n\n"
+                            f"Failing document:\n{latex_src}"
+                        ),
+                    }
+                ],
+            )
+            fixed = response.content[0].text.strip()
+            if fixed.startswith("```"):
+                fixed = re.sub(r"^```[a-z]*\n?", "", fixed)
+                fixed = re.sub(r"\n?```$", "", fixed)
+                fixed = fixed.strip()
+            return canonicalize_tikzlibrary(fixed)
+        except Exception as e:
+            logger.warning(f"AI repair attempt failed: {e}")
+            return latex_src
+
+    async def _regenerate_latex(
+        self,
+        question_text: str,
+        diagram_description: str,
+        subject_guidance: str,
+        prior_error: str,
+    ) -> str:
+        """
+        Ask Claude to generate a brand-new TikZ document, explicitly told what
+        went wrong last time.  Used as a last resort after both deterministic
+        repair and AI repair have failed.
+        """
+        try:
+            user_parts = []
+            if subject_guidance:
+                user_parts.append(f"Drawing instructions: {subject_guidance}")
+            user_parts.append(f"Question: {question_text[:800]}")
+            if diagram_description:
+                user_parts.append(f"Diagram description: {diagram_description}")
+            user_parts.append(
+                f"\nIMPORTANT: A previous attempt failed with:\n{prior_error}\n"
+                "Generate a SIMPLER, robust diagram that avoids complex coordinate "
+                "expressions. Prefer explicit numeric coordinates over computed ones. "
+                "Ensure every opened {{ or [ is closed. Keep the tikzpicture content "
+                "under 60 lines."
+            )
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": "\n\n".join(user_parts)}],
+            )
+            fresh = response.content[0].text.strip()
+            if fresh.startswith("```"):
+                fresh = re.sub(r"^```[a-z]*\n?", "", fresh)
+                fresh = re.sub(r"\n?```$", "", fresh)
+                fresh = fresh.strip()
+            return canonicalize_tikzlibrary(fresh)
+        except Exception as e:
+            logger.warning(f"Regeneration attempt failed: {e}")
+            return ""
+
     async def generate_diagram_png(
         self,
         question_text: str,
@@ -200,6 +282,7 @@ class TikZGenerator:
                 "PATH": f"/Library/TeX/texbin:{os.environ.get('PATH', '')}",
             }
 
+            last_error: Optional[str] = None
             for _pass in range(2):
                 result = subprocess.run(
                     [
@@ -241,7 +324,115 @@ class TikZGenerator:
                             fh.write(latex_src)
                         continue
 
-                raise RuntimeError(f"pdflatex compilation failed:\n{error_summary}")
+                # Both deterministic passes exhausted — try AI repair
+                last_error = error_summary
+                break
+
+            # AI repair fallback: triggered when both deterministic passes failed
+            if last_error is not None:
+                logger.info("pdflatex failed after deterministic repair — attempting AI-assisted repair")
+                ai_latex = await self._ai_repair_latex(latex_src, last_error)
+                if ai_latex != latex_src:
+                    latex_src = ai_latex
+                    with open(tex_file, "w", encoding="utf-8") as fh:
+                        fh.write(latex_src)
+                    result = subprocess.run(
+                        [
+                            PDFLATEX_PATH,
+                            "-interaction=nonstopmode",
+                            "-halt-on-error",
+                            "-output-directory",
+                            tmpdir,
+                            tex_file,
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                        env=pdflatex_env,
+                    )
+                    if result.returncode == 0:
+                        pass  # AI repair succeeded — fall through to PDF conversion
+                    else:
+                        ai_error_lines = [
+                            l
+                            for l in result.stdout.splitlines()
+                            if l.startswith("!") or "Error" in l or "error" in l
+                        ]
+                        ai_error_summary = "\n".join(ai_error_lines[:10]) or result.stdout[-500:]
+                        # Last resort: regenerate from scratch
+                        logger.warning(
+                            "AI repair still failed — attempting full regeneration from scratch"
+                        )
+                        fresh_latex = await self._regenerate_latex(
+                            question_text, diagram_description, subject_guidance, ai_error_summary
+                        )
+                        if fresh_latex:
+                            # Apply deterministic repairs to the fresh source too
+                            fresh_latex = repair_latex(fresh_latex, ("tikzpicture",))
+                            latex_src = fresh_latex
+                            with open(tex_file, "w", encoding="utf-8") as fh:
+                                fh.write(latex_src)
+                            result = subprocess.run(
+                                [
+                                    PDFLATEX_PATH,
+                                    "-interaction=nonstopmode",
+                                    "-halt-on-error",
+                                    "-output-directory",
+                                    tmpdir,
+                                    tex_file,
+                                ],
+                                capture_output=True,
+                                text=True,
+                                timeout=60,
+                                env=pdflatex_env,
+                            )
+                            if result.returncode != 0:
+                                regen_error_lines = [
+                                    l
+                                    for l in result.stdout.splitlines()
+                                    if l.startswith("!") or "Error" in l or "error" in l
+                                ]
+                                regen_error = "\n".join(regen_error_lines[:10]) or result.stdout[-500:]
+                                raise RuntimeError(f"pdflatex compilation failed:\n{regen_error}")
+                        else:
+                            raise RuntimeError(f"pdflatex compilation failed:\n{ai_error_summary}")
+                else:
+                    # AI repair returned the same source — try regeneration directly
+                    logger.warning(
+                        "AI repair made no changes — attempting full regeneration from scratch"
+                    )
+                    fresh_latex = await self._regenerate_latex(
+                        question_text, diagram_description, subject_guidance, last_error
+                    )
+                    if fresh_latex:
+                        fresh_latex = repair_latex(fresh_latex, ("tikzpicture",))
+                        latex_src = fresh_latex
+                        with open(tex_file, "w", encoding="utf-8") as fh:
+                            fh.write(latex_src)
+                        result = subprocess.run(
+                            [
+                                PDFLATEX_PATH,
+                                "-interaction=nonstopmode",
+                                "-halt-on-error",
+                                "-output-directory",
+                                tmpdir,
+                                tex_file,
+                            ],
+                            capture_output=True,
+                            text=True,
+                            timeout=60,
+                            env=pdflatex_env,
+                        )
+                        if result.returncode != 0:
+                            regen_error_lines = [
+                                l
+                                for l in result.stdout.splitlines()
+                                if l.startswith("!") or "Error" in l or "error" in l
+                            ]
+                            regen_error = "\n".join(regen_error_lines[:10]) or result.stdout[-500:]
+                            raise RuntimeError(f"pdflatex compilation failed:\n{regen_error}")
+                    else:
+                        raise RuntimeError(f"pdflatex compilation failed:\n{last_error}")
 
             if not os.path.isfile(pdf_file):
                 raise RuntimeError("pdflatex ran but produced no PDF")
