@@ -271,7 +271,7 @@ DIAGRAM_TOOLS = [
         "type": "function",
         "function": {
             "name": "tikz_tool",
-            "description": "SPECIALIST — PREFER over claude_code_tool for: physics ray/optics diagrams, Feynman diagrams, free body diagrams with vector arrows, spring-mass systems, field lines, 3D crystal unit cells (BCC/FCC/HCP) and lattice structures, geometric constructions, Lewis structures, chemical structural formulas, mechanical engineering diagrams. Use whenever LaTeX-quality vector rendering is needed. Falls back to claude_code_tool automatically if compilation fails.",
+            "description": "SPECIALIST — PREFER over claude_code_tool for: physics ray/optics diagrams, Feynman diagrams, free body diagrams with vector arrows, spring-mass systems, field lines, 2D crystal lattice projections and non-3D lattice structures (for 3D unit cells with atom spheres use plotly_tool instead), geometric constructions, Lewis structures, chemical structural formulas, mechanical engineering diagrams. Use whenever LaTeX-quality vector rendering is needed. Falls back to claude_code_tool automatically if compilation fails.",
             "parameters": {
                 "type": "object",
                 "properties": {

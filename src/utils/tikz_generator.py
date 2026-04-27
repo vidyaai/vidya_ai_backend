@@ -75,21 +75,140 @@ CRITICAL RULES:
 5. Do NOT show computed answer values, formulas that reveal the solution, or
    output quantities that the student is asked to find.
 6. Use siunitx for all physical quantities: \SI{9.8}{\metre\per\second\squared}
-7. For 3D diagrams, use tikz-3dplot: \tdplotsetmaincoords{70}{110} then
-   \begin{tikzpicture}[tdplot_main_coords]
+7. For 3D diagrams, use tikz-3dplot: \tdplotsetmaincoords{70}{110}, then use
+   \begin{scope}[tdplot_main_coords]...\end{scope} INSIDE a normal 2D tikzpicture.
+   NEVER set tdplot_main_coords as the tikzpicture option itself — see rule 13.
 8. For chemical structures, use chemfig: \chemfig{...}
 9. Keep coordinates reasonable: typical diagram fits in a 8×6 unit box.
 10. Use \draw[-{Stealth}] for arrows, \draw[dashed] for dashed lines.
 11. LABEL EVERY NAMED COMPONENT: Every structural component named in the description
     MUST have that exact name as a visible text \node label in the diagram.
     - "ancilla qubit" → add \node label "ancilla qubit" on that line
-    - "lattice point" → add \node label "lattice point" at each lattice position
+    - "lattice point" → add \node label "lattice point" at ONE representative lattice
+      position with a leader-line callout (see rule 14); do NOT repeat at every instance
     - "body-center atom" → add \node label "body-center atom"
     Do NOT substitute with symbols or abbreviations unless the question uses them.
     Aesthetic trade-offs do NOT justify omitting a required label.
-12. READABILITY: Use \footnotesize minimum for labels in dense diagrams (>8 components).
-    Use \small or \normalsize when ≤8 components. If labels would overlap, use
-    [yshift=5pt] or [xshift=8pt] anchor offsets — never drop a required label.
+12. READABILITY & LABEL SPACING (CRITICAL — prevents overlapping text):
+    - Use \footnotesize for dense diagrams (>8 components); \small otherwise.
+    - Minimum label offset from its anchor point: 12pt for single-word labels;
+      at least 20pt for multi-word labels: [yshift=20pt], [xshift=20pt], etc.
+    - PREFER LEADER LINES over in-place offsets for crowded 3D regions:
+        \draw[<-, shorten <=2pt] (label_anchor) -- ++(offset) node[anchor=...] {Label};
+    - For 3D diagrams (tdplot_main_coords scope): NEVER place labels with just
+      [below] or [right] at atom positions — 3D projection maps multiple atoms to
+      nearly identical 2D points. Use leader lines that extend clearly outside the
+      unit cell boundary before placing the text.
+    - CATEGORICAL labels (e.g. "Corner atom", "Face-centered atom", legend entries)
+      MUST go in a dedicated legend \node box, NOT scattered in-scene:
+        \node[draw, fill=white, align=left, font=\small, anchor=north west,
+              inner sep=6pt, rounded corners=2pt] at (legend_pos) {
+          \raisebox{1pt}{\tikz\fill[blue!60!white] (0,0) circle (3pt);} Bottom Layer \\[2pt]
+          \raisebox{1pt}{\tikz\fill[orange] (0,0) circle (3pt);} Middle Layer
+        };
+    - Title/structure name goes ABOVE the diagram in plain 2D (not below where
+      annotation text already lives). See rule 13 for the mandatory pattern.
+13. 3D DIAGRAMS WITH LEGENDS — MANDATORY SCOPE PATTERN:
+    All 3D content goes inside a scope; legend and title are placed in plain 2D
+    screen space AFTER the scope closes, referencing the snapshotted bounding box.
+
+    \begin{tikzpicture}           % plain 2D tikzpicture at root level
+      \tdplotsetmaincoords{70}{110}
+      \begin{scope}[tdplot_main_coords]
+        % ALL 3D atoms, bonds, axes, and in-scene structural labels go here.
+        % Use (x, y, z) coordinates freely — they are projected by the rotation matrix.
+      \end{scope}
+
+      % Snapshot bounding box BEFORE adding legend/title (plain 2D coords)
+      \path (current bounding box.south) coordinate (diagSouth);
+      \path (current bounding box.north) coordinate (diagNorth);
+      \path (current bounding box.west)  coordinate (diagWest);
+
+      % Title ABOVE — plain 2D, not rotated
+      \node[font=\normalsize\bfseries, anchor=south]
+        at ([yshift=8pt]diagNorth) {Title Here};
+
+      % Legend BELOW — plain 2D, not rotated
+      \node[draw, fill=white, align=left, anchor=north,
+            font=\small, inner sep=6pt, rounded corners=2pt]
+        at ([yshift=-12pt]diagSouth) {
+          \raisebox{1pt}{\tikz\fill[blue!60!white] (0,0) circle (3pt);} Layer A \\[2pt]
+          \raisebox{1pt}{\tikz\fill[orange] (0,0) circle (3pt);} Layer B
+        };
+    \end{tikzpicture}
+
+    RULES:
+    - NEVER place legend or title nodes INSIDE the tdplot scope.
+    - NEVER use (x,y,z) three-component coordinates for legend/title nodes.
+    - The bounding-box snapshot coordinates (diagSouth etc.) are always 2D;
+      use them freely outside the scope.
+    - For legend colour swatches, the \tikz\fill[...] pattern above keeps the
+      swatch rendering correctly regardless of the outer diagram's rotation.
+14. ONE LABEL PER REPEATED COMPONENT TYPE (prevents mass label collisions):
+    When the same component type repeats (e.g. 8 corner atoms, 6 face-center
+    atoms, multiple identical gates/resistors/springs), label ONE representative
+    instance with a leader-line callout only. Do NOT draw a separate label node
+    at every identical instance — N overlapping labels are worse than one clear one.
+
+    Exception: if the question EXPLICITLY asks the student to count or identify
+    each instance individually, label all instances but use staggered radial
+    positions (see rule 16).
+
+    Pattern:
+      % Label only the top-right corner atom as representative
+      \draw[<-, shorten <=3pt] (cornerTR) -- ++(0.5, 0.4)
+        node[font=\footnotesize, fill=white, inner sep=2pt, anchor=west]
+        {Corner atom};
+      % All other corner atoms: draw the sphere only, no label
+
+15. WHITE KNOCKOUT BACKGROUND ON EVERY TEXT NODE:
+    Every in-scene \node that renders text — labels, annotations, axis labels,
+    arrow-tip text, midway annotations — MUST include fill=white, inner sep=2pt
+    so that lines or arrows drawn through or near the label do not obscure it.
+
+    Required form:
+      \node[font=\small, fill=white, inner sep=2pt, anchor=...] at (pos) {Text};
+      \draw[<-, shorten <=3pt] (atom) -- ++(dir)
+        node[font=\small, fill=white, inner sep=2pt, anchor=west] {Text};
+
+    This applies to ALL text nodes without exception, including axis labels
+    (c-axis, a₁, a₂), dimension labels, and force/velocity labels.
+
+16. CENTROID-OUTWARD RADIAL PLACEMENT FOR CLUSTERS (≥4 labelled elements):
+    For any cluster of ≥4 components that must each be individually labelled
+    (force polygons, numbered atoms, subcircuit nodes), place each label in the
+    direction AWAY from the cluster centroid.
+
+    Method:
+      \coordinate (centroid) at (cx, cy);   % average of all element positions
+      % For each element E, label goes toward (E - centroid) direction:
+      \node[font=\footnotesize, fill=white, inner sep=2pt,
+            anchor=...] at ($(E) + 0.6*($(E)-(centroid)$)$) {Label};
+
+    - Minimum radial offset: 0.6 TikZ units (≈16 pt at standard scale).
+    - NEVER use plain [above]/[below]/[left]/[right] for elements that are not
+      on a strict cardinal axis from the centroid — use [above right], [below
+      left], or explicit coordinate offsets instead.
+
+17. DIMENSION LINE ANNOTATIONS:
+    For edge-length, radius, distance, or force-magnitude callouts:
+    - Use \draw[<->, >=Stealth] with the label as \node[midway, fill=white,
+      inner sep=2pt, font=\small].
+    - Offset the dimension line ≥0.4 TikZ units away from the nearest structure
+      edge — never run it through an atom or component body.
+    - For a labelled arrow alongside a solid body (e.g. "Atomic radius r"):
+      use a dashed leader from the surface to an offset callout text, not a
+      line that passes through the sphere/cylinder.
+
+    Pattern:
+      % Horizontal dimension line 0.5 units below the bottom edge
+      \draw[<->, >=Stealth]
+        ([yshift=-0.5cm]edgeA) -- ([yshift=-0.5cm]edgeB)
+        node[midway, fill=white, inner sep=2pt, font=\small] {$a$};
+
+      % Radius callout with dashed leader
+      \draw[dashed, thin] (sphere_surface) -- ++(0.6, 0.4)
+        node[font=\small, fill=white, inner sep=2pt, anchor=west] {$r$};
 
 ANSWER-LEAK PREVENTION (CRITICAL):
 - If the question asks students to identify a structure: draw the structure without
