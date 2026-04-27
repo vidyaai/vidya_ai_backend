@@ -1236,6 +1236,24 @@ class AssignmentPDFGenerator:
         }
         """
 
+    def _escape_non_latin1(self, html: str) -> str:
+        """Escape characters outside latin-1 as HTML numeric entities.
+
+        WeasyPrint/pydyf encodes certain PDF string fields (e.g. document title)
+        with latin-1 internally.  Any Unicode codepoint above U+00FF that slips
+        through as a raw character causes a UnicodeEncodeError at PDF write time.
+        Converting such characters to HTML numeric entity references (&#N;) keeps
+        the document semantically correct while staying within the allowed range.
+        """
+        result = []
+        for ch in html:
+            try:
+                ch.encode("latin-1")
+                result.append(ch)
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                result.append(f"&#{ord(ch)};")
+        return "".join(result)
+
     def generate_assignment_pdf(self, assignment: Dict[str, Any]) -> bytes:
         """
         Generate a professional PDF for an assignment.
@@ -1306,6 +1324,10 @@ class AssignmentPDFGenerator:
             </body>
             </html>
             """
+
+            # Escape any characters outside latin-1 that would cause
+            # a UnicodeEncodeError inside WeasyPrint's PDF writer.
+            html_content = self._escape_non_latin1(html_content)
 
             # Generate PDF using WeasyPrint
             html_doc = HTML(string=html_content)
@@ -1587,6 +1609,10 @@ class AssignmentPDFGenerator:
             </body>
             </html>
             """
+
+            # Escape any characters outside latin-1 that would cause
+            # a UnicodeEncodeError inside WeasyPrint's PDF writer.
+            html_content = self._escape_non_latin1(html_content)
 
             html_doc = HTML(string=html_content)
             css_doc = CSS(string=self.generate_css())
