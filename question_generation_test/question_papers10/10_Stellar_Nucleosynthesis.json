@@ -1,0 +1,219 @@
+{
+  "topic": "Stellar Nucleosynthesis",
+  "subject": "physics",
+  "prompt": "Generate 5 diagram-based questions on stellar nucleosynthesis and stellar evolution. Cover: the proton-proton (p-p) chain reaction diagram in main sequence stars, the CNO cycle reaction network in massive stars, the Hertzsprung-Russell (H-R) diagram with evolutionary tracks, the binding energy per nucleon curve and the iron peak, and the onion-shell model of a pre-supernova massive star's internal structure. Each question must require the student to analyze or interpret a diagram.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "diagram-analysis",
+      "question": "Analyze the proton-proton (p-p) chain reaction in main sequence stars as shown in the diagram below: Identify and explain the steps where positrons and neutrinos are released. Discuss how this relates to energy production in stars similar to the Sun.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 1,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_10_20260417_054733/diagrams/bf8f9fe7-a4db-4100-acfa-89f5714bd6a8.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=Lo4tmyprITV%2BrCmlXcoOP65QbKw%3D&Expires=1807941031",
+        "s3_key": "assignments/batch_10_20260417_054733/diagrams/bf8f9fe7-a4db-4100-acfa-89f5714bd6a8.png",
+        "file_id": "bf8f9fe7-a4db-4100-acfa-89f5714bd6a8",
+        "filename": "diagram_q0.png",
+        "domain": "astrophysics",
+        "diagram_type": "proton_proton_chain_reaction",
+        "description": "MISMATCH 1: diagram shows the second reactant in IMPORTANT correction needed: The diagram contains a large green highlighted annotation that explicitly states \"Step where e+ and \u03bde are released\", which directly points out the answer to the question asking the student to identify this step.. Specifically: The annotation 'Step where e+ and \u03bde are released' and its associated green. Do NOT include region labels (Feasible/Infeasible, Stable/Unstable, Optimal, etc.), formula annotations, reaction product labels, threshold markers, or any text that reveals the answer. Show structure and context only."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "In the p-p chain, as illustrated in the diagram below, the key steps where positrons and neutrinos are released are: \n1. Step 1: Proton-proton reaction <eq q1_eq1>. A positron <eq q1_eq2> and a neutrino <eq q1_eq3> are emitted, indicating particle reactions that lead to the formation of deuterium from two protons.\n2. Energy production: Positron annihilation contributes to thermal energy, while neutrinos carry energy away, leading to energy loss that helps regulate the star's temperature.",
+      "rubric": "The student identifies the correct steps involving positrons and neutrinos, as shown in the diagram, explaining their role in star energy regulation and demonstrates understanding of the p-p chain reaction mechanism.",
+      "equations": [
+        {
+          "id": "q1_eq1",
+          "latex": "p + p \\rightarrow \\ ^2\\mathrm{H} + e^+ + \\nu_e",
+          "position": {
+            "char_index": 92,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq2",
+          "latex": "e^+",
+          "position": {
+            "char_index": 144,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq3",
+          "latex": "\\nu_e",
+          "position": {
+            "char_index": 159,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Analyze the proton-proton (p-p) chain reaction in main sequence stars as shown in the diagram below: Identify and explain the steps where positrons and neutrinos are released. Discuss how this relates to energy production in stars similar to the Sun.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 2,
+      "type": "diagram-analysis",
+      "question": "Examine the CNO cycle reaction network in the diagram below for massive stars. Describe the role of carbon, nitrogen, and oxygen as catalysts in the cycle and the conditions under which this cycle becomes dominant over the proton-proton chain.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 2,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_10_20260417_054733/diagrams/cf5d2c67-50e5-4235-afa8-909be0b89089.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=MsVIA2tUE2QA2C2J%2Bff1yblMZg4%3D&Expires=1807941125",
+        "s3_key": "assignments/batch_10_20260417_054733/diagrams/cf5d2c67-50e5-4235-afa8-909be0b89089.png",
+        "file_id": "cf5d2c67-50e5-4235-afa8-909be0b89089",
+        "filename": "diagram_q1.png",
+        "domain": "astrophysics",
+        "diagram_type": "CNO_cycle_reaction_network",
+        "description": "CUMULATIVE LEAK CORRECTIONS (all must be fixed): Known answer terms to avoid: cno cycle; The diagram includes a legend explicitly labeling Carbon, Nitrogen, and Oxygen as \"Catalysts\", which directly answers part of the question asking the student to describe their role as catalysts.. A reaction network diagram"
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "In the CNO cycle, as illustrated in the diagram below, carbon, nitrogen, and oxygen serve as catalysts, facilitating the transformation of hydrogen into helium without being consumed in the process. The cycle becomes dominant over the p-p chain at higher temperatures, around <eq q2_eq1> and above, typical in stars more massive than the Sun.",
+      "rubric": "Student correctly explains the catalytic role of C, N, and O in the CNO cycle as shown in the diagram, conditions for its dominance, and appropriately describes catalytic processes with accurate supporting temperatures.",
+      "equations": [
+        {
+          "id": "q2_eq1",
+          "latex": "15\\, \\text{million K}",
+          "position": {
+            "char_index": 225,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Examine the CNO cycle reaction network in the diagram below for massive stars. Describe the role of carbon, nitrogen, and oxygen as catalysts in the cycle and the conditions under which this cycle becomes dominant over the proton-proton chain.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 3,
+      "type": "diagram-analysis",
+      "question": "Interpret the Hertzsprung-Russell (H-R) diagram shown below with evolutionary tracks. Explain the significance of the main sequence, along with how the position of a star on the diagram can indicate its evolutionary stage.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 3,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_10_20260417_054733/diagrams/1bec3cc5-7706-4d9b-8738-bcd28d4ef51b.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=W2EHDElJMDZj9dw%2BXziogp6jkbw%3D&Expires=1807941175",
+        "s3_key": "assignments/batch_10_20260417_054733/diagrams/1bec3cc5-7706-4d9b-8738-bcd28d4ef51b.png",
+        "file_id": "1bec3cc5-7706-4d9b-8738-bcd28d4ef51b",
+        "filename": "diagram_q2.png",
+        "domain": "astrophysics",
+        "diagram_type": "hertzsprung_russell_diagram",
+        "description": "Hertzsprung-Russell diagram showing the main sequence, red giant branch, and white dwarf region. Include evolutionary tracks for stars of different initial masses, indicating their progression through the main sequence, giant phase, and eventual transition to white dwarfs or supernovae. Label axes with temperature (decreasing left to right) and luminosity, and mark key regions like the main sequence, red giants, and white dwarfs."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The diagram below is an H-R diagram that maps stars' luminance versus temperature. The main sequence, visible on the diagram, represents stars in their longest life phase (hydrogen fusion). A star's position on the diagram indicates its evolutionary stage: higher up are red giants, while the bottom left shows white dwarfs. The position on the diagram determines a star's current and future evolution.",
+      "rubric": "Student accurately describes the main sequence on the diagram and correlates star position to evolutionary phases, showcasing deep understanding of stellar dynamics and lifecycle transitions.",
+      "equations": [],
+      "text": "Interpret the Hertzsprung-Russell (H-R) diagram shown below with evolutionary tracks. Explain the significance of the main sequence, along with how the position of a star on the diagram can indicate its evolutionary stage.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 4,
+      "type": "diagram-analysis",
+      "question": "Analyze the binding energy per nucleon curve in the diagram below and discuss the significance of the iron peak. Explain how this curve predicts energy release through nuclear fusion or fission processes.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 4,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_10_20260417_054733/diagrams/4aeeb74f-a26b-4082-bfd2-f08973cb8cdb.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=fG35LJMi6Su3So3LAyWhHmxgcqY%3D&Expires=1807941217",
+        "s3_key": "assignments/batch_10_20260417_054733/diagrams/4aeeb74f-a26b-4082-bfd2-f08973cb8cdb.png",
+        "file_id": "4aeeb74f-a26b-4082-bfd2-f08973cb8cdb",
+        "filename": "diagram_q3.png",
+        "domain": "nuclear_physics",
+        "diagram_type": "binding_energy_per_nucleon_curve",
+        "description": "Binding energy per nucleon curve showing the variation of binding energy with mass number. The curve should highlight the iron peak, where the binding energy is at its maximum, indicating the most stable nuclei. The x-axis represents the mass number, and the y-axis represents the binding energy per nucleon. The curve should show a general increase up to the iron peak and then a decrease for heavier nuclei."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The diagram shows that light nuclei release energy through fusion up to iron, maximizing stability with high binding energy. The significance of the iron peak in the diagram is that it represents the point of maximum binding energy per nucleon, indicating the most stable nuclei. After iron, as depicted in the diagram, nuclei can release energy via fission. This explains why no energy is gained by fusion of elements heavier than iron, as shown in the diagram.",
+      "rubric": "Correctly interprets the binding energy curve in the diagram, the role of the iron peak in energy release through nuclear processes, and the transition from fusion to fission. Effectively explains nuclear stability principles as illustrated in the diagram.",
+      "equations": [],
+      "text": "Analyze the binding energy per nucleon curve in the diagram below and discuss the significance of the iron peak. Explain how this curve predicts energy release through nuclear fusion or fission processes.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 5,
+      "type": "diagram-analysis",
+      "question": "Discuss the onion-shell model diagram of a pre-supernova massive star's internal structure shown below. Identify the different layers and describe the nucleosynthesis processes occurring in each shell.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 5,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_10_20260417_054733/diagrams/f20db20e-1633-4e14-aa21-10dfa7e85056.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=SmNsA226lg4SrlNRsJLkG9zMfN0%3D&Expires=1807941321",
+        "s3_key": "assignments/batch_10_20260417_054733/diagrams/f20db20e-1633-4e14-aa21-10dfa7e85056.png",
+        "file_id": "f20db20e-1633-4e14-aa21-10dfa7e85056",
+        "filename": "diagram_q4.png",
+        "domain": "astrophysics",
+        "diagram_type": "onion_shell_model",
+        "description": "MISMATCH 1: diagram shows two labels for"
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "In the onion-shell model diagram of a pre-supernova massive star's internal structure shown below, massive stars have layers of different elements: \n1. Innermost: Iron, no fusion occurs in this layer as depicted in the diagram.\n2. Outer shell layers: The diagram illustrates silicon to carbon fusion occurring in these layers, with helium fusion happening further out.\n3. Outermost: As shown in the diagram, hydrogen fusion continues in the outermost layer. \nEach layer in the diagram represents successive advanced fusion stages leading to the formation of an iron core.",
+      "rubric": "Identifies layers as shown in the diagram: iron core (inactive), silicon, oxygen, carbon, helium, hydrogen (active fusion). Explains nuclear reactions in shells, linking synthesis to ultimate supernova sequence understanding as depicted in the diagram.",
+      "equations": [],
+      "text": "Discuss the onion-shell model diagram of a pre-supernova massive star's internal structure shown below. Identify the different layers and describe the nucleosynthesis processes occurring in each shell.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    }
+  ],
+  "statistics": {
+    "total_questions": 5,
+    "questions_with_diagrams": 5
+  }
+}

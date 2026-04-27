@@ -1,0 +1,201 @@
+{
+  "topic": "CRISPR-Cas9 Gene Editing",
+  "subject": "biochemistry",
+  "prompt": "Generate 5 diagram-based questions on CRISPR-Cas9 gene editing mechanisms. Cover: the Cas9 protein\u2013sgRNA complex docking onto target DNA, the PAM sequence recognition and DNA unwinding mechanism, DNA double-strand break repair pathways (NHEJ vs HDR), the off-target effect prediction using a mismatch tolerance diagram, and a base editing window diagram for cytosine base editors (CBEs). Each question must require the student to analyze or interpret a diagram.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "diagram-analysis",
+      "question": "Analyze the diagram below illustrating the Cas9 protein-sgRNA complex docking onto the target DNA sequence. Explain the roles of different domains of the Cas9 protein in binding with the target DNA.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 1,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_7_20260417_050946/diagrams/f6d82030-00d1-4ac6-b09b-0229eb987245.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=2uCVd%2BeM1%2F2%2FyapoNLZwNdRjtcM%3D&Expires=1807938649",
+        "s3_key": "assignments/batch_7_20260417_050946/diagrams/f6d82030-00d1-4ac6-b09b-0229eb987245.png",
+        "file_id": "f6d82030-00d1-4ac6-b09b-0229eb987245",
+        "filename": "diagram_q0.png",
+        "domain": "biochemistry",
+        "diagram_type": "protein_dna_complex",
+        "description": "Diagram illustrating the Cas9 protein-sgRNA complex docking onto the target DNA sequence. The diagram should show the Cas9 protein with labeled domains such as the RuvC, HNH, and PAM-interacting domains. The sgRNA should be shown bound to the Cas9 protein, guiding it to the target DNA. The DNA should be depicted as a double helix with the target sequence highlighted. Labels should clearly identify the Cas9 protein, sgRNA, and target DNA, as well as the specific domains of the Cas9 protein involved in binding.\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 REC\n  \u2022 HNH\n  \u2022 RuvC\nThe diagram will FAIL review if any of these appear."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The diagram illustrates the Cas9 protein-sgRNA complex interacting with the target DNA sequence. The Cas9 protein has several key domains: the recognition lobe, visible in the diagram, contains the REC domains that interact with the sgRNA and the DNA. The nuclease lobe, also depicted in the diagram, contains the HNH and RuvC domains responsible for cleaving the target DNA. As shown, the HNH domain cleaves the DNA strand that base-pairs with the sgRNA, while the RuvC domain cleaves the non-target DNA strand.",
+      "rubric": "- Identify the recognition lobe in the diagram (4 points)\n- Describe roles of REC domains as shown in the diagram (2 points)\n- Explain function of nuclease lobe and domain actions as depicted in the diagram (4 points)",
+      "equations": [],
+      "text": "Analyze the diagram below illustrating the Cas9 protein-sgRNA complex docking onto the target DNA sequence. Explain the roles of different domains of the Cas9 protein in binding with the target DNA.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 2,
+      "type": "diagram-analysis",
+      "question": "Interpret the diagram below showing the PAM sequence recognition and DNA unwinding mechanism of Cas9. How does the PAM sequence influence the specificity of DNA cleavage by Cas9?",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 2,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_7_20260417_050946/diagrams/dfeb9cee-de38-4e36-8469-3ae9c40982e3.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=8c7DG3PXKmL4M9%2F0FF%2B0eySx6wU%3D&Expires=1807938729",
+        "s3_key": "assignments/batch_7_20260417_050946/diagrams/dfeb9cee-de38-4e36-8469-3ae9c40982e3.png",
+        "file_id": "dfeb9cee-de38-4e36-8469-3ae9c40982e3",
+        "filename": "diagram_q1.png",
+        "domain": "biochemistry",
+        "diagram_type": "Cas9_PAM_interaction",
+        "description": "Diagram showing the PAM sequence recognition and DNA unwinding mechanism of Cas9. Include the Cas9 protein, guide RNA, target DNA strand, and PAM sequence. Highlight the interaction between the PAM sequence and Cas9, showing how the DNA is unwound at the target site. Label the Cas9 protein, guide RNA, target DNA, and PAM sequence clearly.\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 PI\nThe diagram will FAIL review if any of these appear."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The diagram below illustrates the importance of the PAM sequence in the mechanism of Cas9. The PAM sequence is vital for Cas9 binding; it is recognized by specific domains in the Cas9 protein, such as the PI domain, as shown in the diagram. The presence of the correct PAM motif, typically <eq q2_eq1>, triggers DNA unwinding and cleavage by ensuring specificity. This step prevents non-specific binding across the genome as the PAM sequence is required to initiate cleavage.",
+      "rubric": "- Identify correct PAM sequence in the diagram (2 points)\n- Explain PAM-dependent initiation of DNA unwinding as depicted in the diagram (5 points)\n- Discuss importance to specificity with reference to the diagram (3 points)",
+      "equations": [
+        {
+          "id": "q2_eq1",
+          "latex": "NGG",
+          "position": {
+            "char_index": 178,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Interpret the diagram below showing the PAM sequence recognition and DNA unwinding mechanism of Cas9. How does the PAM sequence influence the specificity of DNA cleavage by Cas9?",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 3,
+      "type": "diagram-analysis",
+      "question": "Examine the diagram below illustrating the DNA double-strand break repair pathways: Non-Homologous End Joining (NHEJ) vs Homology-Directed Repair (HDR). Discuss the advantages and disadvantages of each pathway in gene editing applications.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 3,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_7_20260417_050946/diagrams/c054f582-4e10-4974-99ca-01aa23800c51.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=zrmZDirtBCEEno1gAyFVQicx%2Bv4%3D&Expires=1807938787",
+        "s3_key": "assignments/batch_7_20260417_050946/diagrams/c054f582-4e10-4974-99ca-01aa23800c51.png",
+        "file_id": "c054f582-4e10-4974-99ca-01aa23800c51",
+        "filename": "diagram_q2.png",
+        "domain": "biochemistry",
+        "diagram_type": "DNA_repair_pathways",
+        "description": "Diagram illustrating the DNA double-strand break repair pathways: Non-Homologous End Joining (NHEJ) and Homology-Directed Repair (HDR). The diagram should show a DNA double helix with a break, with two pathways diverging from the break site. The NHEJ pathway should depict direct ligation of the broken ends, possibly with small insertions or deletions. The HDR pathway should show the use of a homologous template for accurate repair, highlighting the use of a sister chromatid or homologous chromosome. Include labels for key components like 'DNA break', 'NHEJ', 'HDR', 'homologous template', and 'ligation'."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The diagram illustrates the DNA double-strand break repair pathways: Non-Homologous End Joining (NHEJ) and Homology-Directed Repair (HDR). NHEJ, as shown in the diagram, is faster and more efficient but often leads to insertions or deletions, making it suitable for knock-out applications. HDR, depicted in the diagram, is more precise, using a donor template to introduce specific changes, but requires the presence of the template and often a cell cycle phase allowing for repair, limiting its efficiency.",
+      "rubric": "- Describe the NHEJ process and its typical outcomes as illustrated in the diagram (5 points)\n- Explain the HDR process, including the donor template role as shown in the diagram (5 points)",
+      "equations": [],
+      "text": "Examine the diagram below illustrating the DNA double-strand break repair pathways: Non-Homologous End Joining (NHEJ) vs Homology-Directed Repair (HDR). Discuss the advantages and disadvantages of each pathway in gene editing applications.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 4,
+      "type": "diagram-analysis",
+      "question": "Evaluate the diagram below showing the base editing window of cytosine base editors (CBEs). What factors contribute to the editing window, and how does this influence precision in gene editing?",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 4,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_7_20260417_050946/diagrams/e25e41f0-1358-43a5-a919-29c1cc21c330.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=bEx2eNNuGIAp5KW%2Fyy5zDWOR6A8%3D&Expires=1807938929",
+        "s3_key": "assignments/batch_7_20260417_050946/diagrams/e25e41f0-1358-43a5-a919-29c1cc21c330.png",
+        "file_id": "e25e41f0-1358-43a5-a919-29c1cc21c330",
+        "filename": "diagram_q3.png",
+        "domain": "biochemistry",
+        "diagram_type": "base_editing_window",
+        "description": "MISMATCH 1: diagram shows"
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The diagram below illustrates the editing window of cytosine base editors (CBEs), which is determined by the deaminase fusion and sgRNA, typically spanning <eq q4_eq1> bases distal to the PAM sequence. Precision in the diagram is influenced by deaminase kinetics and sgRNA binding affinity, dictating where the C-to-T conversions take place. Tailoring sgRNA, as shown in the diagram, can shift or narrow the editing window for enhanced specificity.",
+      "rubric": "- Identify factors influencing window in the diagram (3 points)\n- Explain impact on precision as depicted in the diagram (5 points)\n- Discuss sgRNA design considerations in relation to the diagram (2 points)",
+      "equations": [
+        {
+          "id": "q4_eq1",
+          "latex": "4-5",
+          "position": {
+            "char_index": 98,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Evaluate the diagram below showing the base editing window of cytosine base editors (CBEs). What factors contribute to the editing window, and how does this influence precision in gene editing?",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 5,
+      "type": "diagram-analysis",
+      "question": "Analyze the mismatch tolerance diagram shown below for predicting off-target effects in CRISPR-Cas9 gene editing. What are the implications of mismatch tolerance on off-target prediction and how can it be minimized?",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 5,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_7_20260417_050946/diagrams/c8791a41-c9bb-4464-a32e-253ec0e19f31.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=r2Hbvxw3fmNbcZyKgP7Y2tDnJ0I%3D&Expires=1807939655",
+        "s3_key": "assignments/batch_7_20260417_050946/diagrams/c8791a41-c9bb-4464-a32e-253ec0e19f31.png",
+        "file_id": "c8791a41-c9bb-4464-a32e-253ec0e19f31",
+        "filename": "diagram_q4.png",
+        "domain": "biochemistry",
+        "diagram_type": "mismatch_tolerance_diagram",
+        "description": "CUMULATIVE LEAK CORRECTIONS (all must be fixed): Known answer terms to avoid: DNA, PAM; The diagram contains the label \"PAM\" in the annotations \"Proximal to PAM\" and \"Distal to PAM\", which is explicitly listed as a forbidden label for this question.. A bar chart showing CRISPR-Cas9 mismatch tolerance. The horizontal axis is labeled 'Position along guide RNA' and shows values from 1 to 20. The vertical axis is labeled 'Off-target Activity' and ranges from 0.0 to 1.0. The bars should show a generally increasing trend in height from left to right, indicating lower activity for positions 1-10 and higher activity for positions 11-20. There should be a label 'Seed Region (positions 1-10)' indicating the first ten bars. There should be a label 'Distal Region (positions 11-20)' indicating the last ten bars. A dashed vertical line may"
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The diagram below illustrates mismatch tolerance, which denotes the capacity of Cas9 to cleave target DNA despite mismatches between the sgRNA and DNA, especially near the PAM sequence. According to the diagram, the lower the tolerance for mismatches, the fewer off-target effects are observed. The diagram highlights that off-target predictions improve with stringent sgRNA selection, which is crucial for restricting unintended cleavage events.",
+      "rubric": "- Analyze mismatch importance as shown in the diagram (4 points)\n- Describe implications for off-target effects using the diagram (4 points)\n- Suggest minimization strategies based on the diagram (2 points)",
+      "equations": [],
+      "text": "Analyze the mismatch tolerance diagram shown below for predicting off-target effects in CRISPR-Cas9 gene editing. What are the implications of mismatch tolerance on off-target prediction and how can it be minimized?",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    }
+  ],
+  "statistics": {
+    "total_questions": 5,
+    "questions_with_diagrams": 5
+  }
+}
