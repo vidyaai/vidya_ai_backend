@@ -692,10 +692,12 @@ class AssignmentPDFGenerator:
             diagram_url = s3_presign_url(question["diagram"]["s3_key"])
             diagram_base64 = self.download_image_as_base64(diagram_url)
             if diagram_base64:
-                # Use diagram description as caption if available
-                caption_text = question.get("diagram", {}).get("description", "")
-                if not caption_text:
-                    caption_text = f"Diagram for Question {question_num}"
+                diagram_type = question.get("diagram", {}).get("diagram_type", "")
+                caption_text = (
+                    diagram_type.replace("_", " ").strip().title()
+                    if diagram_type
+                    else f"Diagram for Question {question_num}"
+                )
                 html += f"""
                 <div class="figure-container">
                     <img src="{diagram_base64}" alt="Question diagram">
@@ -777,9 +779,11 @@ class AssignmentPDFGenerator:
                     diagram_url = s3_presign_url(subq["diagram"]["s3_key"])
                     diagram_base64 = self.download_image_as_base64(diagram_url)
                     if diagram_base64:
-                        sub_caption = subq.get("diagram", {}).get(
-                            "description",
-                            f"Diagram for Part {question_num}.{i+1}",
+                        sub_diagram_type = subq.get("diagram", {}).get("diagram_type", "")
+                        sub_caption = (
+                            sub_diagram_type.replace("_", " ").strip().title()
+                            if sub_diagram_type
+                            else f"Diagram for Part {question_num}.{i+1}"
                         )
                         html += f"""
                         <div class="figure-container">
@@ -1382,9 +1386,7 @@ class AssignmentPDFGenerator:
                 diagram_url = s3_presign_url(correct_answer_diagram["s3_key"])
                 diagram_base64 = self.download_image_as_base64(diagram_url)
                 if diagram_base64:
-                    caption = correct_answer_diagram.get(
-                        "description", f"Answer diagram for Question {question_num}"
-                    )
+                    caption = f"Answer diagram for Question {question_num}"
                     html += f"""
             <div class="figure-container" style="margin-top:8px;">
                 <img src="{diagram_base64}" alt="Correct answer diagram" style="max-width:100%; border:1px solid #d1fae5; border-radius:4px;">
@@ -1454,10 +1456,7 @@ class AssignmentPDFGenerator:
                             diagram_url = s3_presign_url(subq_answer_diagram["s3_key"])
                             diagram_base64 = self.download_image_as_base64(diagram_url)
                             if diagram_base64:
-                                sub_caption = subq_answer_diagram.get(
-                                    "description",
-                                    f"Answer diagram for Part ({part_label})",
-                                )
+                                sub_caption = f"Answer diagram for Part ({part_label})"
                                 html += f"""
                 <div class="figure-container" style="margin-top:8px;">
                     <img src="{diagram_base64}" alt="Correct answer diagram" style="max-width:100%; border:1px solid #d1fae5; border-radius:4px;">

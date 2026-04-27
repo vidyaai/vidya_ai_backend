@@ -1,0 +1,282 @@
+{
+  "topic": "Game Theory & Nash Equilibria",
+  "subject": "math",
+  "prompt": "Generate 5 diagram-based questions on game theory and Nash equilibria. Cover: extensive form game tree for a sequential two-player game, payoff matrix for the Prisoner's Dilemma and identifying Nash equilibria, mixed strategy Nash equilibrium in a coordination game, backward induction on a finite game tree, and a Pareto frontier diagram showing efficient vs inefficient outcomes. Each question must require the student to analyze or interpret a diagram.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "diagram-analysis",
+      "question": "Analyze the extensive form game tree in the diagram below for a sequential two-player game where Player 1 can choose between actions A and B, and Player 2 can then choose between X and Y after observing Player 1's action. Identify the subgame perfect Nash equilibrium by performing backward induction on this game tree.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 1,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_6_20260416_182404/diagrams/91169ebc-dbd4-4acf-8254-c613387f55ab.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=lvusXTRO33c%2FKbmroUrZifZeASk%3D&Expires=1807899937",
+        "s3_key": "assignments/batch_regen_6_20260416_182404/diagrams/91169ebc-dbd4-4acf-8254-c613387f55ab.png",
+        "file_id": "91169ebc-dbd4-4acf-8254-c613387f55ab",
+        "filename": "diagram_q0.png",
+        "domain": "game_theory",
+        "diagram_type": "extensive_form_game_tree",
+        "description": "CUMULATIVE LEAK CORRECTIONS (all must be fixed): Known answer terms to avoid: If Player, Identify, Nash, Player, Backward, nash equilibrium; The diagram contains the label \"Player 1\", but the word \"Player\" is on the forbidden labels list, constituting an answer leak.. A game tree for a sequential two-player game IMPORTANT: Values or sequences in the diagram don't match the question. Specifically: The payoffs for all four outcomes are missing and are represented as \"(?, ?)\", making it impossible for the. The question requires the student to perform backward induction, which is impossible without knowing the numerical payoffs at the terminal nodes, but the diagram only shows placeholders \"(?,?)\".. Regenerate using EXACTLY the values and sequences specified."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "Identify the subgame perfect Nash equilibrium by tracing backward using the diagram below: \n- If Player 1 chooses A in the diagram, Player 2 chooses X since it yields a higher payoff according to the diagram.\n- If Player 1 chooses B in the diagram, Player 2 chooses Y for a higher payoff as shown in the diagram.\n- Backward induction using the diagram reveals: Player 1 should choose A to maximize their own payoff given Player 2's responses.",
+      "rubric": "1. Identify correct paths and payoffs for each subgame in the diagram (4 points)\n2. Correct application of backward induction using the diagram (4 points)\n3. Correct conclusion of Player 1's optimal strategy based on the diagram (2 points)",
+      "equations": [],
+      "text": "Analyze the extensive form game tree in the diagram below for a sequential two-player game where Player 1 can choose between actions A and B, and Player 2 can then choose between X and Y after observing Player 1's action. Identify the subgame perfect Nash equilibrium by performing backward induction on this game tree.",
+      "correctAnswerDiagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_6_20260328_183120/diagrams/4aff0f97-2253-4c39-923f-50c2c7744fae.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=91Si8icw20KFbCBdiUd92KyB4HM%3D&Expires=1806258768",
+        "s3_key": "assignments/batch_6_20260328_183120/diagrams/4aff0f97-2253-4c39-923f-50c2c7744fae.png",
+        "file_id": "4aff0f97-2253-4c39-923f-50c2c7744fae",
+        "filename": "diagram_q0_answer.png"
+      },
+      "subquestions": []
+    },
+    {
+      "id": 2,
+      "type": "short-answer",
+      "question": "Consider the payoff matrix for a Prisoner's Dilemma shown in the diagram below:\n\n|        | Cooperate | Defect |\n|------- |-----------|--------|\n| C | (3,3)    | (0,5) |\n| D | (5,0)    | (1,1) |\n\nIdentify all Nash equilibria in this game and explain why they are Nash equilibria.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 2,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_6_20260416_182404/diagrams/a3032f12-e268-4519-bf18-0c84a2da5996.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=PA%2Bbwpp0Rif9rlszRJwIcdKb%2Blw%3D&Expires=1807900067",
+        "s3_key": "assignments/batch_regen_6_20260416_182404/diagrams/a3032f12-e268-4519-bf18-0c84a2da5996.png",
+        "file_id": "a3032f12-e268-4519-bf18-0c84a2da5996",
+        "filename": "diagram_q1.png",
+        "domain": "game_theory",
+        "diagram_type": "payoff_matrix",
+        "description": "CUMULATIVE LEAK CORRECTIONS (all must be fixed): Known answer terms to avoid: Nash, Defect, all Nash equilibria in this game, why they are Nash equilibria, nash equilibrium, dominant strategy; The diagram includes the label \"Defect\", which is on the forbidden labels list and is a key part of the answer the student must identify.; The diagram includes the label \"Defect\", which is on the question-specific forbidden labels list.. Remove the label 'Defect'. The diagram should show a payoff matrix for a two-player"
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The Nash equilibrium is at (Defect, Defect) with payoffs (1,1) as shown in the diagram below. In this position, neither player benefits by unilaterally changing their strategy. If either cooperates while the other defects, they will receive a lower payoff (0 versus 1).",
+      "rubric": "1. Correct identification of Nash equilibrium (4 points)\n2. Explanation of why it is an equilibrium (3 points)\n3. Consideration of unilateral strategy changes (3 points)",
+      "equations": [],
+      "text": "Consider the payoff matrix for a Prisoner's Dilemma shown in the diagram below:\n\n|        | Cooperate | Defect |\n|------- |-----------|--------|\n| C | (3,3)    | (0,5) |\n| D | (5,0)    | (1,1) |\n\nIdentify all Nash equilibria in this game and explain why they are Nash equilibria.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 3,
+      "type": "diagram-analysis",
+      "question": "Evaluate a mixed strategy Nash equilibrium in a coordination game given by the payoff table in the diagram below, where both players choose high or low effort:\n\n|  | High | Low |\n|----------|-------|-------|\n| High | (2,2) | (0,3) |\n| Low | (3,0) | (1,1) |\n\nUse the mixed strategy method to find the equilibria, and determine the probabilities with which each player should randomize their strategies.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 3,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_6_20260416_182404/diagrams/e43f50c9-1ccf-44db-b0a1-d1adcb59a535.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=1xl%2Bm4uOYTvz3joo2De9vN4FHIs%3D&Expires=1807900195",
+        "s3_key": "assignments/batch_regen_6_20260416_182404/diagrams/e43f50c9-1ccf-44db-b0a1-d1adcb59a535.png",
+        "file_id": "e43f50c9-1ccf-44db-b0a1-d1adcb59a535",
+        "filename": "diagram_q2.png",
+        "domain": "game_theory",
+        "diagram_type": "payoff_matrix",
+        "description": "CUMULATIVE LEAK CORRECTIONS (all must be fixed): Known answer terms to avoid: Let Player, For Player, Let, Player, High, Referring, Set, Mixed, Nash, equilibria; The diagram contains the labels \"Player\" and \"High\", which are explicitly listed in both the general and question-specific forbidden labels lists.; The diagram contains the labels \"Player\" and \"High\", which are explicitly listed in the forbidden labels list for this question.. CUMULATIVE LEAK CORRECTIONS (all must be fixed): Known answer terms to avoid: Let Player, For Player, Let, Player, High, Referring, Set, Mixed, Nash, equilibria; The diagram contains the labels \"Player\" and \"High\", which are explicitly listed in both the general and question-specific forbidden labels lists.. A payoff matrix for a coordination game where both players choose high or low effort. The matrix has two rows and two columns. The first row and first column are labeled 'High', and the second row and column are labeled 'Low'. The payoffs are as follows: (2,2) for High-High, (0,3) for High-Low, (3,0) for Low-High, and (1,1) for Low-Low. Each cell shows the payoff for Player 1 and Player 2.\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 Let Player\n  \u2022 For Player\n  \u2022 Let\n  \u2022 Player\n  \u2022 High\n  \u2022 Referring\n  \u2022 Set\n  \u2022 Mixed\n  \u2022 Nash\n  \u2022 equilibria\n  \u2022 syndrome table\n  \u2022 nash equilibrium\n  \u2022 dominant strategy\n  \u2022 equal areas\nThe diagram will FAIL review if any of these appear. IMPORTANT correction needed: The diagram contains the labels \"Player\" and \"High\", which are explicitly listed in both the general and question-specific forbidden labels lists.. Specifically: The labels \"Player 1\", \"(Player 1, Player 2)\", and \"High\" are present, but \"Player\" and \". Do NOT include region labels (Feasible/Infeasible, Stable/Unstable, Optimal, etc.), formula annotations, reaction product labels, threshold markers, or any text that reveals the answer. Show structure and context only. IMPORTANT correction needed: The diagram contains the labels \"Player\" and \"High\", which are explicitly listed in the forbidden labels list for this question.. Specifically: The diagram includes the labels \"Player 1\", \"(Player 1, Player 2)\", and \"High\", which contain the forbidden terms \"Player\" and. Do NOT include region labels (Feasible/Infeasible, Stable/Unstable, Optimal, etc.), formula annotations, reaction product labels, threshold markers, or any text that reveals the answer. Show structure and context only."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "Let Player A's probability of playing High be <eq q3_eq1>, and Player B's be <eq q3_eq2>. Referring to the payoff table in the diagram below:\n- Set expected payoffs equal using the diagram:\n  - For Player A: <eq q3_eq3> = <eq q3_eq4> => <eq q3_eq5>\n  - For Player B: <eq q3_eq6> = <eq q3_eq7> => <eq q3_eq8>\n\nMixed strategy Nash equilibrium probabilities are <eq q3_eq9> for Player A and <eq q3_eq10> for Player B.",
+      "rubric": "1. Correct expected payoff equations using the diagram (3 points)\n2. Correct calculation of probabilities based on the diagram (4 points)\n3. Conclusion with correct mixed strategy probabilities as shown in the diagram (3 points)",
+      "equations": [
+        {
+          "id": "q3_eq1",
+          "latex": "p",
+          "position": {
+            "char_index": 47,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq2",
+          "latex": "q",
+          "position": {
+            "char_index": 76,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq3",
+          "latex": "q(2) + (1-q)(0)",
+          "position": {
+            "char_index": 122,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq4",
+          "latex": "q(0) + (1-q)(1)",
+          "position": {
+            "char_index": 139,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq5",
+          "latex": "q = 0.5",
+          "position": {
+            "char_index": 148,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq6",
+          "latex": "p(2) + (1-p)(0)",
+          "position": {
+            "char_index": 176,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq7",
+          "latex": "p(3) + (1-p)(1)",
+          "position": {
+            "char_index": 193,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq8",
+          "latex": "p = 0.25",
+          "position": {
+            "char_index": 202,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq9",
+          "latex": "p=0.25",
+          "position": {
+            "char_index": 250,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq10",
+          "latex": "q=0.5",
+          "position": {
+            "char_index": 269,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Evaluate a mixed strategy Nash equilibrium in a coordination game given by the payoff table in the diagram below, where both players choose high or low effort:\n\n|  | High | Low |\n|----------|-------|-------|\n| High | (2,2) | (0,3) |\n| Low | (3,0) | (1,1) |\n\nUse the mixed strategy method to find the equilibria, and determine the probabilities with which each player should randomize their strategies.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 4,
+      "type": "diagram-analysis",
+      "question": "Use backward induction on the game tree depicted in the diagram below for a three-stage sequential game with perfect information. Each player has one possible optimal move at each decision node. Identify the optimal strategy for each player, and explain how backward induction assists in determining this strategy.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 4,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_6_20260416_182404/diagrams/6514ab20-3edf-4fc0-a34b-f47c14c5ab26.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=V7PVbeiXMamZGR2k9CaIaifbIvw%3D&Expires=1807900265",
+        "s3_key": "assignments/batch_regen_6_20260416_182404/diagrams/6514ab20-3edf-4fc0-a34b-f47c14c5ab26.png",
+        "file_id": "6514ab20-3edf-4fc0-a34b-f47c14c5ab26",
+        "filename": "diagram_q3.png",
+        "domain": "game_theory",
+        "diagram_type": "game_tree",
+        "description": "A three-stage sequential game tree with perfect information, showing decision nodes for Player 1 and Player 2, and end nodes representing outcomes. Each player has one optimal move at each decision node.\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 Determine\n  \u2022 Use\n  \u2022 Finally\n  \u2022 Backward\n  \u2022 optimal strategy for each player\n  \u2022 optimal\n  \u2022 dominant strategy\nThe diagram will FAIL review if any of these appear."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "By working backward through the game tree depicted in the diagram below:\n1. Determine optimal moves at terminal nodes for the last player as depicted in the diagram.\n2. Use these optimal moves to evaluate and choose moves for the middle-stage player, as illustrated in the diagram.\n3. Finally, determine the initial player's optimal strategy using the preceding moves, as outlined in the diagram.\nBackward induction ensures rational decision-making by resolving subgames first, as demonstrated in the diagram.",
+      "rubric": "1. Correct identification of optimal moves at each stage in the diagram (3 points)\n2. Correct use of backward induction process as shown in the diagram (4 points)\n3. Logical integration of decisions into a comprehensive strategy, referencing the diagram (3 points)",
+      "equations": [],
+      "text": "Use backward induction on the game tree depicted in the diagram below for a three-stage sequential game with perfect information. Each player has one possible optimal move at each decision node. Identify the optimal strategy for each player, and explain how backward induction assists in determining this strategy.",
+      "correctAnswerDiagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_6_20260328_183120/diagrams/da8aa55a-3b78-4a23-87cb-ab7d103a2928.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=i%2BGd8g9eHp%2BI8ec608p8xJgmLdk%3D&Expires=1806258867",
+        "s3_key": "assignments/batch_6_20260328_183120/diagrams/da8aa55a-3b78-4a23-87cb-ab7d103a2928.png",
+        "file_id": "da8aa55a-3b78-4a23-87cb-ab7d103a2928",
+        "filename": "diagram_q3_answer.png"
+      },
+      "subquestions": []
+    },
+    {
+      "id": 5,
+      "type": "diagram-analysis",
+      "question": "Given the Pareto frontier in the diagram below illustrating efficient vs inefficient outcomes, identify the Pareto efficient points and describe the trade-offs at inefficient points. Explain how any shift in the curve can alter efficiency in allocation.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 5,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_6_20260416_182404/diagrams/961770e0-6a8e-49de-bbb4-3f9bae441dc9.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=qDPwlwmE6Bb8z36tQudmamMCKKE%3D&Expires=1807900370",
+        "s3_key": "assignments/batch_regen_6_20260416_182404/diagrams/961770e0-6a8e-49de-bbb4-3f9bae441dc9.png",
+        "file_id": "961770e0-6a8e-49de-bbb4-3f9bae441dc9",
+        "filename": "diagram_q4.png",
+        "domain": "economics",
+        "diagram_type": "pareto_frontier",
+        "description": "CUMULATIVE LEAK CORRECTIONS (all must be fixed): Known answer terms to avoid: Pareto, Pareto efficient points, trade-offs at inefficient points, pareto frontier, pareto front, feasible region; The diagram explicitly labels points as \"Efficient\" and \"Inefficient\", which directly answers the question asking the student to identify these categories of points.; The diagram explicitly labels points as \"Efficient\" and \"Inefficient\", which directly answers the first part of the question asking the student to identify these points.. CUMULATIVE LEAK CORRECTIONS (all must be fixed): Known answer terms to avoid: Pareto, Pareto efficient points, trade-offs at inefficient points, pareto frontier, pareto front, feasible region; The diagram explicitly labels points as \"Efficient\" and \"Inefficient\", which directly answers the question asking the student to identify these categories of points.. A 2D plot with the x-axis labeled 'Outcome A' and the y-axis labeled 'Outcome B'. A smooth, downward-sloping curve starts high on the y-axis and ends far out on the x-axis. There are several points, marked with circles, located directly on this curve. There are also several points, marked with squares, located in the area below the curve. An arrow should point from the original curve to a new, dashed curve located further out from the origin, indicating an outward shift. Do not label any points or regions as 'Efficient' or 'Inefficient'. IMPORTANT correction needed: The diagram explicitly labels points as \"Efficient\" and \"Inefficient\", which directly answers the first part of the question asking the student to identify these points.. Specifically: The labels \"Efficient\" and \"Inefficient\" are present, which constitutes an answer leak. The diagram is also missing the required. Do NOT include region labels (Feasible/Infeasible, Stable/Unstable, Optimal, etc.), formula annotations, reaction product labels, threshold markers, or any text that reveals the answer. Show structure and context only."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The Pareto efficient points are located on the boundary of the feasible set in the diagram below, where no individual's allocation can be improved without worsening another's. In the diagram below, shifts altering the Pareto frontier can either broaden opportunities for trade-offs or shrink them, thus changing potential efficiency outcomes.",
+      "rubric": "1. Correct identification of efficient points on the diagram below (4 points)\n2. Explanation of trade-offs at inefficient points as shown in the diagram below (3 points)\n3. Understanding of implications of shifts in the frontier as depicted in the diagram below (3 points)",
+      "equations": [],
+      "text": "Given the Pareto frontier in the diagram below illustrating efficient vs inefficient outcomes, identify the Pareto efficient points and describe the trade-offs at inefficient points. Explain how any shift in the curve can alter efficiency in allocation.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    }
+  ],
+  "statistics": {
+    "total_questions": 5,
+    "questions_with_diagrams": 5
+  }
+}

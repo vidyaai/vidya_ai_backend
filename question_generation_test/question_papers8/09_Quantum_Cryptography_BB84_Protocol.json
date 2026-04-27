@@ -1,0 +1,263 @@
+{
+  "topic": "Quantum Cryptography (BB84 Protocol)",
+  "subject": "cs",
+  "prompt": "Generate 5 diagram-based questions on quantum cryptography, focusing on the BB84 protocol. Cover: the four BB84 quantum states on the Bloch sphere (rectilinear and diagonal bases), the BB84 key exchange sequence diagram between Alice, Bob, and Eve (intercept-resend attack), quantum key distribution channel with eavesdropping detection probability graph, the no-cloning theorem circuit diagram, and the sifted key error rate vs eavesdropping probability curve. Each question must require the student to analyze or interpret a diagram.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "diagram-analysis",
+      "question": "Examine the Bloch sphere representation of the BB84 protocol quantum states in the diagram below. Describe the position of each of the four states (<eq q1_eq1>, <eq q1_eq2>, <eq q1_eq3>, <eq q1_eq4>) in terms of their polar and azimuthal angles on the Bloch sphere using rectilinear and diagonal bases.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 1,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_9_20260415_170856/diagrams/8fb5fccf-8006-4187-856c-a2591ea6479b.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=qDGkFDZEEVg%2FOWwD1O6WMKkOuVw%3D&Expires=1807809027",
+        "s3_key": "assignments/batch_regen_9_20260415_170856/diagrams/8fb5fccf-8006-4187-856c-a2591ea6479b.png",
+        "file_id": "8fb5fccf-8006-4187-856c-a2591ea6479b",
+        "filename": "diagram_q0.png",
+        "domain": "quantum_computing",
+        "diagram_type": "bloch_sphere",
+        "description": "A Bloch sphere diagram showing the positions of the four quantum states used in the BB84 protocol: |0\u27e9, |1\u27e9, |+\u27e9, and |-\u27e9. The Bloch sphere should be a 3D sphere with axes labeled x, y, and z. The state |0\u27e9 must be at the north pole (positive z-axis). The state |1\u27e9 must be at the south pole (negative z-axis). The state |+\u27e9 must be on the equator along the positive x-axis. The state |-\u27e9 must be on the equator along the negative x-axis. All four states must be clearly labeled. MISMATCH 1: The diagram shows the state labeled |+\u27e9 on the negative x-axis, but the DIAGRAM DESCRIPTION requires it to be on the positive x-axis (x=1). VISUAL FIX: The point and label for |+\u27e9 must be on the positive x-axis. MISMATCH 2: The diagram shows the state labeled |-\u27e9 on the positive x-axis, but the DIAGRAM DESCRIPTION requires it to be on the negative x-axis (x=-1). VISUAL FIX: The point and label for |-\u27e9 must be on the negative x-axis."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "In the diagram below, <eq q1_eq1> is at <eq q1_eq5>, <eq q1_eq6>; <eq q1_eq2> is at <eq q1_eq7>, <eq q1_eq6>; <eq q1_eq3> is at <eq q1_eq8>, <eq q1_eq6>; <eq q1_eq4> is at <eq q1_eq8>, <eq q1_eq9>.",
+      "rubric": "Evaluate positioning based on correct spherical coordinates for each state as depicted in the diagram below. Full marks for correct angles; partial marks for correct recognition of axes.",
+      "equations": [
+        {
+          "id": "q1_eq1",
+          "latex": "|0\\rangle",
+          "position": {
+            "char_index": 106,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq2",
+          "latex": "|1\\rangle",
+          "position": {
+            "char_index": 114,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq3",
+          "latex": "|+\\rangle",
+          "position": {
+            "char_index": 122,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq4",
+          "latex": "|-\\rangle",
+          "position": {
+            "char_index": 130,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq5",
+          "latex": "\\theta = 0",
+          "position": {
+            "char_index": 0,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq6",
+          "latex": "\\phi = 0",
+          "position": {
+            "char_index": 11,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq7",
+          "latex": "\\theta = \\pi",
+          "position": {
+            "char_index": 27,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq8",
+          "latex": "\\theta = \\frac{\\pi}{2}",
+          "position": {
+            "char_index": 53,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq9",
+          "latex": "\\phi = \\pi",
+          "position": {
+            "char_index": 75,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Examine the Bloch sphere representation of the BB84 protocol quantum states in the diagram below. Describe the position of each of the four states (<eq q1_eq1>, <eq q1_eq2>, <eq q1_eq3>, <eq q1_eq4>) in terms of their polar and azimuthal angles on the Bloch sphere using rectilinear and diagonal bases.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 2,
+      "type": "diagram-analysis",
+      "question": "Interpret the key exchange sequence in the diagram below for the BB84 protocol between Alice and Bob, including an intercept-resend attack by Eve. Explain how the protocol detects eavesdropping.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 2,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_9_20260415_170856/diagrams/6e1dffa2-a955-4750-a693-6ddd2b1b52d2.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=Sev1VfkcsznMpMQ96kkW4u3H9Ac%3D&Expires=1807809117",
+        "s3_key": "assignments/batch_regen_9_20260415_170856/diagrams/6e1dffa2-a955-4750-a693-6ddd2b1b52d2.png",
+        "file_id": "6e1dffa2-a955-4750-a693-6ddd2b1b52d2",
+        "filename": "diagram_q1.png",
+        "domain": "quantum_cryptography",
+        "diagram_type": "BB84_protocol_sequence",
+        "description": "A diagram illustrating the BB84 protocol sequence between Alice and Bob, including an intercept-resend attack by Eve. The diagram should show the following steps: 1. Alice sends a sequence of qubits encoded randomly in either the rectilinear or diagonal basis. 2. Eve intercepts the qubits, measures them in a randomly chosen basis, and resends them to Bob. 3. Bob receives the qubits and measures them in a randomly chosen basis. 4. Alice and Bob publicly compare a subset of their basis choices to detect eavesdropping. Include labeled arrows for each step, showing the flow of qubits and information between Alice, Eve, and Bob. Highlight the basis choices and potential discrepancies introduced by Eve's interference."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The protocol detects eavesdropping by comparing a subset of qubit measurements for discrepancies, as illustrated in the diagram below. If Eve intercepts the qubits and resends them, differences in bases, as shown in the sequence of interactions in the diagram, lead to detectable errors. The diagram below shows how the basis mismatch introduced by Eve's actions results in errors that Alice and Bob can identify when they compare their measurement results.",
+      "rubric": "Full points for explaining the basis comparison and error detection process as depicted in the diagram below. Partial points for identifying Eve's impact without detailing detection, as illustrated in the diagram.",
+      "equations": [],
+      "text": "Interpret the key exchange sequence in the diagram below for the BB84 protocol between Alice and Bob, including an intercept-resend attack by Eve. Explain how the protocol detects eavesdropping.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 3,
+      "type": "diagram-analysis",
+      "question": "Analyze the quantum key distribution channel in the diagram below, which illustrates the probability of eavesdropping detection versus sifted key error rate. Describe the trade-off between security and error rate.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 3,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_9_20260415_170856/diagrams/7ab40cbc-0e1e-419f-abf7-9c93625efcc9.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=nqY1nHPUbKW2h8bDh%2FGqiM1ferk%3D&Expires=1807809187",
+        "s3_key": "assignments/batch_regen_9_20260415_170856/diagrams/7ab40cbc-0e1e-419f-abf7-9c93625efcc9.png",
+        "file_id": "7ab40cbc-0e1e-419f-abf7-9c93625efcc9",
+        "filename": "diagram_q2.png",
+        "domain": "quantum_cryptography",
+        "diagram_type": "probability_vs_error_rate_plot",
+        "description": "A plot showing the probability of eavesdropping detection versus sifted key error rate in a quantum key distribution channel. The x-axis represents the sifted key error rate, and the y-axis represents the probability of eavesdropping detection. The curve should illustrate the trade-off between security (probability of detection) and error rate, highlighting how increasing the error rate affects the detection probability."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "As shown in the diagram below, as the probability of eavesdropping detection increases, the error rate in the sifted key also increases. This illustrates the trade-off between enhancing security (detecting eavesdropping) and maintaining low error rates (key accuracy).",
+      "rubric": "Full marks for explaining the error-security trade-off clearly as depicted in the diagram. Partial marks for responses lacking in the connection between variables shown in the diagram.",
+      "equations": [],
+      "text": "Analyze the quantum key distribution channel in the diagram below, which illustrates the probability of eavesdropping detection versus sifted key error rate. Describe the trade-off between security and error rate.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 4,
+      "type": "diagram-analysis",
+      "question": "Evaluate the quantum circuit shown in the diagram below that demonstrates the no-cloning theorem. Explain how this circuit prevents the cloning of an arbitrary quantum state.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 4,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_9_20260415_170856/diagrams/fe788d02-0e6d-498f-8c2c-c256f7f9ffee.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=DSkSaWceGX8vseaFq%2Fd5Cj0qZHU%3D&Expires=1807809229",
+        "s3_key": "assignments/batch_regen_9_20260415_170856/diagrams/fe788d02-0e6d-498f-8c2c-c256f7f9ffee.png",
+        "file_id": "fe788d02-0e6d-498f-8c2c-c256f7f9ffee",
+        "filename": "diagram_q3.png",
+        "domain": "quantum_computing",
+        "diagram_type": "quantum_circuit",
+        "description": "A quantum circuit demonstrating the no-cloning theorem. The circuit includes two qubit lines: one for the original quantum state |\u03c8\u27e9 and another for the ancilla qubit initialized to |0\u27e9. The circuit has a CNOT gate with the original qubit as the control and the ancilla as the target. Additionally, there is a Hadamard gate on the original qubit before the CNOT gate. The circuit should clearly label the qubits and gates, showing the flow from the input state to the output, demonstrating the impossibility of cloning the quantum state."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The no-cloning theorem states that it is impossible to create an identical copy of an arbitrary unknown quantum state. The diagram below illustrates this by showing a quantum circuit that attempts to clone an arbitrary quantum state. The circuit's inability to process entangled states without altering them, as depicted in the diagram, demonstrates the impossibility of perfect cloning. Any attempt to clone would require measuring the state, which inherently changes it, as shown in the circuit.",
+      "rubric": "Full marks for explaining the impossibility of perfect cloning of quantum states with reference to entanglement and the circuit shown in the diagram. Partial marks for correct principle identification without detailed explanation of how the circuit in the diagram demonstrates this principle.",
+      "equations": [],
+      "text": "Evaluate the quantum circuit shown in the diagram below that demonstrates the no-cloning theorem. Explain how this circuit prevents the cloning of an arbitrary quantum state.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 5,
+      "type": "diagram-analysis",
+      "question": "Examine the correlation curve between sifted key error rate and eavesdropping probability in the quantum key distribution session depicted in the diagram below. How can this curve guide secure communication practices?",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 5,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_9_20260415_170856/diagrams/5e3b98f2-4a02-4d0d-874d-35203871afb2.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=RHJYxMsQdPZQvnk7zvJxGs9bVfM%3D&Expires=1807809281",
+        "s3_key": "assignments/batch_regen_9_20260415_170856/diagrams/5e3b98f2-4a02-4d0d-874d-35203871afb2.png",
+        "file_id": "5e3b98f2-4a02-4d0d-874d-35203871afb2",
+        "filename": "diagram_q4.png",
+        "domain": "quantum_cryptography",
+        "diagram_type": "correlation_curve",
+        "description": "A correlation curve showing the relationship between sifted key error rate and eavesdropping probability in a quantum key distribution session. The x-axis represents the sifted key error rate, and the y-axis represents the eavesdropping probability. The curve should illustrate how changes in the error rate affect the probability of eavesdropping, highlighting key points where the probability significantly increases or decreases. This visual aid helps in understanding how to maintain secure communication practices in quantum cryptography."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "In the diagram below, increased error rates are correlated with higher eavesdropping probabilities. This relationship, as depicted in the diagram, guides users to monitor error rates closely to infer security breaches and adjust communication strategies for heightened security.",
+      "rubric": "Full points for linking error rates with potential security insights as shown in the diagram. Partial points for recognizing correlation without applied insights.",
+      "equations": [],
+      "text": "Examine the correlation curve between sifted key error rate and eavesdropping probability in the quantum key distribution session depicted in the diagram below. How can this curve guide secure communication practices?",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    }
+  ],
+  "statistics": {
+    "total_questions": 5,
+    "questions_with_diagrams": 5
+  }
+}

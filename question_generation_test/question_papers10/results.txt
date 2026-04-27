@@ -1,0 +1,14 @@
+Paper                     Q1    Q2    Q3    Q4    Q5  pass
+--------------------------------------------------------------
+QEC                     PASS  FAIL  PASS  PASS  PASS  4/5
+Orbital                 FAIL  PASS  PASS  PASS  PASS  4/5
+Topological Ins.        PASS  PASS  PASS  PASS  FAIL  4/5
+Neuromorphic            FAIL  PASS  PASS  PASS  FAIL  3/5
+Crystallography         FAIL  FAIL  FAIL  FAIL  PASS  1/5
+Game Theory             PASS  PASS  PASS  PASS  PASS  5/5
+CRISPR                  PASS  PASS  PASS  PASS  FAIL  4/5
+Plasma                  FAIL  PASS  FAIL  FAIL  PASS  2/5
+BB84                    FAIL  FAIL  FAIL  FAIL  PASS  1/5
+Stellar                 PASS  PASS  PASS  PASS  FAIL  4/5
+--------------------------------------------------------------
+FINAL: 32/50 (64%)
