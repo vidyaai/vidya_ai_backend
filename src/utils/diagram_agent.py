@@ -3465,6 +3465,7 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines.""",
         questions: List[Dict[str, Any]],
         assignment_id: str,
         has_diagram_analysis: bool,
+        progress_callback=None,
     ) -> List[Dict[str, Any]]:
         """
         Process multiple questions in parallel with concurrency limit.
@@ -3482,9 +3483,14 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines.""",
 
         async def process_with_semaphore(q: Dict[str, Any], idx: int):
             async with semaphore:
-                return await self._analyze_single_question(
+                if progress_callback:
+                    progress_callback(f"Processing q{idx + 1}")
+                result = await self._analyze_single_question(
                     q, assignment_id, idx, has_diagram_analysis
                 )
+                if progress_callback:
+                    progress_callback(f"q{idx + 1} complete")
+                return result
 
         tasks = [process_with_semaphore(q, i) for i, q in enumerate(questions)]
 
@@ -3555,6 +3561,7 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines.""",
         assignment_id: str,
         has_diagram_analysis: bool,
         generation_prompt: str = "",
+        progress_callback=None,
     ) -> List[Dict[str, Any]]:
         """
         Main entry point: Analyze questions and generate diagrams via multi-agent system.
@@ -3588,7 +3595,7 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines.""",
             try:
                 questions = asyncio.run(
                     self._process_questions_batch(
-                        questions, assignment_id, has_diagram_analysis
+                        questions, assignment_id, has_diagram_analysis, progress_callback
                     )
                 )
             except RuntimeError as e:
@@ -3602,7 +3609,7 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines.""",
                     future = executor.submit(
                         asyncio.run,
                         self._process_questions_batch(
-                            questions, assignment_id, has_diagram_analysis
+                            questions, assignment_id, has_diagram_analysis, progress_callback
                         ),
                     )
                     questions = future.result()
