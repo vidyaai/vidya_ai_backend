@@ -1,0 +1,60 @@
+{
+  "video_path": "video_chat_test/data/test_video.mp4",
+  "video_id": "test_1774304262",
+  "timestamp": "2026-03-23T22:18:51.331601",
+  "processing_times": {
+    "audio_extraction": 3.075599670410156e-05,
+    "transcript_generation": 8.848286390304565,
+    "transcript_formatting": 17.147700548171997,
+    "summary_generation": 13.997321128845215,
+    "chunk_generation": 1.0995965003967285
+  },
+  "transcript_preview": "February. Preparation Hello? Very good evening. Am I audible? Hey. Anirban Mondul is a student name. Right? Anirban? Okay. And you are right now is a student of Saint Teresa School from. Right? Yeah. Okay. I have to do the port eight mode because, auto rotation mode activate. I would try once notification Just try to bring it and, turn on the auto rotation mode. Okay. Data auto rotation option On On Because on Did you understand? Just like agent meet open code Suppose, here, the option you can s",
+  "test_results": [
+    {
+      "question": "What is the name of the student and the counsellor?",
+      "query_type": "hybrid",
+      "strategy": "Fallback",
+      "context_length": 11667,
+      "response_time": 2.3760082721710205,
+      "response": "Great question! The student's name is **Anirban Mondul**, and the counselor's name is **Sadiq Mohammed**. This is mentioned at $03:50$ when the counselor greets Anirban and confirms his school. \n\nDoes that help? Would you like to know more about their conversation or any specific part of the video? \ud83d\ude0a"
+    },
+    {
+      "question": "What is this conversation about?",
+      "query_type": "hybrid",
+      "strategy": "Fallback",
+      "context_length": 10985,
+      "response_time": 5.5143773555755615,
+      "response": "This conversation seems to revolve around the importance of education, particularly in the context of preparing for competitive exams and the role of technology in learning. Here are some key points discussed:\n\n- **Importance of Math and Physics**: The conversation starts by emphasizing that a solid understanding of math is crucial for fields like medicine and physics. If someone struggles with math, they might find physics challenging as well.\n\n- **Educational Systems**: There\u2019s a discussion about different educational boards, like CBSE and ICSE, and how their syllabi impact students' preparation for competitive exams. The speaker mentions that the ICSE syllabus can be overwhelming compared to the more focused CBSE syllabus.\n\n- **Role of Teachers and Guidance**: The conversation highlights the significance of having professional teachers and guidance to help students navigate their studies effectively.\n\n- **Success Stories**: There\u2019s mention of a student, Devdatta Maji, who achieved a high rank in a competitive exam, showcasing resilience and the support of family, particularly her mother.\n\n- **Technology in Education**: The conversation touches on how technology can aid in understanding complex concepts, making learning more accessible.\n\n- **Scholarships and Financial Support**: Towards the end, there\u2019s a discussion about scholarships based on performance and how financial support can help students access education.\n\nOverall, the conversation emphasizes the challenges and strategies in education, particularly for students aiming for competitive exams, and the importance of support systems in their academic journeys. \n\nDoes that help summarize things? Is there a specific part you\u2019d like to dive deeper into? \ud83d\ude0a"
+    },
+    {
+      "question": "What are the main topics discussed?",
+      "query_type": "broad",
+      "strategy": "Fallback",
+      "context_length": 11667,
+      "response_time": 6.931549072265625,
+      "response": "Awesome question! The video covers several key topics, mainly focusing on education, preparation for competitive exams, and the importance of professional learning. Here\u2019s a breakdown of the main points discussed:\n\n- **Introduction and Purpose of the Meeting** ($03:50 - 04:49$):\n  - The meeting is aimed at discussing student potential and development, particularly for class six students.\n\n- **Importance of Early Education** ($07:17 - 08:45$):\n  - Emphasizes that starting education early is crucial for future success, whether the student wants to become a doctor, engineer, etc.\n\n- **Counseling and Support** ($08:46 - 09:43$):\n  - The speaker introduces themselves as an education counselor and discusses the need for guidance in preparing for competitive exams.\n\n- **Quality of Education and Competition** ($09:46 - 10:40$):\n  - Discusses the differences in educational quality across various regions in India and the importance of competitive preparation.\n\n- **Scholarship and Admission Opportunities** ($12:02 - 12:53$):\n  - Talks about the scholarship opportunities available and the financial decisions that need to be made during the meeting.\n\n- **Focus on Math and Science** ($19:12 - 20:32$):\n  - Highlights the importance of math and science for students aiming for careers in fields like medicine and engineering.\n\n- **Professional Learning vs. Normal Education** ($16:15 - 17:21$):\n  - Stresses the need for professional learning to succeed in competitive exams, contrasting it with traditional education.\n\n- **Student Success Stories** ($30:33 - 32:48$):\n  - Shares an inspiring story of a student who achieved a high rank in competitive exams, emphasizing resilience and support from family.\n\n- **Q&A Session** ($35:07 - 37:30$):\n  - The speaker encourages questions from the audience, focusing on study-related inquiries.\n\nDoes this summary help clarify the main topics? Is there a specific part you\u2019d like to dive deeper into? \ud83d\ude0a"
+    },
+    {
+      "question": "Summarize the key points of this conversation",
+      "query_type": "broad",
+      "strategy": "Fallback",
+      "context_length": 10990,
+      "response_time": 8.277533292770386,
+      "response": "Sure! Here\u2019s a summary of the key points from the conversation:\n\n1. **Gravitational Force of the Moon**:\n   - The instructor discusses how the Moon's gravitational force is one-sixth that of Earth's. This means that if something weighs six kilograms on Earth, it would weigh one kilogram on the Moon.\n\n2. **Human Bones**:\n   - The conversation shifts to anatomy, specifically the smallest bones in the human body, which are the **stapes**, **incus**, and **malleus** found in the ear, contrasting with the **femur**, which is the longest bone.\n\n3. **Photosynthesis**:\n   - The process of photosynthesis is explained: green plants use chlorophyll, sunlight, water, and carbon dioxide to produce food (glucose) and release oxygen.\n\n4. **Planets in the Solar System**:\n   - The instructor asks about the hottest planet, which is identified as **Venus**, despite **Mercury** being closest to the Sun. The reason is that Venus has a thick atmosphere that traps heat.\n\n5. **Muscle Types**:\n   - The conversation touches on the three types of muscles in the human body: **skeletal**, **smooth**, and **cardiac** muscles.\n\n6. **Mathematical Patterns**:\n   - The instructor engages the student in identifying patterns in sequences of numbers, discussing logic and reasoning behind finding the next number in a series.\n\n7. **Education and Learning**:\n   - There are discussions about the importance of asking questions and understanding concepts in learning, as well as the role of technology (like AI teachers) in education.\n\n8. **Class Structure and Curriculum**:\n   - The conversation includes details about class schedules, subjects offered, and the qualifications of teachers, emphasizing a structured approach to learning.\n\nOverall, the conversation covers a mix of science, mathematics, and educational methodology, encouraging curiosity and engagement in learning. Does that help clarify things? Would you like to dive deeper into any specific topic mentioned? \ud83d\ude0a"
+    },
+    {
+      "question": "What concerns does the student have?",
+      "query_type": "hybrid",
+      "strategy": "Fallback",
+      "context_length": 10907,
+      "response_time": 4.217193126678467,
+      "response": "From the transcript, it seems the student has a few concerns related to their classes and learning process:\n\n1. **Understanding Class Structure**: The student is trying to clarify the timing and structure of the classes, especially regarding completion classes and their schedules. For instance, there\u2019s a mention of class timings from $06:30$ to $07:30$ and $07:30$ to $08:30$ at $95:55$.\n\n2. **Doubts About Topics**: The student expresses a need for help with specific topics, like the \"automatic drive\" mentioned at $104:47$. This indicates they might be struggling to grasp certain concepts and are looking for clarification.\n\n3. **Performance and Progress**: There\u2019s a mention of performance reports and how the student is doing compared to others at a national level, which suggests they might be concerned about their standing and understanding of the material ($99:05$).\n\n4. **Learning Resources**: The student seems to be interested in understanding how to access additional resources, such as recorded classes and YouTube learning, which was discussed around $104:20$.\n\nDoes that help clarify the student's concerns? Would you like to dive deeper into any specific part of this? \ud83d\ude0a"
+    }
+  ],
+  "summary": {
+    "total_processing_time": 41.09293532371521,
+    "avg_response_time": 5.463332223892212,
+    "total_questions": 5
+  }
+}

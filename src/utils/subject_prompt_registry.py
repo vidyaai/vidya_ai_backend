@@ -94,6 +94,17 @@ COMPUTER SCIENCE DIAGRAM RULES:
 - For sorting: show the initial array, NOT intermediate or final sorted states
 - For FSM/automata: show the state machine diagram, but do NOT mark the answer
   to "what string does this accept?" or "what is the final state?"
+- For BB84 Bloch sphere diagrams showing the encoding alphabet (question is
+  about Alice's transmitted states or the four encoding bases): show all
+  four states |0⟩, |1⟩, |+⟩, |−⟩ with clear labels. For BB84 questions
+  about a single-state preparation, angle illustration, or a specific
+  measurement, show only the components the question requires — do NOT
+  add the full four-state alphabet when it would crowd out the required
+  geometry (polar/azimuthal angles, axis labels). In either case, do NOT
+  include eavesdropping detection labels or note boxes stating conclusions
+  about cloning/entanglement.
+- For quantum error correction: do NOT label "Threshold" lines, "Logical Operator"
+  annotations, or "Syndrome Table" entries if students must identify them.
 - Diagrams show the PROBLEM SETUP — students must work out the SOLUTION
 """,
     "civil": """
@@ -158,6 +169,15 @@ PHYSICS DIAGRAM RULES:
   if the question asks students to calculate them
 - For projectile motion: show the setup, NOT the trajectory if asked to "determine the path"
 - For free body diagrams: show the setup, NOT the net force or acceleration result
+- For Kepler's second law (equal areas): draw the elliptical orbit with TWO sectors
+  clearly marked but shade only ONE sector. Label the other sector with "?" or "Area = ?".
+  Do NOT draw both sectors with visually identical size/shading — the student must prove
+  they are equal.
+- For stellar nucleosynthesis (identify products/stages/shells): draw the structural layout
+  (layers, arrows, reaction paths) but replace the KEY product/element labels with "?"
+  placeholders. The student must identify what is produced at each stage.
+- For plasma confinement: do NOT label drift directions, stability boundaries, or threshold
+  values if the student must determine them.
 """,
     "chemistry": """
 CHEMISTRY DIAGRAM RULES:
@@ -177,6 +197,10 @@ CHEMISTRY DIAGRAM RULES:
 - For titration curves: do NOT label the pH at the equivalence point if asked to "determine" it
 - For molecular orbital diagrams: do NOT fill in electron configurations if students must do it
 - For lab setups: show the apparatus, NOT the expected measurement readings
+- For crystallography / X-ray diffraction (systematic absences): render ALL candidate
+  reflection positions as same-size, same-style dots with (hkl) coordinate labels only.
+  Do NOT use dot size, colour, or presence/absence to distinguish allowed from forbidden
+  reflections — the student must determine which are systematically absent.
 - Diagrams show the PROBLEM SETUP — students must determine the OUTCOME
 """,
     "computer_eng": """
@@ -262,6 +286,11 @@ BIOCHEMISTRY DIAGRAM RULES:
 - Do NOT label the enzyme name if the question asks students to identify the enzyme at a step
 - For pathway diagrams: show the pathway with key intermediates, NOT the answer to "what is the product of this step?"
 - For kinetics plots: show the graph, NOT the calculated Km or Vmax if students must determine them
+- For CRISPR-Cas9 structural questions (identifying domains, features): generate a DETAILED
+  schematic showing at minimum the Cas9 protein outline, guide RNA, target DNA strand, and
+  PAM site. Use "?" placeholders for domains the student must identify (e.g., do NOT label
+  "RuvC", "HNH", or "Bridge Helix" if those are the answer). Do NOT generate a simple
+  arrow-and-box diagram — the question requires molecular-level detail.
 - Show ONLY the problem setup — students must complete or interpret the pathway
 """,
     "pharmacology": """
@@ -323,6 +352,141 @@ MICROBIOLOGY DIAGRAM RULES:
 - For infection cycles: show the cycle steps, NOT the answer to "what is the virulence factor responsible?"
 - For culture growth curves: show the curve, NOT the calculated generation time if students must calculate it
 - Show ONLY the problem setup — students must identify or analyse the microbiological findings
+""",
+    # ─── Advanced physics / quantum / condensed matter ──────────────────────
+    "quantum_computing": """
+QUANTUM COMPUTING / QEC DIAGRAM RULES:
+- Quantum circuits: horizontal qubit lines (wires), gates as labeled boxes or standard symbols
+- Use tikz_tool for quantum circuit diagrams (preferred); claude_code_tool as fallback
+- Label: qubit wire names (q0, q1, ancilla, data), gate names (H, CNOT, X, Z, T, S, Toffoli),
+  measurement gates as meter symbols, classical wires as double lines
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label the error correction code type if students must identify it
+- Do NOT label syndrome measurement results, logical operation names, or error type conclusions
+- Do NOT add a "Syndrome Table", "Logical Qubit Encoding Path", or annotations that name
+  what the circuit DOES — those are what students must derive
+- DO label structural components: qubit wire names, individual gate symbols (H, CNOT, X, Z),
+  ancilla qubit lines, data qubit lines, measurement output lines
+
+⚠️ DIAGRAM SUBTYPE DISAMBIGUATION:
+- Stabilizer/QEC circuit: horizontal qubit lines with gate boxes — NOT a block diagram
+- Logical qubit encoding circuit: show physical qubit wires + gate sequence; do NOT add
+  a "logical qubit" annotation block that names the encoding scheme
+""",
+    "condensed_matter": """
+CONDENSED MATTER / TOPOLOGICAL INSULATORS DIAGRAM RULES:
+- Band structure diagrams: energy E on y-axis, momentum k on x-axis
+- Use tikz_tool for band structures; claude_code_tool with matplotlib as fallback
+- Label: energy axis (E), momentum axis (k), Fermi level (E_F), "Valence Band",
+  "Conduction Band" — these identify axes/regions, not answers
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label the topological phase name ("Topological Insulator", "Trivial Insulator",
+  "Quantum Spin Hall") if students must identify it
+- Do NOT label "Z2 Topological Invariant", "Z2 = 1", or the invariant value
+- Do NOT label "Band Inversion" as a title or annotation — that names the phenomenon
+  students must observe and describe
+- Do NOT annotate regions as "Topological" or "Trivial"
+- DO label: axes (E, k, E_F), band labels ("Valence Band", "Conduction Band"),
+  surface state lines, Dirac point location
+
+⚠️ DIAGRAM SUBTYPE DISAMBIGUATION (CRITICAL — wrong type is the top failure for this subject):
+- NORMAL insulator band structure: parabolic valence band (below) + parabolic conduction band
+  (above) with an energy gap between them. No surface states crossing the gap.
+- TOPOLOGICAL insulator band structure: SAME parabolic bulk bands with gap, BUT with LINEAR
+  surface state bands (V-shaped or X-shaped Dirac cone) crossing through the gap at k=0.
+  BOTH the bulk bands AND the Dirac cone surface states MUST be drawn. The Dirac cone
+  is the KEY distinguishing feature.
+  WRONG defaults to avoid: (a) drawing ONLY the Dirac cone without bulk bands,
+  (b) drawing parabolic bands with a gap but no crossing surface states (that is trivial insulator).
+- DIRAC CONE (standalone): two cones touching at a single point, linear dispersion (V-shape) —
+  NOT parabolic. The touching point is the Dirac point at k=0.
+""",
+    "crystallography": """
+CRYSTALLOGRAPHY / X-RAY DIFFRACTION DIAGRAM RULES:
+- Crystal unit cells: show atoms at correct lattice positions with bonds
+- Use tikz_tool or plotly_tool for 3D unit cells; claude_code_tool for diffraction plots
+- Label: lattice points, unit cell boundaries, basis vectors (a, b, c), Miller indices on planes,
+  atom species labels (if given), angle labels (θ), plane spacing (d)
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label "Systematic absences" in a legend or annotation — that is the answer
+- Do NOT label diffraction condition outcomes (e.g. "constructive interference here")
+- Do NOT annotate structure factor calculation results or Bragg condition conclusions
+- DO label: lattice points, unit cell corners, body-center atom, face-center atoms,
+  axis labels (a, b, c), Miller plane notation (hkl), angle θ, spacing d
+
+MILLER PLANE GEOMETRY (CRITICAL for data_mismatch prevention):
+- (hkl) plane intercepts: x-axis at 1/h, y-axis at 1/k, z-axis at 1/l
+  (index 0 means the plane is PARALLEL to that axis — no intercept)
+- (100): parallel to the yz-plane, cuts x-axis only at x=1
+- (110): cuts x-axis at 1 and y-axis at 1, parallel to z-axis — diagonal in xy-plane
+- (111): cuts all three axes equally at 1,1,1 — diagonal through the cube corner to corner
+- Draw planes using these exact intercepts; do NOT draw aesthetically pleasing but incorrect orientations
+""",
+    "game_theory": """
+GAME THEORY / ECONOMICS DIAGRAM RULES:
+- Payoff matrices: rows = player 1 strategies, columns = player 2 strategies, cells = (P1, P2) payoffs
+- Game trees (extensive form): nodes as circles, branches as lines, payoffs as tuples at terminal nodes
+- Use claude_code_tool with matplotlib for all game theory diagrams
+- Label: player names (Player 1, Player 2), ALL strategy names, ALL payoff values
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label Nash equilibrium solutions, dominant strategies, or best responses
+  (those are what students must find)
+- Do NOT label "Pareto Frontier", "Pareto Front", "Pareto Optimal" on curves
+- Do NOT highlight or annotate optimal payoff nodes as "optimal" or "equilibrium"
+- DO label: player names, strategy branch names, ALL payoff values from the question
+
+⚠️ DATA ACCURACY (CRITICAL — top failure cause for this subject):
+- Use EXACT payoff values from the question text — NEVER substitute generic values (a,b,c or 1,2,3)
+- If the question specifies payoffs as math expressions (e.g., rendered from equations), use
+  the resolved numeric values, not placeholder tokens
+- For game trees: use EXACT branch labels (High/Low, Cooperate/Defect, etc.) from the question
+""",
+    "crispr": """
+CRISPR-CAS9 / MOLECULAR BIOLOGY DIAGRAM RULES:
+- Molecular mechanism diagrams: labeled protein complexes, DNA strands, guide RNA
+- Use imagen_tool for molecular illustrations; claude_code_tool for pathway/comparison diagrams
+- Label structural components: Cas9 protein, guide RNA (gRNA), PAM sequence, target DNA strand,
+  non-target DNA strand, cleavage site
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label specific key residues (e.g., R1335, H840, D10, H840) if the question asks
+  students to identify which residues are involved in a function
+- Do NOT label outcome annotations on mechanism arrows if the question asks what happens
+- Do NOT show mechanism conclusions (e.g., "HNH cleaves here" if students must determine it)
+- DO label: Cas9 body, gRNA, PAM sequence, DNA strands (target/non-target), cleavage position marker
+
+⚠️ DIAGRAM SUBTYPE DISAMBIGUATION (CRITICAL — wrong type is the top failure for this subject):
+- Comparison diagrams (Q asking to compare two pathways/mechanisms): Show as TWO DISTINCT
+  SIDE-BY-SIDE PANELS — left panel = Mechanism A (sequential steps top-to-bottom),
+  right panel = Mechanism B (sequential steps top-to-bottom).
+  NEVER use a concept map, tangled flowchart, or merged single diagram for comparisons.
+  Each panel has its own clearly labeled header and sequential numbered steps.
+""",
+    "stellar_nucleosynthesis": """
+STELLAR NUCLEOSYNTHESIS DIAGRAM RULES:
+- Stellar interior diagrams: concentric shells showing different burning zones
+- Use tikz_tool or claude_code_tool with matplotlib for shell diagrams; matplotlib for HR diagrams
+- Label: shell layer names by position (innermost = Fe core outward), burning reactions per shell
+  (if NOT the answer), temperature annotations, arrow indicating increasing depth
+
+⚠️ ANSWER HIDING (CRITICAL — STUDENT ASSIGNMENT):
+- Do NOT label element products in each shell (C, O, Ne, Si, Fe etc.) if the question asks
+  students to identify what nuclear reaction occurs in which shell
+- DO label: shell boundaries, layer numbers/positions, temperature ranges if given,
+  arrows showing inward/outward direction
+
+⚠️ ONION SHELL STRUCTURE (CRITICAL for wrong_type prevention):
+- The diagram MUST be drawn as concentric circles (onion shell cross-section), not a bar chart,
+  linear diagram, or abstract schematic
+- Layer order from OUTSIDE to CENTER: H-burning → He-burning → C-burning → O-burning →
+  Ne-burning → Mg-burning → Si-burning → Fe core
+- All layers must be visible as concentric rings; the Fe core is the innermost circle
+- Wrong defaults to avoid: drawing only the core, omitting the concentric ring structure,
+  or drawing a linear/sequential flowchart instead of concentric shells
 """,
 }
 

@@ -7,6 +7,7 @@ Used when engine=ai is selected. This reviewer uses Google's Gemini 2.5 Pro
 Same interface as DiagramReviewer but powered by Gemini.
 """
 
+import asyncio
 import base64
 import os
 import json
@@ -65,6 +66,7 @@ class GeminiDiagramReviewer:
         user_prompt_context: str = "",
         domain: str = "",
         diagram_type: str = "",
+        forbidden_labels: list | None = None,
     ) -> Dict[str, Any]:
         """
         Review a generated diagram image using Gemini 2.5 Pro vision.
@@ -88,18 +90,20 @@ class GeminiDiagramReviewer:
                   a full regeneration due to structural/layout problems)
         """
         if not self._ensure_initialized():
-            logger.warning("Gemini reviewer not initialized — passing through")
+            logger.error("Gemini reviewer not initialized — failing closed")
             return {
-                "passed": True,
-                "reason": "Gemini reviewer not available — skipped",
+                "passed": False,
+                "failure_type": "review_error",
+                "reason": "Gemini reviewer not available",
                 "corrected_description": None,
                 "issues": [],
                 "fixable": False,
             }
 
         last_error = None  # Track last error for final fallback
+        MAX_ATTEMPTS = 4
 
-        for attempt in range(2):
+        for attempt in range(MAX_ATTEMPTS):
             try:
                 from vertexai.generative_models import Part, Image
                 import google.api_core.exceptions
@@ -111,6 +115,7 @@ class GeminiDiagramReviewer:
                     user_prompt_context,
                     domain=domain,
                     diagram_type=diagram_type,
+                    forbidden_labels=forbidden_labels,
                 )
 
                 # Create image part from bytes
@@ -121,13 +126,13 @@ class GeminiDiagramReviewer:
                     [review_prompt, image_part],
                     generation_config={
                         "temperature": 0.1,
-                        "max_output_tokens": 800,
+                        "max_output_tokens": 2048,
                     },
                     # request_options={"timeout": 60},  # 60 second timeout
                 )
 
                 result_text = response.text.strip()
-                return self._parse_review_result(result_text)
+                return self._parse_review_result(result_text, forbidden_labels=forbidden_labels)
 
             except google.api_core.exceptions.Cancelled as e:
                 # Handle cancelled/timeout errors specifically
@@ -135,10 +140,12 @@ class GeminiDiagramReviewer:
                 logger.error(f"Gemini diagram review cancelled (timeout): {e}")
                 logger.error(f"Traceback: {traceback.format_exc()}")
 
-                # Don't retry on timeout - just fail fast
+                # Fail closed on timeout — do NOT pass through a potentially
+                # broken diagram. The regen loop will keep the prior image.
                 return {
-                    "passed": True,
-                    "reason": f"Review skipped due to timeout after {attempt + 1} attempt(s)",
+                    "passed": False,
+                    "failure_type": "review_error",
+                    "reason": f"Review timed out after {attempt + 1} attempt(s)",
                     "corrected_description": None,
                     "issues": [],
                     "fixable": False,
@@ -147,6 +154,24 @@ class GeminiDiagramReviewer:
             except Exception as e:
                 last_error = e
                 err_str = str(e)
+
+                # Quota / rate-limit (429 RESOURCE_EXHAUSTED) — back off and
+                # retry. Gemini's per-minute quota recovers quickly, so a few
+                # seconds of sleep is usually enough. Use exponential backoff
+                # capped at 30s so a burst of failures does not stall the run.
+                is_rate_limit = (
+                    "429" in err_str
+                    or "RESOURCE_EXHAUSTED" in err_str
+                    or "Resource exhausted" in err_str
+                )
+                if is_rate_limit and attempt < MAX_ATTEMPTS - 1:
+                    delay = min(2 ** attempt * 3, 30)
+                    logger.warning(
+                        f"Gemini reviewer rate-limited (429) — backing off "
+                        f"{delay}s before retry {attempt + 2}/{MAX_ATTEMPTS}"
+                    )
+                    await asyncio.sleep(delay)
+                    continue
 
                 # gRPC broken pipe / UNAVAILABLE — drop the channel and retry once
                 is_connection_error = (
@@ -171,11 +196,13 @@ class GeminiDiagramReviewer:
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 break
 
-        # Fallback return with proper error reference
+        # Fail closed on unrecoverable reviewer error — a silent pass would
+        # accept whatever diagram we currently have, masking real failures.
         error_msg = str(last_error) if last_error else "Unknown error"
         return {
-            "passed": True,
-            "reason": f"Review skipped due to error: {error_msg}",
+            "passed": False,
+            "failure_type": "review_error",
+            "reason": f"Review failed: {error_msg}",
             "corrected_description": None,
             "issues": [],
             "fixable": False,
@@ -188,6 +215,7 @@ class GeminiDiagramReviewer:
         user_prompt_context: str,
         domain: str = "",
         diagram_type: str = "",
+        forbidden_labels: list | None = None,
     ) -> str:
         # Subject style hint — not a new pass/fail rule, just visual guidance
         style_hint_section = ""
@@ -218,6 +246,16 @@ ASSIGNMENT CONTEXT (the user's original prompt — for STYLE ONLY):
 The QUESTION text is the ONLY authoritative source for what components must be present.
 """
 
+        forbidden_section = ""
+        if forbidden_labels:
+            forbidden_list = "\n".join(f"  - {t}" for t in forbidden_labels)
+            forbidden_section = f"""
+QUESTION-SPECIFIC FORBIDDEN LABELS (auto-derived from the correct answer):
+{forbidden_list}
+If ANY of these terms appear as text labels, legend entries, annotations, or note boxes
+in the diagram, this is an AUTOMATIC FAIL (answer_leak) regardless of the exception list.
+"""
+
         return f"""You are a strict diagram quality reviewer for an educational platform.
 
 Review the attached diagram image and assess its quality.
@@ -225,18 +263,105 @@ Review the attached diagram image and assess its quality.
 QUESTION: {question_text}
 
 DIAGRAM DESCRIPTION (used to generate it): {diagram_description}
-{style_hint_section}{context_section}
+{style_hint_section}{context_section}{forbidden_section}
 
 CHECK ONLY THE FOLLOWING — DO NOT check topology, circuit correctness, or domain knowledge:
 
-1. **ANSWER LEAK CHECK**: Does the diagram reveal the answer to the question? Look for:
-   - Output values shown ("Output = 0", "Y = 1")
-   - Boolean expressions displayed on the diagram
-   - Input values shown ("A=1", "B=0") instead of just variable names
-   - Truth tables embedded in the diagram
-   - Signal values (0/1) annotated on wires
-   - Formulas or equations that solve the problem
-   If ANY answer is visible, this is a FAIL.
+0. **DIAGRAM TYPE CORRECTNESS CHECK** (highest priority):
+   Read the QUESTION and DIAGRAM DESCRIPTION to identify the REQUIRED diagram type
+   (e.g., "right-angled triangle", "BCC unit cell", "Hohmann transfer orbit",
+   "free body diagram", "bar chart", "sequence diagram", "Bloch sphere").
+
+   Look at the image: is the diagram actually showing that type?
+
+   FAIL if the diagram shows a FUNDAMENTALLY DIFFERENT type of structure than requested:
+   - Wrong geometric shape (equilateral instead of right-angled triangle)
+   - Wrong crystal structure type (FCC lattice instead of BCC lattice)
+   - Wrong orbit type (circular orbit instead of elliptical transfer orbit)
+   - Wrong chart type (pie chart instead of bar chart)
+   - Completely wrong domain (circuit diagram shown for a biology question)
+   - Normal insulator band structure shown instead of topological insulator band structure
+
+   This is a fixable=NO failure — the diagram must be regenerated from scratch.
+   For wrong_type failures, CORRECTED_DESCRIPTION is MANDATORY and must contain all four:
+   1. "WRONG: [exact name of what was shown]"
+   2. "CORRECT: [exact name of what must be shown]"
+   3. "VISUAL FEATURES: [2-3 specific visual differences the eye can see]"
+   4. "DO NOT: [the specific wrong default to avoid]"
+   Example: "WRONG: normal semiconductor band structure with parabolic gap. CORRECT: topological
+   insulator band structure. VISUAL FEATURES: valence band crosses ABOVE conduction band (band
+   inversion); linear Dirac cone at k=0 crossing through the gap; two band sets (bulk + surface).
+   DO NOT draw simple parabolic bands with a gap at zone center."
+   Set FAILURE_TYPE: wrong_type
+
+   DO NOT fail for incorrect wiring, component placement, or design rule violations
+   within the correct diagram type — those are topology checks, not type checks.
+
+1. **ANSWER LEAK CHECK** (applies to ALL subjects — not just circuits):
+   Step 1 — Identify the TARGET: Read the QUESTION and determine what the student
+   is being asked to FIND, IDENTIFY, EXPLAIN, CALCULATE, or DESCRIBE. This is the "target".
+   Step 2 — Check the diagram: Does the diagram directly show or trivially reveal the target?
+
+   PRINCIPLE: The diagram must show SETUP and CONTEXT. It must NOT show the CONCLUSION.
+
+   IMPORTANT EXCEPTIONS — these are NEVER answer leaks:
+   - Quantum gate and qubit names: "Data qubit", "Ancilla qubit", "H", "CNOT", "X", "Z", "T", "S",
+     "Toffoli", "Hadamard", "measurement gate", "control qubit", "target qubit", "ancilla bit".
+   - Band structure axis labels: "Valence Band", "Conduction Band", "E" (energy axis), "k" (momentum
+     axis), "E_F" (Fermi energy), "E_g" (band gap label) — these identify axes/regions used to READ
+     the answer, not the answer itself.
+   - Crystal/lattice component labels: "lattice point", "unit cell", "corner atom", "body-center atom",
+     "face-center atom", "basis vector a", "basis vector b", "basis vector c".
+   - Orbital mechanics structural labels: "perihelion", "aphelion", "semi-major axis a",
+     "transfer ellipse", "orbit path", "space probe", "planet".
+   - Game theory structural labels: player node names (Player 1, Player 2), strategy branch labels
+     (High, Low, Cooperate, Defect) — but NOT solution labels (Nash Equilibrium, Pareto Frontier).
+   - Node names (Vout, Vin, VDD), axis labels (Energy, Momentum, Temperature, Frequency),
+     species names (He-3, He-4, proton, neutron), geometric labels (angle A, side c, hypotenuse).
+   - Physical quantities given as SETUP context in the question (not as the answer).
+   - Structural labels that identify WHAT a component IS, not the ANSWER to the question.
+
+   THESE ARE answer leaks (conclude the student's task):
+   - "Z2 Topological Invariant", "Band Inversion", or region labeled "Topological"/"Trivial"
+   - "Systematic absences" in a crystallography legend or annotation
+   - "Pareto Frontier", "Pareto Front", "Nash Equilibrium", "Dominant Strategy" labels
+   - Shell element products (C, O, Ne, Si, Fe) in stellar nucleosynthesis if students must identify them
+   - "Syndrome Table", "Logical Qubit Encoding Path", or any annotation naming what a QEC circuit DOES
+   - "Feasible Region", "Infeasible Region", "Stable", "Unstable", "Optimal" region labels
+
+   ONLY fail for labels that name the CONCLUSION the student must derive, not component names.
+
+   VISUAL-ONLY LEAK RULES (no text needed — the rendering itself reveals the answer):
+   - If the question asks to prove/demonstrate Kepler's second law (equal areas in equal times)
+     and the diagram shows two sectors with visually equal size/shading → answer_leak.
+     Correct: one sector shaded, the other marked with "?" or "Area = ?".
+   - If the question asks to identify systematic absences or forbidden reflections and the
+     diagram uses different dot sizes, colours, or presence/absence to distinguish allowed
+     from forbidden peaks → answer_leak.
+     Correct: all candidate reflection positions as same-size, same-style dots with (hkl) labels.
+   - If the question asks to identify stages, shells, or products (e.g., nucleosynthesis) and
+     ALL of them are labeled with their names → answer_leak.
+     Correct: at least the key answer labels should be replaced with "?" placeholders.
+
+   FAIL if the diagram shows the target answer through ANY of these patterns:
+   - LABELS: Any text label, annotation, or region name that names or interprets the
+     answer the student is supposed to derive (e.g., "Feasible", "Infeasible", "Stable",
+     "Unstable", "Optimal", "Threshold Region", "Detection occurs here", "Fusion viable").
+   - PRODUCTS/OUTCOMES: In flowcharts or reaction diagrams, the specific outputs/products
+     on each step fully labeled when the question asks the student to identify those steps
+     or products.
+   - FORMULAS: A formula or equation rendered as text on the diagram that encodes the
+     relationship the student must explain or derive.
+   - CONCLUSIONS: A title, caption, or annotation that states the conclusion of a
+     comparison or analysis (e.g., "A uses less energy than B", "X is more accurate").
+   - COMPUTED VALUES: Specific numerical answers, thresholds, or equilibrium values
+     annotated when the student must calculate or determine those values.
+
+   If the diagram reveals the target answer → FAIL with fixable=NO. In CORRECTED_DESCRIPTION,
+   you MUST explicitly list the exact label text(s) to remove, e.g.:
+   "Remove the label 'Feasible Region' and the annotation '5 m/s'. Keep all input values
+   and structural labels. [rest of description]"
+   Always name the offending labels verbatim — do not paraphrase them.
 
 2. **LABEL PRESENCE CHECK**: Structural components explicitly named in the QUESTION text
    must appear as visible labels in the diagram. This applies universally to all subjects.
@@ -257,6 +382,14 @@ CHECK ONLY THE FOLLOWING — DO NOT check topology, circuit correctness, or doma
    QUESTION text. Then verify each one appears CORRECTLY in the diagram image. Any
    mismatch between what the question states and what the diagram shows is a FAIL
    with FIXABLE=NO (the diagram must be regenerated from scratch).
+
+   When data_mismatch is detected, CORRECTED_DESCRIPTION is MANDATORY. Use this format
+   for each mismatch found:
+     "MISMATCH [n]: diagram shows [X] but question requires [Y].
+      VISUAL FIX: [exact visual change needed, e.g. 'plane must be parallel to yz-axis',
+      'near-perihelion sector must be ~3x smaller area than near-aphelion sector',
+      'payoff for (Low,High) must be exactly (2,4) not (3,3)']"
+   List every mismatch as a separate numbered entry. Be quantitatively specific.
 
    What to compare (domain-generic examples):
    ── Electrical / Computer Engineering ──
@@ -328,14 +461,42 @@ TOLERANCE GUIDELINES:
   * Minor font size inconsistencies — PASS
   * Slightly cramped but still readable labels — PASS
   * Any circuit topology you personally disagree with — PASS (not your job to verify)
+  * Redundant or duplicate labels (the same label appearing twice on one element) — PASS, do not fail for this
+  * Minor label redundancy that doesn't cause genuine confusion (e.g., "Incoming Space Probe" on a trajectory already showing a probe path) — PASS
+  * A label that names what an element IS (e.g., "Space Probe", "Orbit Path", "Transfer Ellipse") even if it seems obvious — PASS, these are structural identifiers not answer leaks
+
+LENIENCY RULES — automatically PASS these even if technically imperfect:
+1. MINOR MISSING LABELS: If at most ONE secondary/supporting label is absent (e.g., a
+   supplementary axis title, a supporting annotation, or a decorative dimension label)
+   AND all structurally essential components named in the QUESTION are present and labeled
+   → PASS. Only fail missing_labels when a component CENTRAL to the question is entirely
+   absent. A label is "secondary" if removing it does not prevent a student from using the
+   diagram to answer the question.
+2. STANDARD FORMULA LEAKS: A well-known formula or physical law visible on the diagram
+   (e.g., F=ma, V=IR, E=mc², PV=nRT) that every student at this level already knows
+   → PASS. Only fail answer_leak when the formula or expression encodes the SPECIFIC
+   COMPUTED RESULT the question asks for (e.g., showing the exact numerical answer).
+3. CONTEXTUAL RESTATEMENT: A label or annotation that merely restates information
+   ALREADY GIVEN in the question text (not something the student must derive) → PASS.
+   Example: a diagram labeling "Given: L=4m" when the question already states L=4m is
+   not an answer leak — it is a contextual reminder.
 
 RESPOND IN THIS EXACT FORMAT:
 
 VERDICT: PASS or FAIL
+FAILURE_TYPE: none|wrong_type|answer_leak|missing_labels|data_mismatch|readability
 FIXABLE: YES or NO
 REASON: <one sentence explanation>
 ISSUES: <comma-separated list of SPECIFIC label/readability issues found; write "none" if PASS>
 CORRECTED_DESCRIPTION: <if FAIL due to missing/wrong labels, write a complete self-contained description that explicitly names all components from the question; write "none" if PASS>
+
+FAILURE_TYPE values:
+- none: diagram passed
+- wrong_type: diagram is the wrong fundamental type (Check 0)
+- answer_leak: diagram reveals the answer (Check 1)
+- missing_labels: required structural labels absent (Check 2)
+- readability: text illegible (Check 3)
+- data_mismatch: specific values/sequences don't match question (Check 4)
 
 FIXABLE GUIDELINES:
 - YES if the diagram structure is visible but has PURE TEXT errors (wrong/missing labels, illegible text)
@@ -346,35 +507,164 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
 "Show only the diagram structure with generic input labels and output label. Do NOT show any computed values, boolean expressions, or truth tables."
 """
 
-    def _parse_review_result(self, result_text: str) -> Dict[str, Any]:
+    def _parse_review_result(self, result_text: str, forbidden_labels: list | None = None) -> Dict[str, Any]:
         """Parse the structured review response."""
         lines = result_text.strip().split("\n")
 
-        verdict = "PASS"
+        # Default FAIL — if VERDICT is missing or malformed, we want to fail
+        # closed rather than silently accept the diagram.
+        verdict = "FAIL"
+        failure_type = "none"
         reason = "Review completed"
         issues = []
         corrected_desc = None
         fixable = False
 
+        # Known field prefixes — used to detect where one field ends and the next begins
+        _FIELD_PREFIXES = (
+            "VERDICT:", "FAILURE_TYPE:", "FIXABLE:", "REASON:", "ISSUES:", "CORRECTED_DESCRIPTION:"
+        )
+
+        current_field = None
+        field_lines: Dict[str, list] = {}
+
         for line in lines:
-            line = line.strip()
-            if line.upper().startswith("VERDICT:"):
-                verdict = line.split(":", 1)[1].strip().upper()
-            elif line.upper().startswith("FIXABLE:"):
-                fixable_str = line.split(":", 1)[1].strip().upper()
-                fixable = "YES" in fixable_str
-            elif line.upper().startswith("REASON:"):
-                reason = line.split(":", 1)[1].strip()
-            elif line.upper().startswith("ISSUES:"):
-                issues_str = line.split(":", 1)[1].strip()
-                if issues_str.lower() != "none":
-                    issues = [i.strip() for i in issues_str.split(",") if i.strip()]
-            elif line.upper().startswith("CORRECTED_DESCRIPTION:"):
-                desc = line.split(":", 1)[1].strip()
-                if desc.lower() != "none":
-                    corrected_desc = desc
+            stripped = line.strip()
+            upper = stripped.upper()
+            matched = next((p for p in _FIELD_PREFIXES if upper.startswith(p)), None)
+            if matched:
+                current_field = matched.rstrip(":")
+                value_part = stripped[len(matched):].strip()
+                field_lines.setdefault(current_field, [])
+                if value_part:
+                    field_lines[current_field].append(value_part)
+            elif current_field and stripped:
+                # Continuation line for the current field
+                field_lines[current_field].append(stripped)
+
+        def _get(key: str) -> str:
+            return " ".join(field_lines.get(key, [])).strip()
+
+        if "VERDICT" in field_lines:
+            verdict = _get("VERDICT").upper()
+        if "FAILURE_TYPE" in field_lines:
+            failure_type = _get("FAILURE_TYPE").lower()
+        if "FIXABLE" in field_lines:
+            fixable = "YES" in _get("FIXABLE").upper()
+        if "REASON" in field_lines:
+            reason = _get("REASON")
+        if "ISSUES" in field_lines:
+            issues_str = _get("ISSUES")
+            if issues_str.lower() != "none":
+                issues = [i.strip() for i in issues_str.split(",") if i.strip()]
+        if "CORRECTED_DESCRIPTION" in field_lines:
+            desc = _get("CORRECTED_DESCRIPTION")
+            if desc.lower() != "none":
+                corrected_desc = desc
 
         passed = "PASS" in verdict
+        if passed:
+            failure_type = "none"
+
+        # Output-truncation heuristic: a long REASON with an empty ISSUES list
+        # when one is structurally expected is almost always a max_output_tokens
+        # cutoff. Surface it so we can tell from logs.
+        if not passed and not issues and len(reason) > 400:
+            logger.warning(
+                "Reviewer response looks truncated "
+                "(long REASON, empty ISSUES) — consider raising max_output_tokens"
+            )
+
+        # ── Leniency overrides ──────────────────────────────────────────────
+        # These mirror the LENIENCY RULES in the prompt and catch cases where
+        # Gemini still returns FAIL despite the guidance.
+        if not passed:
+            if failure_type == "missing_labels" and forbidden_labels and issues:
+                # If every "missing" issue names a forbidden term, the absence
+                # is intentional (the generator was told not to render it).
+                # Drop those issues before deciding whether the fail stands.
+                _fl_lower = [fl.lower() for fl in forbidden_labels]
+                _remaining = []
+                for i in issues:
+                    i_low = i.lower()
+                    if not any(fl in i_low for fl in _fl_lower):
+                        _remaining.append(i)
+                if not _remaining:
+                    logger.info(
+                        f"LENIENT_PASS: missing_labels only names forbidden "
+                        f"terms ({issues}) — intentional omission, treating as pass"
+                    )
+                    passed = True
+                    failure_type = "none"
+                elif len(_remaining) < len(issues):
+                    logger.info(
+                        f"missing_labels: dropped {len(issues) - len(_remaining)} "
+                        f"forbidden-term issue(s); {len(_remaining)} real issue(s) remain"
+                    )
+                    issues = _remaining
+
+            if not passed and failure_type == "missing_labels" and len(issues) <= 1 and fixable:
+                # At most one secondary label missing and it's fixable → accept
+                logger.info(
+                    f"LENIENT_PASS: missing_labels with ≤1 issue ({issues}) — "
+                    "treating as pass"
+                )
+                passed = True
+                failure_type = "none"
+
+            elif failure_type == "answer_leak" and fixable:
+                # Fixable answer_leak means Gemini itself judged it correctable
+                # in-place (not a structural regen). Check if reason matches the
+                # patterns covered by LENIENCY RULES 2/3.
+                _lenient_leak_keywords = (
+                    "standard formula",
+                    "well-known",
+                    "already given",
+                    "already stated",
+                    "restates",
+                    "general formula",
+                    "common formula",
+                    "universal law",
+                    "physical law",
+                    "given in the question",
+                    "given value",
+                )
+                reason_lower = reason.lower()
+                # Guard: do NOT apply leniency if the reason mentions any
+                # question-specific forbidden label — those are real leaks.
+                _mentions_forbidden = False
+                if forbidden_labels:
+                    _mentions_forbidden = any(
+                        fl.lower() in reason_lower for fl in forbidden_labels
+                    )
+                if not _mentions_forbidden and any(kw in reason_lower for kw in _lenient_leak_keywords):
+                    logger.info(
+                        f"LENIENT_PASS: answer_leak reason matches standard-formula/"
+                        f"contextual-restatement pattern — treating as pass. "
+                        f"Reason: {reason}"
+                    )
+                    passed = True
+                    failure_type = "none"
+                elif _mentions_forbidden:
+                    logger.info(
+                        f"LENIENT_PASS blocked: reason mentions a forbidden label — "
+                        f"keeping FAIL. Reason: {reason}"
+                    )
+
+        # For wrong_type and data_mismatch the prompt REQUIRES a
+        # CORRECTED_DESCRIPTION. If the reviewer omitted it, flag the
+        # regen loop so it builds a fallback with the issues context
+        # instead of silently using the generic template.
+        needs_reprompt = (
+            not passed
+            and failure_type in ("wrong_type", "data_mismatch")
+            and not corrected_desc
+        )
+        if needs_reprompt:
+            logger.warning(
+                f"Reviewer returned failure_type={failure_type} without "
+                "mandatory CORRECTED_DESCRIPTION — flagging needs_reprompt"
+            )
 
         logger.info(
             f"Gemini diagram review: {'PASSED' if passed else 'FAILED'} — {reason}"
@@ -386,8 +676,10 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
 
         return {
             "passed": passed,
+            "failure_type": failure_type,
             "reason": reason,
             "corrected_description": corrected_desc,
             "issues": issues,
             "fixable": fixable,
+            "needs_reprompt": needs_reprompt,
         }

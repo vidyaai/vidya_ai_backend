@@ -1,0 +1,219 @@
+{
+  "topic": "Neuromorphic Computing",
+  "subject": "cs",
+  "prompt": "Generate 5 diagram-based questions on neuromorphic computing and spiking neural networks. Cover: leaky integrate-and-fire (LIF) neuron model with membrane potential trace, spike-timing dependent plasticity (STDP) learning rule graph, crossbar array architecture for synaptic weights, the temporal coding scheme in a spiking network, and comparison of energy consumption between von Neumann and neuromorphic architectures. Each question must require the student to analyze or interpret a diagram.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "diagram-analysis",
+      "question": "Examine the diagram below of a leaky integrate-and-fire (LIF) neuron model, which shows the membrane potential trace over time. Analyze how the membrane potential changes in response to incoming spikes and explain the conditions under which the neuron fires. Specify any key parameters illustrated in the diagram, such as threshold potential and leakage rate.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 1,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_4_20260415_163136/diagrams/423dafeb-2eda-437c-9375-497802d4ddab.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=KkNYtgxOl1pcI%2F%2FLl%2B9MOmldO%2FM%3D&Expires=1807806721",
+        "s3_key": "assignments/batch_regen_4_20260415_163136/diagrams/423dafeb-2eda-437c-9375-497802d4ddab.png",
+        "file_id": "423dafeb-2eda-437c-9375-497802d4ddab",
+        "filename": "diagram_q0.png",
+        "domain": "computational_neuroscience",
+        "diagram_type": "membrane_potential_trace",
+        "description": "Diagram of a leaky integrate-and-fire (LIF) neuron model showing the membrane potential trace over time. The x-axis represents time, and the y-axis represents membrane potential. The trace includes incoming spikes, threshold potential, and leakage rate. Key parameters such as the threshold potential are labeled on the graph. The diagram illustrates how the membrane potential changes in response to spikes and the conditions under which the neuron fires."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "In the diagram below, the membrane potential increases in response to incoming spikes. It decays over time due to leakage until a new spike arrives. The neuron fires when the potential reaches the threshold, as shown in the diagram, after which it resets. The key parameters illustrated in the diagram include the threshold potential (e.g., <eq q1_eq1>) and the leakage rate (time constant <eq q1_eq2>).",
+      "rubric": "1. Correct identification of response to spikes as shown in the diagram (2 points)\n2. Explanation of firing condition as depicted in the diagram (4 points)\n3. Identification of key parameters illustrated in the diagram (4 points)",
+      "equations": [
+        {
+          "id": "q1_eq1",
+          "latex": "V_{\\text{thr}} = -55\\,\\text{mV}",
+          "position": {
+            "char_index": 232,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq2",
+          "latex": "\\tau = 20\\,\\text{ms}",
+          "position": {
+            "char_index": 271,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Examine the diagram below of a leaky integrate-and-fire (LIF) neuron model, which shows the membrane potential trace over time. Analyze how the membrane potential changes in response to incoming spikes and explain the conditions under which the neuron fires. Specify any key parameters illustrated in the diagram, such as threshold potential and leakage rate.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 2,
+      "type": "diagram-analysis",
+      "question": "Examine the diagram below illustrating a spike-timing dependent plasticity (STDP) learning rule. Describe how the timing of pre- and postsynaptic spikes affects the synaptic weight change. Discuss the implications of synaptic modifications based on different time intervals between spikes.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 2,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_4_20260415_163136/diagrams/67e83315-2183-45eb-b49f-2c946349b67f.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=mi%2FSE8QctcCFYqF2Chj8khLgvdE%3D&Expires=1807806763",
+        "s3_key": "assignments/batch_regen_4_20260415_163136/diagrams/67e83315-2183-45eb-b49f-2c946349b67f.png",
+        "file_id": "67e83315-2183-45eb-b49f-2c946349b67f",
+        "filename": "diagram_q1.png",
+        "domain": "computational_neuroscience",
+        "diagram_type": "stdp_curve",
+        "description": "A diagram illustrating the spike-timing dependent plasticity (STDP) curve. The x-axis represents the time difference between pre- and postsynaptic spikes (\u0394t), with negative values indicating pre-before-post and positive values indicating post-before-pre. The y-axis represents the synaptic weight change (\u0394w). The curve should show a positive change in synaptic weight for negative \u0394t (LTP) and a negative change for positive \u0394t (LTD), highlighting the causal relationship between spike timing and synaptic modification."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "In the diagram below illustrating the STDP learning rule, synaptic weights are potentiated if the presynaptic spike occurs shortly before the postsynaptic spike (<eq q2_eq1>), and depressed if it occurs after (<eq q2_eq2>). The magnitude of change is exponential with the time difference, as depicted in the diagram. Close spikes, as shown in the diagram, lead to larger modifications. The implications of these synaptic modifications include strengthening temporal spike sequence learning, which can be inferred from the patterns illustrated in the diagram below.",
+      "rubric": "1. Explanation of weight change based on spike timing as shown in the diagram (5 points)\n2. Description of temporal dependence illustrated in the diagram (3 points)\n3. Discussion of synaptic modification consequences, referencing the diagram below (2 points)",
+      "equations": [
+        {
+          "id": "q2_eq1",
+          "latex": "\\Delta t > 0",
+          "position": {
+            "char_index": 118,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q2_eq2",
+          "latex": "\\Delta t < 0",
+          "position": {
+            "char_index": 169,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Examine the diagram below illustrating a spike-timing dependent plasticity (STDP) learning rule. Describe how the timing of pre- and postsynaptic spikes affects the synaptic weight change. Discuss the implications of synaptic modifications based on different time intervals between spikes.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 3,
+      "type": "diagram-analysis",
+      "question": "Examine the diagram below of a crossbar array architecture used for storing synaptic weights in neuromorphic computing. Describe how this architecture facilitates efficient weight storage and retrieval. Discuss any challenges related to scaling and variability as depicted in the diagram.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 3,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_4_20260415_163136/diagrams/9dc43643-3350-4b1a-8b92-555023770140.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=0OCl5aeFdriHSHF39atGIjxR%2BSM%3D&Expires=1807806809",
+        "s3_key": "assignments/batch_regen_4_20260415_163136/diagrams/9dc43643-3350-4b1a-8b92-555023770140.png",
+        "file_id": "9dc43643-3350-4b1a-8b92-555023770140",
+        "filename": "diagram_q2.png",
+        "domain": "computer_science",
+        "diagram_type": "crossbar_array_architecture",
+        "description": "A crossbar array architecture diagram for neuromorphic computing. The diagram should show a grid-like structure with horizontal and vertical lines representing the word lines and bit lines, respectively. At each intersection, there should be a synaptic weight represented by a memristor or similar device. Label the word lines, bit lines, and synaptic weights. Include arrows or labels to indicate the flow of data for weight storage and retrieval. Highlight any variability or scaling challenges, such as non-uniformity in the memristors or line resistance."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The diagram below of the crossbar array architecture demonstrates how it enables dense weight storage by utilizing the intersections of horizontal and vertical lines to represent synaptic weights. This setup, as shown in the diagram, allows for efficient parallel computations, as multiple weights can be accessed simultaneously. However, the diagram also highlights challenges related to resistance variability at these intersections, which can affect the accuracy of weight retrieval. Additionally, the presence of sneak paths, as illustrated in the circuit shown, poses a challenge to scalability and reliability by allowing unintended current paths that can interfere with the intended operations.",
+      "rubric": "1. Explanation of storage and retrieval mechanism (5 points)\n2. Identification of scalability challenges (3 points)\n3. Addressing variability issues (2 points)",
+      "equations": [],
+      "text": "Examine the diagram below of a crossbar array architecture used for storing synaptic weights in neuromorphic computing. Describe how this architecture facilitates efficient weight storage and retrieval. Discuss any challenges related to scaling and variability as depicted in the diagram.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 4,
+      "type": "diagram-analysis",
+      "question": "Evaluate the temporal coding scheme in the spiking neural network diagram below. Describe how information is encoded temporally and its impact on network processing capabilities. What are the advantages of temporal coding compared to rate coding based on the diagram?",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 4,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_4_20260415_163136/diagrams/d024e387-cc4d-4385-ba64-3b2a30de28aa.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=m6uxGcQwKtGEUNhYDUCjuaWcMfY%3D&Expires=1807806977",
+        "s3_key": "assignments/batch_regen_4_20260415_163136/diagrams/d024e387-cc4d-4385-ba64-3b2a30de28aa.png",
+        "file_id": "d024e387-cc4d-4385-ba64-3b2a30de28aa",
+        "filename": "diagram_q3.png",
+        "domain": "computational_neuroscience",
+        "diagram_type": "spiking_neural_network",
+        "description": "A spiking neural network diagram illustrating temporal coding. The diagram should show a series of neurons (labeled N1, N2, N3, etc.) with spikes occurring at specific time intervals. Each neuron should have a timeline with spikes marked at different points to indicate the temporal sequence of firing. Include labels for the neurons and time markers to emphasize the temporal aspect of coding. The diagram should visually differentiate between temporal coding and rate coding by showing a separate section where spikes are averaged over time for rate coding. IMPORTANT correction needed: The diagram explicitly labels the \"temporal information\" being lost during the rate coding averaging process, which directly points to a key part of the answer the student is supposed to derive.. Specifically: The annotation \"temporal information\" with an arrow pointing away from the \"Rate Coding\" section is. Do NOT include region labels (Feasible/Infeasible, Stable/Unstable, Optimal, etc.), formula annotations, reaction product labels, threshold markers, or any text that reveals the answer. Show structure and context only. IMPORTANT: Values or sequences in the diagram don't match the question. Specifically: The bar chart heights for \"Rate Coding\" are inconsistent with the. The bar chart in the \"Rate Coding\" section does not correctly represent the average rate (or count) of spikes shown in the \"Temporal Coding\" section's spike trains, making the diagram logically inconsistent.. Regenerate using EXACTLY the values and sequences specified."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "Temporal coding in the spiking neural network diagram below represents information by the timing of spikes rather than frequency, as illustrated by the precise spike timings in the circuit shown. This enables precise temporal processing and reduces the number of spikes needed, as depicted in the diagram. Advantages include lower energy consumption and faster information processing compared to rate coding, which can be inferred from the network's efficient spike timing illustrated in the diagram below.",
+      "rubric": "1. Explanation of temporal encoding mechanism in the diagram below (4 points)\n2. Impact on network processing as shown in the diagram (3 points)\n3. Comparison with rate coding based on the diagram below (3 points)",
+      "equations": [],
+      "text": "Evaluate the temporal coding scheme in the spiking neural network diagram below. Describe how information is encoded temporally and its impact on network processing capabilities. What are the advantages of temporal coding compared to rate coding based on the diagram?",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 5,
+      "type": "diagram-analysis",
+      "question": "Examine the comparative diagram of energy consumption between von Neumann and neuromorphic architectures shown below. Discuss the reasons for differences in energy efficiency. What implications does this have for large-scale neural applications?",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 5,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_4_20260415_163136/diagrams/b8b61411-0f6d-4770-b03e-ab5485156ba1.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=GmoMM5nOZu%2BxOoOCynJ8P4DrG7o%3D&Expires=1807807079",
+        "s3_key": "assignments/batch_regen_4_20260415_163136/diagrams/b8b61411-0f6d-4770-b03e-ab5485156ba1.png",
+        "file_id": "b8b61411-0f6d-4770-b03e-ab5485156ba1",
+        "filename": "diagram_q4.png",
+        "domain": "computer_science",
+        "diagram_type": "comparative_energy_consumption_chart",
+        "description": "A comparative energy consumption chart showing energy usage of von Neumann and neuromorphic architectures across various tasks. The chart should have two bars for each task, one representing von Neumann architecture and the other representing neuromorphic architecture. Tasks can include image recognition, natural language processing, and others. The y-axis represents energy consumption in arbitrary units, and the x-axis lists different tasks. This visual comparison helps analyze differences in energy efficiency between the two architectures. IMPORTANT: Values or sequences in the diagram don't match the question. Specifically: The x-axis should list different tasks (e.g., Image Recognition, NLP), with. The diagram description requires a comparative bar chart showing energy usage across multiple tasks, but the diagram provided only shows a single, generic comparison without any task-specific data.. Regenerate using EXACTLY the values and sequences specified. IMPORTANT: Values or sequences in the diagram don't match the question. Specifically: The x-axis should list different tasks (e.g., Image Recognition, NLP), not 'Architecture. The diagram shows a simple bar chart comparing two architectures generically, but the description requires a grouped bar chart comparing the architectures across multiple specific tasks listed on the x-axis.. Regenerate using EXACTLY the values and sequences specified."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The diagram below illustrates that neuromorphic architectures are more energy-efficient compared to von Neumann architectures due to their event-driven nature and locally stored memory, which significantly reduces data transfer energy costs. This efficiency, as shown in the diagram, enables large-scale neural processing with lower power consumption, which is particularly beneficial for portable and battery-powered devices.",
+      "rubric": "1. Explanation of energy efficiency differences as depicted in the diagram (4 points)\n2. Discussion of implications for neural applications based on the diagram (4 points)\n3. Specific examples of efficiency benefits referenced from the diagram (2 points)",
+      "equations": [],
+      "text": "Examine the comparative diagram of energy consumption between von Neumann and neuromorphic architectures shown below. Discuss the reasons for differences in energy efficiency. What implications does this have for large-scale neural applications?",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    }
+  ],
+  "statistics": {
+    "total_questions": 5,
+    "questions_with_diagrams": 5
+  }
+}

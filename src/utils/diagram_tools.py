@@ -6,7 +6,7 @@ Each tool renders a diagram and uploads it to S3.
 """
 
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from controllers.config import logger
 from utils.diagram_generator import DiagramGenerator
 
@@ -80,7 +80,7 @@ DIAGRAM_TOOLS = [
         "type": "function",
         "function": {
             "name": "claude_code_tool",
-            "description": "RECOMMENDED: Use Claude to generate diagram code for any STEM or medical domain. Works for: physics, mechanical, CS data structures, mathematics, chemistry, civil, biology, and ALL medical subjects (physiology, biochemistry, pharmacology, pathology, microbiology) — any technical diagram that is NOT a circuit schematic. Use for precise scientific plots: action potentials, metabolic pathways, dose-response curves, pharmacokinetics, disease progression charts, infection cycles, growth curves, pressure-volume loops, feedback loops. Claude generates clean matplotlib/schemdraw/networkx code executed for technical accuracy.",
+            "description": "General-purpose diagram generator using Claude + matplotlib/networkx/schemdraw. Use when no specialist tool (tikz_tool, plotly_tool, rdkit_tool, circuitikz_tool) is a better fit. Good for: 2D scientific plots, waveforms, timing diagrams, phase diagrams, action potentials, dose-response curves, pharmacokinetics, metabolic pathways, disease progression, data structures (trees/graphs/lists), flowcharts, CS/math/biology/mechanical/civil diagrams that need a 2D plot or graph. Falls back from specialist tools automatically.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -267,6 +267,57 @@ DIAGRAM_TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "tikz_tool",
+            "description": "SPECIALIST — PREFER over claude_code_tool for: physics ray/optics diagrams, Feynman diagrams, free body diagrams with vector arrows, spring-mass systems, field lines, 2D crystal lattice projections and non-3D lattice structures (for 3D unit cells with atom spheres use plotly_tool instead), geometric constructions, Lewis structures, chemical structural formulas, mechanical engineering diagrams. Use whenever LaTeX-quality vector rendering is needed. Falls back to claude_code_tool automatically if compilation fails.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "Detailed description of the diagram to draw, including all components, labels, and spatial relationships.",
+                    },
+                },
+                "required": ["description"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rdkit_tool",
+            "description": "SPECIALIST — PREFER over claude_code_tool for any 2D molecular skeletal formula: organic chemistry structures, drug molecules, amino acids, nucleotides, reaction mechanisms, functional group diagrams. Produces publication-quality 2D structures from SMILES notation. Falls back to claude_code_tool automatically if SMILES conversion fails.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "Description of the molecule or chemical structure. Include the molecule name, functional groups, and any structural features to highlight.",
+                    },
+                },
+                "required": ["description"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "plotly_tool",
+            "description": "SPECIALIST — PREFER over claude_code_tool when true 3D perspective is essential: 3D crystal unit cells with atom spheres at correct lattice positions (BCC/FCC/HCP), 3D molecular orbitals, 3D potential energy surfaces, 3D vector fields, any diagram where rotating 3D geometry is the point. Falls back to claude_code_tool automatically if Plotly/kaleido export fails.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "Description of the 3D diagram, including structure type, atom positions, labels, and what to highlight.",
+                    },
+                },
+                "required": ["description"],
+            },
+        },
+    },
 ]
 
 
@@ -401,6 +452,7 @@ class DiagramTools:
         question_idx: int,
         question_text: str = "",
         subject_guidance: str = "",
+        reference_image_bytes: Optional[bytes] = None,
     ) -> Dict[str, Any]:
         """
         Generate diagram code using Claude 3.5 Sonnet, then execute it.
@@ -428,27 +480,61 @@ class DiagramTools:
 
                 self.claude_generator = ClaudeCodeGenerator()
 
-            # Generate code using Claude
-            code = await self.claude_generator.generate_diagram_code(
-                question_text=question_text or description,
-                domain=domain,
-                diagram_type=diagram_type,
-                tool_type=tool_type,
-                subject_guidance=subject_guidance,
-            )
+            # Generate code using Claude, then execute with up to 2 attempts.
+            # On failure the error is fed back to Claude so it self-corrects.
+            execution_error = ""
+            image_bytes = None
+            for _exec_attempt in range(2):
+                code = await self.claude_generator.generate_diagram_code(
+                    question_text=question_text or description,
+                    domain=domain,
+                    diagram_type=diagram_type,
+                    tool_type=tool_type,
+                    subject_guidance=subject_guidance,
+                    reference_image_bytes=reference_image_bytes if _exec_attempt == 0 else None,
+                    execution_error=execution_error,
+                )
 
-            logger.info(f"Claude generated {len(code)} characters of {tool_type} code")
-            logger.debug(f"Generated code:\n{code}")
+                logger.info(
+                    f"Claude generated {len(code)} chars of {tool_type} code "
+                    f"(attempt {_exec_attempt + 1})"
+                )
+                logger.debug(f"Generated code:\n{code}")
 
-            # Execute the generated code using appropriate tool
-            if tool_type == "matplotlib":
-                image_bytes = await self.diagram_gen.render_matplotlib(code)
-            elif tool_type == "schemdraw":
-                image_bytes = await self.diagram_gen.render_schemdraw(code)
-            elif tool_type == "networkx":
-                image_bytes = await self.diagram_gen.render_networkx(code)
-            else:
-                raise ValueError(f"Unsupported tool_type: {tool_type}")
+                try:
+                    if tool_type == "matplotlib":
+                        image_bytes = await self.diagram_gen.render_matplotlib(code)
+                    elif tool_type == "schemdraw":
+                        image_bytes = await self.diagram_gen.render_schemdraw(code)
+                    elif tool_type == "networkx":
+                        image_bytes = await self.diagram_gen.render_networkx(code)
+                    else:
+                        raise ValueError(f"Unsupported tool_type: {tool_type}")
+                    break  # execution succeeded
+
+                except Exception as exec_err:
+                    execution_error = str(exec_err)
+                    logger.warning(
+                        f"Code execution failed (attempt {_exec_attempt + 1}): "
+                        f"{execution_error[:200]}"
+                    )
+
+                    # Auto-install any missing Python package before retrying
+                    import re as _re, subprocess as _sp, sys as _sys
+                    mod_match = _re.search(
+                        r"No module named '([^']+)'", execution_error
+                    )
+                    if mod_match:
+                        pkg = mod_match.group(1).split(".")[0]
+                        logger.info(f"Attempting pip install {pkg} ...")
+                        _sp.run(
+                            [_sys.executable, "-m", "pip", "install", pkg],
+                            capture_output=True,
+                            timeout=60,
+                        )
+
+                    if _exec_attempt == 1:
+                        raise  # both attempts failed
 
             # Upload to S3
             diagram_data = await self.diagram_gen.upload_to_s3(
@@ -927,6 +1013,280 @@ class DiagramTools:
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
+    async def tikz_tool(
+        self,
+        description: str,
+        assignment_id: str,
+        question_idx: int,
+        question_text: str = "",
+        subject_guidance: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Generate publication-quality diagram using general TikZ (LaTeX).
+
+        Pipeline: Claude → TikZ LaTeX → pdflatex → pdf2image → PNG → S3
+        """
+        try:
+            logger.info(f"Executing tikz_tool for question {question_idx}: {description[:100]}")
+
+            if not hasattr(self, "_tikz_gen") or self._tikz_gen is None:
+                from utils.tikz_generator import TikZGenerator
+                self._tikz_gen = TikZGenerator()
+
+            image_bytes = await self._tikz_gen.generate_diagram_png(
+                question_text=question_text or description,
+                diagram_description=description,
+                subject_guidance=subject_guidance,
+                output_dpi=300,
+            )
+
+            diagram_data = await self.diagram_gen.upload_to_s3(image_bytes, assignment_id, question_idx)
+            diagram_data["_image_bytes"] = image_bytes
+            logger.info(f"Successfully generated TikZ diagram: {description[:80]}")
+            return diagram_data
+
+        except Exception as e:
+            logger.error(f"Error in tikz_tool: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return None
+
+    async def rdkit_tool(
+        self,
+        description: str,
+        assignment_id: str,
+        question_idx: int,
+        question_text: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Generate 2D molecular structure diagram using RDKit.
+
+        Pipeline: Claude → SMILES string → RDKit Draw.MolToImage → PNG → S3
+        Falls back to claude_code_tool if RDKit is unavailable or SMILES is invalid.
+        """
+        try:
+            logger.info(f"Executing rdkit_tool for question {question_idx}: {description[:100]}")
+
+            try:
+                from rdkit import Chem
+                from rdkit.Chem import Draw
+                from rdkit.Chem.Draw import rdMolDraw2D
+            except ImportError:
+                logger.warning("RDKit not installed — falling back to claude_code_tool")
+                return await self.claude_code_tool(
+                    domain="chemistry",
+                    diagram_type="molecular_structure",
+                    tool_type="matplotlib",
+                    description=description,
+                    assignment_id=assignment_id,
+                    question_idx=question_idx,
+                    question_text=question_text,
+                )
+
+            # Ask Claude to provide the SMILES for the described molecule
+            import os
+            from anthropic import Anthropic
+            client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+            smiles_response = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=200,
+                system=(
+                    "You are a chemistry expert. Given a molecule description, return ONLY the "
+                    "canonical SMILES string. No explanation, no markdown, no extra text."
+                ),
+                messages=[{"role": "user", "content": f"Molecule: {description}\n\nQuestion context: {question_text[:300]}"}],
+            )
+            smiles = smiles_response.content[0].text.strip()
+
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is None:
+                raise ValueError(f"Invalid SMILES generated: {smiles!r}")
+
+            # Render at 600x600 with white background
+            drawer = rdMolDraw2D.MolDraw2DCairo(600, 600)
+            drawer.drawOptions().addStereoAnnotation = True
+            drawer.DrawMolecule(mol)
+            drawer.FinishDrawing()
+            image_bytes = drawer.GetDrawingText()
+
+            diagram_data = await self.diagram_gen.upload_to_s3(image_bytes, assignment_id, question_idx)
+            diagram_data["_image_bytes"] = image_bytes
+            logger.info(f"Successfully generated RDKit diagram (SMILES: {smiles[:60]})")
+            return diagram_data
+
+        except Exception as e:
+            logger.error(f"Error in rdkit_tool: {str(e)} — falling back to claude_code_tool")
+            return await self.claude_code_tool(
+                domain="chemistry",
+                diagram_type="molecular_structure",
+                tool_type="matplotlib",
+                description=description,
+                assignment_id=assignment_id,
+                question_idx=question_idx,
+                question_text=question_text,
+            )
+
+    async def plotly_tool(
+        self,
+        description: str,
+        assignment_id: str,
+        question_idx: int,
+        question_text: str = "",
+        subject_guidance: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Generate 3D diagram using Plotly exported to PNG.
+
+        Pipeline: Claude → Plotly Python code → execute → kaleido PNG export → S3
+        Falls back to claude_code_tool (matplotlib) if Plotly/kaleido unavailable.
+        """
+        try:
+            logger.info(f"Executing plotly_tool for question {question_idx}: {description[:100]}")
+
+            try:
+                import plotly  # noqa: F401
+                import kaleido  # noqa: F401
+            except ImportError:
+                logger.warning("plotly/kaleido not installed — falling back to claude_code_tool")
+                return await self.claude_code_tool(
+                    domain="general",
+                    diagram_type="3d_diagram",
+                    tool_type="matplotlib",
+                    description=description,
+                    assignment_id=assignment_id,
+                    question_idx=question_idx,
+                    question_text=question_text,
+                    subject_guidance=subject_guidance,
+                )
+
+            # Ask Claude to generate Plotly code
+            import os
+            import tempfile
+            import subprocess
+            from anthropic import Anthropic
+            client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+
+            guidance_section = f"\nDrawing instructions: {subject_guidance}" if subject_guidance else ""
+            plotly_response = client.messages.create(
+                model="claude-opus-4-5",
+                max_tokens=3000,
+                system=(
+                    "You are an expert Plotly diagram generator for educational content. "
+                    "Generate complete Python code using plotly that creates a 3D diagram. "
+                    "The code must save the figure to 'output.png' using: "
+                    "fig.write_image('output.png', width=800, height=700, scale=2)\n"
+                    "Return ONLY the Python code. No markdown, no explanation.\n"
+                    "Do NOT include any computed answer values or formulas revealing the solution."
+                ),
+                messages=[{"role": "user", "content": (
+                    f"Question: {question_text[:600]}\n"
+                    f"Diagram: {description}"
+                    f"{guidance_section}"
+                )}],
+            )
+            code = plotly_response.content[0].text.strip()
+            if code.startswith("```"):
+                import re
+                code = re.sub(r"^```[a-z]*\n?", "", code)
+                code = re.sub(r"\n?```$", "", code).strip()
+
+            # Validate syntax before executing; repair with AI if broken
+            import ast
+            for _attempt in range(2):
+                try:
+                    ast.parse(code)
+                    break  # syntax OK
+                except SyntaxError as syn_err:
+                    if _attempt == 1:
+                        raise RuntimeError(f"Plotly execution failed: {syn_err}")
+                    logger.warning(f"Plotly code has syntax error, requesting AI repair: {syn_err}")
+                    repair_response = client.messages.create(
+                        model="claude-opus-4-5",
+                        max_tokens=3000,
+                        system=(
+                            "You are an expert Python debugger. "
+                            "Fix ONLY the syntax errors in the provided Python code. "
+                            "Do not change logic or diagram content. "
+                            "Return ONLY the corrected Python code. No markdown, no explanation."
+                        ),
+                        messages=[{"role": "user", "content": (
+                            f"This Python code has a syntax error:\n{syn_err}\n\n"
+                            f"Fix it:\n{code}"
+                        )}],
+                    )
+                    fixed = repair_response.content[0].text.strip()
+                    if fixed.startswith("```"):
+                        import re
+                        fixed = re.sub(r"^```[a-z]*\n?", "", fixed)
+                        fixed = re.sub(r"\n?```$", "", fixed).strip()
+                    code = fixed
+
+            # Execute in a temp directory; retry once with AI repair on runtime error
+            image_bytes: Optional[bytes] = None
+            for _exec_attempt in range(2):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    output_path = os.path.join(tmpdir, "output.png")
+                    run_code = code.replace("'output.png'", f"'{output_path}'").replace('"output.png"', f"'{output_path}'")
+                    script_path = os.path.join(tmpdir, "plot.py")
+                    with open(script_path, "w", encoding="utf-8") as f:
+                        f.write(run_code)
+
+                    result = subprocess.run(
+                        ["python", script_path],
+                        capture_output=True, text=True, timeout=60
+                    )
+                    if result.returncode != 0:
+                        exec_error = result.stderr[-600:] or result.stdout[-600:]
+                        if _exec_attempt == 1:
+                            raise RuntimeError(f"Plotly execution failed: {exec_error}")
+                        logger.warning(f"Plotly execution failed (attempt 1), requesting AI repair: {exec_error[:200]}")
+                        repair_response = client.messages.create(
+                            model="claude-opus-4-5",
+                            max_tokens=3000,
+                            system=(
+                                "You are an expert Python debugger. "
+                                "Fix the runtime error in the provided Python code. "
+                                "Do not change the diagram logic or content. "
+                                "Return ONLY the corrected Python code. No markdown, no explanation."
+                            ),
+                            messages=[{"role": "user", "content": (
+                                f"This Python code raised a runtime error:\n{exec_error}\n\n"
+                                f"Fix it:\n{code}"
+                            )}],
+                        )
+                        fixed = repair_response.content[0].text.strip()
+                        if fixed.startswith("```"):
+                            import re as _re
+                            fixed = _re.sub(r"^```[a-z]*\n?", "", fixed)
+                            fixed = _re.sub(r"\n?```$", "", fixed).strip()
+                        code = fixed
+                        continue
+
+                    if not os.path.isfile(output_path):
+                        raise RuntimeError("Plotly code ran but produced no output.png")
+
+                    with open(output_path, "rb") as f:
+                        image_bytes = f.read()
+                    break
+
+            diagram_data = await self.diagram_gen.upload_to_s3(image_bytes, assignment_id, question_idx)
+            diagram_data["_image_bytes"] = image_bytes
+            logger.info(f"Successfully generated Plotly 3D diagram: {description[:80]}")
+            return diagram_data
+
+        except Exception as e:
+            logger.error(f"Error in plotly_tool: {str(e)} — falling back to claude_code_tool")
+            return await self.claude_code_tool(
+                domain="general",
+                diagram_type="3d_diagram",
+                tool_type="matplotlib",
+                description=description,
+                assignment_id=assignment_id,
+                question_idx=question_idx,
+                question_text=question_text,
+                subject_guidance=subject_guidance,
+            )
+
     async def execute_tool_call(
         self,
         tool_name: str,
@@ -959,6 +1319,7 @@ class DiagramTools:
                     question_idx=question_idx,
                     question_text=question_text,
                     subject_guidance=tool_arguments.get("subject_guidance", ""),
+                    reference_image_bytes=tool_arguments.get("reference_image_bytes"),
                 )
             elif tool_name == "matplotlib_tool":
                 return await self.matplotlib_tool(
@@ -1039,6 +1400,29 @@ class DiagramTools:
                         "diagram_type", "metabolic_pathway"
                     ),
                     description=tool_arguments.get("description", ""),
+                    assignment_id=assignment_id,
+                    question_idx=question_idx,
+                    question_text=question_text,
+                    subject_guidance=tool_arguments.get("subject_guidance", ""),
+                )
+            elif tool_name == "tikz_tool":
+                return await self.tikz_tool(
+                    description=tool_arguments.get("description"),
+                    assignment_id=assignment_id,
+                    question_idx=question_idx,
+                    question_text=question_text,
+                    subject_guidance=tool_arguments.get("subject_guidance", ""),
+                )
+            elif tool_name == "rdkit_tool":
+                return await self.rdkit_tool(
+                    description=tool_arguments.get("description"),
+                    assignment_id=assignment_id,
+                    question_idx=question_idx,
+                    question_text=question_text,
+                )
+            elif tool_name == "plotly_tool":
+                return await self.plotly_tool(
+                    description=tool_arguments.get("description"),
                     assignment_id=assignment_id,
                     question_idx=question_idx,
                     question_text=question_text,

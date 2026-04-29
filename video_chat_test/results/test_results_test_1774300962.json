@@ -1,0 +1,60 @@
+{
+  "video_path": "tests/test_video.mp4",
+  "video_id": "test_1774300962",
+  "timestamp": "2026-03-23T21:24:03.976737",
+  "processing_times": {
+    "audio_extraction": 3.147125244140625e-05,
+    "transcript_generation": 18.456198692321777,
+    "transcript_formatting": 17.901949167251587,
+    "summary_generation": 16.366015911102295,
+    "chunk_generation": 1.6183395385742188
+  },
+  "transcript_preview": "February. Preparation Hello? Very good evening. Am I audible? Hey. Anirban Mondul is a student name. Right? Anirban? Okay. And you are right now is a student of Saint Teresa School from. Right? Yeah. Okay. I have to do the port eight mode because, auto rotation mode activate. I would try once notification Just try to bring it and, turn on the auto rotation mode. Okay. Data auto rotation option On On Because on Did you understand? Just like agent meet open code Suppose, here, the option you can s",
+  "test_results": [
+    {
+      "question": "What is the name of the student and the counsellor?",
+      "query_type": "hybrid",
+      "strategy": "RAG (Hybrid)",
+      "context_length": 5828,
+      "response_time": 2.3321237564086914,
+      "response": "The name of the student is **Anirban Mondul**, and the name of the counselor is **Sadiq Mohammed**. They mention this at the beginning of the video, around $03:22$. \n\nDoes that help? Would you like to dive deeper into their conversation or any specific part of the meeting? \ud83d\ude0a"
+    },
+    {
+      "question": "What is this conversation about?",
+      "query_type": "hybrid",
+      "strategy": "RAG (Hybrid)",
+      "context_length": 5931,
+      "response_time": 8.091526746749878,
+      "response": "This conversation seems to be a mix of a **student-teacher meeting** and an **educational counseling session**. Here are some key points that summarize what\u2019s happening:\n\n- **Introduction and Context**: The conversation starts with a greeting and some technical issues regarding the meeting setup. The speaker, Sadiq Mohammed, introduces himself as a senior education counselor.\n\n- **Focus on Student Development**: There\u2019s a discussion about the importance of early education and how it lays the groundwork for future success. The counselor emphasizes that students need to start preparing early, especially in crucial years like class six.\n\n- **Student Engagement**: The counselor interacts with the student, asking about their aspirations (like wanting to become a doctor) and discussing the importance of education in achieving those goals.\n\n- **Discussion on Subjects**: The conversation touches on various subjects, including **muscle types** (skeletal, smooth, and cardiac) and some basic **math concepts** like the highest common factor. \n\n- **Weight on the Moon**: There's a fun question about how much a student would weigh on the moon, which leads to a discussion about gravity and its effects.\n\n- **Parental Involvement**: The counselor also inquires about the student\u2019s family background and their involvement in the student's education.\n\nOverall, it looks like a supportive and informative session aimed at guiding the student through their educational journey while addressing their specific needs and interests. \n\nDoes that help clarify things? Would you like to dive deeper into any specific part of the conversation? \ud83d\ude0a"
+    },
+    {
+      "question": "What are the main topics discussed?",
+      "query_type": "broad",
+      "strategy": "RAG (Hybrid)",
+      "context_length": 5772,
+      "response_time": 3.0070760250091553,
+      "response": "Awesome question! The video covers a few key topics related to language and communication, especially focusing on sentence structure. Here\u2019s a breakdown of the main points discussed:\n\n1. **Sentence Structure**:\n   - The video explains the **SVO (Subject-Verb-Object)** arrangement, which is the typical order of words in English sentences. This is introduced around $90:20$.\n   - It highlights what a **subject** is, mentioning that it can be a noun or a pronoun, and gives examples like people, animals, and objects.\n\n2. **Types of Sentences**:\n   - The instructor touches on different types of sentences and their structures, emphasizing the importance of understanding these to help someone like Sanya communicate more clearly.\n\n3. **Teaching Methodology**:\n   - There\u2019s a discussion about the effectiveness of teaching methods, particularly in relation to helping students learn English. This part emphasizes the need for practical learning and communication skills.\n\n4. **Muscle Types**:\n   - Another segment discusses the **three types of muscles**: skeletal, smooth, and cardiac. This is mentioned around $67:04$.\n\n5. **Interactive Learning**:\n   - The video also mentions the benefits of interactive classes and the role of technology in education, like AI teachers, which can enhance learning experiences.\n\nDoes that give you a good overview? Would you like to dive deeper into any of these topics? \ud83d\ude0a"
+    },
+    {
+      "question": "Summarize the key points of this conversation",
+      "query_type": "broad",
+      "strategy": "RAG (Hybrid)",
+      "context_length": 5574,
+      "response_time": 6.9260149002075195,
+      "response": "Sure! Let's break down the key points from the conversation in the video:\n\n1. **Class Structure and Focus**:\n   - The discussion revolves around a class called \"The Mystery of Food,\" focusing on energy generation and electricity.\n   - There\u2019s mention of a **proficiency test** related to energy concepts.\n\n2. **Teaching Approach**:\n   - The instructor emphasizes the importance of **materials** and **computation** in the learning process.\n   - They mention the use of **NCERT-based** resources, which are aligned with the educational standards in India.\n\n3. **Language of Instruction**:\n   - The instructor checks if students are comfortable with English and confirms that the session will be conducted in English.\n\n4. **Student Engagement**:\n   - There\u2019s an interactive element where students are encouraged to participate, such as answering questions about devices that use natural forces (like a water wheel).\n\n5. **Scholarship and Fees**:\n   - The conversation touches on scholarship opportunities based on performance in tests, with percentages mentioned (20% to 60% scholarships).\n   - Payment options are discussed, including monthly payments and registration fees.\n\n6. **Learning Tools**:\n   - The use of **animated classes** and **sentence structure** lessons to help students, particularly focusing on language skills for young learners.\n\n7. **Final Exams**:\n   - There\u2019s a mention of upcoming final exams and how they relate to the overall learning program.\n\nDoes that help summarize the conversation? If you want to dive deeper into any specific point, just let me know! \ud83d\ude0a"
+    },
+    {
+      "question": "What concerns does the student have?",
+      "query_type": "hybrid",
+      "strategy": "RAG (Hybrid)",
+      "context_length": 5919,
+      "response_time": 6.876741647720337,
+      "response": "From the sections you've shared, it seems like the student has a few concerns:\n\n1. **Preparation for Future Studies**: The student appears to be worried about their academic performance and how it will affect their future, especially in relation to becoming a doctor. They mention the importance of starting early and the need for proper guidance to achieve their goals.\n\n2. **Understanding Subjects**: There's a concern about the difficulty of subjects like math and science, particularly how math is crucial for understanding physics, which is essential for medical studies. The student seems to be aware that if they struggle with math, it could impact their performance in physics.\n\n3. **Quality of Education**: The student expresses concerns about the quality of learning and the effectiveness of the current educational system. They mention that the syllabus can be vast and overwhelming, especially with the ICC curriculum, which they feel is not as focused as the CBC syllabus.\n\n4. **Pressure and Stress**: The student might be feeling pressure from the academic demands, as indicated by the mention of performance and competition. They seem to be aware of the gap between their current performance and what is required for success.\n\n5. **Engagement and Interest**: There\u2019s a hint of concern about maintaining interest in studies amidst distractions like entertainment and games. They might be struggling to balance study time with leisure activities.\n\nDoes that help clarify the student's concerns? Would you like to dive deeper into any specific point? \ud83d\ude0a"
+    }
+  ],
+  "summary": {
+    "total_processing_time": 54.34253478050232,
+    "avg_response_time": 5.446696615219116,
+    "total_questions": 5
+  }
+}

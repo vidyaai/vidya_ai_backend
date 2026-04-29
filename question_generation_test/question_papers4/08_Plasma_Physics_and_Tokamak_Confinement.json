@@ -1,0 +1,186 @@
+{
+  "topic": "Plasma Physics & Tokamak Confinement",
+  "subject": "physics",
+  "prompt": "Generate 5 diagram-based questions on plasma physics and magnetic confinement fusion. Cover: the toroidal and poloidal magnetic field geometry in a tokamak cross-section, the Lawson criterion diagram (triple product nT\u03c4 vs temperature), magnetic field curvature and the grad-B drift of charged particles, the q-profile (safety factor) and magnetic flux surfaces, and plasma instability growth rate as a function of wave number. Each question must require the student to analyze or interpret a diagram.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "diagram-analysis",
+      "question": "Examine the toroidal and poloidal magnetic field geometry in the tokamak cross-section shown in the diagram below. Describe how these fields collaborate to confine plasma, and identify any potential areas of instability within the configuration.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 1,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_8_20260329_085709/diagrams/af184c27-0d11-4b08-b407-47d881d0c86e.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=Il0gjdmea0knRrMfNcmXOtglf2g%3D&Expires=1806310694",
+        "s3_key": "assignments/batch_regen_8_20260329_085709/diagrams/af184c27-0d11-4b08-b407-47d881d0c86e.png",
+        "file_id": "af184c27-0d11-4b08-b407-47d881d0c86e",
+        "filename": "diagram_q0.png"
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The toroidal magnetic field, as shown in the diagram below, runs around the donut shape of the tokamak, providing the primary magnetic field to confine the plasma. The poloidal field, also depicted in the diagram, runs in loops around the minor circumference, stabilizing the plasma and controlling its shape and position. Together, they create a helical field line structure. Instabilities may arise at the edge where the shear and pressure gradients are steepest, as indicated in the diagram, requiring careful magnetic and equilibrium control.",
+      "rubric": "Award full marks if the student correctly identifies the roles of both toroidal and poloidal fields in confinement as shown in the diagram below and describes potential areas of instability. Deduct points for omissions or incorrect descriptions of the magnetic field structure.",
+      "equations": [],
+      "text": "Examine the toroidal and poloidal magnetic field geometry in the tokamak cross-section shown in the diagram below. Describe how these fields collaborate to confine plasma, and identify any potential areas of instability within the configuration.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 2,
+      "type": "diagram-analysis",
+      "question": "Analyze the Lawson criterion diagram below that displays the triple product <eq q2_eq1> versus temperature. Explain how this diagram is used to evaluate the feasibility of fusion reactions.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 2,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_8_20260329_085709/diagrams/dd0e2b78-c54d-48d4-9788-1ddc9d395866.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=AdpPXbEkGNQUg%2Fbe6wTaPOEw3oE%3D&Expires=1806310799",
+        "s3_key": "assignments/batch_regen_8_20260329_085709/diagrams/dd0e2b78-c54d-48d4-9788-1ddc9d395866.png",
+        "file_id": "dd0e2b78-c54d-48d4-9788-1ddc9d395866",
+        "filename": "diagram_q1.png"
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The Lawson criterion diagram below displays the conditions under which the nuclear fusion power generated exceeds the power losses. The triple product <eq q2_eq1> (density, temperature, confinement time) must reach specific thresholds at given temperatures for different fusion fuel types (e.g., D-T fusion). Achieving points on or above the curve in the diagram indicates feasible fusion reactions.",
+      "rubric": "Full points if the student accurately describes the meaning of each axis in the diagram and explains the significance of the curve and points shown. Partial credit for identifying some but not all aspects, or minor inaccuracies.",
+      "equations": [
+        {
+          "id": "q2_eq1",
+          "latex": "nT\\tau",
+          "position": {
+            "char_index": 52,
+            "context": "question_text"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Analyze the Lawson criterion diagram below that displays the triple product <eq q2_eq1> versus temperature. Explain how this diagram is used to evaluate the feasibility of fusion reactions.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 3,
+      "type": "diagram-analysis",
+      "question": "Examine the diagram below illustrating magnetic field curvature and grad-B drift for a charged particle in a tokamak. Identify how these drifts affect particle confinement and propose mitigation strategies.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 3,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_8_20260329_085709/diagrams/7e3a8cd3-c155-4429-a95c-54ad32ef6d66.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=ea8AfG%2B49zg9AUm0X7xqDmCFe5w%3D&Expires=1806310873",
+        "s3_key": "assignments/batch_regen_8_20260329_085709/diagrams/7e3a8cd3-c155-4429-a95c-54ad32ef6d66.png",
+        "file_id": "7e3a8cd3-c155-4429-a95c-54ad32ef6d66",
+        "filename": "diagram_q2.png"
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "In the diagram below, grad-B drift occurs due to magnetic field gradients, causing charged particles to drift perpendicularly to both the magnetic field and its gradient. This drift, as illustrated in the diagram, can lead to particle loss. Mitigation strategies, which can be inferred from the diagram, include optimizing magnetic geometry and adding auxiliary systems like magnetic mirrors and divertors to redirect particles.",
+      "rubric": "Award full points if the student clearly explains the mechanisms of drifts as depicted in the diagram and suggests viable strategies for their mitigation. Deduct points for missing key drift mechanisms or ineffective mitigation proposals.",
+      "equations": [],
+      "text": "Examine the diagram below illustrating magnetic field curvature and grad-B drift for a charged particle in a tokamak. Identify how these drifts affect particle confinement and propose mitigation strategies.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 4,
+      "type": "diagram-analysis",
+      "question": "Examine the <eq q4_eq1>-profile (safety factor) and magnetic flux surfaces in the tokamak shown in the diagram below. Discuss how the shape of the <eq q4_eq1>-profile influences plasma stability and confinement.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 4,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_8_20260329_085709/diagrams/b63fba99-93b4-4752-948e-7183ab691fb1.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=d46FFliKu8jajTatbFRDCL3A04c%3D&Expires=1806310966",
+        "s3_key": "assignments/batch_regen_8_20260329_085709/diagrams/b63fba99-93b4-4752-948e-7183ab691fb1.png",
+        "file_id": "b63fba99-93b4-4752-948e-7183ab691fb1",
+        "filename": "diagram_q3.png"
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The <eq q4_eq1>-profile describes how the safety factor, <eq q4_eq1>, varies radially in the tokamak shown in the diagram below. A higher <eq q4_eq1>-value, as depicted in the diagram, indicates a lower probability of disruptive modes like tearing. The shape of the <eq q4_eq1>-profile significantly affects MHD stability; a flat or reversed <eq q4_eq1>-profile, as illustrated in the diagram, can enhance stability by preventing modes that degrade confinement.",
+      "rubric": "Award full points if students describe the <eq q4_eq1>-profile and its implications on stability clearly, referencing the diagram where appropriate. Deduct points for misunderstandings regarding the relationship between the <eq q4_eq1>-profile and stability modes, especially if the diagram's details are misinterpreted.",
+      "equations": [
+        {
+          "id": "q4_eq1",
+          "latex": "q",
+          "position": {
+            "char_index": 11,
+            "context": "question_text"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Examine the <eq q4_eq1>-profile (safety factor) and magnetic flux surfaces in the tokamak shown in the diagram below. Discuss how the shape of the <eq q4_eq1>-profile influences plasma stability and confinement.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 5,
+      "type": "diagram-analysis",
+      "question": "Examine the diagram below illustrating plasma instability growth rate as a function of wave number. Discuss the implications of this relationship for tokamak operation and stability control.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 5,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_8_20260329_085709/diagrams/73ac6198-1b99-4aa5-aac6-ab32c32bb458.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=7tridFi5yCg28X93zCkNCT%2BlRzM%3D&Expires=1806311020",
+        "s3_key": "assignments/batch_regen_8_20260329_085709/diagrams/73ac6198-1b99-4aa5-aac6-ab32c32bb458.png",
+        "file_id": "73ac6198-1b99-4aa5-aac6-ab32c32bb458",
+        "filename": "diagram_q4.png"
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The diagram below illustrates that instability growth rates peaking at specific wave numbers indicate potential resonant modes that threaten confinement in a tokamak. Efficient tokamak operation requires minimizing these peaks by actively tuning stability parameters like magnetic shear and pressure profiles, as shown in the diagram. The relationship depicted in the diagram highlights the critical wave numbers where intervention is necessary to maintain stability.",
+      "rubric": "Award full points if the student correctly interprets the diagram below and relates wave number peaks to resonance effects. Deduct points for failure to explain how these insights influence tokamak design or operation adjustments. The diagram should be used to support the explanation of how specific wave numbers correlate with instability growth and the necessary control measures.",
+      "equations": [],
+      "text": "Examine the diagram below illustrating plasma instability growth rate as a function of wave number. Discuss the implications of this relationship for tokamak operation and stability control.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    }
+  ],
+  "statistics": {
+    "total_questions": 5,
+    "questions_with_diagrams": 5
+  }
+}

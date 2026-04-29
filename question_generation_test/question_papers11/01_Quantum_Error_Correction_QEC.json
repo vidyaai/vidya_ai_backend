@@ -1,0 +1,237 @@
+{
+  "topic": "Quantum Error Correction (QEC)",
+  "subject": "cs",
+  "prompt": "Generate 5 diagram-based questions on Quantum Error Correction (QEC). Cover: stabilizer codes and syndrome measurement circuits, the 3-qubit bit-flip code with error detection circuit, the surface code lattice and its logical qubits, fault-tolerant gate teleportation, and the threshold theorem with error rate diagrams. Each question must require the student to analyze or interpret a diagram.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "diagram-analysis",
+      "question": "Analyze the syndrome measurement circuit for a 3-qubit bit-flip code as shown in the circuit below. Explain how the circuit detects a single-bit error and what each ancilla qubit measurement indicates about the error location.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 1,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_1_20260427_090123/diagrams/dcd2fd6b-0e6c-4957-a8cd-ef671cc0019f.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=4YeU3Kp7MEiA6n3%2FSwX8DQRFR2Q%3D&Expires=1808816591",
+        "s3_key": "assignments/batch_1_20260427_090123/diagrams/dcd2fd6b-0e6c-4957-a8cd-ef671cc0019f.png",
+        "file_id": "dcd2fd6b-0e6c-4957-a8cd-ef671cc0019f",
+        "filename": "diagram_q0.png",
+        "domain": "quantum_computing",
+        "diagram_type": "quantum_circuit",
+        "description": "Syndrome measurement circuit for a 3-qubit bit-flip code. The circuit includes three data qubits (q0, q1, q2) and two ancilla qubits (a0, a1). Each ancilla qubit is connected to two data qubits via CNOT gates. The ancilla qubits are measured to detect single-bit errors. The circuit should show the data qubits on horizontal lines with CNOT gates connecting them to the ancilla qubits, which are also on horizontal lines. Measurement symbols should be placed at the end of the ancilla qubit lines to indicate measurement operations."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The circuit shown uses two ancilla qubits to measure the parity of specific qubit pairs. In the diagram, a measurement outcome '<eq q1_eq1>' indicates an error on the first qubit, '<eq q1_eq2>' indicates an error on the second qubit, and '<eq q1_eq3>' indicates an error on the third qubit. An outcome of '<eq q1_eq4>' means no error. Each error syndrome corresponds to a particular bit-flip error location, which is corrected accordingly.",
+      "rubric": "1. Correct identification of the role of ancilla qubits in the diagram (3 points).\n2. Correct mapping of measurement outcomes to error locations as shown in the circuit (4 points).\n3. Explanation of error correction based on the syndrome from the diagram (3 points).",
+      "equations": [
+        {
+          "id": "q1_eq1",
+          "latex": "10",
+          "position": {
+            "char_index": 102,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq2",
+          "latex": "01",
+          "position": {
+            "char_index": 157,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq3",
+          "latex": "11",
+          "position": {
+            "char_index": 213,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq4",
+          "latex": "00",
+          "position": {
+            "char_index": 263,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Analyze the syndrome measurement circuit for a 3-qubit bit-flip code as shown in the circuit below. Explain how the circuit detects a single-bit error and what each ancilla qubit measurement indicates about the error location.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 2,
+      "type": "diagram-analysis",
+      "question": "Interpret the lattice structure of the surface code and identify the logical qubits as represented in the diagram below. Discuss the significance of the code distance in determining the fault tolerance.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 2,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_1_20260427_090123/diagrams/2465ae79-9514-4810-86e6-514e155f00fd.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=1Pda35mRlKFsd3xkDomhmza0bA0%3D&Expires=1808816675",
+        "s3_key": "assignments/batch_1_20260427_090123/diagrams/2465ae79-9514-4810-86e6-514e155f00fd.png",
+        "file_id": "2465ae79-9514-4810-86e6-514e155f00fd",
+        "filename": "diagram_q1.png",
+        "domain": "quantum_computing",
+        "diagram_type": "surface_code_lattice",
+        "description": "Surface code lattice structure showing a grid of physical qubits with logical qubits highlighted. The lattice consists of a grid of squares, each representing a physical qubit. Logical qubits are indicated by specific patterns or colors within the grid. Include labels for logical qubits and indicate the code distance by showing the minimum number of qubits that need to be changed to cause a logical error. The diagram should help visualize how logical qubits are encoded within the lattice."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The logical qubits are defined by the largest stabilizer operators as shown in the diagram below. The code distance is the minimum number of physical qubit errors needed to cause a logical error. In the layout depicted in the diagram, identifying certain lattice paths (horizontal/vertical chains) determines the logical <eq q2_eq1> and <eq q2_eq2> operators. The larger the code distance, the more errors the code can tolerate.",
+      "rubric": "1. Correct identification of logical qubits based on stabilizers in the diagram (4 points).\n2. Explanation of how code distance determines error tolerance, referencing the diagram (3 points).\n3. Proper identification of paths representing logical X and Z in the diagram (3 points).",
+      "equations": [
+        {
+          "id": "q2_eq1",
+          "latex": "X",
+          "position": {
+            "char_index": 226,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q2_eq2",
+          "latex": "Z",
+          "position": {
+            "char_index": 230,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Interpret the lattice structure of the surface code and identify the logical qubits as represented in the diagram below. Discuss the significance of the code distance in determining the fault tolerance.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 3,
+      "type": "diagram-analysis",
+      "question": "Analyze the diagram below showing fault-tolerant gate teleportation. Describe the process involved and how it ensures error correction while executing gates.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 3,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_1_20260427_090123/diagrams/88761323-cc7e-4656-a331-3eded576d4fd.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=WchhfR%2F%2FWBXi1lNpkSYHxzhxo%2Bs%3D&Expires=1808816762",
+        "s3_key": "assignments/batch_1_20260427_090123/diagrams/88761323-cc7e-4656-a331-3eded576d4fd.png",
+        "file_id": "88761323-cc7e-4656-a331-3eded576d4fd",
+        "filename": "diagram_q2.png",
+        "domain": "quantum_computing",
+        "diagram_type": "quantum_circuit",
+        "description": "A fault-tolerant gate teleportation circuit showing qubit lines, CNOT gates, measurement gates, and classical feedforward. Include labeled qubit lines (q0, q1, ancilla), CNOT gates between q0 and ancilla, measurement gates on ancilla, and classical control lines feeding back to q0. Ensure the circuit layout is clear and shows the teleportation process with error correction."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "Fault-tolerant gate teleportation, as illustrated in the diagram below, involves entangling a quantum gate with an ancilla state, performing a Bell measurement between them, and applying corrective operations based on the measurement outcome. This method protects against errors by ensuring the gate operation and error correction are integrated, allowing the correction of errors during entanglement. The circuit shown demonstrates how these steps are implemented to maintain fault tolerance.",
+      "rubric": "1. Correctly describe the role of ancilla qubit entanglement as depicted in the diagram (3 points).\n2. Explanation of the Bell measurement process shown in the diagram (3 points).\n3. Description of corrective operations based on outcomes, as illustrated in the circuit (4 points).",
+      "equations": [],
+      "text": "Analyze the diagram below showing fault-tolerant gate teleportation. Describe the process involved and how it ensures error correction while executing gates.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 4,
+      "type": "diagram-analysis",
+      "question": "Examine the error-rate threshold theorem diagram below. Explain how different regions represent the operational boundaries of quantum error correction and its implications for scalability.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 4,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_1_20260427_090123/diagrams/53b95407-6bab-44f8-baa9-015d67391e1c.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=pNCZomYz7jqMAAj8SEWMAq7mhfY%3D&Expires=1808816900",
+        "s3_key": "assignments/batch_1_20260427_090123/diagrams/53b95407-6bab-44f8-baa9-015d67391e1c.png",
+        "file_id": "53b95407-6bab-44f8-baa9-015d67391e1c",
+        "filename": "diagram_q3.png",
+        "domain": "quantum_computing",
+        "diagram_type": "error_rate_threshold_diagram",
+        "description": "Error-rate threshold theorem diagram showing different regions representing operational boundaries of quantum error correction. The x-axis represents the error rate, and the y-axis represents the logical error rate. The diagram includes a threshold line, below which quantum error correction is effective, and above which it is not. Highlight regions indicating scalable and non-scalable quantum operations.\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 threshold\nThe diagram will FAIL review if any of these appear. IMPORTANT: The diagram is missing required labels. Specifically: missing highlighted region for scalable operations, missing highlighted region for non-scalable operations COR. The diagram is missing the required \"threshold line\" and highlighted regions for \"scalable\" and \"non-scalable\" operations, which are explicitly mentioned in the diagram description.. Add each missing label as visible text at the appropriate location in the diagram. Ensure ALL labels are fully visible and not clipped by diagram boundaries. Use smaller font or reposition labels near edges if needed. IMPORTANT: The diagram is missing required labels. Specifically: missing label: Scalable Operations, missing label: Non-. The diagram is missing several required components explicitly mentioned in the diagram description and correction notes: the \"threshold line\" and the highlighted regions for \"scalable\" and \"non-scalable\" operations.. Add each missing label as visible text at the appropriate location in the diagram. Ensure ALL labels are fully visible and not clipped by diagram boundaries. Use smaller font or reposition labels near edges if needed."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The diagram below illustrates regions where error rates fall below or above the threshold, affecting scalability. In the diagram, the area below the threshold indicates where error correction can effectively manage operational errors. Conversely, the region above the threshold shows where errors propagate too quickly for correction to be feasible. The boundaries depicted in the diagram determine the achievable error rate for scalable quantum computation.",
+      "rubric": "1. Explanation of the threshold principle and its regions as shown in the diagram (4 points).\n2. Implications for operational scalability and error management based on the diagram (3 points).\n3. Analysis of scalability using the thresholds depicted in the diagram (3 points).",
+      "equations": [],
+      "text": "Examine the error-rate threshold theorem diagram below. Explain how different regions represent the operational boundaries of quantum error correction and its implications for scalability.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 5,
+      "type": "short-answer",
+      "question": "Describe the role of stabilizer codes in quantum error correction and how they form the foundation of error detection as illustrated in the syndrome extraction process in the diagram below.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 5,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_1_20260427_090123/diagrams/16c0faec-b001-4335-876d-ead220b67193.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=qkQk%2B6jkeWHOUTxbeWB29Bk0SNc%3D&Expires=1808817003",
+        "s3_key": "assignments/batch_1_20260427_090123/diagrams/16c0faec-b001-4335-876d-ead220b67193.png",
+        "file_id": "16c0faec-b001-4335-876d-ead220b67193",
+        "filename": "diagram_q4.png",
+        "domain": "quantum_computing",
+        "diagram_type": "syndrome_extraction_process",
+        "description": "A quantum circuit diagram illustrating the syndrome extraction process with stabilizer codes. The diagram includes horizontal lines representing qubits, labeled as q0, q1, and ancilla. The circuit shows stabilizer measurements using CNOT gates and measurement gates. The ancilla qubit is used for syndrome extraction, with the measurement result indicating the presence of errors. Include labeled boxes for CNOT gates and measurement symbols, with classical lines showing the measurement output. The diagram should clearly show the flow of information from the qubits through the stabilizer operations to the measurement output, highlighting the role of stabilizer codes in error detection. IMPORTANT: Values or sequences in the diagram don't match the question. Specifically: data_mismatch. The diagram shows qubits labeled q0, q1, q2, ancilla qubit 1, and ancilla qubit 2, which does not match the requested labels of q0, q1, and ancilla from the diagram description.. Regenerate using EXACTLY the values and sequences specified."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "Stabilizer codes use a set of commuting operators that stabilize a subspace of quantum states. In the diagram below, during the syndrome extraction process, every error type affects these stabilizers in a predictable way, allowing detection. The circuit shown illustrates how these codes identify error syndromes, enabling corrections without measuring information directly from the quantum state.",
+      "rubric": "1. Description of stabilizer codes' function in QEC (3 points).\n2. Explanation of how they enable error detection during syndrome extraction as shown in the diagram (4 points).\n3. Importance of stabilizers handling errors predictably (3 points).",
+      "equations": [],
+      "text": "Describe the role of stabilizer codes in quantum error correction and how they form the foundation of error detection as illustrated in the syndrome extraction process in the diagram below.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    }
+  ],
+  "statistics": {
+    "total_questions": 5,
+    "questions_with_diagrams": 5
+  }
+}

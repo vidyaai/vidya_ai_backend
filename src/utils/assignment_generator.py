@@ -210,6 +210,7 @@ class AssignmentGenerator:
         engine: str = "nonai",
         subject: str = "electrical",
         diagram_model: str = "flash",
+        progress_callback=None,
     ) -> Dict[str, Any]:
         """
         Generate an assignment using AI based on provided content and options.
@@ -268,6 +269,7 @@ class AssignmentGenerator:
                     assignment_id=assignment_id,
                     has_diagram_analysis=has_diagram_analysis,
                     generation_prompt=generation_prompt or "",
+                    progress_callback=progress_callback,
                 )
                 logger.info("Multi-agent diagram analysis complete")
 
@@ -352,6 +354,8 @@ class AssignmentGenerator:
             }
 
             logger.info(f"Generated assignment with {len(questions)} questions")
+            if progress_callback:
+                progress_callback("Finalizing assignment...")
             return assignment_data
 
         except Exception as e:

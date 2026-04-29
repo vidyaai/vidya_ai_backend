@@ -1,0 +1,60 @@
+{
+  "video_path": "video_chat_test/data/test_video.mp4",
+  "video_id": "test_1774371405",
+  "timestamp": "2026-03-24T16:58:18.927063",
+  "processing_times": {
+    "audio_extraction": 2.7894973754882812e-05,
+    "transcript_generation": 19.4888174533844,
+    "transcript_formatting": 20.331162452697754,
+    "summary_generation": 17.03628158569336,
+    "chunk_generation": 1.4056012630462646
+  },
+  "transcript_preview": "February. Preparation Hello? Very good evening. Am I audible? Hey. Anirban Mondul is a student name. Right? Anirban? Okay. And you are right now is a student of Saint Teresa School from. Right? Yeah. Okay. I have to do the port eight mode because, auto rotation mode activate. I would try once notification Just try to bring it and, turn on the auto rotation mode. Okay. Data auto rotation option On On Because on Did you understand? Just like agent meet open code Suppose, here, the option you can s",
+  "test_results": [
+    {
+      "question": "What is the name of the student and the counsellor?",
+      "query_type": "hybrid",
+      "strategy": "RAG (Hybrid)",
+      "context_length": 5859,
+      "response_time": 2.2761623859405518,
+      "response": "The student's name is **Anirban Mondul**, and the counselor's name is **Sadiq Mohammed**. They discuss various topics related to education and counseling during the meeting. \n\nIf you want to dive deeper into any specific part of their conversation, just let me know! \ud83d\ude0a"
+    },
+    {
+      "question": "What is this conversation about?",
+      "query_type": "hybrid",
+      "strategy": "RAG (Hybrid)",
+      "context_length": 5934,
+      "response_time": 7.488741159439087,
+      "response": "This conversation seems to be a **counseling session** between an education counselor and a student, possibly involving the student's parents as well. Here are some key points from the discussion:\n\n- **Preparation and Counseling**: The counselor, Sadiq Mohammed, is discussing the importance of education and preparation for future success, particularly focusing on the student's current academic performance and potential. This is mentioned around $03:22$ when he emphasizes the significance of starting early in education.\n\n- **Student's Future Aspirations**: They talk about the student's aspirations, like wanting to become a doctor, and how important it is to build a strong foundation in earlier grades (like class six) to achieve those goals. This is highlighted at $03:45$.\n\n- **Discussion on Muscles**: At $67:04$, the conversation shifts to a more academic topic where they discuss different types of muscles in the human body: **skeletal, smooth, and cardiac muscles**. The counselor is trying to ensure the student understands these concepts.\n\n- **Mathematical Concepts**: There\u2019s also a segment where they discuss the **highest common factor** of numbers and a question about weight on the moon, which involves understanding gravity. This part is found around $53:53$.\n\n- **Engagement and Learning**: Throughout the conversation, the counselor is trying to engage the student and assess their understanding of various subjects, while also addressing the importance of balancing studies with entertainment.\n\nOverall, the conversation is a mix of educational counseling, academic discussions, and encouragement for the student to realize their potential. Does that help clarify things? Would you like to dive deeper into any specific part of the conversation? \ud83d\ude0a"
+    },
+    {
+      "question": "What are the main topics discussed?",
+      "query_type": "broad",
+      "strategy": "Fallback",
+      "context_length": 11661,
+      "response_time": 8.320799827575684,
+      "response": "Awesome question! The video covers several key topics related to education and student preparation. Here\u2019s a breakdown of the main points discussed:\n\n- **Introduction and Purpose of the Meeting** ($03:50 - 04:49$):\n  - The meeting is aimed at discussing student potential and preparation for future academic success.\n\n- **Importance of Early Education** ($07:17 - 08:45$):\n  - Emphasizes the significance of starting education early for long-term success, especially in critical subjects.\n\n- **Counseling and Support** ($08:46 - 09:43$):\n  - The speaker introduces themselves as an education counselor and discusses the need for guidance in preparation for competitive exams.\n\n- **Educational Opportunities and Scholarships** ($12:02 - 12:53$):\n  - Talks about scholarship opportunities and the importance of making informed financial decisions regarding education.\n\n- **Focus on Math and Science** ($19:12 - 20:32$):\n  - Highlights the importance of math and science in various career paths, particularly for aspiring doctors.\n\n- **Professional Learning vs. Traditional Education** ($16:15 - 17:21$):\n  - Discusses the need for professional learning to succeed in competitive environments.\n\n- **Student Success Stories** ($30:33 - 32:48$):\n  - Features a successful student, Devdatta Maji, who achieved a high rank and shares her journey and the support she received.\n\n- **Use of Technology in Education** ($34:01 - 34:15$):\n  - Mentions how technology can aid in understanding complex concepts.\n\nDoes that give you a clearer picture of the topics? Would you like to dive deeper into any specific part? \ud83d\ude0a"
+    },
+    {
+      "question": "Summarize the key points of this conversation",
+      "query_type": "broad",
+      "strategy": "Fallback",
+      "context_length": 11005,
+      "response_time": 9.951423406600952,
+      "response": "Sure! Here\u2019s a summary of the key points from the conversation:\n\n1. **Gravitational Force**:\n   - The gravitational force of the Moon is one-sixth that of Earth's gravity. This means that if something weighs 36 kg on Earth, it would weigh only 6 kg on the Moon. This concept is discussed around $55:50 - 56:51$.\n\n2. **Human Bones**:\n   - The conversation touches on the smallest bones in the human body, specifically mentioning the **stapes**, **incus**, and **malleus**, which are located in the ear. This part is highlighted around $56:52 - 57:20$.\n\n3. **Photosynthesis**:\n   - Photosynthesis is explained as the process by which green plants use chlorophyll, sunlight, water, and carbon dioxide to create food (glucose) and release oxygen. This is discussed at $58:00 - 58:59$.\n\n4. **Planets in the Solar System**:\n   - The hottest planet is identified as **Venus**, despite **Mercury** being closest to the Sun. This is due to Venus's thick atmosphere that traps heat. This discussion occurs between $59:27 - 60:17$.\n\n5. **Muscle Types**:\n   - There are three types of muscles mentioned: **skeletal**, **smooth**, and **cardiac**. The conversation also touches on voluntary and involuntary muscles around $67:31 - 69:19$.\n\n6. **Education and Learning**:\n   - The dialogue includes discussions about teaching methods, the importance of asking questions, and how AI can enhance education. This is explored from $70:51 - 75:36$.\n\n7. **Class Structure**:\n   - The conversation outlines the structure of classes, including fixed schedules and topics like \"The Mystery of Food.\" This is mentioned around $78:10 - 79:43$.\n\n8. **Test Reports and Assessments**:\n   - There\u2019s a brief mention of test results, with some questions about natural forces and devices, indicating a focus on understanding scientific concepts. This is found at $87:29 - 88:05$.\n\nDoes this summary help clarify the conversation? If you want to dive deeper into any specific topic, just let me know! \ud83d\ude0a"
+    },
+    {
+      "question": "What concerns does the student have?",
+      "query_type": "hybrid",
+      "strategy": "RAG (Hybrid)",
+      "context_length": 5930,
+      "response_time": 6.640343427658081,
+      "response": "From the segments you've shared, it seems the student has a few concerns:\n\n1. **Importance of Math for Future Careers**: The student expresses worry about the significance of math in fields like medicine. They mention that if a student isn't strong in math, it could make subjects like physics challenging, which is crucial for aspiring doctors. This concern is highlighted around $18:24$.\n\n2. **Pressure and Competition**: There's a mention of pressure related to competition and the vast syllabus in different educational boards. The student feels that while some exams (like the CBSE) require a certain percentage, the ICC syllabus is too broad and overwhelming, which could lead to stress. This is discussed around $18:24$ and $03:22$.\n\n3. **Quality of Education and Support**: The student seems to be concerned about the quality of education and the effectiveness of the teaching methodologies being used. They mention that the current approach might not be efficient for their learning needs, particularly in understanding complex subjects like muscles in biology. This is noted around $67:04$.\n\n4. **Balancing Study and Entertainment**: There's a concern about how to balance study time with entertainment, as the student acknowledges that games and other activities can distract from studying. This is mentioned around $67:04$.\n\nDoes that help clarify the student's concerns? Would you like to dive deeper into any of these points? \ud83d\ude0a"
+    }
+  ],
+  "summary": {
+    "total_processing_time": 58.26189064979553,
+    "avg_response_time": 6.935494041442871,
+    "total_questions": 5
+  }
+}

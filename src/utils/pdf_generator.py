@@ -692,10 +692,12 @@ class AssignmentPDFGenerator:
             diagram_url = s3_presign_url(question["diagram"]["s3_key"])
             diagram_base64 = self.download_image_as_base64(diagram_url)
             if diagram_base64:
-                # Use diagram description as caption if available
-                caption_text = question.get("diagram", {}).get("description", "")
-                if not caption_text:
-                    caption_text = f"Diagram for Question {question_num}"
+                diagram_type = question.get("diagram", {}).get("diagram_type", "")
+                caption_text = (
+                    diagram_type.replace("_", " ").strip().title()
+                    if diagram_type
+                    else f"Diagram for Question {question_num}"
+                )
                 html += f"""
                 <div class="figure-container">
                     <img src="{diagram_base64}" alt="Question diagram">
@@ -777,9 +779,11 @@ class AssignmentPDFGenerator:
                     diagram_url = s3_presign_url(subq["diagram"]["s3_key"])
                     diagram_base64 = self.download_image_as_base64(diagram_url)
                     if diagram_base64:
-                        sub_caption = subq.get("diagram", {}).get(
-                            "description",
-                            f"Diagram for Part {question_num}.{i+1}",
+                        sub_diagram_type = subq.get("diagram", {}).get("diagram_type", "")
+                        sub_caption = (
+                            sub_diagram_type.replace("_", " ").strip().title()
+                            if sub_diagram_type
+                            else f"Diagram for Part {question_num}.{i+1}"
                         )
                         html += f"""
                         <div class="figure-container">
@@ -1236,6 +1240,24 @@ class AssignmentPDFGenerator:
         }
         """
 
+    def _escape_non_latin1(self, html: str) -> str:
+        """Escape characters outside latin-1 as HTML numeric entities.
+
+        WeasyPrint/pydyf encodes certain PDF string fields (e.g. document title)
+        with latin-1 internally.  Any Unicode codepoint above U+00FF that slips
+        through as a raw character causes a UnicodeEncodeError at PDF write time.
+        Converting such characters to HTML numeric entity references (&#N;) keeps
+        the document semantically correct while staying within the allowed range.
+        """
+        result = []
+        for ch in html:
+            try:
+                ch.encode("latin-1")
+                result.append(ch)
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                result.append(f"&#{ord(ch)};")
+        return "".join(result)
+
     def generate_assignment_pdf(self, assignment: Dict[str, Any]) -> bytes:
         """
         Generate a professional PDF for an assignment.
@@ -1306,6 +1328,10 @@ class AssignmentPDFGenerator:
             </body>
             </html>
             """
+
+            # Escape any characters outside latin-1 that would cause
+            # a UnicodeEncodeError inside WeasyPrint's PDF writer.
+            html_content = self._escape_non_latin1(html_content)
 
             # Generate PDF using WeasyPrint
             html_doc = HTML(string=html_content)
@@ -1382,9 +1408,7 @@ class AssignmentPDFGenerator:
                 diagram_url = s3_presign_url(correct_answer_diagram["s3_key"])
                 diagram_base64 = self.download_image_as_base64(diagram_url)
                 if diagram_base64:
-                    caption = correct_answer_diagram.get(
-                        "description", f"Answer diagram for Question {question_num}"
-                    )
+                    caption = f"Answer diagram for Question {question_num}"
                     html += f"""
             <div class="figure-container" style="margin-top:8px;">
                 <img src="{diagram_base64}" alt="Correct answer diagram" style="max-width:100%; border:1px solid #d1fae5; border-radius:4px;">
@@ -1454,10 +1478,7 @@ class AssignmentPDFGenerator:
                             diagram_url = s3_presign_url(subq_answer_diagram["s3_key"])
                             diagram_base64 = self.download_image_as_base64(diagram_url)
                             if diagram_base64:
-                                sub_caption = subq_answer_diagram.get(
-                                    "description",
-                                    f"Answer diagram for Part ({part_label})",
-                                )
+                                sub_caption = f"Answer diagram for Part ({part_label})"
                                 html += f"""
                 <div class="figure-container" style="margin-top:8px;">
                     <img src="{diagram_base64}" alt="Correct answer diagram" style="max-width:100%; border:1px solid #d1fae5; border-radius:4px;">
@@ -1587,6 +1608,10 @@ class AssignmentPDFGenerator:
             </body>
             </html>
             """
+
+            # Escape any characters outside latin-1 that would cause
+            # a UnicodeEncodeError inside WeasyPrint's PDF writer.
+            html_content = self._escape_non_latin1(html_content)
 
             html_doc = HTML(string=html_content)
             css_doc = CSS(string=self.generate_css())
