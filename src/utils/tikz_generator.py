@@ -29,7 +29,11 @@ from typing import Optional
 
 from anthropic import Anthropic
 from controllers.config import logger
-from utils.latex_repair import canonicalize_tikzlibrary, repair_latex, _UNCLOSED_GROUP_ERRORS
+from utils.latex_repair import (
+    canonicalize_tikzlibrary,
+    repair_latex,
+    _UNCLOSED_GROUP_ERRORS,
+)
 
 try:
     from pdf2image import convert_from_path
@@ -376,7 +380,9 @@ class TikZGenerator:
         Full pipeline: Claude → TikZ LaTeX → pdflatex → pdf2image → PNG bytes.
         """
         if not PDF2IMAGE_AVAILABLE:
-            raise RuntimeError("pdf2image is not installed. Run: pip install pdf2image pillow")
+            raise RuntimeError(
+                "pdf2image is not installed. Run: pip install pdf2image pillow"
+            )
 
         if not os.path.isfile(PDFLATEX_PATH):
             raise RuntimeError(
@@ -437,7 +443,9 @@ class TikZGenerator:
                 if _pass == 0:
                     repaired = repair_latex(latex_src, ("tikzpicture",))
                     if repaired != latex_src:
-                        logger.info("pdflatex pass 1 failed — applying deterministic repairs and retrying")
+                        logger.info(
+                            "pdflatex pass 1 failed — applying deterministic repairs and retrying"
+                        )
                         latex_src = repaired
                         with open(tex_file, "w", encoding="utf-8") as fh:
                             fh.write(latex_src)
@@ -449,7 +457,9 @@ class TikZGenerator:
 
             # AI repair fallback: triggered when both deterministic passes failed
             if last_error is not None:
-                logger.info("pdflatex failed after deterministic repair — attempting AI-assisted repair")
+                logger.info(
+                    "pdflatex failed after deterministic repair — attempting AI-assisted repair"
+                )
                 ai_latex = await self._ai_repair_latex(latex_src, last_error)
                 if ai_latex != latex_src:
                     latex_src = ai_latex
@@ -477,13 +487,18 @@ class TikZGenerator:
                             for l in result.stdout.splitlines()
                             if l.startswith("!") or "Error" in l or "error" in l
                         ]
-                        ai_error_summary = "\n".join(ai_error_lines[:10]) or result.stdout[-500:]
+                        ai_error_summary = (
+                            "\n".join(ai_error_lines[:10]) or result.stdout[-500:]
+                        )
                         # Last resort: regenerate from scratch
                         logger.warning(
                             "AI repair still failed — attempting full regeneration from scratch"
                         )
                         fresh_latex = await self._regenerate_latex(
-                            question_text, diagram_description, subject_guidance, ai_error_summary
+                            question_text,
+                            diagram_description,
+                            subject_guidance,
+                            ai_error_summary,
                         )
                         if fresh_latex:
                             # Apply deterministic repairs to the fresh source too
@@ -511,10 +526,17 @@ class TikZGenerator:
                                     for l in result.stdout.splitlines()
                                     if l.startswith("!") or "Error" in l or "error" in l
                                 ]
-                                regen_error = "\n".join(regen_error_lines[:10]) or result.stdout[-500:]
-                                raise RuntimeError(f"pdflatex compilation failed:\n{regen_error}")
+                                regen_error = (
+                                    "\n".join(regen_error_lines[:10])
+                                    or result.stdout[-500:]
+                                )
+                                raise RuntimeError(
+                                    f"pdflatex compilation failed:\n{regen_error}"
+                                )
                         else:
-                            raise RuntimeError(f"pdflatex compilation failed:\n{ai_error_summary}")
+                            raise RuntimeError(
+                                f"pdflatex compilation failed:\n{ai_error_summary}"
+                            )
                 else:
                     # AI repair returned the same source — try regeneration directly
                     logger.warning(
@@ -548,15 +570,24 @@ class TikZGenerator:
                                 for l in result.stdout.splitlines()
                                 if l.startswith("!") or "Error" in l or "error" in l
                             ]
-                            regen_error = "\n".join(regen_error_lines[:10]) or result.stdout[-500:]
-                            raise RuntimeError(f"pdflatex compilation failed:\n{regen_error}")
+                            regen_error = (
+                                "\n".join(regen_error_lines[:10])
+                                or result.stdout[-500:]
+                            )
+                            raise RuntimeError(
+                                f"pdflatex compilation failed:\n{regen_error}"
+                            )
                     else:
-                        raise RuntimeError(f"pdflatex compilation failed:\n{last_error}")
+                        raise RuntimeError(
+                            f"pdflatex compilation failed:\n{last_error}"
+                        )
 
             if not os.path.isfile(pdf_file):
                 raise RuntimeError("pdflatex ran but produced no PDF")
 
-            images = convert_from_path(pdf_file, dpi=output_dpi, fmt="png", single_file=True)
+            images = convert_from_path(
+                pdf_file, dpi=output_dpi, fmt="png", single_file=True
+            )
             if not images:
                 raise RuntimeError("pdf2image returned no images")
 

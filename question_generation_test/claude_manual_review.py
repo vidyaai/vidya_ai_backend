@@ -52,16 +52,22 @@ def review_with_claude(img_bytes: bytes, question_text: str) -> dict:
     response = client.messages.create(
         model="claude-opus-4-6",
         max_tokens=400,
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "type": "image",
-                    "source": {"type": "base64", "media_type": "image/png", "data": img_b64},
-                },
-                {"type": "text", "text": prompt},
-            ],
-        }],
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": img_b64,
+                        },
+                    },
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ],
     )
     text = response.content[0].text.strip()
     verdict = "PASS" if "VERDICT: PASS" in text else "FAIL"
@@ -105,22 +111,35 @@ def main():
             )
 
             if not url:
-                paper_results.append({"q": i, "verdict": "NO_IMAGE", "reason": "No S3 URL", "issues": ""})
+                paper_results.append(
+                    {"q": i, "verdict": "NO_IMAGE", "reason": "No S3 URL", "issues": ""}
+                )
                 print(f"  Q{i}: NO_IMAGE", flush=True)
                 continue
 
             img_bytes = download_image(url)
             if not img_bytes:
-                paper_results.append({"q": i, "verdict": "DOWNLOAD_FAIL", "reason": "Could not download", "issues": ""})
+                paper_results.append(
+                    {
+                        "q": i,
+                        "verdict": "DOWNLOAD_FAIL",
+                        "reason": "Could not download",
+                        "issues": "",
+                    }
+                )
                 print(f"  Q{i}: DOWNLOAD_FAIL", flush=True)
                 continue
 
             try:
                 result = review_with_claude(img_bytes, q_text)
                 paper_results.append({"q": i, **result})
-                print(f"  Q{i}: {result['verdict']} — {result['reason'][:80]}", flush=True)
+                print(
+                    f"  Q{i}: {result['verdict']} — {result['reason'][:80]}", flush=True
+                )
             except Exception as e:
-                paper_results.append({"q": i, "verdict": "ERROR", "reason": str(e)[:80], "issues": ""})
+                paper_results.append(
+                    {"q": i, "verdict": "ERROR", "reason": str(e)[:80], "issues": ""}
+                )
                 print(f"  Q{i}: ERROR — {e}", flush=True)
 
         all_results.append({"topic": topic, "questions": paper_results})

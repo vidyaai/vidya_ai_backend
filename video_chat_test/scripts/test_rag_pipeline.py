@@ -16,7 +16,7 @@ import argparse
 from typing import Dict, Any
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from utils.db import SessionLocal
 from models import Video, VideoSummary, TranscriptChunk
@@ -40,7 +40,7 @@ TEST_QUERIES = {
     "hybrid": [
         "What is discussed about X in this video?",
         "Can you explain the main points about Y?",
-    ]
+    ],
 }
 
 
@@ -61,18 +61,18 @@ class RAGPipelineTester:
             "chunk_generation_time": 0,
             "retrieval_times": [],
             "token_usage": {"input": 0, "output": 0},
-            "retrieval_strategies_used": set()
+            "retrieval_strategies_used": set(),
         }
 
     def __del__(self):
-        if hasattr(self, 'db'):
+        if hasattr(self, "db"):
             self.db.close()
 
     def test_pipeline(self):
         """Run complete RAG pipeline tests"""
-        print("="*80)
+        print("=" * 80)
         print(f"RAG Pipeline Test for Video: {self.video_id}")
-        print("="*80)
+        print("=" * 80)
 
         try:
             # Step 1: Check video exists
@@ -83,7 +83,9 @@ class RAGPipelineTester:
 
             print(f"\n✅ Video found: {video.title}")
             print(f"   Source: {video.source_type}")
-            print(f"   Transcript available: {bool(video.transcript_text or video.formatted_transcript)}")
+            print(
+                f"   Transcript available: {bool(video.transcript_text or video.formatted_transcript)}"
+            )
 
             # Step 2: Get transcript
             transcript = self.get_transcript(video)
@@ -94,39 +96,39 @@ class RAGPipelineTester:
             print(f"   Transcript length: {len(transcript)} characters")
 
             # Step 3: Test Summary Generation (Phase 2)
-            print("\n" + "="*80)
+            print("\n" + "=" * 80)
             print("Phase 2: Video Summarization")
-            print("="*80)
+            print("=" * 80)
             self.test_summarization(video, transcript)
 
             # Step 4: Test Chunk Generation + Embeddings (Phase 3)
-            print("\n" + "="*80)
+            print("\n" + "=" * 80)
             print("Phase 3: Chunking & Embeddings")
-            print("="*80)
+            print("=" * 80)
             self.test_chunking(transcript)
 
             # Step 5: Test Hybrid Retrieval
-            print("\n" + "="*80)
+            print("\n" + "=" * 80)
             print("Phase 3: Hybrid Retrieval (BM25 + Semantic)")
-            print("="*80)
+            print("=" * 80)
             self.test_hybrid_retrieval()
 
             # Step 6: Test Query Classification
-            print("\n" + "="*80)
+            print("\n" + "=" * 80)
             print("Query Classification & Routing")
-            print("="*80)
+            print("=" * 80)
             self.test_query_classification()
 
             # Step 7: Test Fallback Mechanism
-            print("\n" + "="*80)
+            print("\n" + "=" * 80)
             print("Fallback Mechanism (Progressive Enhancement)")
-            print("="*80)
+            print("=" * 80)
             self.test_fallback_mechanism(transcript)
 
             # Step 8: Print Performance Summary
-            print("\n" + "="*80)
+            print("\n" + "=" * 80)
             print("Performance Summary")
-            print("="*80)
+            print("=" * 80)
             self.print_performance_summary()
 
             print("\n✅ All tests completed successfully!")
@@ -134,6 +136,7 @@ class RAGPipelineTester:
         except Exception as e:
             print(f"\n❌ Test failed with error: {e}")
             import traceback
+
             traceback.print_exc()
 
     def get_video(self) -> Video:
@@ -182,22 +185,30 @@ class RAGPipelineTester:
     def test_chunking(self, transcript: str):
         """Test Phase 3: Chunking and embedding"""
         # Check if chunks exist
-        existing_chunks = self.db.query(TranscriptChunk).filter(
-            TranscriptChunk.video_id == self.video_id
-        ).count()
+        existing_chunks = (
+            self.db.query(TranscriptChunk)
+            .filter(TranscriptChunk.video_id == self.video_id)
+            .count()
+        )
 
         if existing_chunks > 0:
             print(f"✅ Chunks already exist: {existing_chunks} chunks")
 
             # Test a chunk
-            sample_chunk = self.db.query(TranscriptChunk).filter(
-                TranscriptChunk.video_id == self.video_id
-            ).first()
+            sample_chunk = (
+                self.db.query(TranscriptChunk)
+                .filter(TranscriptChunk.video_id == self.video_id)
+                .first()
+            )
 
             print(f"   Sample chunk:")
             print(f"   - Text: {sample_chunk.text[:100]}...")
-            print(f"   - Timestamp: {sample_chunk.start_time} - {sample_chunk.end_time}")
-            print(f"   - Embedding dims: {len(sample_chunk.embedding) if sample_chunk.embedding else 0}")
+            print(
+                f"   - Timestamp: {sample_chunk.start_time} - {sample_chunk.end_time}"
+            )
+            print(
+                f"   - Embedding dims: {len(sample_chunk.embedding) if sample_chunk.embedding else 0}"
+            )
         else:
             print("⏳ Generating chunks and embeddings...")
             start_time = time.time()
@@ -217,11 +228,7 @@ class RAGPipelineTester:
 
     def test_hybrid_retrieval(self):
         """Test hybrid BM25 + semantic retrieval"""
-        test_queries = [
-            "main concepts",
-            "what is discussed",
-            "explain the key points"
-        ]
+        test_queries = ["main concepts", "what is discussed", "explain the key points"]
 
         print("\nTesting hybrid retrieval...")
 
@@ -242,11 +249,13 @@ class RAGPipelineTester:
             )
             hybrid_time = time.time() - start_time
 
-            self.metrics["retrieval_times"].append({
-                "query": query,
-                "semantic_time": semantic_time,
-                "hybrid_time": hybrid_time
-            })
+            self.metrics["retrieval_times"].append(
+                {
+                    "query": query,
+                    "semantic_time": semantic_time,
+                    "hybrid_time": hybrid_time,
+                }
+            )
 
             print(f"  ├─ Semantic search: {semantic_time*1000:.1f}ms")
             print(f"  ├─ Hybrid search: {hybrid_time*1000:.1f}ms")
@@ -255,9 +264,11 @@ class RAGPipelineTester:
 
             if hybrid_results:
                 top_result = hybrid_results[0]
-                print(f"     Top result: {top_result.get('start_time', '?')} - {top_result.get('end_time', '?')}")
+                print(
+                    f"     Top result: {top_result.get('start_time', '?')} - {top_result.get('end_time', '?')}"
+                )
                 print(f"     Text: {top_result.get('text', '')[:80]}...")
-                if 'rrf_combined' in top_result:
+                if "rrf_combined" in top_result:
                     print(f"     RRF score: {top_result['rrf_combined']:.4f}")
 
     def test_query_classification(self):
@@ -276,7 +287,7 @@ class RAGPipelineTester:
         test_questions = [
             "What are Karnaugh maps?",
             "Explain the main concept",
-            "How does this work?"
+            "How does this work?",
         ]
 
         print("\nTesting fallback extraction...")
@@ -297,13 +308,19 @@ class RAGPipelineTester:
         """Print overall performance metrics"""
         print(f"\n📊 Timing Summary:")
         if self.metrics["summary_generation_time"] > 0:
-            print(f"   Summary generation: {self.metrics['summary_generation_time']:.2f}s")
+            print(
+                f"   Summary generation: {self.metrics['summary_generation_time']:.2f}s"
+            )
         if self.metrics["chunk_generation_time"] > 0:
             print(f"   Chunk generation: {self.metrics['chunk_generation_time']:.2f}s")
 
         if self.metrics["retrieval_times"]:
-            avg_semantic = sum(r["semantic_time"] for r in self.metrics["retrieval_times"]) / len(self.metrics["retrieval_times"])
-            avg_hybrid = sum(r["hybrid_time"] for r in self.metrics["retrieval_times"]) / len(self.metrics["retrieval_times"])
+            avg_semantic = sum(
+                r["semantic_time"] for r in self.metrics["retrieval_times"]
+            ) / len(self.metrics["retrieval_times"])
+            avg_hybrid = sum(
+                r["hybrid_time"] for r in self.metrics["retrieval_times"]
+            ) / len(self.metrics["retrieval_times"])
             print(f"   Average semantic retrieval: {avg_semantic*1000:.1f}ms")
             print(f"   Average hybrid retrieval: {avg_hybrid*1000:.1f}ms")
             speedup = (avg_semantic / avg_hybrid - 1) * 100 if avg_hybrid > 0 else 0

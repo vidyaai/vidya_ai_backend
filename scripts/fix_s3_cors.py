@@ -18,6 +18,7 @@ AWS_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION", "us-west-1")
 BUCKET_NAME = os.getenv("AWS_S3_BUCKET", "uservideodownloads980")
 
+
 def configure_s3_cors():
     """Configure CORS for the S3 bucket to allow video playback."""
 
@@ -26,35 +27,35 @@ def configure_s3_cors():
 
     # Create S3 client
     s3_client = boto3.client(
-        's3',
+        "s3",
         aws_access_key_id=AWS_ACCESS_KEY,
         aws_secret_access_key=AWS_SECRET_KEY,
-        region_name=AWS_REGION
+        region_name=AWS_REGION,
     )
 
     # CORS configuration
     cors_configuration = {
-        'CORSRules': [
+        "CORSRules": [
             {
-                'AllowedHeaders': ['*'],
-                'AllowedMethods': ['GET', 'HEAD'],
-                'AllowedOrigins': [
-                    'http://localhost:3000',
-                    'http://localhost:3001',
-                    'http://54.153.26.252:3000',
-                    'http://54.153.26.252:8000',
-                    'https://vidyaai.co',
-                    'https://www.vidyaai.co',
-                    '*'  # Allow all origins for now (can be restricted later)
+                "AllowedHeaders": ["*"],
+                "AllowedMethods": ["GET", "HEAD"],
+                "AllowedOrigins": [
+                    "http://localhost:3000",
+                    "http://localhost:3001",
+                    "http://54.153.26.252:3000",
+                    "http://54.153.26.252:8000",
+                    "https://vidyaai.co",
+                    "https://www.vidyaai.co",
+                    "*",  # Allow all origins for now (can be restricted later)
                 ],
-                'ExposeHeaders': [
-                    'Content-Length',
-                    'Content-Type',
-                    'ETag',
-                    'Accept-Ranges',
-                    'Content-Range'
+                "ExposeHeaders": [
+                    "Content-Length",
+                    "Content-Type",
+                    "ETag",
+                    "Accept-Ranges",
+                    "Content-Range",
                 ],
-                'MaxAgeSeconds': 3600
+                "MaxAgeSeconds": 3600,
             }
         ]
     }
@@ -62,15 +63,14 @@ def configure_s3_cors():
     try:
         # Apply CORS configuration
         s3_client.put_bucket_cors(
-            Bucket=BUCKET_NAME,
-            CORSConfiguration=cors_configuration
+            Bucket=BUCKET_NAME, CORSConfiguration=cors_configuration
         )
         print("✅ CORS configuration applied successfully!")
 
         # Verify the configuration
         response = s3_client.get_bucket_cors(Bucket=BUCKET_NAME)
         print("\n📋 Current CORS rules:")
-        for idx, rule in enumerate(response['CORSRules'], 1):
+        for idx, rule in enumerate(response["CORSRules"], 1):
             print(f"\nRule {idx}:")
             print(f"  Allowed Methods: {rule.get('AllowedMethods', [])}")
             print(f"  Allowed Origins: {rule.get('AllowedOrigins', [])}")
@@ -83,6 +83,7 @@ def configure_s3_cors():
     except Exception as e:
         print(f"❌ Error configuring CORS: {e}")
         return False
+
 
 if __name__ == "__main__":
     print("=" * 60)

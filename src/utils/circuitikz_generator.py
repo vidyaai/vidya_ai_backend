@@ -1167,7 +1167,9 @@ Return ONLY the complete LaTeX document starting with \\documentclass."""
                 if _pass == 0:
                     repaired = repair_latex(latex_src, ("circuitikz", "tikzpicture"))
                     if repaired != latex_src:
-                        logger.info("pdflatex pass 1 failed — applying deterministic repairs and retrying")
+                        logger.info(
+                            "pdflatex pass 1 failed — applying deterministic repairs and retrying"
+                        )
                         latex_src = repaired
                         with open(tex_file, "w", encoding="utf-8") as fh:
                             fh.write(latex_src)

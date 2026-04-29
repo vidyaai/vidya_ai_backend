@@ -132,7 +132,9 @@ class GeminiDiagramReviewer:
                 )
 
                 result_text = response.text.strip()
-                return self._parse_review_result(result_text, forbidden_labels=forbidden_labels)
+                return self._parse_review_result(
+                    result_text, forbidden_labels=forbidden_labels
+                )
 
             except google.api_core.exceptions.Cancelled as e:
                 # Handle cancelled/timeout errors specifically
@@ -165,7 +167,7 @@ class GeminiDiagramReviewer:
                     or "Resource exhausted" in err_str
                 )
                 if is_rate_limit and attempt < MAX_ATTEMPTS - 1:
-                    delay = min(2 ** attempt * 3, 30)
+                    delay = min(2**attempt * 3, 30)
                     logger.warning(
                         f"Gemini reviewer rate-limited (429) — backing off "
                         f"{delay}s before retry {attempt + 2}/{MAX_ATTEMPTS}"
@@ -507,7 +509,9 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
 "Show only the diagram structure with generic input labels and output label. Do NOT show any computed values, boolean expressions, or truth tables."
 """
 
-    def _parse_review_result(self, result_text: str, forbidden_labels: list | None = None) -> Dict[str, Any]:
+    def _parse_review_result(
+        self, result_text: str, forbidden_labels: list | None = None
+    ) -> Dict[str, Any]:
         """Parse the structured review response."""
         lines = result_text.strip().split("\n")
 
@@ -522,7 +526,12 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
 
         # Known field prefixes — used to detect where one field ends and the next begins
         _FIELD_PREFIXES = (
-            "VERDICT:", "FAILURE_TYPE:", "FIXABLE:", "REASON:", "ISSUES:", "CORRECTED_DESCRIPTION:"
+            "VERDICT:",
+            "FAILURE_TYPE:",
+            "FIXABLE:",
+            "REASON:",
+            "ISSUES:",
+            "CORRECTED_DESCRIPTION:",
         )
 
         current_field = None
@@ -534,7 +543,7 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
             matched = next((p for p in _FIELD_PREFIXES if upper.startswith(p)), None)
             if matched:
                 current_field = matched.rstrip(":")
-                value_part = stripped[len(matched):].strip()
+                value_part = stripped[len(matched) :].strip()
                 field_lines.setdefault(current_field, [])
                 if value_part:
                     field_lines[current_field].append(value_part)
@@ -603,7 +612,12 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
                     )
                     issues = _remaining
 
-            if not passed and failure_type == "missing_labels" and len(issues) <= 1 and fixable:
+            if (
+                not passed
+                and failure_type == "missing_labels"
+                and len(issues) <= 1
+                and fixable
+            ):
                 # At most one secondary label missing and it's fixable → accept
                 logger.info(
                     f"LENIENT_PASS: missing_labels with ≤1 issue ({issues}) — "
@@ -637,7 +651,9 @@ If an answer leak is detected, CORRECTED_DESCRIPTION must say:
                     _mentions_forbidden = any(
                         fl.lower() in reason_lower for fl in forbidden_labels
                     )
-                if not _mentions_forbidden and any(kw in reason_lower for kw in _lenient_leak_keywords):
+                if not _mentions_forbidden and any(
+                    kw in reason_lower for kw in _lenient_leak_keywords
+                ):
                     logger.info(
                         f"LENIENT_PASS: answer_leak reason matches standard-formula/"
                         f"contextual-restatement pattern — treating as pass. "

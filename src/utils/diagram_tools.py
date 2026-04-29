@@ -491,7 +491,9 @@ class DiagramTools:
                     diagram_type=diagram_type,
                     tool_type=tool_type,
                     subject_guidance=subject_guidance,
-                    reference_image_bytes=reference_image_bytes if _exec_attempt == 0 else None,
+                    reference_image_bytes=reference_image_bytes
+                    if _exec_attempt == 0
+                    else None,
                     execution_error=execution_error,
                 )
 
@@ -521,6 +523,7 @@ class DiagramTools:
 
                     # Auto-install any missing Python package before retrying
                     import re as _re, subprocess as _sp, sys as _sys
+
                     mod_match = _re.search(
                         r"No module named '([^']+)'", execution_error
                     )
@@ -1027,10 +1030,13 @@ class DiagramTools:
         Pipeline: Claude → TikZ LaTeX → pdflatex → pdf2image → PNG → S3
         """
         try:
-            logger.info(f"Executing tikz_tool for question {question_idx}: {description[:100]}")
+            logger.info(
+                f"Executing tikz_tool for question {question_idx}: {description[:100]}"
+            )
 
             if not hasattr(self, "_tikz_gen") or self._tikz_gen is None:
                 from utils.tikz_generator import TikZGenerator
+
                 self._tikz_gen = TikZGenerator()
 
             image_bytes = await self._tikz_gen.generate_diagram_png(
@@ -1040,7 +1046,9 @@ class DiagramTools:
                 output_dpi=300,
             )
 
-            diagram_data = await self.diagram_gen.upload_to_s3(image_bytes, assignment_id, question_idx)
+            diagram_data = await self.diagram_gen.upload_to_s3(
+                image_bytes, assignment_id, question_idx
+            )
             diagram_data["_image_bytes"] = image_bytes
             logger.info(f"Successfully generated TikZ diagram: {description[:80]}")
             return diagram_data
@@ -1048,6 +1056,7 @@ class DiagramTools:
         except Exception as e:
             logger.error(f"Error in tikz_tool: {str(e)}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
@@ -1065,7 +1074,9 @@ class DiagramTools:
         Falls back to claude_code_tool if RDKit is unavailable or SMILES is invalid.
         """
         try:
-            logger.info(f"Executing rdkit_tool for question {question_idx}: {description[:100]}")
+            logger.info(
+                f"Executing rdkit_tool for question {question_idx}: {description[:100]}"
+            )
 
             try:
                 from rdkit import Chem
@@ -1086,6 +1097,7 @@ class DiagramTools:
             # Ask Claude to provide the SMILES for the described molecule
             import os
             from anthropic import Anthropic
+
             client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
             smiles_response = client.messages.create(
                 model="claude-haiku-4-5-20251001",
@@ -1094,7 +1106,12 @@ class DiagramTools:
                     "You are a chemistry expert. Given a molecule description, return ONLY the "
                     "canonical SMILES string. No explanation, no markdown, no extra text."
                 ),
-                messages=[{"role": "user", "content": f"Molecule: {description}\n\nQuestion context: {question_text[:300]}"}],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"Molecule: {description}\n\nQuestion context: {question_text[:300]}",
+                    }
+                ],
             )
             smiles = smiles_response.content[0].text.strip()
 
@@ -1109,13 +1126,17 @@ class DiagramTools:
             drawer.FinishDrawing()
             image_bytes = drawer.GetDrawingText()
 
-            diagram_data = await self.diagram_gen.upload_to_s3(image_bytes, assignment_id, question_idx)
+            diagram_data = await self.diagram_gen.upload_to_s3(
+                image_bytes, assignment_id, question_idx
+            )
             diagram_data["_image_bytes"] = image_bytes
             logger.info(f"Successfully generated RDKit diagram (SMILES: {smiles[:60]})")
             return diagram_data
 
         except Exception as e:
-            logger.error(f"Error in rdkit_tool: {str(e)} — falling back to claude_code_tool")
+            logger.error(
+                f"Error in rdkit_tool: {str(e)} — falling back to claude_code_tool"
+            )
             return await self.claude_code_tool(
                 domain="chemistry",
                 diagram_type="molecular_structure",
@@ -1141,13 +1162,17 @@ class DiagramTools:
         Falls back to claude_code_tool (matplotlib) if Plotly/kaleido unavailable.
         """
         try:
-            logger.info(f"Executing plotly_tool for question {question_idx}: {description[:100]}")
+            logger.info(
+                f"Executing plotly_tool for question {question_idx}: {description[:100]}"
+            )
 
             try:
                 import plotly  # noqa: F401
                 import kaleido  # noqa: F401
             except ImportError:
-                logger.warning("plotly/kaleido not installed — falling back to claude_code_tool")
+                logger.warning(
+                    "plotly/kaleido not installed — falling back to claude_code_tool"
+                )
                 return await self.claude_code_tool(
                     domain="general",
                     diagram_type="3d_diagram",
@@ -1164,9 +1189,14 @@ class DiagramTools:
             import tempfile
             import subprocess
             from anthropic import Anthropic
+
             client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
-            guidance_section = f"\nDrawing instructions: {subject_guidance}" if subject_guidance else ""
+            guidance_section = (
+                f"\nDrawing instructions: {subject_guidance}"
+                if subject_guidance
+                else ""
+            )
             plotly_response = client.messages.create(
                 model="claude-opus-4-5",
                 max_tokens=3000,
@@ -1178,20 +1208,27 @@ class DiagramTools:
                     "Return ONLY the Python code. No markdown, no explanation.\n"
                     "Do NOT include any computed answer values or formulas revealing the solution."
                 ),
-                messages=[{"role": "user", "content": (
-                    f"Question: {question_text[:600]}\n"
-                    f"Diagram: {description}"
-                    f"{guidance_section}"
-                )}],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Question: {question_text[:600]}\n"
+                            f"Diagram: {description}"
+                            f"{guidance_section}"
+                        ),
+                    }
+                ],
             )
             code = plotly_response.content[0].text.strip()
             if code.startswith("```"):
                 import re
+
                 code = re.sub(r"^```[a-z]*\n?", "", code)
                 code = re.sub(r"\n?```$", "", code).strip()
 
             # Validate syntax before executing; repair with AI if broken
             import ast
+
             for _attempt in range(2):
                 try:
                     ast.parse(code)
@@ -1199,7 +1236,9 @@ class DiagramTools:
                 except SyntaxError as syn_err:
                     if _attempt == 1:
                         raise RuntimeError(f"Plotly execution failed: {syn_err}")
-                    logger.warning(f"Plotly code has syntax error, requesting AI repair: {syn_err}")
+                    logger.warning(
+                        f"Plotly code has syntax error, requesting AI repair: {syn_err}"
+                    )
                     repair_response = client.messages.create(
                         model="claude-opus-4-5",
                         max_tokens=3000,
@@ -1209,14 +1248,20 @@ class DiagramTools:
                             "Do not change logic or diagram content. "
                             "Return ONLY the corrected Python code. No markdown, no explanation."
                         ),
-                        messages=[{"role": "user", "content": (
-                            f"This Python code has a syntax error:\n{syn_err}\n\n"
-                            f"Fix it:\n{code}"
-                        )}],
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": (
+                                    f"This Python code has a syntax error:\n{syn_err}\n\n"
+                                    f"Fix it:\n{code}"
+                                ),
+                            }
+                        ],
                     )
                     fixed = repair_response.content[0].text.strip()
                     if fixed.startswith("```"):
                         import re
+
                         fixed = re.sub(r"^```[a-z]*\n?", "", fixed)
                         fixed = re.sub(r"\n?```$", "", fixed).strip()
                     code = fixed
@@ -1226,20 +1271,26 @@ class DiagramTools:
             for _exec_attempt in range(2):
                 with tempfile.TemporaryDirectory() as tmpdir:
                     output_path = os.path.join(tmpdir, "output.png")
-                    run_code = code.replace("'output.png'", f"'{output_path}'").replace('"output.png"', f"'{output_path}'")
+                    run_code = code.replace("'output.png'", f"'{output_path}'").replace(
+                        '"output.png"', f"'{output_path}'"
+                    )
                     script_path = os.path.join(tmpdir, "plot.py")
                     with open(script_path, "w", encoding="utf-8") as f:
                         f.write(run_code)
 
                     result = subprocess.run(
                         ["python", script_path],
-                        capture_output=True, text=True, timeout=60
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
                     )
                     if result.returncode != 0:
                         exec_error = result.stderr[-600:] or result.stdout[-600:]
                         if _exec_attempt == 1:
                             raise RuntimeError(f"Plotly execution failed: {exec_error}")
-                        logger.warning(f"Plotly execution failed (attempt 1), requesting AI repair: {exec_error[:200]}")
+                        logger.warning(
+                            f"Plotly execution failed (attempt 1), requesting AI repair: {exec_error[:200]}"
+                        )
                         repair_response = client.messages.create(
                             model="claude-opus-4-5",
                             max_tokens=3000,
@@ -1249,14 +1300,20 @@ class DiagramTools:
                                 "Do not change the diagram logic or content. "
                                 "Return ONLY the corrected Python code. No markdown, no explanation."
                             ),
-                            messages=[{"role": "user", "content": (
-                                f"This Python code raised a runtime error:\n{exec_error}\n\n"
-                                f"Fix it:\n{code}"
-                            )}],
+                            messages=[
+                                {
+                                    "role": "user",
+                                    "content": (
+                                        f"This Python code raised a runtime error:\n{exec_error}\n\n"
+                                        f"Fix it:\n{code}"
+                                    ),
+                                }
+                            ],
                         )
                         fixed = repair_response.content[0].text.strip()
                         if fixed.startswith("```"):
                             import re as _re
+
                             fixed = _re.sub(r"^```[a-z]*\n?", "", fixed)
                             fixed = _re.sub(r"\n?```$", "", fixed).strip()
                         code = fixed
@@ -1269,13 +1326,17 @@ class DiagramTools:
                         image_bytes = f.read()
                     break
 
-            diagram_data = await self.diagram_gen.upload_to_s3(image_bytes, assignment_id, question_idx)
+            diagram_data = await self.diagram_gen.upload_to_s3(
+                image_bytes, assignment_id, question_idx
+            )
             diagram_data["_image_bytes"] = image_bytes
             logger.info(f"Successfully generated Plotly 3D diagram: {description[:80]}")
             return diagram_data
 
         except Exception as e:
-            logger.error(f"Error in plotly_tool: {str(e)} — falling back to claude_code_tool")
+            logger.error(
+                f"Error in plotly_tool: {str(e)} — falling back to claude_code_tool"
+            )
             return await self.claude_code_tool(
                 domain="general",
                 diagram_type="3d_diagram",

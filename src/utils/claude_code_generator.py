@@ -90,7 +90,12 @@ class ClaudeCodeGenerator:
 
         system_prompt = self._build_system_prompt()
         user_prompt = self._build_user_prompt(
-            question_text, domain, diagram_type, tool_type, subject_guidance, execution_error
+            question_text,
+            domain,
+            diagram_type,
+            tool_type,
+            subject_guidance,
+            execution_error,
         )
 
         # Skip entirely if we already know the key is invalid
@@ -102,11 +107,16 @@ class ClaudeCodeGenerator:
         # Build message content — include reference image if provided (for answer-leak fixes)
         if reference_image_bytes:
             import base64
+
             b64 = base64.standard_b64encode(reference_image_bytes).decode("utf-8")
             message_content = [
                 {
                     "type": "image",
-                    "source": {"type": "base64", "media_type": "image/png", "data": b64},
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/png",
+                        "data": b64,
+                    },
                 },
                 {
                     "type": "text",
