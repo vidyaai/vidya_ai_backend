@@ -3489,7 +3489,10 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines.""",
                     q, assignment_id, idx, has_diagram_analysis
                 )
                 if progress_callback:
-                    progress_callback(f"q{idx + 1} complete")
+                    if result.get("hasDiagram"):
+                        progress_callback(f"Diagram added for question {idx + 1}")
+                    else:
+                        progress_callback(f"question {idx + 1} complete")
                 return result
 
         tasks = [process_with_semaphore(q, i) for i, q in enumerate(questions)]
