@@ -40,7 +40,8 @@ def _extract_required_labels(question_text: str) -> list:
     answer_terms: set = set()
     for m in re.finditer(
         r"\b(?:find|calculate|determine|explain|describe|compute|derive|prove|identify)\s+(?:the\s+)?([A-Za-z][A-Za-z\s\-]{1,35}?)(?:\s*[,\.;]|\s+and\s|$)",
-        question_text, re.IGNORECASE
+        question_text,
+        re.IGNORECASE,
     ):
         answer_terms.add(m.group(1).strip().lower())
 
@@ -54,7 +55,8 @@ def _extract_required_labels(question_text: str) -> list:
     for m in re.finditer(
         r"\b(?:label(?:ed|s|ing)?|show\s+the|mark\s+the|indicate\s+the|include\s+the)\s+(?:the\s+)?"
         r"([A-Za-z][A-Za-z\s\-₀₁₂₃₄₅₆₇₈₉]{1,35}?)(?:\s*[,\.;]|\s+and\s|\s+in\s|\s+at\s|\s+on\s|$)",
-        question_text, re.IGNORECASE
+        question_text,
+        re.IGNORECASE,
     ):
         add(m.group(1))
 
@@ -69,7 +71,8 @@ def _extract_required_labels(question_text: str) -> list:
     for m in re.finditer(
         r"\b(?:actions?|strategies?)\s*(?:are|:)\s*"
         r"([A-Z][a-z]+(?:\s*(?:and|,)\s*[A-Z][a-z]+)*)",
-        question_text, re.IGNORECASE,
+        question_text,
+        re.IGNORECASE,
     ):
         for part in re.split(r"\s*(?:and|,)\s*", m.group(1)):
             add(part.strip())
@@ -84,33 +87,62 @@ def _extract_required_labels(question_text: str) -> list:
 # concepts that name a CONCLUSION, not a structural component.
 _GLOBAL_FORBIDDEN_CONCEPTS: set = {
     # Game theory / optimisation — solution names
-    "pareto frontier", "pareto front", "nash equilibrium", "dominant strategy",
-    "feasible region", "infeasible region", "stable", "unstable", "optimal",
+    "pareto frontier",
+    "pareto front",
+    "nash equilibrium",
+    "dominant strategy",
+    "feasible region",
+    "infeasible region",
+    "stable",
+    "unstable",
+    "optimal",
     # Crystallography / diffraction — derived relationships
-    "systematic absences", "forbidden reflections",
-    "miller indices", "path difference", "bragg condition", "bragg's law",
+    "systematic absences",
+    "forbidden reflections",
+    "miller indices",
+    "path difference",
+    "bragg condition",
+    "bragg's law",
     "constructive interference",
     # Topological insulators / band structure — conclusions
-    "band inversion", "z2 topological invariant", "spin-momentum locking",
-    "linear dispersion", "dirac cone",
+    "band inversion",
+    "z2 topological invariant",
+    "spin-momentum locking",
+    "linear dispersion",
+    "dirac cone",
     # QEC / quantum circuits — conclusions
-    "threshold", "threshold region", "critical threshold",
-    "logical operator", "logical qubit encoding path", "syndrome table",
+    "threshold",
+    "threshold region",
+    "critical threshold",
+    "logical operator",
+    "logical qubit encoding path",
+    "syndrome table",
     # Quantum cryptography — attack/detection conclusions
-    "eavesdropping", "eavesdropping detection",
+    "eavesdropping",
+    "eavesdropping detection",
     # Biochemistry — editing / activity regions
     "base editing window",
     # Kepler / orbital mechanics — visual conclusions
     "equal areas",
     # Neuromorphic / neuroscience — synaptic outcomes
-    "potentiation", "depression", "long-term potentiation",
-    "long-term depression", "ltp", "ltd",
-    "threshold potential", "integration threshold", "membrane leakage",
+    "potentiation",
+    "depression",
+    "long-term potentiation",
+    "long-term depression",
+    "ltp",
+    "ltd",
+    "threshold potential",
+    "integration threshold",
+    "membrane leakage",
     # Neuromorphic architecture labels that reveal the answer
-    "conventional architecture", "von neumann architecture",
+    "conventional architecture",
+    "von neumann architecture",
     # Stellar nucleosynthesis — named cycles / outcomes
-    "pp chain", "proton-proton chain", "cno cycle",
-    "onion shell model", "onion-shell model",
+    "pp chain",
+    "proton-proton chain",
+    "cno cycle",
+    "onion shell model",
+    "onion-shell model",
 }
 
 
@@ -160,9 +192,7 @@ def _extract_forbidden_terms(
         for m in re.findall(r"\b[A-Z][a-z]{7,}\b", correct_answer):
             if m.lower() not in q_lower:
                 _add(m)
-        for m in re.findall(
-            r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}\b", correct_answer
-        ):
+        for m in re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}\b", correct_answer):
             if len(m) >= 10 and m.lower() not in q_lower:
                 _add(m)
 
@@ -718,13 +748,21 @@ CODE GENERATION BEST PRACTICES:
             # ── Extract correct answer for forbidden-terms analysis ──────
             correct_answer_raw = question.get("correctAnswer", "")
             # For MCQ, resolve index to option text so forbidden list is useful
-            if question_type == "multiple-choice" and isinstance(correct_answer_raw, str) and len(correct_answer_raw) <= 2:
+            if (
+                question_type == "multiple-choice"
+                and isinstance(correct_answer_raw, str)
+                and len(correct_answer_raw) <= 2
+            ):
                 options = question.get("options", [])
                 idx_map = {chr(65 + i): opt for i, opt in enumerate(options)}
-                correct_answer_raw = idx_map.get(correct_answer_raw.upper(), correct_answer_raw)
+                correct_answer_raw = idx_map.get(
+                    correct_answer_raw.upper(), correct_answer_raw
+                )
             _forbidden_terms = _extract_forbidden_terms(
                 equation_resolved_question_text,
-                correct_answer_raw if isinstance(correct_answer_raw, str) else str(correct_answer_raw),
+                correct_answer_raw
+                if isinstance(correct_answer_raw, str)
+                else str(correct_answer_raw),
             )
             if _forbidden_terms:
                 logger.info(
@@ -1165,8 +1203,11 @@ Mode: {mode_description}
                 ):
                     # Prefer dynamic guidance from DomainRouter (works for any subject);
                     # fall back to registry for known domains.
-                    injected_guidance = q_subject_guidance or self.prompt_registry.get_nonai_tool_prompt(
-                        q_domain, q_diagram_type, "matplotlib"
+                    injected_guidance = (
+                        q_subject_guidance
+                        or self.prompt_registry.get_nonai_tool_prompt(
+                            q_domain, q_diagram_type, "matplotlib"
+                        )
                     )
                     if injected_guidance:
                         tool_arguments = dict(tool_arguments)  # copy before mutating
@@ -1175,9 +1216,11 @@ Mode: {mode_description}
                             f"Q{question_idx}: Injected {q_domain}/{q_diagram_type} subject_guidance "
                             f"into claude_code_tool ({len(injected_guidance)} chars)"
                         )
-                elif tool_name in ("tikz_tool", "plotly_tool") and not tool_arguments.get(
-                    "subject_guidance"
-                ) and q_subject_guidance:
+                elif (
+                    tool_name in ("tikz_tool", "plotly_tool")
+                    and not tool_arguments.get("subject_guidance")
+                    and q_subject_guidance
+                ):
                     tool_arguments = dict(tool_arguments)
                     tool_arguments["subject_guidance"] = q_subject_guidance
                     logger.info(
@@ -1197,7 +1240,9 @@ Mode: {mode_description}
                 # ── Inject REQUIRED LABELS into description ──────────────────
                 # Extract structural component names from the question and prepend
                 # as mandatory labels so the generator cannot omit them.
-                _required_labels = _extract_required_labels(equation_resolved_question_text)
+                _required_labels = _extract_required_labels(
+                    equation_resolved_question_text
+                )
                 if _required_labels and "description" in tool_arguments:
                     tool_arguments = dict(tool_arguments)
                     label_prefix = (
@@ -1205,7 +1250,9 @@ Mode: {mode_description}
                         + "\n".join(f"  \u2022 {lbl}" for lbl in _required_labels)
                         + "\nThe diagram will FAIL automated review if any of these are missing.\n\n"
                     )
-                    tool_arguments["description"] = label_prefix + tool_arguments["description"]
+                    tool_arguments["description"] = (
+                        label_prefix + tool_arguments["description"]
+                    )
                     logger.info(
                         f"Q{question_idx}: Injected {len(_required_labels)} required labels: "
                         f"{', '.join(_required_labels)}"
@@ -1222,7 +1269,9 @@ Mode: {mode_description}
                         + "\n".join(f"  \u2022 {t}" for t in _forbidden_terms)
                         + "\nThe diagram will FAIL review if any of these appear."
                     )
-                    tool_arguments["description"] = tool_arguments["description"] + forbidden_suffix
+                    tool_arguments["description"] = (
+                        tool_arguments["description"] + forbidden_suffix
+                    )
                     logger.info(
                         f"Q{question_idx}: Injected {len(_forbidden_terms)} forbidden labels "
                         f"into description"
@@ -1581,7 +1630,8 @@ Mode: {mode_description}
                         _accumulated_leak_reasons: list[str] = []
                         if _forbidden_terms:
                             _accumulated_leak_reasons.append(
-                                "Known answer terms to avoid: " + ", ".join(_forbidden_terms[:10])
+                                "Known answer terms to avoid: "
+                                + ", ".join(_forbidden_terms[:10])
                             )
 
                         # Get image bytes for the initial diagram
@@ -1589,6 +1639,7 @@ Mode: {mode_description}
                         if _review_bytes is None:
                             try:
                                 import requests as _req
+
                                 resp = _req.get(diagram_data["s3_url"], timeout=15)
                                 if resp.status_code == 200:
                                     _review_bytes = resp.content
@@ -1639,8 +1690,12 @@ Mode: {mode_description}
                                     break
 
                                 # Build corrected description for next attempt
-                                failure_type = review_result.get("failure_type", "answer_leak")
-                                corrected_desc = review_result.get("corrected_description")
+                                failure_type = review_result.get(
+                                    "failure_type", "answer_leak"
+                                )
+                                corrected_desc = review_result.get(
+                                    "corrected_description"
+                                )
 
                                 # Review errors (timeout, init failure, malformed response)
                                 # indicate we have no actionable feedback — keep the
@@ -1660,12 +1715,18 @@ Mode: {mode_description}
                                 # Accumulate answer_leak reasons so each regen attempt
                                 # knows ALL labels that have leaked so far
                                 if failure_type == "answer_leak":
-                                    _accumulated_leak_reasons.append(review_result["reason"])
+                                    _accumulated_leak_reasons.append(
+                                        review_result["reason"]
+                                    )
 
                                 if not corrected_desc:
-                                    original_desc = _current_args.get("description", description_for_review)
+                                    original_desc = _current_args.get(
+                                        "description", description_for_review
+                                    )
                                     reason = review_result["reason"]
-                                    issue_line = _format_issues(review_result.get("issues", ""))
+                                    issue_line = _format_issues(
+                                        review_result.get("issues", "")
+                                    )
 
                                     if failure_type == "wrong_type":
                                         corrected_desc = (
@@ -1702,7 +1763,10 @@ Mode: {mode_description}
 
                                 # For answer_leak: prepend ALL accumulated leak reasons so
                                 # Claude knows every label that has leaked across all attempts
-                                if failure_type == "answer_leak" and len(_accumulated_leak_reasons) > 1:
+                                if (
+                                    failure_type == "answer_leak"
+                                    and len(_accumulated_leak_reasons) > 1
+                                ):
                                     all_leaks = "; ".join(_accumulated_leak_reasons)
                                     corrected_desc = (
                                         f"CUMULATIVE LEAK CORRECTIONS (all must be fixed): {all_leaks}. "
@@ -1724,8 +1788,12 @@ Mode: {mode_description}
                                         regen_args["subject_guidance"] = corrected_desc
                                     # For answer_leak: pass the failed diagram as reference image
                                     # so Claude can see exactly which labels to remove
-                                    elif failure_type == "answer_leak" and _review_bytes:
-                                        regen_args["reference_image_bytes"] = _review_bytes
+                                    elif (
+                                        failure_type == "answer_leak" and _review_bytes
+                                    ):
+                                        regen_args[
+                                            "reference_image_bytes"
+                                        ] = _review_bytes
                                         logger.info(
                                             f"Q{question_idx}: Passing reference image to Claude "
                                             f"for surgical answer-leak fix"
@@ -1758,7 +1826,10 @@ Mode: {mode_description}
                                     if _review_bytes is None:
                                         try:
                                             import requests as _req
-                                            resp = _req.get(regen_data["s3_url"], timeout=15)
+
+                                            resp = _req.get(
+                                                regen_data["s3_url"], timeout=15
+                                            )
                                             if resp.status_code == 200:
                                                 _review_bytes = resp.content
                                         except Exception as dl_err:
@@ -3598,7 +3669,10 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines.""",
             try:
                 questions = asyncio.run(
                     self._process_questions_batch(
-                        questions, assignment_id, has_diagram_analysis, progress_callback
+                        questions,
+                        assignment_id,
+                        has_diagram_analysis,
+                        progress_callback,
                     )
                 )
             except RuntimeError as e:
@@ -3612,7 +3686,10 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines.""",
                     future = executor.submit(
                         asyncio.run,
                         self._process_questions_batch(
-                            questions, assignment_id, has_diagram_analysis, progress_callback
+                            questions,
+                            assignment_id,
+                            has_diagram_analysis,
+                            progress_callback,
                         ),
                     )
                     questions = future.result()

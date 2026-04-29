@@ -11,10 +11,11 @@ import os
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from utils.ml_models import OpenAIVisionClient
 from controllers.config import logger
@@ -54,7 +55,7 @@ def test_query_rewriter():
     conversation_history_1 = [
         {
             "role": "user",
-            "content": "give me 10 questions from this lecture to prepare for exams"
+            "content": "give me 10 questions from this lecture to prepare for exams",
         },
         {
             "role": "assistant",
@@ -78,8 +79,8 @@ def test_query_rewriter():
 
 9. How does lift impact the motion of the atmosphere at large?
 
-10. What is the economic significance of aviation mentioned?"""
-        }
+10. What is the economic significance of aviation mentioned?""",
+        },
     ]
 
     test_queries_1 = [
@@ -97,7 +98,7 @@ def test_query_rewriter():
         print(f"  Resolved term: {result.get('resolved_term')}")
         print(f"  Rewritten: '{result.get('rewritten_query')}'")
 
-        if result.get('has_ambiguous_reference'):
+        if result.get("has_ambiguous_reference"):
             print("  ✅ PASS - Detected and rewrote reference")
         else:
             print("  ❌ FAIL - Did not detect reference")
@@ -108,12 +109,12 @@ def test_query_rewriter():
     conversation_history_2 = [
         {
             "role": "user",
-            "content": "is wafer level chip packaging discussed in the video?"
+            "content": "is wafer level chip packaging discussed in the video?",
         },
         {
             "role": "assistant",
-            "content": "Yes, wafer level chip packaging is discussed at 60:31 to 61:26 in the video."
-        }
+            "content": "Yes, wafer level chip packaging is discussed at 60:31 to 61:26 in the video.",
+        },
     ]
 
     query_2 = "can you give me some external links about the above topic?"
@@ -124,7 +125,7 @@ def test_query_rewriter():
     print(f"  Resolved term: {result.get('resolved_term')}")
     print(f"  Rewritten: '{result.get('rewritten_query')}'")
 
-    if "wafer level chip packaging" in result.get('rewritten_query', '').lower():
+    if "wafer level chip packaging" in result.get("rewritten_query", "").lower():
         print("  ✅ PASS - Correctly resolved 'the above topic'")
     else:
         print("  ❌ FAIL - Did not resolve 'the above topic'")
@@ -133,14 +134,11 @@ def test_query_rewriter():
     print_test_case(3, "Self-contained query (no reference)")
 
     conversation_history_3 = [
-        {
-            "role": "user",
-            "content": "what is aerodynamics?"
-        },
+        {"role": "user", "content": "what is aerodynamics?"},
         {
             "role": "assistant",
-            "content": "Aerodynamics is the study of how air flows around objects..."
-        }
+            "content": "Aerodynamics is the study of how air flows around objects...",
+        },
     ]
 
     query_3 = "what is drag?"
@@ -151,7 +149,7 @@ def test_query_rewriter():
     print(f"  Resolved term: {result.get('resolved_term')}")
     print(f"  Rewritten: '{result.get('rewritten_query')}'")
 
-    if not result.get('has_ambiguous_reference'):
+    if not result.get("has_ambiguous_reference"):
         print("  ✅ PASS - Correctly identified as self-contained")
     else:
         print("  ❌ FAIL - Incorrectly detected reference")
@@ -160,14 +158,11 @@ def test_query_rewriter():
     print_test_case(4, "Implicit reference ('elaborate more')")
 
     conversation_history_4 = [
-        {
-            "role": "user",
-            "content": "what is the Bernoulli principle?"
-        },
+        {"role": "user", "content": "what is the Bernoulli principle?"},
         {
             "role": "assistant",
-            "content": "The Bernoulli principle states that an increase in the speed of a fluid occurs simultaneously with a decrease in pressure..."
-        }
+            "content": "The Bernoulli principle states that an increase in the speed of a fluid occurs simultaneously with a decrease in pressure...",
+        },
     ]
 
     query_4 = "can you elaborate more on this?"
@@ -178,7 +173,7 @@ def test_query_rewriter():
     print(f"  Resolved term: {result.get('resolved_term')}")
     print(f"  Rewritten: '{result.get('rewritten_query')}'")
 
-    if result.get('has_ambiguous_reference'):
+    if result.get("has_ambiguous_reference"):
         print("  ✅ PASS - Detected implicit reference")
     else:
         print("  ❌ FAIL - Did not detect implicit reference")
@@ -193,7 +188,7 @@ def test_query_rewriter():
     print(f"  Has reference: {result.get('has_ambiguous_reference')}")
     print(f"  Rewritten: '{result.get('rewritten_query')}'")
 
-    if result.get('rewritten_query') == query_5:
+    if result.get("rewritten_query") == query_5:
         print("  ✅ PASS - Returned original query (no history)")
     else:
         print("  ❌ FAIL - Should return original when no history")
@@ -202,17 +197,14 @@ def test_query_rewriter():
     print_test_case(6, "Different numbering styles (1), 2:, 3-)")
 
     conversation_history_6 = [
-        {
-            "role": "user",
-            "content": "give me key concepts"
-        },
+        {"role": "user", "content": "give me key concepts"},
         {
             "role": "assistant",
             "content": """Key concepts:
 1) Turboprops vs turbojets - efficiency comparison
 2: Propeller control systems - constant speed mechanisms
-3 - Flight instrumentation - six-pack layout"""
-        }
+3 - Flight instrumentation - six-pack layout""",
+        },
     ]
 
     test_queries_6 = [
@@ -229,7 +221,7 @@ def test_query_rewriter():
         print(f"  Resolved term: {result.get('resolved_term')}")
         print(f"  Rewritten: '{result.get('rewritten_query')}'")
 
-        if result.get('has_ambiguous_reference'):
+        if result.get("has_ambiguous_reference"):
             print(f"  ✅ PASS - Detected reference")
         else:
             print(f"  ❌ FAIL - Did not detect reference")
@@ -257,4 +249,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n\n❌ Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()

@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Add the src directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from sqlalchemy import text
 from utils.db import SessionLocal
@@ -22,11 +22,15 @@ def fix_youtube_videos():
     db = SessionLocal()
     try:
         # Get YouTube videos without youtube_id
-        result = db.execute(text("""
+        result = db.execute(
+            text(
+                """
             SELECT id, title, youtube_url
             FROM videos
             WHERE source_type = 'youtube' AND (youtube_id IS NULL OR youtube_id = '')
-        """))
+        """
+            )
+        )
         rows = result.fetchall()
 
         if not rows:
@@ -41,20 +45,26 @@ def fix_youtube_videos():
             print(f"    YouTube URL: {youtube_url}")
 
             # Try to extract youtube_id from the video ID or URL
-            if youtube_url and 'youtube.com' in youtube_url:
+            if youtube_url and "youtube.com" in youtube_url:
                 # Extract youtube_id from URL
                 import re
-                match = re.search(r'(?:v=|/)([a-zA-Z0-9_-]{11})', youtube_url)
+
+                match = re.search(r"(?:v=|/)([a-zA-Z0-9_-]{11})", youtube_url)
                 if match:
                     youtube_id = match.group(1)
                     print(f"    Extracted youtube_id: {youtube_id}")
 
                     # Update the record
-                    db.execute(text("""
+                    db.execute(
+                        text(
+                            """
                         UPDATE videos
                         SET youtube_id = :youtube_id
                         WHERE id = :video_id
-                    """), {"youtube_id": youtube_id, "video_id": video_id})
+                    """
+                        ),
+                        {"youtube_id": youtube_id, "video_id": video_id},
+                    )
                     db.commit()
                     print(f"    ✓ Updated youtube_id")
                 else:
@@ -62,11 +72,16 @@ def fix_youtube_videos():
             elif video_id and len(video_id) == 11:
                 # The video ID itself might be the youtube_id
                 print(f"    Video ID looks like a youtube_id, updating...")
-                db.execute(text("""
+                db.execute(
+                    text(
+                        """
                     UPDATE videos
                     SET youtube_id = :youtube_id
                     WHERE id = :video_id
-                """), {"youtube_id": video_id, "video_id": video_id})
+                """
+                    ),
+                    {"youtube_id": video_id, "video_id": video_id},
+                )
                 db.commit()
                 print(f"    ✓ Updated youtube_id")
             else:

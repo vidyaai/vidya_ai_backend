@@ -779,7 +779,9 @@ class AssignmentPDFGenerator:
                     diagram_url = s3_presign_url(subq["diagram"]["s3_key"])
                     diagram_base64 = self.download_image_as_base64(diagram_url)
                     if diagram_base64:
-                        sub_diagram_type = subq.get("diagram", {}).get("diagram_type", "")
+                        sub_diagram_type = subq.get("diagram", {}).get(
+                            "diagram_type", ""
+                        )
                         sub_caption = (
                             sub_diagram_type.replace("_", " ").strip().title()
                             if sub_diagram_type

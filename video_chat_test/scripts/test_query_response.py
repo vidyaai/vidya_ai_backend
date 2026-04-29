@@ -16,7 +16,7 @@ import argparse
 from typing import Dict, Any
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from utils.db import SessionLocal
 from models import Video, VideoSummary, TranscriptChunk
@@ -36,17 +36,17 @@ class QueryResponseTester:
         self.vision_client = OpenAIVisionClient()
 
     def __del__(self):
-        if hasattr(self, 'db'):
+        if hasattr(self, "db"):
             self.db.close()
 
     def test_query(self, query: str):
         """Test a single query end-to-end"""
-        print("="*80)
+        print("=" * 80)
         print(f"Query Response Test")
-        print("="*80)
+        print("=" * 80)
         print(f"Video ID: {self.video_id}")
         print(f"Query: {query}")
-        print("="*80)
+        print("=" * 80)
 
         try:
             # Get video and transcript
@@ -64,14 +64,20 @@ class QueryResponseTester:
             print(f"   Transcript length: {len(transcript):,} characters")
 
             # Check RAG status
-            summary_exists = self.summary_service.get_summary(self.db, self.video_id) is not None
-            chunks_count = self.db.query(TranscriptChunk).filter(
-                TranscriptChunk.video_id == self.video_id
-            ).count()
+            summary_exists = (
+                self.summary_service.get_summary(self.db, self.video_id) is not None
+            )
+            chunks_count = (
+                self.db.query(TranscriptChunk)
+                .filter(TranscriptChunk.video_id == self.video_id)
+                .count()
+            )
 
             print(f"\n📊 RAG Status:")
             print(f"   Summary available: {'✅ Yes' if summary_exists else '❌ No'}")
-            print(f"   Chunks available: {'✅ Yes' if chunks_count > 0 else '❌ No'} ({chunks_count} chunks)")
+            print(
+                f"   Chunks available: {'✅ Yes' if chunks_count > 0 else '❌ No'} ({chunks_count} chunks)"
+            )
 
             # Classify query
             query_type = self.query_router.classify_query(query)
@@ -100,6 +106,7 @@ class QueryResponseTester:
                 # Use fallback extraction
                 retrieval_strategy = "Fallback (chunks not ready)"
                 from utils.context_extraction import extract_relevant_context
+
                 context = extract_relevant_context(transcript, query, max_tokens=3000)
 
             context_time = time.time() - context_start
@@ -112,9 +119,7 @@ class QueryResponseTester:
             response_start = time.time()
 
             response = self.vision_client.ask_text_only(
-                prompt=query,
-                context=context,
-                conversation_history=[]
+                prompt=query, context=context, conversation_history=[]
             )
 
             response_time = time.time() - response_start
@@ -124,11 +129,11 @@ class QueryResponseTester:
             print(f"   Total time: {total_time:.2f}s")
 
             # Display response
-            print(f"\n" + "="*80)
+            print(f"\n" + "=" * 80)
             print(f"Response:")
-            print("="*80)
+            print("=" * 80)
             print(response)
-            print("="*80)
+            print("=" * 80)
 
             # Performance summary
             print(f"\n📊 Performance Metrics:")
@@ -139,7 +144,8 @@ class QueryResponseTester:
 
             # Check for timestamps in response
             import re
-            timestamps = re.findall(r'\$?\d{1,2}:\d{2}(?::\d{2})?\$?', response)
+
+            timestamps = re.findall(r"\$?\d{1,2}:\d{2}(?::\d{2})?\$?", response)
             if timestamps:
                 print(f"\n⏱️  Timestamps cited: {len(timestamps)}")
                 print(f"   Examples: {', '.join(timestamps[:3])}")
@@ -151,6 +157,7 @@ class QueryResponseTester:
         except Exception as e:
             print(f"\n❌ Test failed: {e}")
             import traceback
+
             traceback.print_exc()
 
 

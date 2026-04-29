@@ -348,7 +348,7 @@ Timestamp: 2026-03-23T22:09:40.567344
 2026-03-23 22:10:37,832 - controllers.config - INFO - 🔍 System prompt check - Contains 'LaTeX ONLY': True
 2026-03-23 22:10:37,832 - controllers.config - INFO - 🔍 System prompt check - Contains 'NEVER use HTML': True
 2026-03-23 22:10:41,523 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-2026-03-23 22:10:41,528 - controllers.config - INFO - 🤖 AI Response (first 500 chars): Great question! The student's name is **Anirban Mondul**, and the counselor's name is **Sadiq Mohammed**. You can find this information at the beginning of the video, specifically around $03:50$ where they introduce themselves. 
+2026-03-23 22:10:41,528 - controllers.config - INFO - 🤖 AI Response (first 500 chars): Great question! The student's name is **Anirban Mondul**, and the counselor's name is **Sadiq Mohammed**. You can find this information at the beginning of the video, specifically around $03:50$ where they introduce themselves.
 
 Does that help? Want to know more about their conversation or any specific part of the video? 😊
 2026-03-23 22:10:41,528 - controllers.config - INFO - 🔍 Response contains 'MathML': False
@@ -462,15 +462,15 @@ RESULTS SUMMARY
 
 📊 Query Results:
 --------------------------------------------------------------------------------
-#   Strategy        Type       Time (ms)    Context   
+#   Strategy        Type       Time (ms)    Context
 --------------------------------------------------------------------------------
-1   Fallback        hybrid     5802         11637     
-2   Fallback        hybrid     8945         10935     
-3   Fallback        broad      5932         11637     
-4   Fallback        broad      11745        11078     
-5   Fallback        hybrid     6205         10913     
+1   Fallback        hybrid     5802         11637
+2   Fallback        hybrid     8945         10935
+3   Fallback        broad      5932         11637
+4   Fallback        broad      11745        11078
+5   Fallback        hybrid     6205         10913
 --------------------------------------------------------------------------------
-AVG                            7726         11240     
+AVG                            7726         11240
 
 
 📝 Detailed Responses:
@@ -479,7 +479,7 @@ AVG                            7726         11240
 [Q1] What is the name of the student and the counsellor?
 Strategy: Fallback | Type: hybrid | Time: 5802ms
 --------------------------------------------------------------------------------
-Great question! The student's name is **Anirban Mondul**, and the counselor's name is **Sadiq Mohammed**. You can find this information at the beginning of the video, specifically around $03:50$ where they introduce themselves. 
+Great question! The student's name is **Anirban Mondul**, and the counselor's name is **Sadiq Mohammed**. You can find this information at the beginning of the video, specifically around $03:50$ where they introduce themselves.
 
 Does that help? Want to know more about their conversation or any specific part of the video? 😊
 --------------------------------------------------------------------------------

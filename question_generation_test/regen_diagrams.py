@@ -37,13 +37,15 @@ def load_papers(input_dir: Path) -> list:
     papers = []
     for f in files:
         data = json.loads(f.read_text())
-        papers.append({
-            "filename": f.name,
-            "topic": data.get("topic", f.stem),
-            "subject": data.get("subject", "engineering"),
-            "prompt": data.get("prompt", ""),
-            "questions": data.get("questions", []),
-        })
+        papers.append(
+            {
+                "filename": f.name,
+                "topic": data.get("topic", f.stem),
+                "subject": data.get("subject", "engineering"),
+                "prompt": data.get("prompt", ""),
+                "questions": data.get("questions", []),
+            }
+        )
     return papers
 
 
@@ -87,7 +89,9 @@ def regen_paper(paper: dict, paper_idx: int, output_dir: Path) -> dict:
     }
 
     try:
-        assignment_id = f"batch_regen_{paper_idx}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        assignment_id = (
+            f"batch_regen_{paper_idx}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
 
         # Strip diagrams so the agent regenerates all of them
         questions = strip_diagrams(paper["questions"])
@@ -114,8 +118,10 @@ def regen_paper(paper: dict, paper_idx: int, output_dir: Path) -> dict:
         # Generate PDF
         safe_topic = (
             topic.replace(" ", "_")
-            .replace("(", "").replace(")", "")
-            .replace("&", "and").replace("/", "-")
+            .replace("(", "")
+            .replace(")", "")
+            .replace("&", "and")
+            .replace("/", "-")
         )
         pdf_generator = AssignmentPDFGenerator()
         pdf_assignment = {
@@ -133,28 +139,36 @@ def regen_paper(paper: dict, paper_idx: int, output_dir: Path) -> dict:
 
         json_path = output_dir / f"{paper_idx:02d}_{safe_topic}.json"
         with open(json_path, "w") as f:
-            json.dump({
-                "topic": topic,
-                "subject": subject,
-                "prompt": paper["prompt"],
-                "questions": questions,
-                "statistics": {
-                    "total_questions": len(questions),
-                    "questions_with_diagrams": diagram_count,
+            json.dump(
+                {
+                    "topic": topic,
+                    "subject": subject,
+                    "prompt": paper["prompt"],
+                    "questions": questions,
+                    "statistics": {
+                        "total_questions": len(questions),
+                        "questions_with_diagrams": diagram_count,
+                    },
                 },
-            }, f, indent=2)
+                f,
+                indent=2,
+            )
 
         elapsed = time.time() - start
-        result.update({
-            "status": "OK",
-            "questions": len(questions),
-            "diagrams": diagram_count,
-            "tools_used": sorted(tools_used) or ["claude_code"],
-            "pdf_kb": round(len(pdf_bytes) / 1024, 1),
-            "time_s": round(elapsed, 0),
-            "pdf_file": pdf_filename,
-        })
-        print(f"  OK  {len(questions)} questions, {diagram_count} diagrams — {pdf_filename} ({result['pdf_kb']} KB)")
+        result.update(
+            {
+                "status": "OK",
+                "questions": len(questions),
+                "diagrams": diagram_count,
+                "tools_used": sorted(tools_used) or ["claude_code"],
+                "pdf_kb": round(len(pdf_bytes) / 1024, 1),
+                "time_s": round(elapsed, 0),
+                "pdf_file": pdf_filename,
+            }
+        )
+        print(
+            f"  OK  {len(questions)} questions, {diagram_count} diagrams — {pdf_filename} ({result['pdf_kb']} KB)"
+        )
 
     except Exception as e:
         elapsed = time.time() - start
@@ -174,7 +188,9 @@ def print_table(results: list):
     print(header)
     print("-" * 110)
     for r in results:
-        tools_or_err = r["error"] if r["status"] == "FAIL" else ", ".join(r.get("tools_used", []))
+        tools_or_err = (
+            r["error"] if r["status"] == "FAIL" else ", ".join(r.get("tools_used", []))
+        )
         row = (
             f"{r['id']:>2}  "
             f"{r['topic']:<40}  "
@@ -191,15 +207,20 @@ def print_table(results: list):
     ok = sum(1 for r in results if r["status"] == "OK")
     total_diags = sum(r["diagrams"] for r in results)
     total_time = sum(r["time_s"] for r in results)
-    print(f"  {'TOTAL':<40}    {'':<10}    {ok}/10  {sum(r['questions'] for r in results):>3}  {total_diags:>5}  {'':>7}  {total_time:>7.0f}")
+    print(
+        f"  {'TOTAL':<40}    {'':<10}    {ok}/10  {sum(r['questions'] for r in results):>3}  {total_diags:>5}  {'':>7}  {total_time:>7.0f}"
+    )
     print(f"{'='*110}\n")
 
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default="question_papers", help="Input folder name")
-    parser.add_argument("--output", default="question_papers2", help="Output folder name")
+    parser.add_argument(
+        "--output", default="question_papers2", help="Output folder name"
+    )
     args = parser.parse_args()
 
     base = Path(__file__).parent

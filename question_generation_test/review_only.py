@@ -48,12 +48,21 @@ async def review_paper(paper_path: Path, reviewer: GeminiDiagramReviewer) -> lis
         q_text = q.get("question", q.get("text", ""))
 
         if not url:
-            results.append({"q": i + 1, "status": "NO_DIAGRAM", "failure_type": "-", "reason": ""})
+            results.append(
+                {"q": i + 1, "status": "NO_DIAGRAM", "failure_type": "-", "reason": ""}
+            )
             continue
 
         img_bytes = download_image(url)
         if not img_bytes:
-            results.append({"q": i + 1, "status": "DOWNLOAD_FAIL", "failure_type": "-", "reason": ""})
+            results.append(
+                {
+                    "q": i + 1,
+                    "status": "DOWNLOAD_FAIL",
+                    "failure_type": "-",
+                    "reason": "",
+                }
+            )
             continue
 
         # Substitute <eq qN_eqM> placeholders with their LaTeX from the
@@ -85,12 +94,14 @@ async def review_paper(paper_path: Path, reviewer: GeminiDiagramReviewer) -> lis
         status = "PASS" if result["passed"] else "FAIL"
         failure_type = result.get("failure_type", "-") if not result["passed"] else "-"
         print(f"  Q{i+1}: {status} ({failure_type}) — {result['reason'][:80]}")
-        results.append({
-            "q": i + 1,
-            "status": status,
-            "failure_type": failure_type,
-            "reason": result["reason"],
-        })
+        results.append(
+            {
+                "q": i + 1,
+                "status": status,
+                "failure_type": failure_type,
+                "reason": result["reason"],
+            }
+        )
 
     return results
 
@@ -162,7 +173,9 @@ async def main():
         print(row)
 
     print("-" * 100)
-    print(f"TOTAL: {total_pass}/{total_diagrams} passed ({100*total_pass//total_diagrams if total_diagrams else 0}%)")
+    print(
+        f"TOTAL: {total_pass}/{total_diagrams} passed ({100*total_pass//total_diagrams if total_diagrams else 0}%)"
+    )
     print(f"{'='*100}\n")
 
 
