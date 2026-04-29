@@ -70,6 +70,8 @@ class ClaudeCodeGenerator:
         diagram_type: str,
         tool_type: str = "matplotlib",
         subject_guidance: str = "",
+        reference_image_bytes: Optional[bytes] = None,
+        execution_error: str = "",
     ) -> str:
         """
         Generate Python diagram code using Claude
@@ -88,7 +90,7 @@ class ClaudeCodeGenerator:
 
         system_prompt = self._build_system_prompt()
         user_prompt = self._build_user_prompt(
-            question_text, domain, diagram_type, tool_type, subject_guidance
+            question_text, domain, diagram_type, tool_type, subject_guidance, execution_error
         )
 
         # Skip entirely if we already know the key is invalid
@@ -97,13 +99,35 @@ class ClaudeCodeGenerator:
                 "Claude API key previously failed authentication — skipping to avoid repeated 401 errors"
             )
 
+        # Build message content — include reference image if provided (for answer-leak fixes)
+        if reference_image_bytes:
+            import base64
+            b64 = base64.standard_b64encode(reference_image_bytes).decode("utf-8")
+            message_content = [
+                {
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": "image/png", "data": b64},
+                },
+                {
+                    "type": "text",
+                    "text": (
+                        "The image above is the PREVIOUS diagram that had issues. "
+                        "Use it as a reference for layout and structure, but fix the problems "
+                        "described in the instructions below. Do NOT copy any labels or annotations "
+                        "that reveal the answer.\n\n" + user_prompt
+                    ),
+                },
+            ]
+        else:
+            message_content = user_prompt
+
         try:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4000,
                 temperature=0.1,  # Low temperature for consistent, accurate code
                 system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
+                messages=[{"role": "user", "content": message_content}],
             )
 
             self._api_key_valid = True  # Key works
@@ -445,6 +469,7 @@ plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')
         diagram_type: str,
         tool_type: str,
         subject_guidance: str = "",
+        execution_error: str = "",
     ) -> str:
         """Build user prompt"""
 
@@ -456,7 +481,19 @@ plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')
         if subject_guidance:
             subject_section = f"\n**Subject-Specific Guidance:**\n{subject_guidance}\n"
 
-        return f"""Generate complete Python code to create this diagram:
+        error_section = ""
+        if execution_error:
+            error_section = f"""
+⚠️ PREVIOUS CODE FAILED — YOU MUST FIX THIS ERROR:
+```
+{execution_error[:600]}
+```
+Keep exactly the same diagram logic and content. Only fix the code error above.
+Do NOT change what the diagram shows — just make it execute without errors.
+
+"""
+
+        return f"""Generate complete Python code to create this diagram:{error_section}
 
 **Question/Description:**
 {question_text}
@@ -476,14 +513,27 @@ plt.savefig('output.png', dpi=200, bbox_inches='tight', facecolor='white')
 6. Use fontsize=14+ for dimension labels, axis labels, and annotations so text is readable in PDF
 7. MANDATORY: Use matplotlib mathtext for ALL subscripts — $y_1$ NOT 'y1', $P_2$ NOT 'P2', $V_{{out}}$ NOT 'Vout'
 8. MANDATORY: ALL text labels must have white bbox background for readability
-9. ANSWER HIDING (CRITICAL): This is a student assignment — the diagram must NOT reveal the answer.
+9. ANSWER HIDING (CRITICAL): This is a student assignment — the diagram MUST NOT reveal the answer.
+   UNIVERSAL RULE: Show the setup, structure, and context. NEVER show the conclusion.
    - For timing/waveform diagrams: draw ONLY INPUT waveforms (CLK, D, A, B, EN, RESET).
      OUTPUT signals (Q, Q1, Q2, Q̄, Y) must be BLANK dashed lines with "?" labels.
      NEVER draw actual output waveform values — students must determine these.
    - For counter/state machine diagrams: show ONLY the circuit topology and initial state.
      Do NOT show state transition sequences or output values.
-   - For any diagram where the question asks "find", "determine", "calculate", "draw",
-     or "describe" an output — do NOT include that output in the diagram.
+   - For plots/graphs with regions: NEVER add text labels that interpret or name regions
+     (e.g., "Feasible", "Infeasible", "Stable", "Unstable", "High Security", "Optimal",
+     "Threshold Region"). Label only axes, curve names, and data series. Region boundaries
+     may be shown as dashed lines but must NOT be annotated with an interpretation.
+   - For reaction/process flowcharts: NEVER label arrow outcomes with the specific
+     products, equations, particle names, or quantities the student is asked to identify.
+     Show node labels (reactant names, step names) but leave product annotations blank or "?".
+   - For comparison charts (bar, stacked, grouped): NEVER add a title or annotation
+     that states the conclusion (e.g., "neuromorphic uses less energy", "HDR is more accurate").
+     Show bars with neutral axis labels only; let the student draw the conclusion.
+   - For any diagram where the question asks "find", "determine", "calculate", "explain",
+     "identify", or "describe" X — do NOT label, annotate, or highlight X in the diagram.
+   - NEVER add formula text overlays or equation annotations (e.g., E = v·k, nTτ > 10²¹)
+     as floating text on any diagram — formulas belong in the question text, not the figure.
 
 Return ONLY the Python code, ready to execute."""
 
@@ -589,6 +639,19 @@ Follow the CMOS INVERTER and CMOS NAND examples in the system prompt EXACTLY.
 - Add edges: G.add_edge(source, target, **attrs)
 - Choose layout: spring, hierarchical, circular
 - Draw with labels and clear styling
+
+⚠️ CRITICAL — BROKEN APIs (do NOT use these):
+- nx.multipartite_layout() is BROKEN in networkx 3.6 — causes AttributeError crash.
+  Instead, for layered/hierarchical graphs use a manual pos dict:
+  ```python
+  layer_nodes = {'layer0': [...], 'layer1': [...], 'layer2': [...]}
+  pos = {}
+  for layer_idx, nodes in enumerate(layer_nodes.values()):
+      for node_idx, node in enumerate(nodes):
+          pos[node] = (node_idx - len(nodes)/2, -layer_idx)
+  ```
+  Or use nx.spring_layout(G, seed=42) for general graphs.
+- Do NOT pass a lambda to any layout function's subset_key/node_color parameters.
 """
             },
         }

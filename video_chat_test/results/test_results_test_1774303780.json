@@ -1,0 +1,60 @@
+{
+  "video_path": "/home/ubuntu/Pingu/vidya_ai_backend/video_chat_test/data/test_video.mp4",
+  "video_id": "test_1774303780",
+  "timestamp": "2026-03-23T22:11:14.356596",
+  "processing_times": {
+    "audio_extraction": 3.0040740966796875e-05,
+    "transcript_generation": 16.567293882369995,
+    "transcript_formatting": 19.38008975982666,
+    "summary_generation": 17.849712133407593,
+    "chunk_generation": 1.2887251377105713
+  },
+  "transcript_preview": "February. Preparation Hello? Very good evening. Am I audible? Hey. Anirban Mondul is a student name. Right? Anirban? Okay. And you are right now is a student of Saint Teresa School from. Right? Yeah. Okay. I have to do the port eight mode because, auto rotation mode activate. I would try once notification Just try to bring it and, turn on the auto rotation mode. Okay. Data auto rotation option On On Because on Did you understand? Just like agent meet open code Suppose, here, the option you can s",
+  "test_results": [
+    {
+      "question": "What is the name of the student and the counsellor?",
+      "query_type": "hybrid",
+      "strategy": "Fallback",
+      "context_length": 11637,
+      "response_time": 5.802075147628784,
+      "response": "Great question! The student's name is **Anirban Mondul**, and the counselor's name is **Sadiq Mohammed**. You can find this information at the beginning of the video, specifically around $03:50$ where they introduce themselves. \n\nDoes that help? Want to know more about their conversation or any specific part of the video? \ud83d\ude0a"
+    },
+    {
+      "question": "What is this conversation about?",
+      "query_type": "hybrid",
+      "strategy": "Fallback",
+      "context_length": 10935,
+      "response_time": 8.944996118545532,
+      "response": "This conversation seems to revolve around education, particularly focusing on the challenges and experiences of students preparing for competitive exams in India. Here are some key points that stand out:\n\n- **Importance of Subjects**: The discussion touches on the significance of subjects like physics and math, especially for aspiring doctors and engineers. There's an emphasis on how a strong foundation in math can impact understanding physics.\n\n- **Educational Systems**: The conversation mentions different educational boards like CBSE and ICSE, highlighting the differences in syllabi and how they prepare students for competitive exams.\n\n- **Student Experiences**: There are references to personal experiences of students, such as Devdatta Maji, who achieved a high rank in exams despite initial doubts. This part emphasizes resilience and support from family.\n\n- **Learning Platforms**: The conversation also discusses digital learning platforms like InfinityLearn, which aim to provide resources and support for students.\n\n- **Scholarships and Fees**: Towards the end, there's a discussion about scholarships based on performance and the financial aspects of education, including fees and payment plans.\n\nOverall, the conversation is a mix of educational guidance, personal stories, and insights into the challenges faced by students in their academic journeys. Does that help clarify things? Would you like to dive deeper into any specific part of the conversation? \ud83d\ude0a"
+    },
+    {
+      "question": "What are the main topics discussed?",
+      "query_type": "broad",
+      "strategy": "Fallback",
+      "context_length": 11637,
+      "response_time": 5.932345867156982,
+      "response": "Great question! The video covers several key topics, mainly focused on education and student preparation. Here\u2019s a breakdown of the main points discussed:\n\n- **Importance of Early Education** ($07:17 - 08:15$): The speaker emphasizes how crucial it is for students to start preparing early for their future careers, like becoming doctors or engineers.\n\n- **Counseling and Support** ($08:46 - 09:43$): The speaker introduces themselves as an education counselor and talks about the need for guidance in students' educational journeys.\n\n- **Quality of Education** ($09:17 - 10:07$): There's a discussion about the decline in learning quality and the importance of professional learning for success.\n\n- **Scholarship and Admission Opportunities** ($12:02 - 12:53$): The speaker mentions scholarship opportunities and the need for financial decisions regarding education.\n\n- **Focus on Math and Science** ($19:12 - 20:32$): The importance of math in various fields, especially for aspiring doctors, is highlighted, along with the need for strong foundational knowledge.\n\n- **Student Success Stories** ($30:33 - 32:48$): The video features an interview with a successful student, Devdatta Maji, discussing her journey and the support she received from her family.\n\n- **Technology in Education** ($34:01 - 34:15$): The role of technology in helping students understand difficult concepts is briefly mentioned.\n\nDoes that give you a good overview? Would you like to dive deeper into any specific topic? \ud83d\ude0a"
+    },
+    {
+      "question": "Summarize the key points of this conversation",
+      "query_type": "broad",
+      "strategy": "Fallback",
+      "context_length": 11078,
+      "response_time": 11.74497365951538,
+      "response": "Sure! Let's break down the key points from the conversation:\n\n1. **Gravitational Force**:\n   - The gravitational force of the Moon is **one-sixth** that of Earth's gravity. This means that if something weighs 36 kg on Earth, it would weigh only 6 kg on the Moon. This concept is discussed around $56:16$ to $56:51$.\n\n2. **Human Bones**:\n   - The conversation shifts to human anatomy, specifically the bones in the ear (stapes, incus, and malleus) and the femur, which is the longest bone in the body. This is mentioned around $56:52$ to $57:20$.\n\n3. **Photosynthesis**:\n   - The process of photosynthesis is explained as how green plants use chlorophyll, sunlight, water, and carbon dioxide to produce food (glucose) while releasing oxygen. This is covered from $58:30$ to $59:27$.\n\n4. **Planets in the Solar System**:\n   - Venus is identified as the hottest planet, despite Mercury being closest to the Sun. The explanation involves how Venus has a thick atmosphere that traps heat, while Mercury has extreme temperature fluctuations. This discussion occurs between $59:27$ and $60:17$.\n\n5. **Muscle Types**:\n   - The conversation touches on the three types of muscles: **skeletal**, **smooth**, and **cardiac** muscles. This is discussed from $67:31$ to $69:19$.\n\n6. **Educational Methodology**:\n   - There\u2019s a discussion about the effectiveness of teaching methods and the importance of understanding concepts rather than just memorizing facts. This is highlighted around $68:01$ to $70:49$.\n\n7. **Class Structure and Schedule**:\n   - The conversation also includes details about class schedules, user IDs, and the importance of attending classes for subjects like math and science. This is mentioned from $76:06$ to $78:57$.\n\n8. **Student Engagement**:\n   - The teacher emphasizes the importance of asking questions and being engaged in learning, encouraging students to clarify their doubts. This is noted in several parts, particularly around $61:06$ to $62:04$.\n\nOverall, the conversation covers a range of educational topics, from science concepts to teaching methodologies, while also focusing on student engagement and understanding. Does this summary help? Would you like to dive deeper into any specific topic? \ud83d\ude0a"
+    },
+    {
+      "question": "What concerns does the student have?",
+      "query_type": "hybrid",
+      "strategy": "Fallback",
+      "context_length": 10913,
+      "response_time": 6.204893350601196,
+      "response": "It looks like the student has a few concerns related to their classes and the overall learning experience. Here are some key points based on the transcript:\n\n- **Class Timing and Structure**: The student seems to be discussing the timing of classes, mentioning specific time slots like $06:30$ to $07:30$ and $07:30$ to $08:30$. They express a need for clarity on when classes will take place and how they can fit into their schedule.\n\n- **Completion Levels and Performance**: There\u2019s a mention of completion levels and performance reports, indicating that the student might be concerned about their progress and how it compares to others, especially in terms of national and state-level rankings ($99:05 - 100:03$).\n\n- **Doubts About Specific Topics**: The student has questions about particular subjects, like the automatic drive, and seems to seek help with understanding these topics better ($104:18 - 104:23$).\n\n- **Financial Concerns**: There\u2019s a discussion about fees and payment structures, with the student inquiring about registration amounts and monthly payments. They seem to be concerned about the affordability of the program and the overall cost ($109:17 - 111:52$).\n\nDoes that help clarify their concerns? If you'd like to dive deeper into any specific area, just let me know! \ud83d\ude0a"
+    }
+  ],
+  "summary": {
+    "total_processing_time": 55.085850954055786,
+    "avg_response_time": 7.725856828689575,
+    "total_questions": 5
+  }
+}

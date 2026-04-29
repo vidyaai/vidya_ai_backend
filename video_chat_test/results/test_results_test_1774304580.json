@@ -1,0 +1,60 @@
+{
+  "video_path": "video_chat_test/data/test_video.mp4",
+  "video_id": "test_1774304580",
+  "timestamp": "2026-03-23T22:24:07.813259",
+  "processing_times": {
+    "audio_extraction": 2.8371810913085938e-05,
+    "transcript_generation": 10.38415265083313,
+    "transcript_formatting": 18.067605018615723,
+    "summary_generation": 17.628139972686768,
+    "chunk_generation": 0.6736645698547363
+  },
+  "transcript_preview": "February. Preparation Hello? Very good evening. Am I audible? Hey. Anirban Mondul is a student name. Right? Anirban? Okay. And you are right now is a student of Saint Teresa School from. Right? Yeah. Okay. I have to do the port eight mode because, auto rotation mode activate. I would try once notification Just try to bring it and, turn on the auto rotation mode. Okay. Data auto rotation option On On Because on Did you understand? Just like agent meet open code Suppose, here, the option you can s",
+  "test_results": [
+    {
+      "question": "What is the name of the student and the counsellor?",
+      "query_type": "hybrid",
+      "strategy": "RAG (Hybrid)",
+      "context_length": 14704,
+      "response_time": 1.7712256908416748,
+      "response": "The name of the student is **Anirban Mondul**, and the name of the counselor is **Sadiq Mohammed**. This is mentioned at the beginning of the video, around $03:16$. \n\nDoes that help? Would you like to know more about their conversation or any specific part of the meeting? \ud83d\ude0a"
+    },
+    {
+      "question": "What is this conversation about?",
+      "query_type": "hybrid",
+      "strategy": "RAG (Hybrid)",
+      "context_length": 5939,
+      "response_time": 5.37327241897583,
+      "response": "This conversation seems to be a **counseling meeting** focused on student education and development. Here are some key points that summarize what's happening:\n\n- **Introduction of Participants**: The speaker introduces themselves as Sadiq Mohammed, a senior education counselor, and is speaking with a student named Anirban and their parents.\n\n- **Importance of Education**: The counselor emphasizes the significance of starting educational preparation early, especially for students in class six, as it sets the foundation for future success in higher classes.\n\n- **Discussion on Student Potential**: There\u2019s a focus on verifying the student's true potential and how to utilize it effectively. The counselor mentions that understanding the types of muscles (skeletal, smooth, and cardiac) is part of the educational content.\n\n- **Scholarship Opportunities**: The conversation includes details about a scholarship program based on the student's performance in tests, with potential discounts on fees.\n\n- **Technology in Education**: The counselor discusses the role of AI in education and how it can enhance learning experiences, mentioning live classes and concept classes.\n\n- **Logistics and Fees**: There are discussions about payment methods, registration fees, and the structure of the educational program, including complimentary classes.\n\nOverall, the conversation is about guiding the student and their parents through the educational process, discussing potential scholarships, and the importance of foundational learning. \n\nDoes that help clarify things? Would you like to dive deeper into any specific part of the conversation? \ud83d\ude0a"
+    },
+    {
+      "question": "What are the main topics discussed?",
+      "query_type": "broad",
+      "strategy": "RAG (Hybrid)",
+      "context_length": 5753,
+      "response_time": 5.541860580444336,
+      "response": "Awesome question! The video covers a few key topics related to language and communication, particularly focusing on sentence structure and types of muscles. Here\u2019s a breakdown of the main topics discussed:\n\n1. **Sentence Structure**:\n   - The video explains the **SVO (Subject-Verb-Object)** arrangement in English sentences, which is introduced around $90:20$.\n   - It talks about the **subject** of a sentence, which can be a noun or a pronoun, and gives examples like people, animals, and objects.\n   - The instructor emphasizes the importance of arranging words in a way that makes sense for clear communication.\n\n2. **Types of Muscles**:\n   - There\u2019s a discussion about the **three types of muscles**: skeletal, smooth, and cardiac, starting around $67:04$.\n   - The video touches on voluntary and involuntary muscles, which helps to explain how different muscles function in the body.\n\n3. **Teaching Methodology**:\n   - The video also explores the effectiveness of teaching methods and the importance of communication in education, particularly in English grammar and concept classes.\n\n4. **Student Engagement**:\n   - There are mentions of how students interact in classes, the role of teachers, and the use of technology in education, including AI teachers.\n\nDoes that help clarify the main topics? If you want to dive deeper into any specific part, just let me know! \ud83d\ude0a"
+    },
+    {
+      "question": "Summarize the key points of this conversation",
+      "query_type": "broad",
+      "strategy": "RAG (Hybrid)",
+      "context_length": 5628,
+      "response_time": 4.81955623626709,
+      "response": "Sure! Let's break down the key points from the conversation:\n\n1. **Class Structure and Language**:\n   - The teacher is conducting interactive classes and emphasizes the importance of using English for communication, as all students are comfortable with it.\n\n2. **Educational Focus**:\n   - The discussion includes topics like energy generation and the use of electricity in devices. The teacher refers to a chapter on \"The Mystery of Food\" and mentions proficiency tests related to energy.\n\n3. **Student Performance and Scholarships**:\n   - There's a mention of performance metrics, with a completion level of 90% being highlighted. The teacher discusses scholarships based on student performance, ranging from 20% to 60%.\n\n4. **Class Materials and Curriculum**:\n   - The curriculum is based on NCERT standards, and the teacher discusses materials related to physics and chemistry, indicating a structured approach to subjects.\n\n5. **Enrollment and Fees**:\n   - The conversation touches on the enrollment process, including registration fees and monthly payment plans, with scholarships available to reduce costs.\n\n6. **Student Engagement**:\n   - The teacher encourages students to participate actively and mentions the use of animated classes to enhance understanding, especially for younger students like Sanya, who is learning to form sentences in English.\n\nOverall, the conversation revolves around the structure of the educational program, student performance, scholarship opportunities, and the importance of interactive learning. Does that help clarify things? Would you like to dive deeper into any specific part? \ud83d\ude0a"
+    },
+    {
+      "question": "What concerns does the student have?",
+      "query_type": "hybrid",
+      "strategy": "RAG (Hybrid)",
+      "context_length": 5900,
+      "response_time": 2.6172780990600586,
+      "response": "It sounds like the student has a few concerns based on the sections of the video you provided! Here are some key points:\n\n1. **Importance of Math in Science**: The student seems to be worried about their math skills, especially since math is crucial for subjects like physics, which is important for aspiring doctors. They mentioned that if you're not good at math, physics can be quite challenging. This concern is highlighted around $18:24$.\n\n2. **Pressure of Competition**: There\u2019s a mention of competition and the pressure that comes with it, particularly regarding the percentage required for success in exams. The student feels that there's a gap in their preparation and that the syllabus can be overwhelming, especially with the vastness of the ICC syllabus compared to the more focused CBC syllabus. This is discussed around $18:24$ and $03:16$.\n\n3. **Future Aspirations**: The student expresses a desire to become a doctor but also seems to feel the weight of expectations and the need for proper guidance to achieve that goal. They mention the importance of starting early in their education to succeed later on, which is discussed around $03:16$.\n\n4. **Quality of Learning**: There's a concern about the quality of education and how it affects performance. The student seems to feel that the current learning system is not meeting their needs, which is mentioned around $03:16$.\n\n5. **Understanding Concepts**: In the latter part of the transcript, the student struggles with specific science concepts, like why Venus is the hottest planet, indicating a need for clarification and deeper understanding of the material.\n\nDoes that help clarify the student's concerns? Would you like to dive deeper into any specific area or explore how they can address these worries? \ud83d\ude0a"
+    }
+  ],
+  "summary": {
+    "total_processing_time": 46.75359058380127,
+    "avg_response_time": 4.024638605117798,
+    "total_questions": 5
+  }
+}

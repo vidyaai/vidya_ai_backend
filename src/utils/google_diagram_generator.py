@@ -263,6 +263,12 @@ CRITICAL RULES:
 - DO NOT include truth tables or boolean expressions in the diagram
 - DO NOT include any text that reveals the solution
 - This is for a student exam — the answer must NOT be visible
+- If the description includes a FORBIDDEN LABELS section, do not render those
+  specific terms as text labels, legend entries, annotations, titles, or note
+  boxes. Where such a label would normally sit beside a structural element,
+  use "?" as a placeholder so the element itself remains visible. Do NOT
+  remove structural components, and do NOT replace numerical values that are
+  explicitly given in the question — those are problem inputs, not answers.
 
 TEXT & LABEL ACCURACY (EXTREMELY IMPORTANT):
 - Every dimension label MUST be spelled out EXACTLY as specified (e.g. "10 mm" not "10m", "1 mm" not "1im")

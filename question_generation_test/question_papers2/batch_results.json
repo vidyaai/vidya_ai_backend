@@ -1,0 +1,152 @@
+[
+  {
+    "id": 1,
+    "topic": "Quantum Error Correction (QEC)",
+    "subject": "cs",
+    "status": "OK",
+    "questions": 5,
+    "diagrams": 5,
+    "tools_used": [
+      "claude_code"
+    ],
+    "pdf_kb": 551.1,
+    "time_s": 551.0,
+    "error": "",
+    "pdf_file": "01_Quantum_Error_Correction_QEC.pdf"
+  },
+  {
+    "id": 2,
+    "topic": "Orbital Mechanics of Planets",
+    "subject": "physics",
+    "status": "OK",
+    "questions": 5,
+    "diagrams": 5,
+    "tools_used": [
+      "claude_code"
+    ],
+    "pdf_kb": 679.7,
+    "time_s": 382.0,
+    "error": "",
+    "pdf_file": "02_Orbital_Mechanics_of_Planets.pdf"
+  },
+  {
+    "id": 3,
+    "topic": "Topological Insulators",
+    "subject": "physics",
+    "status": "OK",
+    "questions": 5,
+    "diagrams": 5,
+    "tools_used": [
+      "claude_code"
+    ],
+    "pdf_kb": 2104.4,
+    "time_s": 292.0,
+    "error": "",
+    "pdf_file": "03_Topological_Insulators.pdf"
+  },
+  {
+    "id": 4,
+    "topic": "Neuromorphic Computing",
+    "subject": "cs",
+    "status": "OK",
+    "questions": 5,
+    "diagrams": 5,
+    "tools_used": [
+      "claude_code"
+    ],
+    "pdf_kb": 459.7,
+    "time_s": 388.0,
+    "error": "",
+    "pdf_file": "04_Neuromorphic_Computing.pdf"
+  },
+  {
+    "id": 5,
+    "topic": "Crystallography & X-ray Diffraction",
+    "subject": "chemistry",
+    "status": "OK",
+    "questions": 5,
+    "diagrams": 5,
+    "tools_used": [
+      "claude_code"
+    ],
+    "pdf_kb": 1001.8,
+    "time_s": 333.0,
+    "error": "",
+    "pdf_file": "05_Crystallography_and_X-ray_Diffraction.pdf"
+  },
+  {
+    "id": 6,
+    "topic": "Game Theory & Nash Equilibria",
+    "subject": "math",
+    "status": "OK",
+    "questions": 5,
+    "diagrams": 4,
+    "tools_used": [
+      "claude_code"
+    ],
+    "pdf_kb": 449.0,
+    "time_s": 245.0,
+    "error": "",
+    "pdf_file": "06_Game_Theory_and_Nash_Equilibria.pdf"
+  },
+  {
+    "id": 7,
+    "topic": "CRISPR-Cas9 Gene Editing",
+    "subject": "biochemistry",
+    "status": "OK",
+    "questions": 5,
+    "diagrams": 5,
+    "tools_used": [
+      "claude_code"
+    ],
+    "pdf_kb": 1481.6,
+    "time_s": 302.0,
+    "error": "",
+    "pdf_file": "07_CRISPR-Cas9_Gene_Editing.pdf"
+  },
+  {
+    "id": 8,
+    "topic": "Plasma Physics & Tokamak Confinement",
+    "subject": "physics",
+    "status": "OK",
+    "questions": 5,
+    "diagrams": 5,
+    "tools_used": [
+      "claude_code"
+    ],
+    "pdf_kb": 919.5,
+    "time_s": 294.0,
+    "error": "",
+    "pdf_file": "08_Plasma_Physics_and_Tokamak_Confinement.pdf"
+  },
+  {
+    "id": 9,
+    "topic": "Quantum Cryptography (BB84 Protocol)",
+    "subject": "cs",
+    "status": "OK",
+    "questions": 5,
+    "diagrams": 5,
+    "tools_used": [
+      "claude_code"
+    ],
+    "pdf_kb": 721.5,
+    "time_s": 308.0,
+    "error": "",
+    "pdf_file": "09_Quantum_Cryptography_BB84_Protocol.pdf"
+  },
+  {
+    "id": 10,
+    "topic": "Stellar Nucleosynthesis",
+    "subject": "physics",
+    "status": "OK",
+    "questions": 5,
+    "diagrams": 5,
+    "tools_used": [
+      "claude_code"
+    ],
+    "pdf_kb": 631.3,
+    "time_s": 344.0,
+    "error": "",
+    "pdf_file": "10_Stellar_Nucleosynthesis.pdf"
+  }
+]

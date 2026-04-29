@@ -1,0 +1,201 @@
+{
+  "topic": "Topological Insulators",
+  "subject": "physics",
+  "prompt": "Generate 5 diagram-based questions on topological insulators and topological phases of matter. Cover: bulk band structure with non-trivial topology and band inversion, the bulk-boundary correspondence and protected surface states, the quantum spin Hall effect edge states, Z2 topological invariant in k-space, and the Dirac cone dispersion relation on the surface of a 3D topological insulator. Each question must require the student to analyze or interpret a diagram.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "diagram-analysis",
+      "question": "Analyze the band structure diagram of a topological insulator shown below. Identify where band inversion occurs and explain how this leads to a non-trivial topology in the system.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 1,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_3_20260417_043838/diagrams/b5914311-924d-4bfc-baf6-de6a66378569.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=dE%2FVC6SVLhQ2Es292nFm3acDqV4%3D&Expires=1807936767",
+        "s3_key": "assignments/batch_3_20260417_043838/diagrams/b5914311-924d-4bfc-baf6-de6a66378569.png",
+        "file_id": "b5914311-924d-4bfc-baf6-de6a66378569",
+        "filename": "diagram_q0.png",
+        "domain": "solid_state_physics",
+        "diagram_type": "band_structure_diagram",
+        "description": "Band structure of a topological insulator showing the conduction and valence bands with band inversion highlighted. The diagram should include the energy axis and momentum axis, with the band inversion region clearly marked to illustrate the non-trivial topology.\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 Brillouin\n  \u2022 band inversion\nThe diagram will FAIL review if any of these appear."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "Band inversion occurs at the point in the diagram where the conduction and valence bands invert, usually near a high-symmetry point in the Brillouin zone. In the diagram below, this inversion is visually represented by the crossing of the bands. This inversion results in a change in the topological order of the bands, leading to a non-trivial topology characterized by a non-zero topological invariant.",
+      "rubric": "- Identify the correct region of band inversion in the diagram: 4 points\n- Explain the concept of band inversion: 3 points\n- Discuss the implications for non-trivial topology: 3 points",
+      "equations": [],
+      "text": "Analyze the band structure diagram of a topological insulator shown below. Identify where band inversion occurs and explain how this leads to a non-trivial topology in the system.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 2,
+      "type": "diagram-analysis",
+      "question": "Consider the surface state dispersion diagram shown below for a 3D topological insulator. Analyze the Dirac cone structure and explain the significance of protected surface states as a consequence of the bulk-boundary correspondence.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 2,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_3_20260417_043838/diagrams/83b43dfd-6556-45a1-ac14-f1ccab9f2298.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=cFkj0%2FdhxSMnQoUEg2MC3xrODE0%3D&Expires=1807936805",
+        "s3_key": "assignments/batch_3_20260417_043838/diagrams/83b43dfd-6556-45a1-ac14-f1ccab9f2298.png",
+        "file_id": "83b43dfd-6556-45a1-ac14-f1ccab9f2298",
+        "filename": "diagram_q1.png",
+        "domain": "condensed_matter_physics",
+        "diagram_type": "dirac_cone_dispersion",
+        "description": "Dispersion relation showing Dirac cone on the surface of a 3D topological insulator. The diagram should depict the linear Dirac cone structure with the two cones touching at a single point. The axes should be labeled with energy (E) on the vertical axis and momentum (k) on the horizontal axes, indicating the surface state dispersion. Highlight the Dirac point where the cones meet, representing the protected surface states due to bulk-boundary correspondence.\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 dirac cone\n  \u2022 linear dispersion\nThe diagram will FAIL review if any of these appear."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The diagram below illustrates the Dirac cone structure at the surface of a 3D topological insulator, showing linear dispersion around the Dirac point where electrons behave like massless Dirac fermions. These surface states, depicted in the diagram, are protected by the bulk-boundary correspondence, which ensures their robustness against non-magnetic perturbations due to topological invariants of the bulk band structure.",
+      "rubric": "- Identify the Dirac cone and explain linear dispersion as shown in the diagram: 4 points\n- Discuss the concept of bulk-boundary correspondence in relation to the diagram: 3 points\n- Explain the role of topological invariants as indicated by the diagram: 3 points",
+      "equations": [],
+      "text": "Consider the surface state dispersion diagram shown below for a 3D topological insulator. Analyze the Dirac cone structure and explain the significance of protected surface states as a consequence of the bulk-boundary correspondence.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 3,
+      "type": "short-answer",
+      "question": "Explain how the <eq q3_eq1> topological invariant is used to determine the topological phase of a quantum spin Hall insulator in the diagram below. Provide a brief outline of the calculation method in k-space.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 3,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_3_20260417_043838/diagrams/9a06a0d8-fa55-42bd-a66b-ab304aaea658.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=aIiW57pI3hWtRDJ%2Fdz%2FK8yegAa4%3D&Expires=1807936931",
+        "s3_key": "assignments/batch_3_20260417_043838/diagrams/9a06a0d8-fa55-42bd-a66b-ab304aaea658.png",
+        "file_id": "9a06a0d8-fa55-42bd-a66b-ab304aaea658",
+        "filename": "diagram_q2.png",
+        "domain": "quantum_physics",
+        "diagram_type": "band_structure_diagram",
+        "description": "CUMULATIVE LEAK CORRECTIONS (all must be fixed): Known answer terms to avoid: Brillouin; The diagram contains labels that directly answer parts of the question, specifically \"Z2 invariant calculated at TRIM\" and \"band inversion region\", which are key concepts the student is expected to explain.; The diagram contains the label \"TRIM\" pointing to the special momentum points on the k-axis, which is a key concept the student is supposed to identify and explain as part of the calculation method for the Z2 invariant.. CUMULATIVE LEAK CORRECTIONS (all must be fixed): Known answer terms to avoid: Brillouin; The diagram contains labels that directly answer parts of the question, specifically \"Z2 invariant calculated at TRIM\" and \"band inversion region\", which are key concepts the student is expected to explain.. A band structure diagram of a quantum spin Hall insulator. The diagram shows the energy E(k) versus momentum k. It includes a 'conduction band' (top, shaded green) and a 'valence band' (bottom, shaded blue). The bands show an inversion near the \u0393 point (k=0). Dashed red lines labeled 'edge states' cross the band gap, connecting the valence and conduction bands. The k-axis is labeled with time-reversal invariant momenta (TRIM) points: \u0393, -\u03c0/a, and \u03c0/a. An annotation for 'time-reversal symmetry: \u0398' is present. A 'band gap' is indicated by a vertical orange arrow. Do NOT include the labels \"Z2 invariant calculated at TRIM\" or \"band inversion region\". IMPORTANT correction needed: The diagram contains the label \"TRIM\" pointing to the special momentum points on the k-axis, which is a key concept the student is supposed to identify and explain as part of the calculation method for the Z2 invariant.. Specifically: The label \"TRIM\" points to the Time-. Do NOT include region labels (Feasible/Infeasible, Stable/Unstable, Optimal, etc.), formula annotations, reaction product labels, threshold markers, or any text that reveals the answer. Show structure and context only."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The <eq q3_eq1> topological invariant, as illustrated in the diagram below, distinguishes between trivial and non-trivial topological phases in a quantum spin Hall insulator. In k-space, it is calculated by integrating the Berry connection over the occupied electronic states across the Brillouin zone or a half of it and considering time-reversal symmetry. A non-zero <eq q3_eq1> invariant, as depicted in the diagram, indicates a topologically non-trivial phase characterized by edge states.",
+      "rubric": "- Define the <eq q3_eq1> topological invariant: 3 points\n- Explain the calculation method in k-space, referencing the diagram where applicable: 4 points\n- Discuss its significance in determining topological phases, as shown in the diagram: 3 points",
+      "equations": [
+        {
+          "id": "q3_eq1",
+          "latex": "Z_2",
+          "position": {
+            "char_index": 13,
+            "context": "question_text"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Explain how the <eq q3_eq1> topological invariant is used to determine the topological phase of a quantum spin Hall insulator in the diagram below. Provide a brief outline of the calculation method in k-space.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 4,
+      "type": "short-answer",
+      "question": "Examine the diagram below and describe the quantum spin Hall effect and the nature of edge states that arise due to its presence in topological insulators. Highlight the role of spin-momentum locking.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 4,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_3_20260417_043838/diagrams/620783d4-bd74-4a7d-8331-627d98bfd5e1.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=ICw19sCo6rmn56NrhrQk3mh6W4w%3D&Expires=1807936977",
+        "s3_key": "assignments/batch_3_20260417_043838/diagrams/620783d4-bd74-4a7d-8331-627d98bfd5e1.png",
+        "file_id": "620783d4-bd74-4a7d-8331-627d98bfd5e1",
+        "filename": "diagram_q3.png",
+        "domain": "quantum_physics",
+        "diagram_type": "topological_insulator_edge_states",
+        "description": "A diagram of a topological insulator showing the bulk and edge regions. The bulk should be represented as an insulating material, while the edges should show conducting channels. Include arrows along the edges to represent the direction of electron flow, with each arrow labeled to indicate the electron spin direction (up or down) to demonstrate spin-momentum locking. The diagram should clearly differentiate between the insulating bulk and the conducting edge states, highlighting the quantum spin Hall effect.\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 spin-momentum locking\nThe diagram will FAIL review if any of these appear."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The diagram below illustrates the quantum spin Hall effect, which involves the presence of spin-polarized edge states that transport charge along the edges of a topological insulator without dissipation. As shown in the diagram, these edge states demonstrate spin-momentum locking, where the spin direction is locked perpendicular to the direction of motion. This locking leads to robustness against backscattering due to spin conservation, as depicted in the edge state pathways in the diagram.",
+      "rubric": "- Explain the quantum spin Hall effect as illustrated in the diagram: 4 points\n- Describe the nature of edge states as depicted in the diagram: 3 points\n- Discuss spin-momentum locking and its implications, referencing the diagram: 3 points",
+      "equations": [],
+      "text": "Examine the diagram below and describe the quantum spin Hall effect and the nature of edge states that arise due to its presence in topological insulators. Highlight the role of spin-momentum locking.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 5,
+      "type": "diagram-analysis",
+      "question": "Using the k-space diagram below, identify and explain the regions corresponding to trivial and non-trivial topological phases. Discuss the implications for electronic transport properties.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 5,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_3_20260417_043838/diagrams/0bb45091-ee9a-440f-89da-db516fd2579b.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=JBAwtYaY0yIFCTF%2BC4eHnmWhxPc%3D&Expires=1807937025",
+        "s3_key": "assignments/batch_3_20260417_043838/diagrams/0bb45091-ee9a-440f-89da-db516fd2579b.png",
+        "file_id": "0bb45091-ee9a-440f-89da-db516fd2579b",
+        "filename": "diagram_q4.png",
+        "domain": "condensed_matter_physics",
+        "diagram_type": "k_space_diagram",
+        "description": "A k-space diagram illustrating topological phases. The diagram should show a two-dimensional k-space with regions labeled as 'trivial' and 'non-trivial' topological phases. Use different colors or shading to distinguish these regions. Include axes labeled kx and ky, and mark the boundaries between the phases clearly. The diagram should be suitable for discussing electronic transport properties in condensed matter physics."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "In the k-space diagram below, the non-trivial topological phase regions are indicated where the <eq q5_eq1> invariant is non-zero, often marked by a change in the topological order. These regions in the diagram signify robust edge states contributing to dissipationless transport. Trivial phases, as shown in the diagram, are characterized by a zero <eq q5_eq1> invariant, corresponding to the absence of such protected states.",
+      "rubric": "- Correctly identify non-trivial and trivial regions in the diagram: 4 points\n- Explain the topological phases as depicted in the diagram: 3 points\n- Discuss implications for transport properties based on the diagram: 3 points",
+      "equations": [
+        {
+          "id": "q5_eq1",
+          "latex": "Z_2",
+          "position": {
+            "char_index": 63,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Using the k-space diagram below, identify and explain the regions corresponding to trivial and non-trivial topological phases. Discuss the implications for electronic transport properties.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    }
+  ],
+  "statistics": {
+    "total_questions": 5,
+    "questions_with_diagrams": 5
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /home/ubuntu/Dhriti/vidya_ai_backend log --oneline --all -- IMPLEMENTATION_SUMMARY.md)",
+      "Bash(git -C /home/ubuntu/Dhriti/vidya_ai_backend/ ls-files --error-unmatch IMPLEMENTATION_SUMMARY.md)",
+      "Bash(git mv *)"
+    ]
+  }
+}

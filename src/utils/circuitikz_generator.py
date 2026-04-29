@@ -31,6 +31,11 @@ from typing import Optional
 
 from anthropic import Anthropic
 from controllers.config import logger
+from utils.latex_repair import (
+    CANONICAL_TIKZLIBRARIES,
+    canonicalize_tikzlibrary,
+    repair_latex,
+)
 
 try:
     from pdf2image import convert_from_path
@@ -949,6 +954,19 @@ These diagrams are for STUDENT ASSIGNMENTS. The student must solve the problem.
 - DO show circuit structure and given parameters ONLY
 - DO label all inputs with variable names (A, B, C) NOT specific values
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+LABEL EVERY NAMED COMPONENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Every structural component named in the description MUST have that exact name
+as a visible \node label in the final circuit diagram.
+- If the description says "ancilla qubit", label it "ancilla qubit"
+- If the description says "measurement gate", label it "measurement gate"
+Do NOT substitute with symbols or numbers unless the question uses them.
+Aesthetic trade-offs do NOT justify omitting a required label.
+
+READABILITY: Use font=\footnotesize minimum in dense circuits (>8 components).
+If labels would overlap, use [yshift=4pt] or [xshift=6pt] to offset — never drop a label.
+
 Return ONLY the complete LaTeX document. Nothing else."""
 
     def _build_user_prompt(
@@ -1039,6 +1057,17 @@ Return ONLY the complete LaTeX document starting with \\documentclass."""
             if "\\documentclass" not in latex:
                 raise ValueError("Claude did not return valid LaTeX document")
 
+            # Replace any Claude-generated \usetikzlibrary{...} with the canonical set
+            # that includes all decoration libraries — prevents "decoration library" errors.
+            # If Claude added none, inject one before \begin{document}.
+            if re.search(r"\\usetikzlibrary\{", latex):
+                latex = canonicalize_tikzlibrary(latex)
+            else:
+                latex = latex.replace(
+                    r"\begin{document}",
+                    CANONICAL_TIKZLIBRARIES + "\n\\begin{document}",
+                )
+
             logger.info(f"Claude generated {len(latex)} chars of CircuiTikZ LaTeX")
             return latex
 
@@ -1117,24 +1146,34 @@ Return ONLY the complete LaTeX document starting with \\documentclass."""
                     timeout=60,
                     env=pdflatex_env,
                 )
-                if result.returncode != 0:
-                    # Extract the useful error lines from pdflatex output
-                    error_lines = [
-                        l
-                        for l in result.stdout.splitlines()
-                        if l.startswith("!") or "Error" in l or "error" in l
-                    ]
-                    error_summary = "\n".join(error_lines[:10]) or result.stdout[-500:]
-                    logger.error(
-                        f"pdflatex pass {_pass+1} failed (rc={result.returncode}):\n"
-                        f"{error_summary}"
-                    )
-                    # Save .tex for debugging
-                    debug_tex = os.path.join(tempfile.gettempdir(), "debug_circuit.tex")
-                    with open(debug_tex, "w") as f:
-                        f.write(latex_src)
-                    logger.info(f"Debug LaTeX saved to {debug_tex}")
-                    raise RuntimeError(f"pdflatex compilation failed:\n{error_summary}")
+                if result.returncode == 0:
+                    break
+
+                error_lines = [
+                    l
+                    for l in result.stdout.splitlines()
+                    if l.startswith("!") or "Error" in l or "error" in l
+                ]
+                error_summary = "\n".join(error_lines[:10]) or result.stdout[-500:]
+                logger.error(
+                    f"pdflatex pass {_pass+1} failed (rc={result.returncode}):\n"
+                    f"{error_summary}"
+                )
+                debug_tex = os.path.join(tempfile.gettempdir(), "debug_circuit.tex")
+                with open(debug_tex, "w") as f:
+                    f.write(latex_src)
+                logger.info(f"Debug LaTeX saved to {debug_tex}")
+
+                if _pass == 0:
+                    repaired = repair_latex(latex_src, ("circuitikz", "tikzpicture"))
+                    if repaired != latex_src:
+                        logger.info("pdflatex pass 1 failed — applying deterministic repairs and retrying")
+                        latex_src = repaired
+                        with open(tex_file, "w", encoding="utf-8") as fh:
+                            fh.write(latex_src)
+                        continue
+
+                raise RuntimeError(f"pdflatex compilation failed:\n{error_summary}")
 
             if not os.path.isfile(pdf_file):
                 raise RuntimeError("pdflatex ran successfully but no PDF produced")

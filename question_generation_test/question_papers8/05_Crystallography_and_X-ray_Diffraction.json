@@ -1,0 +1,311 @@
+{
+  "topic": "Crystallography & X-ray Diffraction",
+  "subject": "chemistry",
+  "prompt": "Generate 5 diagram-based questions on crystallography and X-ray diffraction. Cover: Bragg's law geometry with incident and diffracted X-ray beams, the reciprocal lattice and Ewald sphere construction, Miller indices for crystal planes (100), (110), (111) in a cubic unit cell, systematic absences in an FCC diffraction pattern, and structure factor calculation for a BCC crystal. Each question must require the student to analyze or interpret a diagram.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "diagram-analysis",
+      "question": "Examine the diagram below illustrating the geometry of Bragg's law, where an incident X-ray beam strikes a crystal plane, and the diffracted beam is observed. Identify the angle of incidence, the spacing between planes, and the conditions for constructive interference according to the equation <eq q1_eq1>. Explain how each component is represented in the diagram.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 1,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_5_20260415_163826/diagrams/614c4f65-bef2-4262-aebf-bf774df8e4ce.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=xJ7V2%2FxC5QluEEv6Uqc4ap4Dz4E%3D&Expires=1807807171",
+        "s3_key": "assignments/batch_regen_5_20260415_163826/diagrams/614c4f65-bef2-4262-aebf-bf774df8e4ce.png",
+        "file_id": "614c4f65-bef2-4262-aebf-bf774df8e4ce",
+        "filename": "diagram_q0.png",
+        "domain": "crystallography",
+        "diagram_type": "bragg_diffraction_geometry",
+        "description": "A diagram illustrating the geometry of Bragg's law. Show an incident X-ray beam striking a crystal plane at an angle \u03b8, with the diffracted beam leaving at the same angle. Indicate the spacing between the crystal planes as 'd'. Label the angle of incidence as '\u03b8', the plane spacing as 'd', and the path difference as '2dsin\u03b8'. Include a note for the condition of constructive interference: n\u03bb = 2dsin\u03b8. Ensure the crystal planes are parallel and the beams are represented as lines with arrows showing direction."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The angle of incidence <eq q1_eq2> is the angle between the incident beam and the crystal plane, as depicted in the diagram below. The spacing <eq q1_eq3> is the perpendicular distance between adjacent planes, also shown in the diagram. Constructive interference occurs when <eq q1_eq1>, which is illustrated in the diagram by the alignment of the incident and diffracted beams. Labels in the diagram: <eq q1_eq2> - incident angle, <eq q1_eq3> - plane spacing, <eq q1_eq4> - X-ray wavelength.",
+      "rubric": "- Correct identification of <eq q1_eq2> in the diagram below (2 points)\n- Correct explanation of plane spacing <eq q1_eq3> as shown in the diagram below (2 points)\n- Correct application of Bragg's law, referencing the diagram below (2 points)\n- Diagram interpretation (3 points)\n- Clarity and completeness of explanation (1 point)",
+      "equations": [
+        {
+          "id": "q1_eq1",
+          "latex": "n\\lambda = 2d\\sin\\theta",
+          "position": {
+            "char_index": 207,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq2",
+          "latex": "\\theta",
+          "position": {
+            "char_index": 24,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq3",
+          "latex": "d",
+          "position": {
+            "char_index": 73,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq4",
+          "latex": "\\lambda",
+          "position": {
+            "char_index": 202,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Examine the diagram below illustrating the geometry of Bragg's law, where an incident X-ray beam strikes a crystal plane, and the diffracted beam is observed. Identify the angle of incidence, the spacing between planes, and the conditions for constructive interference according to the equation <eq q1_eq1>. Explain how each component is represented in the diagram.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 2,
+      "type": "diagram-analysis",
+      "question": "Examine the diagram below of the reciprocal lattice and Ewald sphere construction. Determine where the reflections will occur when an X-ray beam is incident on a crystal. Define the conditions under which a specific point in the reciprocal lattice satisfies the Laue condition, and interpret its meaning in the context of X-ray diffraction.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 2,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_5_20260415_163826/diagrams/7cd17b90-4fd6-4ec2-94d1-bb5cc4bd2e8e.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=BXCSR%2Fy8Iq0%2Fkwg%2Bfx6RAoouzJs%3D&Expires=1807807267",
+        "s3_key": "assignments/batch_regen_5_20260415_163826/diagrams/7cd17b90-4fd6-4ec2-94d1-bb5cc4bd2e8e.png",
+        "file_id": "7cd17b90-4fd6-4ec2-94d1-bb5cc4bd2e8e",
+        "filename": "diagram_q1.png",
+        "domain": "crystallography",
+        "diagram_type": "reciprocal_lattice_with_ewald_sphere",
+        "description": "A diagram showing the reciprocal lattice and Ewald sphere construction. The diagram should include a grid representing the reciprocal lattice points, a circle representing the Ewald sphere, and an incident X-ray beam. The Ewald sphere should be tangent to the origin of the reciprocal lattice. Label the incident X-ray beam, the reciprocal lattice points, and the Ewald sphere. Indicate the Laue condition by showing a reciprocal lattice point on the surface of the Ewald sphere, which represents a reflection condition being satisfied. IMPORTANT correction needed: The diagram explicitly highlights the answer by coloring the reflection points red and adding a legend entry \"potential reflection\", which directly answers the question of where reflections occur.. Specifically: The diagram identifies the specific reciprocal lattice points that satisfy the Laue condition by coloring them red and providing a legend entry \"potential reflection\". This directly answers the first part of the. Do NOT include region labels (Feasible/Infeasible, Stable/Unstable, Optimal, etc.), formula annotations, reaction product labels, threshold markers, or any text that reveals the answer. Show structure and context only."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "Reflections occur where the Ewald sphere intersects the reciprocal lattice points in the diagram. A reciprocal lattice point satisfies the Laue condition when the vector from the origin to this point is equal to the vector sum of the incident and reflected wave vectors, as illustrated in the diagram. This represents a condition for diffraction peaks in the context of X-ray diffraction.",
+      "rubric": "- Correct identification of reflection points in the diagram (2 points)\n- Explanation of Laue condition with reference to the diagram (3 points)\n- Interpretation in X-ray diffraction context (3 points)\n- Diagram analysis (2 points)",
+      "equations": [],
+      "text": "Examine the diagram below of the reciprocal lattice and Ewald sphere construction. Determine where the reflections will occur when an X-ray beam is incident on a crystal. Define the conditions under which a specific point in the reciprocal lattice satisfies the Laue condition, and interpret its meaning in the context of X-ray diffraction.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 3,
+      "type": "diagram-analysis",
+      "question": "Interpret the diagram below, which shows Miller indices (100), (110), and (111) planes in a cubic unit cell. Explain how these planes are oriented with respect to the cubic axes and how each set of indices determines the plane's orientation.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 3,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_5_20260415_163826/diagrams/0c7c6e8d-3b6d-4100-8097-9ecc95a71016.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=UJIRNE1AARJYBpKLIXpRvYuiI2Q%3D&Expires=1807807455",
+        "s3_key": "assignments/batch_regen_5_20260415_163826/diagrams/0c7c6e8d-3b6d-4100-8097-9ecc95a71016.png",
+        "file_id": "0c7c6e8d-3b6d-4100-8097-9ecc95a71016",
+        "filename": "diagram_q2.png",
+        "domain": "crystallography",
+        "diagram_type": "miller_indices_planes",
+        "description": "A 3D cubic unit cell with the origin at the back-left-bottom corner and axes labeled x, y, and z. Show three distinct, semi-transparent planes within the cube, each with a different color. The first plane, clearly labeled '(100)', must be parallel to the yz-plane and intercept the x-axis at the edge of the unit cell. The second plane, clearly labeled '(110)', must intercept the x-axis and y-axis at the edges of the unit cell and be parallel to the z-axis. The third plane, clearly labeled '(111)', must intercept the x, y, and z axes at the edges of the unit cell. Each label must IMPORTANT: Values or sequences in the diagram don't match the question. Specifically: The (100) plane is not drawn, the label '(100)' is missing. The diagram is missing the (100) plane, which is explicitly required by the question and its description, making it impossible for a student to fully answer the prompt.. Regenerate using EXACTLY the values and sequences specified."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "In the diagram below, the (100) plane intersects the <eq q3_eq1>-axis and is parallel to <eq q3_eq2> and <eq q3_eq3>. The (110) plane in the diagram intersects both <eq q3_eq1> and <eq q3_eq2> but is parallel to <eq q3_eq3>. The (111) plane, as shown in the diagram, intersects <eq q3_eq1>, <eq q3_eq2>, and <eq q3_eq3> equally. Miller indices in the diagram represent the reciprocal of the intercepts with the axes.",
+      "rubric": "- Correct description of (100) plane orientation in the diagram (2 points)\n- Correct description of (110) plane orientation in the diagram (2 points)\n- Correct description of (111) plane orientation in the diagram (2 points)\n- Explanation of Miller indices context (3 points)\n- Clarity in expression (1 point)",
+      "equations": [
+        {
+          "id": "q3_eq1",
+          "latex": "x",
+          "position": {
+            "char_index": 29,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq2",
+          "latex": "y",
+          "position": {
+            "char_index": 47,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq3",
+          "latex": "z",
+          "position": {
+            "char_index": 54,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Interpret the diagram below, which shows Miller indices (100), (110), and (111) planes in a cubic unit cell. Explain how these planes are oriented with respect to the cubic axes and how each set of indices determines the plane's orientation.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 4,
+      "type": "diagram-analysis",
+      "question": "Examine the diagram below of an FCC diffraction pattern. Identify the systematic absences in the diffraction peaks and explain the underlying cause of these absences based on the lattice plane reflections.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 4,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_5_20260415_163826/diagrams/36b319c9-e344-4ca6-92cf-dea2423746ef.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=r0NtyunyQbrxopBdg1XQVxtZP%2Bk%3D&Expires=1807807610",
+        "s3_key": "assignments/batch_regen_5_20260415_163826/diagrams/36b319c9-e344-4ca6-92cf-dea2423746ef.png",
+        "file_id": "36b319c9-e344-4ca6-92cf-dea2423746ef",
+        "filename": "diagram_q3.png",
+        "domain": "crystallography",
+        "diagram_type": "fcc_diffraction_pattern",
+        "description": "CUMULATIVE LEAK CORRECTIONS (all must be fixed): The diagram highlights specific diffraction rings in a thicker line weight, which directly points the student to the allowed reflections and implicitly identifies the absent ones, thereby leaking the answer.; The diagram uses a thicker line weight to highlight the allowed diffraction rings, which directly points the student to the answer and allows them to identify the systematic absences by simple observation rather than analysis.. A diagram of an FCC diffraction pattern showing the arrangement of diffraction peaks. The diagram should highlight the systematic absences in the diffraction peaks, which occur due to specific lattice plane reflections. The axes should be labeled with the appropriate indices, and the peaks should be marked to indicate their presence or absence. IMPORTANT correction needed: The diagram highlights specific diffraction rings in a thicker line weight, which directly points the student to the allowed reflections and implicitly identifies the absent ones, thereby leaking the answer.. Specifically: The diffraction rings for allowed reflections ({111}, {200}, {220}, {31. Do NOT include region labels (Feasible/Infeasible, Stable/Unstable, Optimal, etc.), formula annotations, reaction product labels, threshold markers, or any text that reveals the answer. Show structure and context only. IMPORTANT correction needed: The diagram uses a thicker line weight to highlight the allowed diffraction rings, which directly points the student to the answer and allows them to identify the systematic absences by simple observation rather than analysis.. Specifically: The use of different line weights for allowed vs. absent reflections leaks the answer.. Do NOT include region labels (Feasible/Infeasible, Stable/Unstable, Optimal, etc.), formula annotations, reaction product labels, threshold markers, or any text that reveals the answer. Show structure and context only."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "Systematic absences in the diffraction pattern shown in the diagram occur for reflections where <eq q4_eq1>, <eq q4_eq2>, and <eq q4_eq3> are not all even or odd. This is due to destructive interference arising from the FCC lattice's face-centered nature. The diagram below illustrates these absences, which reflect the absence of certain planes affecting constructive interference.",
+      "rubric": "- Identification of systematic absences in the diagram (5 points)\n- Explanation based on FCC structure as shown in the diagram below (3 points)\n- Effective use of the diagram to couple with the explanation (2 points)",
+      "equations": [
+        {
+          "id": "q4_eq1",
+          "latex": "h",
+          "position": {
+            "char_index": 41,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q4_eq2",
+          "latex": "k",
+          "position": {
+            "char_index": 44,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q4_eq3",
+          "latex": "l",
+          "position": {
+            "char_index": 49,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Examine the diagram below of an FCC diffraction pattern. Identify the systematic absences in the diffraction peaks and explain the underlying cause of these absences based on the lattice plane reflections.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 5,
+      "type": "diagram-analysis",
+      "question": "Examine the atomic arrangement of the BCC crystal in the diagram below. Use this to calculate the structure factor for a given set of Miller indices, assuming only atomic scattering factors are considered. Detail the steps involved in the calculation.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 5,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_5_20260415_163826/diagrams/da575f6c-8a76-4c84-907d-14a6449c7f1e.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=HFYoscN%2FQ5ft%2BsK35KzoFxV7hVA%3D&Expires=1807807654",
+        "s3_key": "assignments/batch_regen_5_20260415_163826/diagrams/da575f6c-8a76-4c84-907d-14a6449c7f1e.png",
+        "file_id": "da575f6c-8a76-4c84-907d-14a6449c7f1e",
+        "filename": "diagram_q4.png",
+        "domain": "chemistry",
+        "diagram_type": "bcc_unit_cell",
+        "description": "3D diagram of a BCC (body-centered cubic) unit cell. The diagram should show a cube with atoms at each corner and a single atom at the center of the cube. Label the corner atoms and the body-center atom. Highlight the cubic symmetry and spatial arrangement of the atoms. Ensure the perspective clearly shows the three-dimensional structure, with axes labeled to indicate orientation."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The structure factor <eq q5_eq1> is determined by analyzing the atomic arrangement depicted in the diagram below. If <eq q5_eq2> is odd, the structure factor is <eq q5_eq3>. If the sum is even, it is <eq q5_eq4>. Step 1: Identify atomic positions from the diagram. Step 2: Apply the formula using these positions as shown in the diagram. Result: Dependent on whether the sum of the Miller indices is even or odd.",
+      "rubric": "- Correctly identify atomic arrangement contribution from the diagram (2 points)\n- Derivation of structure factor formula using the diagram (2 points)\n- Correct application to Miller indices as shown in the diagram (3 points)\n- Explanation and calculation clarity based on the diagram (3 points)",
+      "equations": [
+        {
+          "id": "q5_eq1",
+          "latex": "F(hkl) = f(1 + e^{i\\pi(h+k+l)})",
+          "position": {
+            "char_index": 20,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q5_eq2",
+          "latex": "h+k+l",
+          "position": {
+            "char_index": 41,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q5_eq3",
+          "latex": "F(hkl) = 0",
+          "position": {
+            "char_index": 56,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q5_eq4",
+          "latex": "F(hkl) = 2f",
+          "position": {
+            "char_index": 70,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Examine the atomic arrangement of the BCC crystal in the diagram below. Use this to calculate the structure factor for a given set of Miller indices, assuming only atomic scattering factors are considered. Detail the steps involved in the calculation.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    }
+  ],
+  "statistics": {
+    "total_questions": 5,
+    "questions_with_diagrams": 5
+  }
+}

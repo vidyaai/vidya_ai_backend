@@ -1779,25 +1779,8 @@ async def generate_assignment(
 
 
 # ─── SSE streaming generation endpoint ────────────────────────────────
-import logging
 import queue
 import threading
-
-
-class _QueueLogHandler(logging.Handler):
-    """Captures log records into a thread-safe queue for SSE streaming."""
-
-    def __init__(self, q: queue.Queue):
-        super().__init__()
-        self.q = q
-
-    def emit(self, record: logging.LogRecord):
-        try:
-            msg = record.getMessage()
-            level = record.levelname.lower()
-            self.q.put({"type": "log", "level": level, "message": msg})
-        except Exception:
-            pass
 
 
 @router.post("/api/assignments/generate-stream")
@@ -1848,18 +1831,10 @@ async def generate_assignment_stream(
     log_queue: queue.Queue = queue.Queue()
     _DONE = object()
 
+    def _emit(message: str):
+        log_queue.put({"type": "log", "level": "info", "message": message})
+
     def _run_generation():
-        handler = _QueueLogHandler(log_queue)
-        handler.setLevel(logging.INFO)
-
-        target_loggers = [
-            logging.getLogger("controllers.config"),
-            logging.getLogger("utils.assignment_generator"),
-            logging.getLogger("utils.diagram_agent"),
-        ]
-        for lg in target_loggers:
-            lg.addHandler(handler)
-
         try:
             generator = AssignmentGenerator()
 
@@ -1873,13 +1848,7 @@ async def generate_assignment_stream(
                 "engineeringDiscipline", "electrical"
             )
 
-            log_queue.put(
-                {
-                    "type": "log",
-                    "level": "info",
-                    "message": f"Engine: {diagram_engine} | Subject: {diagram_subject} | Model: {diagram_model_opt}",
-                }
-            )
+            _emit("Generating questions...")
 
             generated_data = generator.generate_assignment(
                 generation_options=generate_data.generation_options,
@@ -1892,6 +1861,7 @@ async def generate_assignment_stream(
                 engine=diagram_engine,
                 subject=diagram_subject,
                 diagram_model=diagram_model_opt,
+                progress_callback=_emit,
             )
 
             # Persist using a fresh DB session for this thread
@@ -1955,8 +1925,6 @@ async def generate_assignment_stream(
         except Exception as exc:
             log_queue.put({"type": "error", "message": str(exc)})
         finally:
-            for lg in target_loggers:
-                lg.removeHandler(handler)
             log_queue.put(_DONE)
 
     thread = threading.Thread(target=_run_generation, daemon=True)

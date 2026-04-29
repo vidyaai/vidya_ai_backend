@@ -38,3 +38,14 @@ question_papers_log/
 debug/
 
 question_generation_test/run*
+
+# Virtual environment
+vidyaai_env/
+
+# Large binary files
+*.mp4
+*.mp3
+*.sql
+
+video_chat_test/data/
+fcc_crystal_paper/

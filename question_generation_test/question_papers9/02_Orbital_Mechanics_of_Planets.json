@@ -1,0 +1,236 @@
+{
+  "topic": "Orbital Mechanics of Planets",
+  "subject": "physics",
+  "prompt": "Generate 5 diagram-based questions on orbital mechanics of planets. Cover: Kepler's second law (equal areas in equal time), Hohmann transfer orbit between two circular orbits, gravitational slingshot / flyby trajectory around a planet, Lagrange points (L1-L5) in the Earth-Sun system, and orbital precession of Mercury. Each question must require the student to analyze or interpret a diagram.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "diagram-analysis",
+      "question": "Examine the diagram below depicting a planet's elliptical orbit around the sun. Using Kepler's second law, describe how the area swept out by a line from the planet to the sun varies over time. Explain how the speed of the planet changes as it moves along different segments of its orbit and why.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 1,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_2_20260416_174826/diagrams/863e9213-81dc-42cb-a8db-6fd983bf1d9e.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=bF2fEwbIVbWOEPU31bpySQhVtlc%3D&Expires=1807897848",
+        "s3_key": "assignments/batch_regen_2_20260416_174826/diagrams/863e9213-81dc-42cb-a8db-6fd983bf1d9e.png",
+        "file_id": "863e9213-81dc-42cb-a8db-6fd983bf1d9e",
+        "filename": "diagram_q0.png",
+        "domain": "astronomy",
+        "diagram_type": "planetary_orbit",
+        "description": "CUMULATIVE LEAK CORRECTIONS (all must be fixed): Known answer terms to avoid: According, Kepler, equal areas; The diagram explicitly labels two sectors with \"Area swept in equal time\", which directly states the principle of Kepler's second law that the student is asked to explain.; The diagram visually depicts the answer by showing two sectors of approximately equal area, which demonstrates the principle of \"equal areas in equal times\" that the student is supposed to explain.. A diagram of a planet in an elliptical orbit around the sun. The sun is at one focus of the ellipse. The major axis is drawn as a dashed line, with the 'Perihelion' and 'Aphelion' points labeled at the ends. The other focus is also marked. Show two shaded sectors representing the area swept by the planet's orbit. One sector, labeled 'Area 1', should be near the perihelion. The other sector, labeled 'Area 2', should be near the aphelion. CRITICAL: The two areas must be drawn with clearly and significantly different sizes to avoid visually leaking the 'equal areas in equal times' law. For example, make Area 2 visibly larger than Area 1. The planet should be labeled at the edge of one of the sectors. Do not include any labels that state or imply the areas are equal or are swept in equal times."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "According to Kepler's second law, as illustrated in the diagram below, a planet sweeps out equal areas in equal times as it orbits the sun. This means that when the planet is closer to the sun (at perihelion), it moves faster, sweeping out the same area in a shorter amount of time compared to when it is farther from the sun (at aphelion), where it moves slower. The diagram visually demonstrates this by showing the areas swept out over equal time intervals, highlighting the variation in the planet's speed along different segments of its orbit.",
+      "rubric": "Award full points for a complete explanation of Kepler's second law supported by an analysis of the speed variation in the planet's orbit, specifically detailing the faster speeds near perihelion and slower speeds near aphelion, as depicted in the diagram below.",
+      "equations": [],
+      "text": "Examine the diagram below depicting a planet's elliptical orbit around the sun. Using Kepler's second law, describe how the area swept out by a line from the planet to the sun varies over time. Explain how the speed of the planet changes as it moves along different segments of its orbit and why.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 2,
+      "type": "diagram-analysis",
+      "question": "Examine the diagram below showing a spacecraft executing a Hohmann transfer orbit between two circular orbits around Earth. Calculate the velocity changes (<eq q2_eq1>) required at each segment of the transfer. Provide a detailed step-by-step explanation of the calculation.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 2,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_2_20260416_174826/diagrams/9bf683cd-d6e0-4316-9805-b8a988a4a88e.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=ss9diO4YQUj%2BUAntgkCUqTKxFW4%3D&Expires=1807897903",
+        "s3_key": "assignments/batch_regen_2_20260416_174826/diagrams/9bf683cd-d6e0-4316-9805-b8a988a4a88e.png",
+        "file_id": "9bf683cd-d6e0-4316-9805-b8a988a4a88e",
+        "filename": "diagram_q1.png",
+        "domain": "orbital_mechanics",
+        "diagram_type": "hohmann_transfer_orbit",
+        "description": "MANDATORY LABELS \u2014 every item below MUST appear as visible text in the diagram:\n  \u2022 \u0394v\nThe diagram will FAIL automated review if any of these are missing.\n\nA Hohmann transfer orbit diagram showing two concentric circular orbits around Earth. The inner orbit is the initial circular orbit, and the outer orbit is the final circular orbit. The transfer orbit is an elliptical path that connects the two circular orbits. The diagram includes Earth at the center, the two circular orbits, and the elliptical transfer orbit. Mark the points on the elliptical orbit where the velocity changes (\u0394v) occur: one at the periapsis (closest point to Earth) and one at the apoapsis (farthest point from Earth). Label these points as \u0394v1 and \u0394v2 respectively. Include arrows to indicate the direction of the spacecraft's motion along the orbits.\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 Step\n  \u2022 Examine\n  \u2022 Use\n  \u2022 Hohmann\n  \u2022 Refer\n  \u2022 Compute\n  \u2022 Final\nThe diagram will FAIL review if any of these appear."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "Step 1: Examine the diagram below to identify the initial circular orbit and calculate the velocity in this orbit (<eq q2_eq2>). Step 2: Use the diagram to determine the point of transfer to the elliptical Hohmann transfer orbit and calculate the velocity in the transfer orbit at this point (<eq q2_eq3>). Step 3: Refer to the diagram to identify the final circular orbit and calculate the velocity in this orbit (<eq q2_eq4>). Step 4: Compute the velocity changes required at each segment of the transfer using <eq q2_eq5> and <eq q2_eq6>. Final answer: The values of <eq q2_eq5> and <eq q2_eq6> as indicated by the diagram.",
+      "rubric": "Points are awarded for correctly following each calculation step as illustrated in the diagram below. Full marks require accurate computation of velocities and correct application of orbital mechanics formulas, with reference to the diagram to ensure proper understanding of the spacecraft's trajectory.",
+      "equations": [
+        {
+          "id": "q2_eq1",
+          "latex": "\\Delta v",
+          "position": {
+            "char_index": 95,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q2_eq2",
+          "latex": "v_1 = \\sqrt{\\frac{GM}{R_1}}",
+          "position": {
+            "char_index": 66,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q2_eq3",
+          "latex": "v_2 = \\sqrt{2GM\\left(\\frac{1}{R_1} - \\frac{1}{(R_1+R_2)/2}\\right)}",
+          "position": {
+            "char_index": 144,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q2_eq4",
+          "latex": "v_3 = \\sqrt{\\frac{GM}{R_2}}",
+          "position": {
+            "char_index": 244,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q2_eq5",
+          "latex": "\\Delta v_1 = v_2 - v_1",
+          "position": {
+            "char_index": 276,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q2_eq6",
+          "latex": "\\Delta v_2 = v_3 - v_2",
+          "position": {
+            "char_index": 297,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Examine the diagram below showing a spacecraft executing a Hohmann transfer orbit between two circular orbits around Earth. Calculate the velocity changes (<eq q2_eq1>) required at each segment of the transfer. Provide a detailed step-by-step explanation of the calculation.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 3,
+      "type": "diagram-analysis",
+      "question": "Examine the diagram below that illustrates the trajectory of a space probe executing a gravitational slingshot maneuver around a planet. Explain how this maneuver alters the probe's trajectory and velocity, and discuss the conservation laws that apply to this process.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 3,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_2_20260416_174826/diagrams/8ca78607-290a-452a-a5f4-11f7b2595d59.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=tuUqHjVaQtHs5e2%2F%2FC7Or%2FJ8y2A%3D&Expires=1807897999",
+        "s3_key": "assignments/batch_regen_2_20260416_174826/diagrams/8ca78607-290a-452a-a5f4-11f7b2595d59.png",
+        "file_id": "8ca78607-290a-452a-a5f4-11f7b2595d59",
+        "filename": "diagram_q2.png",
+        "domain": "orbital_mechanics",
+        "diagram_type": "gravitational_slingshot_trajectory",
+        "description": "A diagram showing the trajectory of a space probe performing a"
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The gravitational slingshot maneuver, as illustrated in the diagram below, uses the planet's gravity to change the probe's trajectory and increase its velocity relative to the sun. The diagram shows how the probe enters the planet's gravitational sphere of influence and is accelerated by the planet's motion as it leaves, effectively transferring momentum from the planet to the probe. This process is consistent with the conservation of momentum and energy, as depicted in the trajectory changes shown in the diagram.",
+      "rubric": "Award points for a clear and accurate explanation of gravitational assists, referencing both the conservation of momentum and energy, and describing the resultant velocity and trajectory changes as illustrated in the diagram below.",
+      "equations": [],
+      "text": "Examine the diagram below that illustrates the trajectory of a space probe executing a gravitational slingshot maneuver around a planet. Explain how this maneuver alters the probe's trajectory and velocity, and discuss the conservation laws that apply to this process.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 4,
+      "type": "diagram-analysis",
+      "question": "Examine the diagram below depicting the five Lagrange points (L1-L5) in the Earth-Sun system. Describe the stability of each point and how satellites can utilize these positions.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 4,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_2_20260416_174826/diagrams/881579df-2f82-46cb-9a3f-578be1ab46a0.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=LRUU2lKBTZC846Phd6654a6KjyY%3D&Expires=1807898116",
+        "s3_key": "assignments/batch_regen_2_20260416_174826/diagrams/881579df-2f82-46cb-9a3f-578be1ab46a0.png",
+        "file_id": "881579df-2f82-46cb-9a3f-578be1ab46a0",
+        "filename": "diagram_q3.png",
+        "domain": "astrophysics",
+        "diagram_type": "lagrange_points",
+        "description": "A diagram"
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "In the diagram below, L1, L2, and L3 are depicted as saddle points, indicating they are dynamically unstable. In contrast, L4 and L5 form equilateral triangles with Earth and the Sun, showing their stability. Satellites can utilize these positions by maintaining stable orbits around L4 and L5, while those at L1, L2, and L3 require station-keeping due to their instability.",
+      "rubric": "Points are awarded for indicating the stability of each Lagrange point as shown in the diagram and their suitability for satellite positioning, highlighting the distinction between stable and unstable points.",
+      "equations": [],
+      "text": "Examine the diagram below depicting the five Lagrange points (L1-L5) in the Earth-Sun system. Describe the stability of each point and how satellites can utilize these positions.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 5,
+      "type": "short-answer",
+      "question": "Using the diagram below that details Mercury's orbit, explain the phenomenon of orbital precession and its causes, including contributions from both Newtonian mechanics and general relativity, with equations <eq_q_1> and <eq_q_2> resolved.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 5,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_2_20260416_174826/diagrams/2a14b5aa-a103-42c6-a7a5-669be62de1b7.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=04PRjmbTEsnUp4ZHt9htzl%2BSAl0%3D&Expires=1807898256",
+        "s3_key": "assignments/batch_regen_2_20260416_174826/diagrams/2a14b5aa-a103-42c6-a7a5-669be62de1b7.png",
+        "file_id": "2a14b5aa-a103-42c6-a7a5-669be62de1b7",
+        "filename": "diagram_q4.png",
+        "domain": "astrophysics",
+        "diagram_type": "orbital_precession_diagram",
+        "description": "CUMULATIVE LEAK CORRECTIONS (all must be fixed): Known answer terms to avoid: Orbital, Mercury, Newtonian, phenomenon of orbital precession, base editing window; The diagram contains multiple forbidden labels (\"Mercury\", \"Newtonian\", \"Orbital\") and also directly reveals the answer by explicitly labeling the two causes of precession, which the student is required to explain.. Diagram showing an elliptical orbit of a planet around the Sun. The orientation of the ellipse should be shown to precess over time, with successive orbits drawn to illustrate this shift. The perihelion point should be marked for each successive orbit. Key points like the perihelion and aphelion must be labeled. Arrows must indicate the direction of the planet's motion and the direction of the precession. Crucially, there must be annotations that indicate the portion of the precession caused by Newtonian mechanics (e.g., gravitational tugs from other planets) and the portion caused by general relativity. IMPORTANT correction needed: The diagram contains multiple forbidden labels (\"Mercury\", \"Newtonian\", \"Orbital\") and also directly reveals the answer by explicitly labeling the two causes of precession, which the student is required to explain.. Specifically: The diagram contains the forbidden labels \"Mercury\" (in the title, as. Do NOT include region labels (Feasible/Infeasible, Stable/Unstable, Optimal, etc.), formula annotations, reaction product labels, threshold markers, or any text that reveals the answer. Show structure and context only."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "Orbital precession refers to the gradual rotation of the orbit of a body. In the diagram below, Mercury's orbit is illustrated, showing how it is significantly influenced by the gravitational pull from other planets (Newtonian mechanics) and its proximity to the sun, which causes its orbit to precess due to the curvature of spacetime (general relativity). This effect was one of the first confirmations of general relativity, as depicted in the diagram.",
+      "rubric": "Award points for explaining both the Newtonian and relativistic aspects of orbital precession and how they contribute to the observed phenomenon in Mercury's orbit, as illustrated in the diagram below.",
+      "equations": [],
+      "text": "Using the diagram below that details Mercury's orbit, explain the phenomenon of orbital precession and its causes, including contributions from both Newtonian mechanics and general relativity, with equations <eq_q_1> and <eq_q_2> resolved.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    }
+  ],
+  "statistics": {
+    "total_questions": 5,
+    "questions_with_diagrams": 5
+  }
+}

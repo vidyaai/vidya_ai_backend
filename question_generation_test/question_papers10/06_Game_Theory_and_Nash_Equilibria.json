@@ -1,0 +1,420 @@
+{
+  "topic": "Game Theory & Nash Equilibria",
+  "subject": "math",
+  "prompt": "Generate 5 diagram-based questions on game theory and Nash equilibria. Cover: extensive form game tree for a sequential two-player game, payoff matrix for the Prisoner's Dilemma and identifying Nash equilibria, mixed strategy Nash equilibrium in a coordination game, backward induction on a finite game tree, and a Pareto frontier diagram showing efficient vs inefficient outcomes. Each question must require the student to analyze or interpret a diagram.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "diagram-analysis",
+      "question": "Consider the extensive form game tree for a sequential two-player game shown in the diagram below. Player 1 moves first, choosing between A and B. If Player 1 chooses A, Player 2 chooses between C and D; if B, Player 2 chooses between E and F. Analyze the game tree and identify the Nash equilibrium(s). Assume the following payoffs: <eq q1_eq1>, <eq q1_eq2>, <eq q1_eq3>, and <eq q1_eq4>.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 1,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_6_20260417_050425/diagrams/a89b01d7-6412-437c-96b0-01e46ebb7aab.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=BpOSs6A6tRrH6T%2FT5LNLd5iS9v0%3D&Expires=1807938339",
+        "s3_key": "assignments/batch_6_20260417_050425/diagrams/a89b01d7-6412-437c-96b0-01e46ebb7aab.png",
+        "file_id": "a89b01d7-6412-437c-96b0-01e46ebb7aab",
+        "filename": "diagram_q0.png",
+        "domain": "game_theory",
+        "diagram_type": "extensive_form_game_tree",
+        "description": "Extensive form game tree for a sequential two-player game with specified payoffs. Player 1 chooses between A and B; Player 2 chooses between C, D, E, and F based on Player 1's choice. Payoffs are (3, 2), (1, 1), (2, 3), and (0, 0).\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 nash equilibrium\nThe diagram will FAIL review if any of these appear."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 1,
+      "correctAnswer": "The Nash equilibrium is (A, C) with payoffs <eq q1_eq1>, as both players have no incentive to deviate from this strategy according to the game tree shown in the diagram below.",
+      "rubric": "Award full marks for accurately identifying the Nash equilibrium from the diagram and providing a valid rationale for the stability of the equilibrium. Partial credit for correct identification without proper justification.",
+      "equations": [
+        {
+          "id": "q1_eq1",
+          "latex": "(3, 2)",
+          "position": {
+            "char_index": 324,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq2",
+          "latex": "(1, 1)",
+          "position": {
+            "char_index": 334,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq3",
+          "latex": "(2, 3)",
+          "position": {
+            "char_index": 344,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq4",
+          "latex": "(0, 0)",
+          "position": {
+            "char_index": 354,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q1_eq5",
+          "latex": "(3, 2)",
+          "position": {
+            "char_index": 67,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Consider the extensive form game tree for a sequential two-player game shown in the diagram below. Player 1 moves first, choosing between A and B. If Player 1 chooses A, Player 2 chooses between C and D; if B, Player 2 chooses between E and F. Analyze the game tree and identify the Nash equilibrium(s). Assume the following payoffs: <eq q1_eq1>, <eq q1_eq2>, <eq q1_eq3>, and <eq q1_eq4>.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 2,
+      "type": "diagram-analysis",
+      "question": "Analyze the payoff matrix shown in the diagram below for the classic Prisoner's Dilemma. Identify all Nash equilibria for the matrix: Player 1 choices (Cooperate, Defect) and Player 2 choices (Cooperate, Defect) with associated payoffs as follows: <eq q2_eq1>, <eq q2_eq2>, <eq q2_eq3>, and <eq q2_eq4>.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 2,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_6_20260417_050425/diagrams/3da1e96d-a188-454a-abd1-26be0037966e.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=FUYQXrtCFe%2Bo3M3mRUllwrFqaLU%3D&Expires=1807938387",
+        "s3_key": "assignments/batch_6_20260417_050425/diagrams/3da1e96d-a188-454a-abd1-26be0037966e.png",
+        "file_id": "3da1e96d-a188-454a-abd1-26be0037966e",
+        "filename": "diagram_q1.png",
+        "domain": "game_theory",
+        "diagram_type": "payoff_matrix",
+        "description": "Payoff matrix for the Prisoner's Dilemma game. Player 1 choices are 'Cooperate' and 'Defect', Player 2 choices are 'Cooperate' and 'Defect'. The payoffs are (3, 3) for both cooperating, (0, 5) for Player 1 cooperating and Player 2 defecting, (5, 0) for Player 1 defecting and Player 2 cooperating, and (1, 1) for both defecting.\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 nash equilibrium\nThe diagram will FAIL review if any of these appear."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 1,
+      "correctAnswer": "The Nash equilibrium is (Defect, Defect) with payoffs <eq q2_eq4> as shown in the diagram below, as both players have no incentive to unilaterally change their strategy.",
+      "rubric": "Award full marks for identifying the correct Nash equilibrium in the diagram and justifying why no player has an incentive to deviate. Partial credit for correct identification without reasoning.",
+      "equations": [
+        {
+          "id": "q2_eq1",
+          "latex": "(3, 3)",
+          "position": {
+            "char_index": 246,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q2_eq2",
+          "latex": "(0, 5)",
+          "position": {
+            "char_index": 256,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q2_eq3",
+          "latex": "(5, 0)",
+          "position": {
+            "char_index": 266,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q2_eq4",
+          "latex": "(1, 1)",
+          "position": {
+            "char_index": 276,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q2_eq5",
+          "latex": "(1, 1)",
+          "position": {
+            "char_index": 55,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Analyze the payoff matrix shown in the diagram below for the classic Prisoner's Dilemma. Identify all Nash equilibria for the matrix: Player 1 choices (Cooperate, Defect) and Player 2 choices (Cooperate, Defect) with associated payoffs as follows: <eq q2_eq1>, <eq q2_eq2>, <eq q2_eq3>, and <eq q2_eq4>.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 3,
+      "type": "diagram-analysis",
+      "question": "Given a coordination game with the following mixed strategy Nash equilibrium: Two players each choose between actions X and Y. The payoff matrix is defined as shown in the diagram below: <eq q3_eq1>, <eq q3_eq2>, <eq q3_eq3>, and <eq q3_eq4>. Calculate the probabilities of each player choosing X and Y in the mixed strategy Nash equilibrium.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 3,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_6_20260417_050425/diagrams/80d6e4e0-a780-400f-8ad2-9506249f6738.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=yUKMWOZOJW54FIp47uLBaGGkwPM%3D&Expires=1807938430",
+        "s3_key": "assignments/batch_6_20260417_050425/diagrams/80d6e4e0-a780-400f-8ad2-9506249f6738.png",
+        "file_id": "80d6e4e0-a780-400f-8ad2-9506249f6738",
+        "filename": "diagram_q2.png",
+        "domain": "game_theory",
+        "diagram_type": "payoff_matrix",
+        "description": "Payoff matrix for a coordination game with two players. Each player chooses between actions X and Y. The matrix is 2x2 with the following payoffs: (2, 2) for (X, X), (1, 1) for (X, Y) and (Y, X), and (3, 3) for (Y, Y).\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 nash equilibrium\nThe diagram will FAIL review if any of these appear."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 1,
+      "correctAnswer": "At mixed strategy Nash equilibrium, both players choose X with probability <eq q3_eq5> and Y with probability <eq q3_eq5>, as shown in the diagram below.",
+      "rubric": "Award full marks for correctly calculating the mixed strategy probabilities based on the payoff matrix provided in the diagram. Partial credit for setting up the equations correctly but making arithmetic errors.",
+      "equations": [
+        {
+          "id": "q3_eq1",
+          "latex": "(2, 2)",
+          "position": {
+            "char_index": 211,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq2",
+          "latex": "(1, 1)",
+          "position": {
+            "char_index": 221,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq3",
+          "latex": "(1, 1)",
+          "position": {
+            "char_index": 231,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq4",
+          "latex": "(3, 3)",
+          "position": {
+            "char_index": 241,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq5",
+          "latex": "\\frac{1}{2}",
+          "position": {
+            "char_index": 78,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Given a coordination game with the following mixed strategy Nash equilibrium: Two players each choose between actions X and Y. The payoff matrix is defined as shown in the diagram below: <eq q3_eq1>, <eq q3_eq2>, <eq q3_eq3>, and <eq q3_eq4>. Calculate the probabilities of each player choosing X and Y in the mixed strategy Nash equilibrium.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 4,
+      "type": "diagram-analysis",
+      "question": "Using the diagram below of a finite game tree, perform backward induction to determine the optimal strategies for the players. Assume initially that Player 1 can choose between G and H, and Player 2 can choose I or J after observing Player 1's choice. The final payoffs are <eq q4_eq1>, <eq q4_eq2>, <eq q4_eq3>, and <eq q4_eq4>.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 4,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_6_20260417_050425/diagrams/08782642-496a-4be5-9663-6550cf5a8467.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=YCTER2uiSDm2qCJGVLOwC6WaYSA%3D&Expires=1807938492",
+        "s3_key": "assignments/batch_6_20260417_050425/diagrams/08782642-496a-4be5-9663-6550cf5a8467.png",
+        "file_id": "08782642-496a-4be5-9663-6550cf5a8467",
+        "filename": "diagram_q3.png",
+        "domain": "game_theory",
+        "diagram_type": "finite_game_tree",
+        "description": "Finite game tree showing Player 1's choices (G, H) and Player 2's choices (I, J) with final payoffs (4, 4), (2, 3), (3, 2), and (1, 1).\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 optimal\nThe diagram will FAIL review if any of these appear. IMPORTANT: Values or sequences in the diagram don't match the question. Specifically: The diagram shows payoffs (3, 2) and (1, 1) resulting from Player 2's choice 'J. The diagram's structure does not correctly represent the game described in the question, leading to a mismatch between the paths and the specified payoffs.. Regenerate using EXACTLY the values and sequences specified."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 1,
+      "correctAnswer": "Using backward induction on the diagram below, the optimal strategy is (G, I) resulting in payoffs <eq q4_eq1>. In the diagram, Player 2 chooses I when Player 1 chooses G, and J when H. Therefore, Player 1 chooses G.",
+      "rubric": "Award full marks for correctly applying backward induction using the diagram and identifying the optimal strategies. Partial credit for a partially correct induction process using the diagram without reaching the final optimal strategies.",
+      "equations": [
+        {
+          "id": "q4_eq1",
+          "latex": "(4, 4)",
+          "position": {
+            "char_index": 251,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q4_eq2",
+          "latex": "(2, 3)",
+          "position": {
+            "char_index": 261,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q4_eq3",
+          "latex": "(3, 2)",
+          "position": {
+            "char_index": 271,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q4_eq4",
+          "latex": "(1, 1)",
+          "position": {
+            "char_index": 281,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q4_eq5",
+          "latex": "(4, 4)",
+          "position": {
+            "char_index": 61,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Using the diagram below of a finite game tree, perform backward induction to determine the optimal strategies for the players. Assume initially that Player 1 can choose between G and H, and Player 2 can choose I or J after observing Player 1's choice. The final payoffs are <eq q4_eq1>, <eq q4_eq2>, <eq q4_eq3>, and <eq q4_eq4>.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 5,
+      "type": "diagram-analysis",
+      "question": "Examine the Pareto frontier in the diagram below illustrating possible outcomes for two firms. Analyze the diagram to distinguish between efficient and inefficient outcomes. The diagram shows combinations of payoffs <eq q5_eq1>, <eq q5_eq2>, and <eq q5_eq3> are labeled.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 5,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_6_20260417_050425/diagrams/86695037-5f4f-44fa-a75e-8ac1d2573a8c.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=ezTzQTgq7LWZgJZ0cdBltx7d6jw%3D&Expires=1807938531",
+        "s3_key": "assignments/batch_6_20260417_050425/diagrams/86695037-5f4f-44fa-a75e-8ac1d2573a8c.png",
+        "file_id": "86695037-5f4f-44fa-a75e-8ac1d2573a8c",
+        "filename": "diagram_q4.png",
+        "domain": "economics",
+        "diagram_type": "pareto_frontier",
+        "description": "Pareto frontier diagram for two firms' outcomes, showing combinations of payoffs (5, 5), (4, 3), and (2, 4). The diagram illustrates efficient and inefficient outcomes on a graph with labeled points.\n\nFORBIDDEN LABELS (do NOT render as text, legend entries, annotations, note boxes, or titles \u2014 these reveal the answer):\n  \u2022 pareto front\n  \u2022 pareto frontier\nThe diagram will FAIL review if any of these appear."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 1,
+      "correctAnswer": "The efficient outcomes on the Pareto frontier, as illustrated in the diagram below, are <eq q5_eq1> and <eq q5_eq3>. The outcome <eq q5_eq2> is inefficient as it could be dominated by a movement to the efficient boundary depicted in the diagram.",
+      "rubric": "Award full marks for correctly identifying efficient outcomes on the Pareto frontier in the diagram and justifying why other outcomes are inefficient. Partial credit for partial identification of efficient outcomes as shown in the diagram.",
+      "equations": [
+        {
+          "id": "q5_eq1",
+          "latex": "(5, 5)",
+          "position": {
+            "char_index": 206,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q5_eq2",
+          "latex": "(4, 3)",
+          "position": {
+            "char_index": 216,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q5_eq3",
+          "latex": "(2, 4)",
+          "position": {
+            "char_index": 226,
+            "context": "question_text"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q5_eq4",
+          "latex": "(5, 5)",
+          "position": {
+            "char_index": 47,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q5_eq5",
+          "latex": "(2, 4)",
+          "position": {
+            "char_index": 60,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q5_eq6",
+          "latex": "(4, 3)",
+          "position": {
+            "char_index": 89,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Examine the Pareto frontier in the diagram below illustrating possible outcomes for two firms. Analyze the diagram to distinguish between efficient and inefficient outcomes. The diagram shows combinations of payoffs <eq q5_eq1>, <eq q5_eq2>, and <eq q5_eq3> are labeled.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    }
+  ],
+  "statistics": {
+    "total_questions": 5,
+    "questions_with_diagrams": 5
+  }
+}

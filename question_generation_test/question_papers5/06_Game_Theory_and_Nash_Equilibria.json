@@ -1,0 +1,266 @@
+{
+  "topic": "Game Theory & Nash Equilibria",
+  "subject": "math",
+  "prompt": "Generate 5 diagram-based questions on game theory and Nash equilibria. Cover: extensive form game tree for a sequential two-player game, payoff matrix for the Prisoner's Dilemma and identifying Nash equilibria, mixed strategy Nash equilibrium in a coordination game, backward induction on a finite game tree, and a Pareto frontier diagram showing efficient vs inefficient outcomes. Each question must require the student to analyze or interpret a diagram.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "diagram-analysis",
+      "question": "Analyze the extensive form game tree in the diagram below for a sequential two-player game where Player 1 can choose between actions A and B, and Player 2 can then choose between X and Y after observing Player 1's action. Determine the subgame perfect Nash equilibrium by performing backward induction on this game tree.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 1,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_6_20260329_182913/diagrams/3fa9d10f-ae1c-4200-b67f-70183543a51b.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=yg%2FbbRb9lLs5VQCrLb6zi3HiYf4%3D&Expires=1806344984",
+        "s3_key": "assignments/batch_regen_6_20260329_182913/diagrams/3fa9d10f-ae1c-4200-b67f-70183543a51b.png",
+        "file_id": "3fa9d10f-ae1c-4200-b67f-70183543a51b",
+        "filename": "diagram_q0.png",
+        "domain": "game_theory",
+        "diagram_type": "extensive_form_game_tree",
+        "description": "Extensive form game tree for a sequential two-player game where Player 1 chooses between actions A and B, and Player 2 chooses between X and Y after observing Player 1's action. The diagram illustrates the decision nodes and possible outcomes for performing backward induction."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "Identify the subgame perfect Nash equilibrium by tracing backward using the diagram below: \n- If Player 1 chooses A in the diagram, Player 2 chooses X since it yields a higher payoff according to the diagram.\n- If Player 1 chooses B in the diagram, Player 2 chooses Y for a higher payoff as shown in the diagram.\n- Backward induction using the diagram reveals: Player 1 should choose A to maximize their own payoff given Player 2's responses.",
+      "rubric": "1. Identify correct paths and payoffs for each subgame in the diagram (4 points)\n2. Correct application of backward induction using the diagram (4 points)\n3. Correct conclusion of Player 1's optimal strategy based on the diagram (2 points)",
+      "equations": [],
+      "text": "Analyze the extensive form game tree in the diagram below for a sequential two-player game where Player 1 can choose between actions A and B, and Player 2 can then choose between X and Y after observing Player 1's action. Determine the subgame perfect Nash equilibrium by performing backward induction on this game tree.",
+      "correctAnswerDiagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_6_20260328_183120/diagrams/4aff0f97-2253-4c39-923f-50c2c7744fae.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=91Si8icw20KFbCBdiUd92KyB4HM%3D&Expires=1806258768",
+        "s3_key": "assignments/batch_6_20260328_183120/diagrams/4aff0f97-2253-4c39-923f-50c2c7744fae.png",
+        "file_id": "4aff0f97-2253-4c39-923f-50c2c7744fae",
+        "filename": "diagram_q0_answer.png"
+      },
+      "subquestions": []
+    },
+    {
+      "id": 2,
+      "type": "short-answer",
+      "question": "Consider a payoff matrix for a Prisoner's Dilemma:\n\n|        | Cooperate | Defect |\n|------- |-----------|--------|\n| C | (3,3)    | (0,5) |\n| D | (5,0)    | (1,1) |\n\nIdentify all Nash equilibria in this game and explain why they are Nash equilibria.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 2,
+      "hasCode": false,
+      "hasDiagram": false,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": null,
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The Nash equilibrium is at (Defect, Defect) with payoffs (1,1). In this position, neither player benefits by unilaterally changing their strategy. If either cooperates while the other defects, they will receive a lower payoff (0 versus 1).",
+      "rubric": "1. Correct identification of Nash equilibrium (4 points)\n2. Explanation of why it is an equilibrium (3 points)\n3. Consideration of unilateral strategy changes (3 points)",
+      "equations": [],
+      "text": "Consider a payoff matrix for a Prisoner's Dilemma:\n\n|        | Cooperate | Defect |\n|------- |-----------|--------|\n| C | (3,3)    | (0,5) |\n| D | (5,0)    | (1,1) |\n\nIdentify all Nash equilibria in this game and explain why they are Nash equilibria.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 3,
+      "type": "diagram-analysis",
+      "question": "Evaluate a mixed strategy Nash equilibrium in a coordination game given by the payoff table in the diagram below, where both players choose high or low effort:\n\n|  | High | Low |\n|----------|-------|-------|\n| High | (2,2) | (0,3) |\n| Low | (3,0) | (1,1) |\n\nUse the mixed strategy method to find the equilibria, and determine the probabilities with which each player should randomize their strategies.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 3,
+      "hasCode": false,
+      "hasDiagram": false,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": null,
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "Let Player A's probability of playing High be <eq q3_eq1>, and Player B's be <eq q3_eq2>. Referring to the payoff table in the diagram below:\n- Set expected payoffs equal based on the diagram:\n  - For Player A: <eq q3_eq3> = <eq q3_eq4> => <eq q3_eq5>\n  - For Player B: <eq q3_eq6> = <eq q3_eq7> => <eq q3_eq8>\n\nMixed strategy Nash equilibrium probabilities are <eq q3_eq9> for Player A and <eq q3_eq10> for Player B.",
+      "rubric": "1. Correct expected payoff equations using the diagram (3 points)\n2. Correct calculation of probabilities based on the diagram (4 points)\n3. Conclusion with correct mixed strategy probabilities as shown in the diagram (3 points)",
+      "equations": [
+        {
+          "id": "q3_eq1",
+          "latex": "p",
+          "position": {
+            "char_index": 47,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq2",
+          "latex": "q",
+          "position": {
+            "char_index": 76,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq3",
+          "latex": "q(2) + (1-q)(0)",
+          "position": {
+            "char_index": 122,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq4",
+          "latex": "q(0) + (1-q)(1)",
+          "position": {
+            "char_index": 139,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq5",
+          "latex": "q = 0.5",
+          "position": {
+            "char_index": 148,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq6",
+          "latex": "p(2) + (1-p)(0)",
+          "position": {
+            "char_index": 176,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq7",
+          "latex": "p(3) + (1-p)(1)",
+          "position": {
+            "char_index": 193,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq8",
+          "latex": "p = 0.25",
+          "position": {
+            "char_index": 202,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq9",
+          "latex": "p=0.25",
+          "position": {
+            "char_index": 250,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        },
+        {
+          "id": "q3_eq10",
+          "latex": "q=0.5",
+          "position": {
+            "char_index": 269,
+            "context": "correctAnswer"
+          },
+          "type": "inline"
+        }
+      ],
+      "text": "Evaluate a mixed strategy Nash equilibrium in a coordination game given by the payoff table in the diagram below, where both players choose high or low effort:\n\n|  | High | Low |\n|----------|-------|-------|\n| High | (2,2) | (0,3) |\n| Low | (3,0) | (1,1) |\n\nUse the mixed strategy method to find the equilibria, and determine the probabilities with which each player should randomize their strategies.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    },
+    {
+      "id": 4,
+      "type": "diagram-analysis",
+      "question": "Perform backward induction on the game tree shown in the diagram below for a three-stage sequential game with perfect information. Each player has one possible optimal move at each decision node. Determine the optimal strategy for each player, and explain how backward induction aids in determining this strategy.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 4,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_6_20260329_182913/diagrams/41c93fc7-01ea-44f4-99fd-caead7e63df3.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=Od%2BfvxmjXfStp1DGqdE%2BmRgMtHU%3D&Expires=1806345113",
+        "s3_key": "assignments/batch_regen_6_20260329_182913/diagrams/41c93fc7-01ea-44f4-99fd-caead7e63df3.png",
+        "file_id": "41c93fc7-01ea-44f4-99fd-caead7e63df3",
+        "filename": "diagram_q3.png",
+        "domain": "game_theory",
+        "diagram_type": "game_tree",
+        "description": "A three-stage sequential game tree with decision nodes for Player 1 and Player 2, illustrating possible moves at each stage. IMPORTANT: Values or sequences in the diagram don't match the question. The question text and diagram description refer to. Regenerate using EXACTLY the values and sequences specified. IMPORTANT correction needed: The diagram contains annotations on the right. Do NOT include region labels (Feasible/Infeasible, Stable/Unstable, Optimal, etc.), formula annotations, reaction product labels, threshold markers, or any text that reveals the answer. Show structure and context only."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "By working backward through the game tree shown in the diagram below:\n1. Determine optimal moves at terminal nodes for the last player as depicted in the diagram.\n2. Use these optimal moves to evaluate and choose moves for the middle-stage player, as illustrated in the diagram.\n3. Finally, determine the initial player's optimal strategy using the preceding moves, as outlined in the diagram below.\nBackward induction ensures rational decision-making by resolving subgames first, as demonstrated in the diagram.",
+      "rubric": "1. Correct identification of optimal moves at each stage in the diagram (3 points)\n2. Correct use of backward induction process as shown in the diagram below (4 points)\n3. Logical integration of decisions into a comprehensive strategy, referencing the diagram (3 points)",
+      "equations": [],
+      "text": "Perform backward induction on the game tree shown in the diagram below for a three-stage sequential game with perfect information. Each player has one possible optimal move at each decision node. Determine the optimal strategy for each player, and explain how backward induction aids in determining this strategy.",
+      "correctAnswerDiagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_6_20260328_183120/diagrams/da8aa55a-3b78-4a23-87cb-ab7d103a2928.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=i%2BGd8g9eHp%2BI8ec608p8xJgmLdk%3D&Expires=1806258867",
+        "s3_key": "assignments/batch_6_20260328_183120/diagrams/da8aa55a-3b78-4a23-87cb-ab7d103a2928.png",
+        "file_id": "da8aa55a-3b78-4a23-87cb-ab7d103a2928",
+        "filename": "diagram_q3_answer.png"
+      },
+      "subquestions": []
+    },
+    {
+      "id": 5,
+      "type": "diagram-analysis",
+      "question": "Given the Pareto frontier illustrated in the diagram below, identify the Pareto efficient points and describe the trade-offs at inefficient points. Explain how any shift in the curve can alter efficiency in allocation.",
+      "points": 10.0,
+      "difficulty": "hard",
+      "options": [],
+      "allowMultipleCorrect": false,
+      "multipleCorrectAnswers": [],
+      "order": 5,
+      "hasCode": false,
+      "hasDiagram": true,
+      "codeLanguage": "",
+      "outputType": "",
+      "rubricType": "overall",
+      "code": "",
+      "diagram": {
+        "s3_url": "https://uservideodownloads980.s3.amazonaws.com/assignments/batch_regen_6_20260329_182913/diagrams/102f50b3-1663-4c96-84e9-a3371bf02ad9.png?AWSAccessKeyId=AKIA2ONXT6HZOV7LBI7T&Signature=Z6sRiilziZeZXFYeJczqFcQOy%2FQ%3D&Expires=1806345184",
+        "s3_key": "assignments/batch_regen_6_20260329_182913/diagrams/102f50b3-1663-4c96-84e9-a3371bf02ad9.png",
+        "file_id": "102f50b3-1663-4c96-84e9-a3371bf02ad9",
+        "filename": "diagram_q4.png",
+        "domain": "economics",
+        "diagram_type": "pareto_frontier",
+        "description": "CUMULATIVE LEAK CORRECTIONS (all must be fixed): The diagram labels the points as \"E\" for efficient; The diagram labels points with \"E\" for efficient and. A Pareto frontier diagram illustrating efficient vs inefficient outcomes. The diagram shows a curve representing the Pareto frontier, with points on the curve labeled as Pareto efficient and points below the curve labeled as inefficient. Arrows indicate potential shifts in the curve to illustrate changes in efficiency. IMPORTANT correction needed: The diagram labels the points as \"E\" for efficient. Do NOT include region labels (Feasible/Infeasible, Stable/Unstable, Optimal, etc.), formula annotations, reaction product labels, threshold markers, or any text that reveals the answer. Show structure and context only. IMPORTANT correction needed: The diagram labels points with \"E\" for efficient and. Do NOT include region labels (Feasible/Infeasible, Stable/Unstable, Optimal, etc.), formula annotations, reaction product labels, threshold markers, or any text that reveals the answer. Show structure and context only."
+      },
+      "optionalParts": false,
+      "requiredPartsCount": 0,
+      "correctAnswer": "The Pareto efficient points are located on the boundary of the feasible set in the diagram, where no individual's allocation can be improved without worsening another's. In the diagram below, shifts altering the Pareto frontier can either broaden opportunities for trade-offs or shrink them, thus changing potential efficiency outcomes.",
+      "rubric": "1. Correct identification of efficient points on the diagram (4 points)\n2. Explanation of trade-offs at inefficient points as shown in the diagram (3 points)\n3. Understanding of implications of shifts in the frontier as depicted in the diagram (3 points)",
+      "equations": [],
+      "text": "Given the Pareto frontier illustrated in the diagram below, identify the Pareto efficient points and describe the trade-offs at inefficient points. Explain how any shift in the curve can alter efficiency in allocation.",
+      "correctAnswerDiagram": null,
+      "subquestions": []
+    }
+  ],
+  "statistics": {
+    "total_questions": 5,
+    "questions_with_diagrams": 3
+  }
+}
