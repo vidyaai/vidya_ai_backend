@@ -105,9 +105,12 @@ async def verify_session(
 
         logger.info(f"✅ Session {session_id} verified and subscription updated")
 
+        metadata = session.get("metadata") or {}
         return {
             "success": True,
             "message": "Subscription activated successfully",
+            "plan_type": metadata.get("plan_type"),
+            "billing_period": metadata.get("billing_period"),
         }
 
     except HTTPException:
