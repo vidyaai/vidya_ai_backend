@@ -16,6 +16,7 @@ from models import (
     CourseEnrollment,
     LectureSummary,
     SharedLink,
+    SharedLinkAccess,
     Subscription,
     UserUsage,
 )
@@ -106,8 +107,18 @@ async def delete_account(
                     f"Failed to cancel Stripe subscription for user {firebase_uid}: {e}"
                 )
 
-        # 2. Delete SharedLinks owned by user (before Videos/Folders to avoid FK violations)
-        # SharedLink.shared_accesses cascades via ORM, so SharedLinkAccess rows are handled
+        # 2. Delete SharedLinks owned by user (before Videos/Folders to avoid FK violations).
+        # Bulk .delete() bypasses ORM cascade, so delete SharedLinkAccess rows explicitly first.
+        owned_link_ids = [
+            row[0]
+            for row in db.query(SharedLink.id)
+            .filter(SharedLink.owner_id == firebase_uid)
+            .all()
+        ]
+        if owned_link_ids:
+            db.query(SharedLinkAccess).filter(
+                SharedLinkAccess.shared_link_id.in_(owned_link_ids)
+            ).delete(synchronize_session=False)
         db.query(SharedLink).filter(SharedLink.owner_id == firebase_uid).delete(
             synchronize_session=False
         )
@@ -162,14 +173,33 @@ async def delete_account(
             AssignmentSubmission.user_id == firebase_uid
         ).delete(synchronize_session=False)
 
-        # 7. Delete Assignments + S3 (ORM cascades submissions on own assignments + SharedLinks)
+        # 7. Delete Assignments + S3. Bulk .delete() bypasses ORM cascade, so
+        # explicitly delete dependent submissions and shared links (and their accesses) first.
         assignments = (
             db.query(Assignment).filter(Assignment.user_id == firebase_uid).all()
         )
+        owned_assignment_ids = [a.id for a in assignments]
         for a in assignments:
             for f in a.uploaded_files or []:
                 if isinstance(f, dict):
                     _delete_s3_key(f.get("s3_key"))
+        if owned_assignment_ids:
+            assignment_link_ids = [
+                row[0]
+                for row in db.query(SharedLink.id)
+                .filter(SharedLink.assignment_id.in_(owned_assignment_ids))
+                .all()
+            ]
+            if assignment_link_ids:
+                db.query(SharedLinkAccess).filter(
+                    SharedLinkAccess.shared_link_id.in_(assignment_link_ids)
+                ).delete(synchronize_session=False)
+                db.query(SharedLink).filter(
+                    SharedLink.id.in_(assignment_link_ids)
+                ).delete(synchronize_session=False)
+            db.query(AssignmentSubmission).filter(
+                AssignmentSubmission.assignment_id.in_(owned_assignment_ids)
+            ).delete(synchronize_session=False)
         db.query(Assignment).filter(Assignment.user_id == firebase_uid).delete(
             synchronize_session=False
         )
