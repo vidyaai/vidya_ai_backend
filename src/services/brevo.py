@@ -58,6 +58,11 @@ def add_contact_to_brevo(
         return
     Thread(
         target=_send_to_brevo,
-        args=(email, first_name or "", last_name or "", list_id or BREVO_DEFAULT_LIST_ID),
+        args=(
+            email,
+            first_name or "",
+            last_name or "",
+            list_id or BREVO_DEFAULT_LIST_ID,
+        ),
         daemon=True,
     ).start()
