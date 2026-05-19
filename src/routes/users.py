@@ -21,6 +21,7 @@ from models import (
     UserUsage,
 )
 from schemas import UserProfileResponse, UserProfileUpdate
+from services.brevo import add_contact_to_brevo
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
@@ -29,14 +30,23 @@ def _get_or_create_user(db: Session, current_user: dict) -> User:
     """Get existing user or create one if not found."""
     user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
     if not user:
+        email = current_user.get("email")
+        name = current_user.get("name") or ""
         user = User(
             firebase_uid=current_user["uid"],
-            email=current_user.get("email"),
-            name=current_user.get("name"),
+            email=email,
+            name=name,
         )
         db.add(user)
         db.commit()
         db.refresh(user)
+        if email:
+            parts = name.split(" ", 1)
+            add_contact_to_brevo(
+                email=email,
+                first_name=parts[0] if parts else "",
+                last_name=parts[1] if len(parts) > 1 else "",
+            )
     return user
 
 
