@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     JSON,
     Boolean,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -244,6 +245,11 @@ class Assignment(Base):
     shared_links = relationship(
         "SharedLink", back_populates="assignment", cascade="all, delete-orphan"
     )
+    reviews = relationship(
+        "AssignmentReview",
+        back_populates="assignment",
+        cascade="all, delete-orphan",
+    )
     course = relationship("Course", back_populates="assignments")
 
 
@@ -300,6 +306,33 @@ class AssignmentSubmission(Base):
 
     # Relationships
     assignment = relationship("Assignment", back_populates="submissions")
+
+
+class AssignmentReview(Base):
+    __tablename__ = "assignment_reviews"
+    __table_args__ = (
+        UniqueConstraint("assignment_id", "user_id", name="uq_assignment_reviews_assignment_user"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    assignment_id = Column(
+        String,
+        ForeignKey("assignments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(String, nullable=False, index=True)  # Firebase UID of the reviewer (creator)
+    rating = Column(Integer, nullable=False)  # 1-5
+    comment = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=datetime.now(timezone.utc),
+        onupdate=datetime.now(timezone.utc),
+    )
+
+    assignment = relationship("Assignment", back_populates="reviews")
 
 
 class User(Base):

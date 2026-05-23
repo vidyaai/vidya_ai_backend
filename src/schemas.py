@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -282,6 +282,24 @@ class AssignmentOut(BaseModel):
     google_form_url: Optional[str] = None
     google_form_response_url: Optional[str] = None
     ai_penalty_percentage: Optional[float] = 50.0
+
+    class Config:
+        from_attributes = True
+
+
+class AssignmentReviewRequest(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    comment: Optional[str] = None
+
+
+class AssignmentReviewOut(BaseModel):
+    id: str
+    assignment_id: str
+    user_id: str
+    rating: int
+    comment: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True

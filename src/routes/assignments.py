@@ -33,6 +33,7 @@ from models import (
     SharedLink,
     SharedLinkAccess,
     AssignmentSubmission,
+    AssignmentReview,
     Video,
     CourseEnrollment,
 )
@@ -48,6 +49,8 @@ from schemas import (
     AssignmentSubmissionUpdate,
     AssignmentSubmissionOut,
     AssignmentGenerateRequest,
+    AssignmentReviewRequest,
+    AssignmentReviewOut,
     DocumentImportRequest,
     DocumentImportResponse,
     DiagramUploadResponse,
@@ -3762,3 +3765,88 @@ async def download_solution_pdf(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate solution PDF",
         )
+
+
+# ─── Assignment review (creator feedback on AI-generated quality) ─────
+
+
+def _get_owned_assignment_or_raise(
+    assignment_id: str, user_id: str, db: Session
+) -> Assignment:
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+        )
+    if assignment.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the assignment creator can review this assignment",
+        )
+    return assignment
+
+
+@router.post(
+    "/api/assignments/{assignment_id}/review", response_model=AssignmentReviewOut
+)
+def submit_assignment_review(
+    assignment_id: str,
+    payload: AssignmentReviewRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Upsert the creator's review (1-5 stars + optional comment) for an assignment."""
+    user_id = current_user["uid"]
+    _get_owned_assignment_or_raise(assignment_id, user_id, db)
+
+    review = (
+        db.query(AssignmentReview)
+        .filter(
+            AssignmentReview.assignment_id == assignment_id,
+            AssignmentReview.user_id == user_id,
+        )
+        .first()
+    )
+
+    if review:
+        review.rating = payload.rating
+        review.comment = payload.comment
+    else:
+        review = AssignmentReview(
+            assignment_id=assignment_id,
+            user_id=user_id,
+            rating=payload.rating,
+            comment=payload.comment,
+        )
+        db.add(review)
+
+    db.commit()
+    db.refresh(review)
+    return review
+
+
+@router.get(
+    "/api/assignments/{assignment_id}/review", response_model=AssignmentReviewOut
+)
+def get_assignment_review(
+    assignment_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Return the current user's existing review for an assignment, or 404."""
+    user_id = current_user["uid"]
+    _get_owned_assignment_or_raise(assignment_id, user_id, db)
+
+    review = (
+        db.query(AssignmentReview)
+        .filter(
+            AssignmentReview.assignment_id == assignment_id,
+            AssignmentReview.user_id == user_id,
+        )
+        .first()
+    )
+    if not review:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No review found"
+        )
+    return review
