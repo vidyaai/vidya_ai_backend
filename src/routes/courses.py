@@ -33,6 +33,13 @@ from schemas import (
     EnrollStudentsRequest,
 )
 from utils.firebase_auth import get_current_user
+from services.email import (
+    send_enrollment_active_email_background,
+    send_enrollment_invite_email_background,
+    send_course_material_added_email_background,
+    verify_invite_token,
+)
+import jwt as _jwt
 
 router = APIRouter()
 
@@ -113,6 +120,34 @@ def _verify_course_access(course_id: str, user_uid: str, db: Session) -> Course:
     if not enrolled:
         raise HTTPException(status_code=403, detail="Access denied")
     return course
+
+
+def _notify_new_enrollments(
+    course: Course, active: list[CourseEnrollment], pending: list[CourseEnrollment]
+) -> None:
+    """Send the appropriate email per new enrollment (post-commit)."""
+    for e in active:
+        send_enrollment_active_email_background(e, course)
+    for e in pending:
+        send_enrollment_invite_email_background(e, course)
+
+
+def _active_enrollee_recipients(
+    db: Session, course_id: str
+) -> list[tuple[str, str | None]]:
+    """Return (email, None) tuples for all active enrollees of a course."""
+    enrollments = (
+        db.query(CourseEnrollment)
+        .filter(
+            and_(
+                CourseEnrollment.course_id == course_id,
+                CourseEnrollment.status == "active",
+                CourseEnrollment.email.isnot(None),
+            )
+        )
+        .all()
+    )
+    return [(e.email, None) for e in enrollments if e.email]
 
 
 def _lookup_firebase_user(email: str):
@@ -377,6 +412,8 @@ def enroll_students(
     for e in all_enrollments:
         db.refresh(e)
 
+    _notify_new_enrollments(course, enrolled, pending)
+
     return {
         "enrolled": len(enrolled),
         "pending": len(pending),
@@ -488,6 +525,8 @@ async def enroll_students_csv(
     all_enrollments = enrolled + pending
     for e in all_enrollments:
         db.refresh(e)
+
+    _notify_new_enrollments(course, enrolled, pending)
 
     return {
         "enrolled": len(enrolled),
@@ -663,6 +702,10 @@ async def upload_course_material(
             _transcribe_course_material_background, material.id, s3_key
         )
 
+    send_course_material_added_email_background(
+        course, material, _active_enrollee_recipients(db, course_id)
+    )
+
     return {
         "id": material.id,
         "course_id": material.course_id,
@@ -710,6 +753,11 @@ def link_video_to_course(
     db.add(material)
     db.commit()
     db.refresh(material)
+
+    send_course_material_added_email_background(
+        course, material, _active_enrollee_recipients(db, course_id)
+    )
+
     return {
         "id": material.id,
         "course_id": material.course_id,
@@ -913,3 +961,69 @@ def list_course_assignments(
         result.append(assignment_dict)
 
     return result
+
+
+# ── Invite acceptance ────────────────────────────────────────────────────
+
+
+@router.post("/api/enrollments/accept")
+def accept_enrollment_invite(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Convert a 'pending' CourseEnrollment to 'active' via a signed invite token.
+
+    The token's email must match the signed-in user's email (case-insensitive).
+    Idempotent: re-accepting an already-active enrollment succeeds without changes.
+    """
+    token = (payload or {}).get("token")
+    if not token:
+        raise HTTPException(status_code=400, detail="Missing token")
+
+    try:
+        claims = verify_invite_token(token)
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=400, detail="Invitation link has expired")
+    except _jwt.PyJWTError:
+        raise HTTPException(status_code=400, detail="Invalid invitation link")
+    except RuntimeError as e:
+        # INVITE_TOKEN_SECRET unset on the server
+        logger.error(f"Invite token verification misconfigured: {e}")
+        raise HTTPException(status_code=500, detail="Invitation system not configured")
+
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(CourseEnrollment.id == claims["enrollment_id"])
+        .first()
+    )
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+
+    user_email = (current_user.get("email") or "").lower()
+    if not user_email or user_email != claims["email"].lower():
+        raise HTTPException(
+            status_code=403,
+            detail="This invitation was sent to a different email address. Sign in with the invited address.",
+        )
+
+    course = db.query(Course).filter(Course.id == enrollment.course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course no longer exists")
+
+    if enrollment.status == "pending":
+        enrollment.status = "active"
+        enrollment.user_id = current_user["uid"]
+        enrollment.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(enrollment)
+        logger.info(
+            f"Enrollment {enrollment.id} accepted by {current_user['uid']} "
+            f"for course {course.id}"
+        )
+
+    return {
+        "course_id": course.id,
+        "course_title": course.title,
+        "status": enrollment.status,
+    }

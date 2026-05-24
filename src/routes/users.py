@@ -1,4 +1,7 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 import stripe
 from firebase_admin import auth as fb_auth
@@ -22,8 +25,37 @@ from models import (
 )
 from schemas import UserProfileResponse, UserProfileUpdate
 from services.brevo import add_contact_to_brevo
+from services.email import (
+    send_welcome_email_background,
+    send_enrollment_active_email_background,
+)
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
+
+
+def _claim_pending_enrollments(db: Session, user: User) -> None:
+    """When a user signs up, convert any pending enrollments addressed to their
+    email into active ones (defense-in-depth alongside the tokenized accept flow)."""
+    if not user.email:
+        return
+    pending = (
+        db.query(CourseEnrollment)
+        .filter(
+            func.lower(CourseEnrollment.email) == user.email.lower(),
+            CourseEnrollment.status == "pending",
+        )
+        .all()
+    )
+    if not pending:
+        return
+    for enrollment in pending:
+        enrollment.status = "active"
+        enrollment.user_id = user.firebase_uid
+        enrollment.updated_at = datetime.now(timezone.utc)
+        course = db.query(Course).filter(Course.id == enrollment.course_id).first()
+        if course:
+            send_enrollment_active_email_background(enrollment, course)
+    db.commit()
 
 
 def _get_or_create_user(db: Session, current_user: dict) -> User:
@@ -47,6 +79,7 @@ def _get_or_create_user(db: Session, current_user: dict) -> User:
                 first_name=parts[0] if parts else "",
                 last_name=parts[1] if len(parts) > 1 else "",
             )
+        _claim_pending_enrollments(db, user)
     return user
 
 
@@ -68,10 +101,13 @@ async def update_user_profile(
 ):
     """Update the current user's user_type ('professor' or 'student')."""
     user = _get_or_create_user(db, current_user)
+    was_unset = user.user_type is None
     user.user_type = payload.user_type
     db.commit()
     db.refresh(user)
     logger.info(f"User {user.firebase_uid} set user_type to '{user.user_type}'")
+    if was_unset and user.user_type in ("student", "professor"):
+        send_welcome_email_background(user)
     return UserProfileResponse(user_type=user.user_type)
 
 

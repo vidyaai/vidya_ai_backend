@@ -35,8 +35,10 @@ from models import (
     AssignmentSubmission,
     AssignmentReview,
     Video,
+    Course,
     CourseEnrollment,
 )
+from services.email import send_assignment_published_email_background
 from schemas import (
     AssignmentCreate,
     AssignmentUpdate,
@@ -64,6 +66,30 @@ from fastapi.responses import Response, StreamingResponse
 from utils.pdf_generator import AssignmentPDFGenerator
 
 router = APIRouter()
+
+
+def _notify_assignment_published(db: Session, assignment: Assignment) -> None:
+    """Email all active enrollees of the assignment's course. No-op if not course-scoped."""
+    if not assignment.course_id or assignment.status != "published":
+        return
+    course = db.query(Course).filter(Course.id == assignment.course_id).first()
+    if not course:
+        return
+    enrollments = (
+        db.query(CourseEnrollment)
+        .filter(
+            and_(
+                CourseEnrollment.course_id == assignment.course_id,
+                CourseEnrollment.status == "active",
+                CourseEnrollment.email.isnot(None),
+            )
+        )
+        .all()
+    )
+    recipients = [(e.email, None) for e in enrollments if e.email]
+    if not recipients:
+        return
+    send_assignment_published_email_background(course, assignment, recipients)
 
 
 def process_pdf_in_background(
@@ -950,6 +976,7 @@ async def create_assignment(
         db.refresh(assignment)
 
         logger.info(f"Created assignment: {assignment.id} - {assignment.title}")
+        _notify_assignment_published(db, assignment)
         return assignment
 
     except Exception as e:
@@ -995,6 +1022,8 @@ async def update_assignment(
                 detail="Cannot revert a published assignment to draft",
             )
 
+        previous_status = assignment.status
+
         # Update fields
         for field, value in update_data.items():
             setattr(assignment, field, value)
@@ -1009,6 +1038,8 @@ async def update_assignment(
         db.refresh(assignment)
 
         logger.info(f"Updated assignment: {assignment.id} - {assignment.title}")
+        if previous_status != "published" and assignment.status == "published":
+            _notify_assignment_published(db, assignment)
         return assignment
 
     except HTTPException:
