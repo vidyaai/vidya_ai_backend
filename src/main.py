@@ -22,6 +22,7 @@ from routes.lecture_summary import router as lecture_summary_router
 from routes.courses import router as courses_router
 from routes.course_performance import router as course_performance_router
 from routes.users import router as users_router
+from routes.material_chat import router as material_chat_router
 from utils.youtube_utils import start_cache_cleanup_thread
 
 
@@ -115,6 +116,7 @@ app.include_router(lecture_summary_router)
 app.include_router(courses_router)
 app.include_router(course_performance_router)
 app.include_router(users_router)
+app.include_router(material_chat_router)
 
 
 if __name__ == "__main__":

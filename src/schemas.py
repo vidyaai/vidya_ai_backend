@@ -68,6 +68,52 @@ class VideoQuery(BaseModel):
     session_id: Optional[str] = None
 
 
+class MaterialChatQuery(BaseModel):
+    material_id: str
+    query: str
+    session_id: Optional[str] = None
+
+
+class MaterialChatSessionCreate(BaseModel):
+    material_id: str
+    title: Optional[str] = None
+
+
+class MaterialChatSessionRename(BaseModel):
+    title: str
+
+
+class MaterialChatSessionOut(BaseModel):
+    id: str
+    course_material_id: str
+    user_id: str
+    title: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MaterialChatMessageOut(BaseModel):
+    id: str
+    session_id: str
+    role: str
+    content: str
+    citations: Optional[List[Dict[str, Any]]] = None
+    timestamp_seconds: Optional[float] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MaterialChatQueryResponse(BaseModel):
+    response: str
+    session_id: str
+    citations: List[Dict[str, Any]] = []
+
+
 class TranslationRequest(BaseModel):
     youtube_url: str
     source_language: str = "en"
