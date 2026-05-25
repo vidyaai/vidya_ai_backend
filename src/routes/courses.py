@@ -836,6 +836,7 @@ def list_materials(
                 "folder": m.folder,
                 "transcript_text": eff_transcript_text,
                 "transcript_status": eff_transcript_status,
+                "chunking_status": m.chunking_status,
                 "created_at": m.created_at,
                 "updated_at": m.updated_at,
             }
