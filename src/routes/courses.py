@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from controllers.config import AWS_S3_BUCKET, logger, s3_client, upload_executor
 from controllers.storage import s3_presign_url, transcribe_video_with_deepgram_url
+from controllers.background_tasks import chunk_pdf_material_background
 from utils.db import get_db, SessionLocal
 from models import (
     Assignment,
@@ -679,6 +680,14 @@ async def upload_course_material(
         logger.error(f"S3 upload failed: {e}")
         raise HTTPException(status_code=500, detail="File upload to S3 failed")
 
+    # Determine whether this material is chat-eligible at upload time
+    is_chunkable_doc = material_type != "video" and (
+        file.content_type == "application/pdf"
+        or fname.endswith(".pdf")
+        or "wordprocessingml" in (file.content_type or "")
+        or fname.endswith(".docx")
+    )
+
     material = CourseMaterial(
         course_id=course_id,
         title=title,
@@ -690,6 +699,7 @@ async def upload_course_material(
         mime_type=file.content_type,
         folder=folder,
         transcript_status="processing" if material_type == "video" else None,
+        chunking_status="pending" if is_chunkable_doc else None,
     )
     db.add(material)
     db.commit()
@@ -701,6 +711,10 @@ async def upload_course_material(
         upload_executor.submit(
             _transcribe_course_material_background, material.id, s3_key
         )
+
+    # Kick off background PDF/DOCX chunking + embedding for chat
+    if is_chunkable_doc:
+        upload_executor.submit(chunk_pdf_material_background, material.id, s3_key)
 
     send_course_material_added_email_background(
         course, material, _active_enrollee_recipients(db, course_id)
@@ -720,6 +734,7 @@ async def upload_course_material(
         "order": material.order,
         "transcript_status": material.transcript_status,
         "transcript_text": material.transcript_text,
+        "chunking_status": material.chunking_status,
         "created_at": material.created_at,
         "updated_at": material.updated_at,
     }

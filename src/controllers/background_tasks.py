@@ -6,7 +6,14 @@ from utils.db import SessionLocal
 
 # from utils.youtube_utils import download_video  # Disabled - YouTube download not working
 from utils.format_transcript import create_formatted_transcript
-from models import Video, Assignment, AssignmentSubmission, VideoSummary
+from models import (
+    Video,
+    Assignment,
+    AssignmentSubmission,
+    VideoSummary,
+    CourseMaterial,
+    MaterialChunk,
+)
 from .config import (
     frames_path,
     output_path,
@@ -568,5 +575,150 @@ def generate_summary_background(video_id: str, transcript: str):
     except Exception as e:
         logger.error(f"Error in background processing for {video_id}: {e}")
 
+    finally:
+        db.close()
+
+
+def _extract_pdf_pages(content: bytes) -> List[Dict[str, Any]]:
+    """Extract per-page text from a PDF using pypdf (fast, no GPT call)."""
+    import pypdf
+    from io import BytesIO
+
+    pages: List[Dict[str, Any]] = []
+    reader = pypdf.PdfReader(BytesIO(content))
+    for page_num, page in enumerate(reader.pages, start=1):
+        try:
+            text = page.extract_text() or ""
+        except Exception as e:
+            logger.warning(f"pypdf failed to extract page {page_num}: {e}")
+            text = ""
+        text = text.strip()
+        if text:
+            pages.append({"page_number": page_num, "text": text})
+    return pages
+
+
+def _extract_docx_pages(content: bytes) -> List[Dict[str, Any]]:
+    """Extract text from DOCX as a single 'page' (DOCX has no native paging)."""
+    import docx
+    from io import BytesIO
+
+    document = docx.Document(BytesIO(content))
+    text = "\n".join(p.text for p in document.paragraphs if p.text)
+    text = text.strip()
+    return [{"page_number": None, "text": text}] if text else []
+
+
+def chunk_pdf_material_background(material_id: str, s3_key: str) -> None:
+    """
+    Background job: download a CourseMaterial PDF/DOCX from S3, extract text
+    per page, chunk it, embed each chunk, and persist as MaterialChunk rows.
+
+    Updates CourseMaterial.chunking_status to "processing" / "completed" / "failed".
+    """
+    from services.chunking_embedding_service import SemanticChunker, EmbeddingService
+
+    logger.info(f"Starting PDF chunking for material {material_id}")
+    db = SessionLocal()
+    try:
+        material = (
+            db.query(CourseMaterial).filter(CourseMaterial.id == material_id).first()
+        )
+        if not material:
+            logger.error(f"CourseMaterial {material_id} not found, aborting chunking")
+            return
+
+        material.chunking_status = "processing"
+        material.updated_at = datetime.now(timezone.utc)
+        db.commit()
+
+        # Download file bytes from S3
+        if not s3_client or not AWS_S3_BUCKET:
+            raise RuntimeError("S3 not configured")
+        obj = s3_client.get_object(Bucket=AWS_S3_BUCKET, Key=s3_key)
+        file_bytes = obj["Body"].read()
+
+        # Extract per-page text
+        mime = (material.mime_type or "").lower()
+        fname = (material.file_name or "").lower()
+        if mime == "application/pdf" or fname.endswith(".pdf"):
+            pages = _extract_pdf_pages(file_bytes)
+        elif "wordprocessingml" in mime or fname.endswith(".docx"):
+            pages = _extract_docx_pages(file_bytes)
+        else:
+            logger.warning(
+                f"Unsupported mime '{mime}' for material {material_id}; skipping chunking"
+            )
+            material.chunking_status = "failed"
+            db.commit()
+            return
+
+        if not pages:
+            logger.warning(f"No text extracted from material {material_id}")
+            material.chunking_status = "failed"
+            db.commit()
+            return
+
+        # Chunk each page so the resulting chunks carry page_number for citations
+        chunker = SemanticChunker()
+        all_chunks: List[Dict[str, Any]] = []
+        for page in pages:
+            page_chunks = chunker._chunk_plain_text(page["text"])
+            for c in page_chunks:
+                all_chunks.append(
+                    {
+                        "text": c["text"],
+                        "word_count": c["word_count"],
+                        "page_number": page["page_number"],
+                    }
+                )
+
+        if not all_chunks:
+            material.chunking_status = "failed"
+            db.commit()
+            return
+
+        # Embed all chunks in batch
+        embedder = EmbeddingService()
+        embeddings = embedder.embed_batch([c["text"] for c in all_chunks])
+
+        # Clear any stale chunks and insert new ones
+        db.query(MaterialChunk).filter(
+            MaterialChunk.course_material_id == material_id
+        ).delete(synchronize_session=False)
+
+        for idx, (chunk, embedding) in enumerate(zip(all_chunks, embeddings)):
+            db.add(
+                MaterialChunk(
+                    course_material_id=material_id,
+                    chunk_index=idx,
+                    text=chunk["text"],
+                    page_number=chunk["page_number"],
+                    word_count=chunk["word_count"],
+                    embedding=embedding,
+                )
+            )
+
+        material.chunking_status = "completed"
+        material.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        logger.info(
+            f"Chunking completed for material {material_id}: {len(all_chunks)} chunks"
+        )
+
+    except Exception as e:
+        logger.error(f"Chunking failed for material {material_id}: {e}")
+        try:
+            mat = (
+                db.query(CourseMaterial)
+                .filter(CourseMaterial.id == material_id)
+                .first()
+            )
+            if mat:
+                mat.chunking_status = "failed"
+                mat.updated_at = datetime.now(timezone.utc)
+                db.commit()
+        except Exception:
+            pass
     finally:
         db.close()
