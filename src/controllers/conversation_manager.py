@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
-from models import Video
+from models import Video, MaterialChatSession, MaterialChatMessage
 from controllers.config import logger
 
 
@@ -211,4 +211,116 @@ def get_merged_conversation_history(
     except Exception as e:
         logger.error(f"Error retrieving conversation history: {e}")
         # Return empty list on error - do NOT use client history
+        return []
+
+
+# ── Per-CourseMaterial chat persistence ─────────────────────────────────
+
+
+def store_material_conversation_turn(
+    db: Session,
+    course_material_id: str,
+    firebase_uid: str,
+    user_message: str,
+    ai_response: str,
+    citations: Optional[List[Dict[str, Any]]] = None,
+    timestamp_seconds: Optional[float] = None,
+    session_id: Optional[str] = None,
+) -> str:
+    """
+    Append a user turn + assistant turn to a MaterialChatSession.
+
+    If session_id is provided and belongs to (course_material_id, firebase_uid),
+    reuse it. Otherwise reuse this user's most-recently-updated session for
+    the material, or create a new one.
+
+    Returns the session_id used (string).
+    """
+    try:
+        session: Optional[MaterialChatSession] = None
+        if session_id:
+            session = (
+                db.query(MaterialChatSession)
+                .filter(
+                    MaterialChatSession.id == session_id,
+                    MaterialChatSession.course_material_id == course_material_id,
+                    MaterialChatSession.user_id == firebase_uid,
+                )
+                .first()
+            )
+
+        if session is None:
+            session = (
+                db.query(MaterialChatSession)
+                .filter(
+                    MaterialChatSession.course_material_id == course_material_id,
+                    MaterialChatSession.user_id == firebase_uid,
+                )
+                .order_by(MaterialChatSession.updated_at.desc())
+                .first()
+            )
+
+        if session is None:
+            session = MaterialChatSession(
+                course_material_id=course_material_id,
+                user_id=firebase_uid,
+                title=f"Chat {datetime.now().strftime('%b %d, %I:%M %p')}",
+            )
+            db.add(session)
+            db.flush()  # populate session.id
+
+        db.add(
+            MaterialChatMessage(
+                session_id=session.id,
+                role="user",
+                content=user_message,
+                timestamp_seconds=timestamp_seconds,
+            )
+        )
+        db.add(
+            MaterialChatMessage(
+                session_id=session.id,
+                role="assistant",
+                content=ai_response,
+                citations=citations,
+                timestamp_seconds=timestamp_seconds,
+            )
+        )
+
+        session.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        logger.info(
+            f"Stored material chat turn in session {session.id} for material {course_material_id}"
+        )
+        return session.id
+
+    except Exception as e:
+        logger.error(f"Error storing material conversation turn: {e}")
+        db.rollback()
+        return session_id or ""
+
+
+def get_merged_material_conversation_history(
+    db: Session,
+    session_id: str,
+    limit: int = 20,
+) -> List[Dict[str, Any]]:
+    """
+    Load up to `limit` most recent messages for a MaterialChatSession,
+    returned in chronological order as OpenAI-style {role, content} dicts.
+
+    Database is the only source of truth — no client-supplied history is merged.
+    """
+    try:
+        rows = (
+            db.query(MaterialChatMessage)
+            .filter(MaterialChatMessage.session_id == session_id)
+            .order_by(MaterialChatMessage.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        rows.reverse()  # chronological
+        return [{"role": r.role, "content": r.content} for r in rows]
+    except Exception as e:
+        logger.error(f"Error retrieving material conversation history: {e}")
         return []
