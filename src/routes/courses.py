@@ -14,7 +14,10 @@ from sqlalchemy.orm import Session, joinedload
 
 from controllers.config import AWS_S3_BUCKET, logger, s3_client, upload_executor
 from controllers.storage import s3_presign_url, transcribe_video_with_deepgram_url
-from controllers.background_tasks import chunk_pdf_material_background
+from controllers.background_tasks import (
+    chunk_pdf_material_background,
+    chunk_video_material_transcript_background,
+)
 from utils.db import get_db, SessionLocal
 from models import (
     Assignment,
@@ -182,12 +185,24 @@ def _transcribe_course_material_background(material_id: str, s3_key: str) -> Non
         if material:
             material.transcript_text = transcript_text or None
             material.transcript_status = "completed" if transcript_text else "failed"
+            # Mark chunking as pending so the UI can show a "indexing for chat" badge
+            # between transcription completing and chunking finishing.
+            if transcript_text and not material.video_id:
+                material.chunking_status = "pending"
             material.updated_at = datetime.now(timezone.utc)
             db.commit()
             logger.info(
                 f"Transcription {'completed' if transcript_text else 'failed'} "
                 f"for course material {material_id}"
             )
+
+            # Dispatch downstream chunking so the chat panel can ground answers
+            # in the lecture. Skipped for gallery-linked videos (they use
+            # TranscriptChunk via the existing Chat-with-Video pipeline).
+            if transcript_text and not material.video_id:
+                upload_executor.submit(
+                    chunk_video_material_transcript_background, material_id
+                )
     except Exception as e:
         logger.error(f"Background transcription error for material {material_id}: {e}")
         try:

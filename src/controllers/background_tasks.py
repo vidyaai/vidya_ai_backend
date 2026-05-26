@@ -722,3 +722,101 @@ def chunk_pdf_material_background(material_id: str, s3_key: str) -> None:
             pass
     finally:
         db.close()
+
+
+def chunk_video_material_transcript_background(material_id: str) -> None:
+    """
+    Background job: chunk + embed the transcript_text of a directly-uploaded
+    course video into MaterialChunk rows so /api/material-chat retrieval can
+    ground answers in the lecture.
+
+    Skipped for materials linked to a Gallery Video (those use TranscriptChunk
+    keyed to Video.id, which is already populated by the Chat-with-Video
+    pipeline).
+
+    Updates CourseMaterial.chunking_status to "processing" / "completed" / "failed".
+    """
+    from services.chunking_embedding_service import SemanticChunker, EmbeddingService
+
+    logger.info(f"Starting video-transcript chunking for material {material_id}")
+    db = SessionLocal()
+    try:
+        material = (
+            db.query(CourseMaterial).filter(CourseMaterial.id == material_id).first()
+        )
+        if not material:
+            logger.error(f"CourseMaterial {material_id} not found, aborting chunking")
+            return
+
+        # Linked Gallery videos use TranscriptChunk; nothing to do here.
+        if material.video_id:
+            logger.info(
+                f"Material {material_id} is linked to Video {material.video_id}; "
+                "skipping MaterialChunk creation (TranscriptChunk path is used)."
+            )
+            return
+
+        transcript = (material.transcript_text or "").strip()
+        if not transcript:
+            logger.warning(
+                f"Material {material_id} has no transcript_text; cannot chunk."
+            )
+            material.chunking_status = "failed"
+            db.commit()
+            return
+
+        material.chunking_status = "processing"
+        material.updated_at = datetime.now(timezone.utc)
+        db.commit()
+
+        chunker = SemanticChunker()
+        plain_chunks = chunker._chunk_plain_text(transcript)
+        if not plain_chunks:
+            material.chunking_status = "failed"
+            db.commit()
+            return
+
+        embedder = EmbeddingService()
+        embeddings = embedder.embed_batch([c["text"] for c in plain_chunks])
+
+        # Clear any stale chunks and insert new ones
+        db.query(MaterialChunk).filter(
+            MaterialChunk.course_material_id == material_id
+        ).delete(synchronize_session=False)
+
+        for idx, (chunk, embedding) in enumerate(zip(plain_chunks, embeddings)):
+            db.add(
+                MaterialChunk(
+                    course_material_id=material_id,
+                    chunk_index=idx,
+                    text=chunk["text"],
+                    page_number=None,  # No page concept for video transcripts
+                    word_count=chunk["word_count"],
+                    embedding=embedding,
+                )
+            )
+
+        material.chunking_status = "completed"
+        material.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        logger.info(
+            f"Video-transcript chunking completed for {material_id}: "
+            f"{len(plain_chunks)} chunks"
+        )
+
+    except Exception as e:
+        logger.error(f"Video-transcript chunking failed for {material_id}: {e}")
+        try:
+            mat = (
+                db.query(CourseMaterial)
+                .filter(CourseMaterial.id == material_id)
+                .first()
+            )
+            if mat:
+                mat.chunking_status = "failed"
+                mat.updated_at = datetime.now(timezone.utc)
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()

@@ -19,13 +19,16 @@ synchronously so chunks land before the script exits.
 import argparse
 import sys
 
-from controllers.background_tasks import chunk_pdf_material_background
+from controllers.background_tasks import (
+    chunk_pdf_material_background,
+    chunk_video_material_transcript_background,
+)
 from controllers.config import logger
 from models import CourseMaterial
 from utils.db import SessionLocal
 
 
-def _is_chunkable(material: CourseMaterial) -> bool:
+def _is_chunkable_doc(material: CourseMaterial) -> bool:
     if material.material_type == "video":
         return False
     if not material.s3_key:
@@ -40,6 +43,15 @@ def _is_chunkable(material: CourseMaterial) -> bool:
     )
 
 
+def _is_chunkable_video(material: CourseMaterial) -> bool:
+    if material.material_type != "video":
+        return False
+    # Gallery-linked videos use TranscriptChunk via the existing video pipeline.
+    if material.video_id:
+        return False
+    return bool((material.transcript_text or "").strip())
+
+
 def backfill(limit: int = None, material_id: str = None, force: bool = False) -> None:
     db = SessionLocal()
     try:
@@ -47,7 +59,6 @@ def backfill(limit: int = None, material_id: str = None, force: bool = False) ->
         if material_id:
             query = query.filter(CourseMaterial.id == material_id)
         else:
-            query = query.filter(CourseMaterial.material_type != "video")
             if not force:
                 query = query.filter(CourseMaterial.chunking_status.is_(None))
 
@@ -55,19 +66,31 @@ def backfill(limit: int = None, material_id: str = None, force: bool = False) ->
             query = query.limit(limit)
 
         targets = query.all()
-        candidates = [m for m in targets if _is_chunkable(m)]
+        doc_candidates = [m for m in targets if _is_chunkable_doc(m)]
+        video_candidates = [m for m in targets if _is_chunkable_video(m)]
         logger.info(
-            f"Backfill: {len(candidates)} chunkable materials "
+            f"Backfill: {len(doc_candidates)} PDF/DOCX + "
+            f"{len(video_candidates)} video materials "
             f"(considered {len(targets)})"
         )
 
-        for i, material in enumerate(candidates, start=1):
+        for i, material in enumerate(doc_candidates, start=1):
             logger.info(
-                f"[{i}/{len(candidates)}] Chunking material {material.id} "
+                f"[doc {i}/{len(doc_candidates)}] Chunking material {material.id} "
                 f"({material.file_name})"
             )
             try:
                 chunk_pdf_material_background(material.id, material.s3_key)
+            except Exception as e:
+                logger.error(f"Failed material {material.id}: {e}")
+
+        for i, material in enumerate(video_candidates, start=1):
+            logger.info(
+                f"[video {i}/{len(video_candidates)}] Chunking transcript for "
+                f"material {material.id} ({material.title})"
+            )
+            try:
+                chunk_video_material_transcript_background(material.id)
             except Exception as e:
                 logger.error(f"Failed material {material.id}: {e}")
     finally:
