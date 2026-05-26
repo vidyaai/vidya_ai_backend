@@ -166,9 +166,12 @@ def _retrieve_context(
         cache_key=cache_key,
     )
 
+    # Keep the LLM context in retrieval-ranking order (best chunks first
+    # are more likely to fit inside the model's attention budget).
     context_text = "\n\n".join(
         f"[{c.get('chunk_index')}] {c.get('text', '')}" for c in top
     )
+
     citations: List[Dict[str, Any]] = []
     for c in top:
         citation = {"chunk_index": c.get("chunk_index")}
@@ -177,6 +180,17 @@ def _retrieve_context(
             if v is not None:
                 citation[k] = v
         citations.append(citation)
+
+    # Surface citations in *document* order — users read them as "where to
+    # look in the source", not "how relevant each is". Sort by page (PDFs),
+    # then start_seconds (videos), then chunk_index as a stable fallback.
+    citations.sort(
+        key=lambda c: (
+            c.get("page_number") if c.get("page_number") is not None else float("inf"),
+            c.get("start_seconds") if c.get("start_seconds") is not None else float("inf"),
+            c.get("chunk_index") if c.get("chunk_index") is not None else float("inf"),
+        )
+    )
     return context_text, citations
 
 
