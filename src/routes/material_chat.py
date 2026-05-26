@@ -37,14 +37,83 @@ from schemas import (
     MaterialChatSessionOut,
     MaterialChatSessionRename,
 )
+from openai import OpenAI
 from services.chunking_embedding_service import EmbeddingService
 from utils.db import get_db
 from utils.firebase_auth import get_current_user
-from utils.ml_models import OpenAIVisionClient
 from utils.text_utils import normalize_ai_response
 
 
 router = APIRouter(prefix="/api/material-chat", tags=["Material Chat"])
+
+
+# ── Source-aware system prompt ──────────────────────────────────────────
+#
+# The Chat-with-Video product (utils/system_prompt.py) hard-codes "video"
+# everywhere — using it for a PDF makes the model say "the video explains…"
+# even when it's looking at lecture notes. Build a small, material-type-
+# aware prompt here so PDFs read as documents and lectures read as videos.
+
+_SHARED_STYLE = """
+**Be conversational and warm:**
+- Talk like a real person, use contractions, show enthusiasm.
+- Encouraging and supportive, never robotic.
+
+**Response style:**
+- Open with a brief, friendly acknowledgement.
+- Explain in clear, simple language; use examples and analogies.
+- Bold key terms. Bullets for lists.
+- Use emojis sparingly — at most one per response.
+
+**Math and technical content:**
+- Use LaTeX ONLY: \\( inline \\) and \\[ display \\]. NEVER HTML or MathML.
+- Always explain what the equation means in plain English first.
+
+**Stay grounded in the source:**
+- Use the provided context as your source of truth.
+- If the question is off-topic, gently redirect to what the source covers.
+- If the source doesn't cover the question, say so honestly — don't invent.
+"""
+
+_SYSTEM_PROMPT_DOC = (
+    "You are a friendly, enthusiastic tutor helping a student understand a "
+    "document they're reading (lecture notes, a PDF chapter, or similar). "
+    "Reference the material as 'the document', 'these notes', or 'this PDF' — "
+    "never as a video or lecture recording.\n"
+    + _SHARED_STYLE
+)
+
+_SYSTEM_PROMPT_VIDEO = (
+    "You are a friendly, enthusiastic tutor helping a student understand a "
+    "lecture video they're watching. The provided context is the lecture "
+    "transcript. Reference the material as 'the lecture' or 'the video'.\n"
+    + _SHARED_STYLE
+)
+
+
+def _system_prompt_for(material_type: str) -> str:
+    return _SYSTEM_PROMPT_VIDEO if material_type == "video" else _SYSTEM_PROMPT_DOC
+
+
+def _build_messages(
+    material_type: str,
+    context_text: str,
+    query: str,
+    history: List[Dict[str, Any]],
+) -> List[Dict[str, str]]:
+    messages: List[Dict[str, str]] = [
+        {"role": "system", "content": _system_prompt_for(material_type)},
+    ]
+    for msg in history or []:
+        if isinstance(msg, dict) and "role" in msg and "content" in msg:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+    messages.append(
+        {
+            "role": "user",
+            "content": f"Context from the source:\n{context_text}\n\nQuestion: {query}",
+        }
+    )
+    return messages
 
 
 # ── Access control ──────────────────────────────────────────────────────
@@ -242,12 +311,15 @@ async def query_material(
     if body.session_id:
         history = get_merged_material_conversation_history(db, body.session_id)
 
-    vision_client = OpenAIVisionClient()
-    ai_response = vision_client.ask_text_only(
-        prompt=body.query,
-        context=context_text,
-        conversation_history=history,
+    messages = _build_messages(material.material_type, context_text, body.query, history)
+    client = OpenAI()
+    completion = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=messages,
+        max_tokens=1500,
+        temperature=0.3,
     )
+    ai_response = completion.choices[0].message.content or ""
     ai_response = normalize_ai_response(ai_response) if ai_response else ""
 
     session_id = store_material_conversation_turn(
@@ -316,17 +388,26 @@ async def query_material_stream(
                 + "\n\n"
             )
 
-            vision_client = OpenAIVisionClient()
+            messages = _build_messages(
+                material.material_type, context_text, body.query, history
+            )
+            client = OpenAI()
+            stream = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                max_tokens=1500,
+                temperature=0.3,
+                stream=True,
+            )
             full_response = ""
-            for chunk_text in vision_client.ask_text_only_stream(
-                prompt=body.query,
-                context=context_text,
-                conversation_history=history,
-            ):
-                full_response += chunk_text
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content if chunk.choices else None
+                if not delta:
+                    continue
+                full_response += delta
                 yield (
                     "data: "
-                    + json.dumps({"type": "content", "data": chunk_text})
+                    + json.dumps({"type": "content", "data": delta})
                     + "\n\n"
                 )
 
