@@ -29,8 +29,8 @@ import subprocess
 import tempfile
 from typing import Optional
 
-from anthropic import Anthropic
 from controllers.config import logger
+from utils.bedrock_client import get_bedrock_client, resolve_model_id
 from utils.latex_repair import (
     CANONICAL_TIKZLIBRARIES,
     canonicalize_tikzlibrary,
@@ -63,8 +63,9 @@ class CircuiTikZGenerator:
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        self.client = Anthropic(api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
-        self.model = "claude-opus-4-5"
+        del api_key  # Bedrock auth comes from boto3 credential chain
+        self.client = get_bedrock_client()
+        self.model = resolve_model_id("claude-opus-4-5")
         self._api_key_valid: Optional[bool] = None
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -1034,7 +1035,7 @@ Return ONLY the complete LaTeX document starting with \\documentclass."""
             Raw LaTeX string (complete document)
         """
         if self._api_key_valid is False:
-            raise RuntimeError("Anthropic API key previously failed — skipping")
+            raise RuntimeError("Bedrock auth previously failed — skipping")
 
         try:
             response = self.client.messages.create(
@@ -1073,9 +1074,13 @@ Return ONLY the complete LaTeX document starting with \\documentclass."""
 
         except Exception as e:
             err = str(e)
-            if "401" in err or "authentication_error" in err:
+            if (
+                "AccessDeniedException" in err
+                or "UnrecognizedClientException" in err
+                or "ExpiredTokenException" in err
+            ):
                 self._api_key_valid = False
-                logger.error(f"Anthropic API key INVALID: {err}")
+                logger.error(f"Bedrock auth failed: {err}")
             logger.error(f"CircuiTikZ LaTeX generation failed: {err}")
             raise
 

@@ -9,12 +9,12 @@ This produces vertical CMOS layouts that look like real textbook diagrams
 horizontal-oriented output.
 """
 
-import os
 import io
+import os
 import tempfile
 from typing import Optional
-from anthropic import Anthropic
 from controllers.config import logger
+from utils.bedrock_client import get_bedrock_client, resolve_model_id
 
 try:
     import cairosvg
@@ -51,12 +51,9 @@ class SVGCircuitGenerator:
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-        if not self.api_key:
-            raise ValueError("Anthropic API key required")
-
-        self.client = Anthropic(api_key=self.api_key)
-        self.model = "claude-sonnet-4-20250514"
+        del api_key  # Bedrock auth comes from boto3 credential chain
+        self.client = get_bedrock_client()
+        self.model = resolve_model_id("claude-sonnet-4-20250514")
         self._api_key_valid = None
 
     def _build_system_prompt(self) -> str:
@@ -445,9 +442,13 @@ Return ONLY the SVG markup. No explanations."""
 
         except Exception as e:
             error_str = str(e)
-            if "401" in error_str or "authentication_error" in error_str:
+            if (
+                "AccessDeniedException" in error_str
+                or "UnrecognizedClientException" in error_str
+                or "ExpiredTokenException" in error_str
+            ):
                 self._api_key_valid = False
-                logger.error(f"Claude API key is INVALID: {error_str}")
+                logger.error(f"Bedrock auth failed: {error_str}")
             logger.error(f"SVG circuit generation failed: {error_str}")
             raise
 

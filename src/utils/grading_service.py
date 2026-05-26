@@ -14,6 +14,7 @@ from pylatexenc.latex2text import LatexNodes2Text
 
 from controllers.storage import s3_presign_url
 from utils.ai_detection_service import get_ai_detection_service
+from utils.bedrock_client import get_bedrock_client, resolve_model_id
 
 # Safely import Pydantic to enable Strict Structured Outputs for Gemini
 try:
@@ -59,15 +60,13 @@ class LLMGrader:
     def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o") -> None:
         self.model = model
         self.provider = self._detect_provider(model)
+        self._resolved_model = model
 
         if self.provider == "openai":
             self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
         elif self.provider == "anthropic":
-            import anthropic as _anthropic
-
-            self.client = _anthropic.Anthropic(
-                api_key=api_key or os.getenv("ANTHROPIC_API_KEY")
-            )
+            self.client = get_bedrock_client()
+            self._resolved_model = resolve_model_id(model)
         elif self.provider == "gemini":
             import google.genai as _genai
 
@@ -153,14 +152,27 @@ class LLMGrader:
                             }
                         )
                     else:
+                        # Bedrock's Claude image block only accepts base64 source —
+                        # not URL. Fetch the bytes server-side and inline them.
+                        resp = _requests.get(url, timeout=30)
+                        resp.raise_for_status()
+                        media_type = resp.headers.get(
+                            "content-type", "image/jpeg"
+                        ).split(";")[0]
                         anthropic_content.append(
                             {
                                 "type": "image",
-                                "source": {"type": "url", "url": url},
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": media_type,
+                                    "data": base64.b64encode(resp.content).decode(
+                                        "ascii"
+                                    ),
+                                },
                             }
                         )
             response = self.client.messages.create(
-                model=self.model,
+                model=self._resolved_model,
                 max_tokens=max_tokens,
                 system=system_content,
                 messages=[{"role": "user", "content": anthropic_content}],
