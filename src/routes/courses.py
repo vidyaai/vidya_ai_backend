@@ -13,7 +13,11 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from controllers.config import AWS_S3_BUCKET, logger, s3_client, upload_executor
-from controllers.storage import s3_presign_url, transcribe_video_with_deepgram_url
+from controllers.storage import (
+    s3_presign_url,
+    transcribe_video_with_deepgram_url,
+    transcribe_video_with_deepgram_url_timed,
+)
 from controllers.background_tasks import (
     chunk_pdf_material_background,
     chunk_video_material_transcript_background,
@@ -166,13 +170,34 @@ def _lookup_firebase_user(email: str):
 
 
 def _transcribe_course_material_background(material_id: str, s3_key: str) -> None:
-    """Background job: transcribe a directly-uploaded course video and store the result."""
+    """Background job: transcribe a directly-uploaded course video and store the result.
+
+    Uses Deepgram's timed (utterance-level) transcription so MaterialChunk rows
+    can later be tagged with start_seconds for the chat panel's clickable
+    timestamps. Plain transcript_text is preserved for back-compat with any
+    consumer that ignores transcript_json.
+    """
     db = SessionLocal()
     try:
-        # Generate presigned URL so Deepgram can pull from S3 directly
+        transcript_text = ""
+        transcript_json = None
         try:
             presigned = s3_presign_url(s3_key, expires_in=60 * 60 * 12)
-            transcript_text = transcribe_video_with_deepgram_url(presigned)
+            material_pre = (
+                db.query(CourseMaterial)
+                .filter(CourseMaterial.id == material_id)
+                .first()
+            )
+            timed = transcribe_video_with_deepgram_url_timed(
+                presigned, video_title=(material_pre.title if material_pre else "Video")
+            )
+            transcript_json = timed
+            segments = timed.get("transcription") or []
+            transcript_text = " ".join(s.get("text", "") for s in segments).strip()
+            # Fallback to plain transcription if timed yielded nothing usable
+            if not transcript_text:
+                transcript_text = transcribe_video_with_deepgram_url(presigned)
+                transcript_json = None
         except Exception as e:
             logger.error(
                 f"Deepgram URL transcription failed for material {material_id}: {e}"
@@ -184,6 +209,7 @@ def _transcribe_course_material_background(material_id: str, s3_key: str) -> Non
         )
         if material:
             material.transcript_text = transcript_text or None
+            material.transcript_json = transcript_json
             material.transcript_status = "completed" if transcript_text else "failed"
             # Mark chunking as pending so the UI can show a "indexing for chat" badge
             # between transcription completing and chunking finishing.
@@ -193,7 +219,8 @@ def _transcribe_course_material_background(material_id: str, s3_key: str) -> Non
             db.commit()
             logger.info(
                 f"Transcription {'completed' if transcript_text else 'failed'} "
-                f"for course material {material_id}"
+                f"for course material {material_id} "
+                f"({'timed' if transcript_json else 'plain'})"
             )
 
             # Dispatch downstream chunking so the chat panel can ground answers

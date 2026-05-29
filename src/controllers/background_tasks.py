@@ -770,27 +770,40 @@ def chunk_video_material_transcript_background(material_id: str) -> None:
         db.commit()
 
         chunker = SemanticChunker()
-        plain_chunks = chunker._chunk_plain_text(transcript)
-        if not plain_chunks:
+
+        # Prefer timed Deepgram segments when present so chunks carry
+        # start/end seconds for clickable timestamps. Fall back to plain
+        # text chunking for legacy materials transcribed before migration 21.
+        segments = None
+        if isinstance(material.transcript_json, dict):
+            segments = material.transcript_json.get("transcription")
+        if segments:
+            timed_chunks = chunker.chunk_timed_segments(segments)
+        else:
+            timed_chunks = chunker._chunk_plain_text(transcript)
+
+        if not timed_chunks:
             material.chunking_status = "failed"
             db.commit()
             return
 
         embedder = EmbeddingService()
-        embeddings = embedder.embed_batch([c["text"] for c in plain_chunks])
+        embeddings = embedder.embed_batch([c["text"] for c in timed_chunks])
 
         # Clear any stale chunks and insert new ones
         db.query(MaterialChunk).filter(
             MaterialChunk.course_material_id == material_id
         ).delete(synchronize_session=False)
 
-        for idx, (chunk, embedding) in enumerate(zip(plain_chunks, embeddings)):
+        for idx, (chunk, embedding) in enumerate(zip(timed_chunks, embeddings)):
             db.add(
                 MaterialChunk(
                     course_material_id=material_id,
                     chunk_index=idx,
                     text=chunk["text"],
                     page_number=None,  # No page concept for video transcripts
+                    start_seconds=chunk.get("start_seconds"),
+                    end_seconds=chunk.get("end_seconds"),
                     word_count=chunk["word_count"],
                     embedding=embedding,
                 )
@@ -801,7 +814,8 @@ def chunk_video_material_transcript_background(material_id: str) -> None:
         db.commit()
         logger.info(
             f"Video-transcript chunking completed for {material_id}: "
-            f"{len(plain_chunks)} chunks"
+            f"{len(timed_chunks)} chunks "
+            f"({'timed' if segments else 'plain'})"
         )
 
     except Exception as e:
