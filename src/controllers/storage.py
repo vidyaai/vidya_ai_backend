@@ -3,7 +3,7 @@ import os
 import mimetypes
 import subprocess
 import tempfile
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
 from .config import s3_client, AWS_S3_BUCKET, deepgram_client, logger
 
@@ -608,3 +608,92 @@ def transcribe_video_with_deepgram_timed(
                 os.remove(temp_audio_path)
         except Exception:
             pass
+
+
+def transcribe_video_with_deepgram_url_timed(
+    media_url: str, video_title: str = "Video"
+) -> dict:
+    """URL-fed variant of transcribe_video_with_deepgram_timed.
+
+    Calls Deepgram's prerecorded URL API (so the server doesn't have to
+    download the file) with utterances enabled, and reuses the same
+    response-parsing pass as the local-file timed transcriber.
+    """
+    if not deepgram_client:
+        raise Exception("Deepgram is not configured on server")
+
+    try:
+        try:
+            from deepgram import PrerecordedOptions  # type: ignore
+        except Exception:
+            PrerecordedOptions = None  # type: ignore
+
+        options = None
+        if PrerecordedOptions is not None:
+            options = PrerecordedOptions(
+                model="nova-2",
+                smart_format=True,
+                punctuate=True,
+                utterances=True,
+                utt_split=3.0,
+            )
+
+        payload = {"url": media_url}
+        try:
+            import httpx
+
+            response = deepgram_client.listen.rest.v("1").transcribe_url(
+                payload, options, timeout=httpx.Timeout(300.0)
+            )
+        except Exception:
+            response = deepgram_client.listen.rest.v("1").transcribe_url(
+                payload, options
+            )
+
+        segments: List[Dict[str, Any]] = []
+        total_duration = 0.0
+        try:
+            results = (
+                response.get("results")
+                if isinstance(response, dict)
+                else getattr(response, "results", None)
+            )
+            if results:
+                utterances = (
+                    results.get("utterances")
+                    if isinstance(results, dict)
+                    else getattr(results, "utterances", None)
+                )
+                if utterances:
+                    for utt in utterances:
+                        start = (
+                            utt.get("start")
+                            if isinstance(utt, dict)
+                            else getattr(utt, "start", 0)
+                        )
+                        end = (
+                            utt.get("end")
+                            if isinstance(utt, dict)
+                            else getattr(utt, "end", 0)
+                        )
+                        text = (
+                            utt.get("transcript")
+                            if isinstance(utt, dict)
+                            else getattr(utt, "transcript", "")
+                        )
+                        if text:
+                            segments.append(
+                                {"start": start, "dur": end - start, "text": text}
+                            )
+                            total_duration = max(total_duration, end)
+        except Exception as parse_error:
+            logger.error(f"Failed to parse Deepgram URL timing data: {parse_error}")
+
+        return {
+            "title": video_title,
+            "lengthInSeconds": int(total_duration),
+            "transcription": segments,
+        }
+
+    except Exception as e:
+        raise Exception(f"Deepgram URL timed transcription failed: {str(e)}")
