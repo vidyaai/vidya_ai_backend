@@ -559,6 +559,7 @@ class CourseMaterial(Base):
 
     # Transcription (for directly uploaded video materials)
     transcript_text = Column(Text, nullable=True)
+    transcript_json = Column(JSONB, nullable=True)  # Deepgram timed segments
     transcript_status = Column(
         String, nullable=True
     )  # "pending", "processing", "completed", "failed"
@@ -695,6 +696,8 @@ class MaterialChunk(Base):
 
     text = Column(Text, nullable=False)
     page_number = Column(Integer, nullable=True)  # For PDF citations
+    start_seconds = Column(Float, nullable=True)  # For video citations
+    end_seconds = Column(Float, nullable=True)  # For video citations
     word_count = Column(Integer, nullable=True)
 
     embedding = Column(Vector(1536), nullable=True)
