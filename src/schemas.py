@@ -128,6 +128,14 @@ class QuizRequest(BaseModel):
     language: str = "en"
 
 
+class MaterialQuizRequest(BaseModel):
+    material_id: str
+    num_questions: int = 5
+    difficulty: str = "medium"
+    include_explanations: bool = True
+    language: str = "en"
+
+
 # Sharing-related schemas
 class FirebaseUser(BaseModel):
     uid: str

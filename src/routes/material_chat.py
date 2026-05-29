@@ -36,11 +36,13 @@ from schemas import (
     MaterialChatSessionCreate,
     MaterialChatSessionOut,
     MaterialChatSessionRename,
+    MaterialQuizRequest,
 )
 from openai import OpenAI
 from services.chunking_embedding_service import EmbeddingService
 from utils.db import get_db
 from utils.firebase_auth import get_current_user
+from utils.ml_models import OpenAIQuizClient
 from utils.text_utils import normalize_ai_response
 
 
@@ -67,6 +69,8 @@ _SHARED_STYLE = """
 
 **Math and technical content:**
 - Use LaTeX ONLY: \\( inline \\) and \\[ display \\]. NEVER HTML or MathML.
+- NEVER place a LaTeX expression inside bold markers. Wrong: **the matrix \\(K\\) represents…**.
+  Right: the matrix \\(K\\) **represents…**. Bolding wraps math in raw HTML and breaks rendering.
 - Always explain what the equation means in plain English first.
 
 **Stay grounded in the source:**
@@ -558,3 +562,83 @@ def list_messages(
         .all()
     )
     return rows
+
+
+# ── Quiz ────────────────────────────────────────────────────────────────
+
+
+def _build_quiz_source_text(db: Session, material: CourseMaterial) -> str:
+    """Build the source text the quiz generator should read from.
+
+    Videos use the stored transcript (timed segments collapsed into plain
+    text where available). PDFs/DOCXs use the concatenated MaterialChunk
+    text in document order — same content the chat retrieval already grounds
+    answers in.
+    """
+    if material.material_type == "video":
+        text = (material.transcript_text or "").strip()
+        if text:
+            return text
+        # Fallback to MaterialChunks (legacy materials transcribed pre-21)
+    rows = (
+        db.query(MaterialChunk)
+        .filter(MaterialChunk.course_material_id == material.id)
+        .order_by(MaterialChunk.chunk_index.asc())
+        .all()
+    )
+    return "\n\n".join(r.text for r in rows if r.text)
+
+
+@router.post("/quiz")
+async def generate_material_quiz(
+    body: MaterialQuizRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate an MCQ quiz for a CourseMaterial.
+
+    Returns the same shape as /api/quiz/generate so the frontend QuizPanel
+    flow can be reused: {success, quiz: [{id, question, options, answer,
+    difficulty, explanation?}], message}.
+    """
+    material = _user_can_access_material(db, current_user["uid"], body.material_id)
+    source_text = _build_quiz_source_text(db, material)
+    if not source_text:
+        raise HTTPException(
+            status_code=400,
+            detail="No transcript or indexed content available for this material yet.",
+        )
+
+    quiz_client = OpenAIQuizClient()
+    try:
+        result = quiz_client.generate_quiz(
+            transcript=source_text,
+            num_questions=body.num_questions,
+            difficulty=body.difficulty,
+            include_explanations=body.include_explanations,
+            language=body.language,
+        )
+    except Exception as e:
+        logger.error(f"Quiz generation failed for material {material.id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate quiz: {e}")
+
+    questions = result.get("quiz", []) if isinstance(result, dict) else []
+    formatted: List[Dict[str, Any]] = []
+    for i, q in enumerate(questions):
+        item = {
+            "id": f"q{i+1}",
+            "question": q.get("question", ""),
+            "options": q.get("options", []),
+            "answer": q.get("answer", ""),
+            "difficulty": body.difficulty,
+        }
+        if body.include_explanations and "explanation" in q:
+            item["explanation"] = q["explanation"]
+        formatted.append(item)
+
+    return {
+        "success": True,
+        "material_id": material.id,
+        "quiz": formatted,
+        "message": f"Successfully generated {len(formatted)} questions",
+    }
