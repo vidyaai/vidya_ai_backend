@@ -219,6 +219,8 @@ def _retrieve_context(
                 "embedding": r.embedding,
                 "chunk_index": r.chunk_index,
                 "page_number": r.page_number,
+                "start_seconds": r.start_seconds,
+                "end_seconds": r.end_seconds,
             }
             for r in rows
         ]
@@ -237,8 +239,22 @@ def _retrieve_context(
 
     # Keep the LLM context in retrieval-ranking order (best chunks first
     # are more likely to fit inside the model's attention budget).
+    # For video chunks, prefix each with an [MM:SS] marker so the LLM
+    # naturally weaves clickable timestamps into its prose — the
+    # frontend's parseMarkdownWithMath turns any MM:SS into a button.
+    def _fmt_timestamp_prefix(c: Dict[str, Any]) -> str:
+        s = c.get("start_seconds")
+        if s is None:
+            return ""
+        total = int(s)
+        m, sec = divmod(total, 60)
+        h = m // 60
+        m = m % 60
+        return f"[{h:02d}:{m:02d}:{sec:02d}] " if h else f"[{m:02d}:{sec:02d}] "
+
     context_text = "\n\n".join(
-        f"[{c.get('chunk_index')}] {c.get('text', '')}" for c in top
+        f"{_fmt_timestamp_prefix(c)}[{c.get('chunk_index')}] {c.get('text', '')}"
+        for c in top
     )
 
     citations: List[Dict[str, Any]] = []
