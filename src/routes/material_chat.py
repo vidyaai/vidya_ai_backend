@@ -622,7 +622,15 @@ async def generate_material_quiz(
         logger.error(f"Quiz generation failed for material {material.id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate quiz: {e}")
 
-    questions = result.get("quiz", []) if isinstance(result, dict) else []
+    # OpenAIQuizClient.generate_quiz normalizes into data["quiz"], but
+    # OpenAI's json_object mode sometimes hands back the array under
+    # "questions" instead of "quiz" — in which case the normalization
+    # pass (which only reads "quiz") clobbers it with []. Read whichever
+    # key is populated; mirror's the gallery quiz.py's same fallback.
+    if isinstance(result, dict):
+        questions = result.get("quiz") or result.get("questions") or []
+    else:
+        questions = []
     formatted: List[Dict[str, Any]] = []
     for i, q in enumerate(questions):
         item = {
