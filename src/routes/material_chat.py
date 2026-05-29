@@ -24,6 +24,7 @@ from models import (
     Course,
     CourseEnrollment,
     CourseMaterial,
+    LectureSummary,
     MaterialChatMessage,
     MaterialChatSession,
     MaterialChunk,
@@ -37,6 +38,8 @@ from schemas import (
     MaterialChatSessionOut,
     MaterialChatSessionRename,
     MaterialQuizRequest,
+    MaterialSummaryRequest,
+    MaterialSummaryResponse,
 )
 from openai import OpenAI
 from services.chunking_embedding_service import EmbeddingService
@@ -650,3 +653,196 @@ async def generate_material_quiz(
         "quiz": formatted,
         "message": f"Successfully generated {len(formatted)} questions",
     }
+
+
+# ── Summary ─────────────────────────────────────────────────────────────
+
+
+_MATERIAL_SUMMARY_TAG = "course_material_v1"
+
+
+@router.post("/summary", response_model=MaterialSummaryResponse)
+async def generate_material_summary(
+    body: MaterialSummaryRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate a lecture-style summary for a CourseMaterial.
+
+    Mirrors POST /api/lecture-summary/generate but anchored to a
+    CourseMaterial: takes a material_id, builds the source text the
+    same way the quiz endpoint does, runs the existing summarization
+    workflow, persists the result in LectureSummary (with the
+    material_id stored in the loose video_id column and a metadata
+    tag so the download endpoint can distinguish), and returns the
+    summary markdown alongside the summary_id.
+    """
+    import os
+    import tempfile
+    import time
+    from uuid import uuid4
+    from controllers.storage import s3_upload_file
+
+    user_id = current_user["uid"]
+    material = _user_can_access_material(db, user_id, body.material_id)
+    source_text = _build_quiz_source_text(db, material)
+    if not source_text:
+        raise HTTPException(
+            status_code=400,
+            detail="No transcript or indexed content available for this material yet.",
+        )
+
+    # Check cache unless force_regenerate
+    if not body.force_regenerate:
+        existing = (
+            db.query(LectureSummary)
+            .filter(
+                LectureSummary.video_id == material.id,
+                LectureSummary.user_id == user_id,
+            )
+            .order_by(LectureSummary.created_at.desc())
+            .first()
+        )
+        if existing:
+            return MaterialSummaryResponse(
+                summary_id=existing.id,
+                material_id=material.id,
+                summary=existing.summary_markdown or "",
+                summary_metadata=existing.summary_metadata,
+                created_at=existing.created_at,
+            )
+
+    # Generate new summary
+    try:
+        from summarize_lecture.graph.workflow import run_summarization
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Summarization module not available: {e}"
+        )
+
+    start = time.time()
+    final_state = run_summarization(material.id, source_text)
+    if final_state.get("errors"):
+        raise HTTPException(
+            status_code=500,
+            detail=f"Summarization failed: {'; '.join(final_state['errors'])}",
+        )
+
+    summary_markdown = final_state.get("summary_markdown", "")
+    key_topics = final_state.get("key_topics", [])
+    research_results = final_state.get("research_results", [])
+    if not summary_markdown:
+        raise HTTPException(
+            status_code=500, detail="Summary generation returned no content."
+        )
+
+    # Generate + upload PDF
+    s3_key: Optional[str] = None
+    summary_id = str(uuid4())
+    try:
+        from summarize_lecture.utils.pdf_generator import LectureSummaryPDFGenerator
+
+        pdf_generator = LectureSummaryPDFGenerator()
+        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        temp_pdf_path = temp_pdf.name
+        temp_pdf.close()
+        try:
+            pdf_path = pdf_generator.generate_pdf_from_content(
+                summary_markdown, temp_pdf_path
+            )
+            if pdf_path and os.path.exists(pdf_path):
+                s3_key = f"lecture-summaries/material-{material.id}/{summary_id}.pdf"
+                s3_upload_file(pdf_path, s3_key, "application/pdf")
+        finally:
+            try:
+                pdf_generator.cleanup()
+            except Exception:
+                pass
+            if os.path.exists(temp_pdf_path):
+                os.remove(temp_pdf_path)
+    except Exception as e:
+        # PDF is a nice-to-have; persist the markdown summary even if PDF fails.
+        logger.error(f"PDF generation failed for material {material.id}: {e}")
+
+    generation_time = time.time() - start
+    summary_metadata = {
+        "source": _MATERIAL_SUMMARY_TAG,
+        "material_id": material.id,
+        "material_title": material.title or "Untitled material",
+        "key_topics": key_topics,
+        "research_sources_count": len(research_results),
+        "generation_time_seconds": round(generation_time, 2),
+    }
+
+    row = LectureSummary(
+        id=summary_id,
+        video_id=material.id,  # loose String column reused for material id
+        user_id=user_id,
+        summary_markdown=summary_markdown,
+        summary_pdf_s3_key=s3_key,
+        summary_metadata=summary_metadata,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+
+    return MaterialSummaryResponse(
+        summary_id=row.id,
+        material_id=material.id,
+        summary=summary_markdown,
+        summary_metadata=summary_metadata,
+        created_at=row.created_at,
+    )
+
+
+@router.get("/summary/{summary_id}/download")
+async def download_material_summary(
+    summary_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Stream the PDF for a previously generated material-chat summary."""
+    from fastapi.responses import Response
+    from controllers.storage import s3_presign_url
+    from controllers.config import s3_client, AWS_S3_BUCKET
+
+    user_id = current_user["uid"]
+    summary = (
+        db.query(LectureSummary).filter(LectureSummary.id == summary_id).first()
+    )
+    if not summary:
+        raise HTTPException(status_code=404, detail="Summary not found")
+
+    # Trust boundary: summary owner OR a user who can access the underlying material.
+    if summary.user_id != user_id:
+        try:
+            _user_can_access_material(db, user_id, summary.video_id)
+        except HTTPException:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+    if not summary.summary_pdf_s3_key:
+        raise HTTPException(status_code=404, detail="PDF not available for this summary")
+
+    if not s3_client or not AWS_S3_BUCKET:
+        raise HTTPException(status_code=500, detail="S3 not configured")
+
+    try:
+        obj = s3_client.get_object(
+            Bucket=AWS_S3_BUCKET, Key=summary.summary_pdf_s3_key
+        )
+        body = obj["Body"].read()
+    except Exception as e:
+        logger.error(f"Failed to fetch summary PDF from S3: {e}")
+        raise HTTPException(status_code=500, detail="Failed to download summary PDF")
+
+    fname = "summary.pdf"
+    if isinstance(summary.summary_metadata, dict):
+        t = summary.summary_metadata.get("material_title") or ""
+        clean = "".join(c if c.isalnum() else "_" for c in t).strip("_")
+        if clean:
+            fname = f"{clean[:60]}_Summary.pdf"
+    return Response(
+        content=body,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )

@@ -136,6 +136,19 @@ class MaterialQuizRequest(BaseModel):
     language: str = "en"
 
 
+class MaterialSummaryRequest(BaseModel):
+    material_id: str
+    force_regenerate: bool = False
+
+
+class MaterialSummaryResponse(BaseModel):
+    summary_id: str
+    material_id: str
+    summary: str
+    summary_metadata: Optional[dict] = None
+    created_at: datetime
+
+
 # Sharing-related schemas
 class FirebaseUser(BaseModel):
     uid: str
