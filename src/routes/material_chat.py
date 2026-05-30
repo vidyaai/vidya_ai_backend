@@ -93,14 +93,28 @@ _SYSTEM_PROMPT_DOC = (
     "You are a friendly, enthusiastic tutor helping a student understand a "
     "document they're reading (lecture notes, a PDF chapter, or similar). "
     "Reference the material as 'the document', 'these notes', or 'this PDF' — "
-    "never as a video or lecture recording.\n"
+    "never as a video or lecture recording.\n\n"
+    "**Inline citations are required.** Every chunk of context you receive "
+    "is prefixed with a `[Page N]` marker. When you state a fact drawn from "
+    "the document, weave the exact `Page N` reference into the sentence — "
+    "e.g. `As explained on Page 3, the matrix \\(K\\) represents…`. Always "
+    "spell it as `Page N` (capital P, space, digits) — the UI renders this "
+    "form as a clickable link that opens the PDF at that page.\n"
     + _SHARED_STYLE
 )
 
 _SYSTEM_PROMPT_VIDEO = (
     "You are a friendly, enthusiastic tutor helping a student understand a "
     "lecture video they're watching. The provided context is the lecture "
-    "transcript. Reference the material as 'the lecture' or 'the video'.\n"
+    "transcript. Reference the material as 'the lecture' or 'the video'.\n\n"
+    "**Inline citations are required.** Every chunk of context you receive "
+    "is prefixed with a `[MM:SS]` (or `[HH:MM:SS]`) timestamp from the "
+    "lecture. When you state a fact drawn from the lecture, weave the exact "
+    "timestamp into the sentence — e.g. `Around 1:24 the professor "
+    "explains…`. Always spell timestamps as `MM:SS` digits with a colon — "
+    "the UI renders any such substring as a clickable button that seeks "
+    "the player. Never replace a timestamp with a generic phrase like 'at "
+    "the start' or 'later on'.\n"
     + _SHARED_STYLE
 )
 
@@ -255,21 +269,29 @@ def _retrieve_context(
 
     # Keep the LLM context in retrieval-ranking order (best chunks first
     # are more likely to fit inside the model's attention budget).
-    # For video chunks, prefix each with an [MM:SS] marker so the LLM
-    # naturally weaves clickable timestamps into its prose — the
-    # frontend's parseMarkdownWithMath turns any MM:SS into a button.
-    def _fmt_timestamp_prefix(c: Dict[str, Any]) -> str:
+    # Prefix each chunk with a citation marker the model is told to quote
+    # back inline:
+    #   • Video chunks → `[MM:SS]` (or `[H:MM:SS]` past an hour). The
+    #     frontend's parseMarkdownWithMath turns any MM:SS substring into
+    #     a clickable button that seeks the player.
+    #   • PDF chunks → `[Page N]`. The frontend's MaterialChatBox pre-
+    #     transforms these into markdown links and intercepts clicks to
+    #     drive the iframe to that page.
+    def _fmt_citation_prefix(c: Dict[str, Any]) -> str:
         s = c.get("start_seconds")
-        if s is None:
-            return ""
-        total = int(s)
-        m, sec = divmod(total, 60)
-        h = m // 60
-        m = m % 60
-        return f"[{h:02d}:{m:02d}:{sec:02d}] " if h else f"[{m:02d}:{sec:02d}] "
+        if s is not None:
+            total = int(s)
+            m, sec = divmod(total, 60)
+            h = m // 60
+            m = m % 60
+            return f"[{h:02d}:{m:02d}:{sec:02d}] " if h else f"[{m:02d}:{sec:02d}] "
+        p = c.get("page_number")
+        if p is not None:
+            return f"[Page {p}] "
+        return ""
 
     context_text = "\n\n".join(
-        f"{_fmt_timestamp_prefix(c)}[{c.get('chunk_index')}] {c.get('text', '')}"
+        f"{_fmt_citation_prefix(c)}{c.get('text', '')}"
         for c in top
     )
 
