@@ -686,6 +686,7 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
         conversation_history: Optional[List[Dict[str, Any]]] = None,
         video_title: str = "",
         enable_search: bool = True,
+        system_prompt_override: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Answer question with optional web search augmentation.
@@ -790,6 +791,7 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
                 contextualized_prompt,
                 context,
                 conversation_history,  # Use rewritten query
+                system_prompt_override=system_prompt_override,
             )
             result["used_web_search"] = False
 
@@ -801,7 +803,10 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
             fallback_query = prompt
             return {
                 "response": self.ask_text_only(
-                    fallback_query, context, conversation_history
+                    fallback_query,
+                    context,
+                    conversation_history,
+                    system_prompt_override=system_prompt_override,
                 ),
                 "sources": [],
                 "used_web_search": False,
@@ -815,6 +820,7 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
         conversation_history: Optional[List[Dict[str, Any]]] = None,
         video_title: str = "",
         enable_search: bool = True,
+        system_prompt_override: Optional[str] = None,
     ) -> Iterator[str]:
         """
         Stream answer with optional web search augmentation.
@@ -922,7 +928,10 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
 
             # Stream response
             for chunk in self.ask_text_only_stream(
-                contextualized_prompt, context, conversation_history
+                contextualized_prompt,
+                context,
+                conversation_history,
+                system_prompt_override=system_prompt_override,
             ):
                 yield json.dumps({"type": "content", "data": chunk}) + "\n"
 
