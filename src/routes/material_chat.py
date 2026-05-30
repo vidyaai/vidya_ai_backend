@@ -111,24 +111,40 @@ _SYSTEM_PROMPT_VIDEO = (
     "and bullet.** Every chunk of context you receive is prefixed with a "
     "`[MM:SS]` (or `[HH:MM:SS]`) timestamp from the lecture. Use those "
     "timestamps verbatim in your answer. The rules are absolute:\n"
-    "- **Numbered topics / bullets that describe a section MUST each end "
-    "  with `(MM:SS - MM:SS)`** — the start of the first chunk you draw "
-    "  from for that topic and the end of the last. Do NOT only put a "
-    "  single range on the top-level title and leave the subtopics blank. "
-    "  Every numbered item gets its own range. Example:\n"
-    "    `1. Introduction to FEM (00:00 - 03:30)`\n"
-    "    `   - the speaker introduces… (00:21)`\n"
-    "    `2. Principle of Virtual Displacements (03:30 - 07:00)`\n"
-    "    `   - …`\n"
+    "- For a list of topics / sections, use a **numbered list** (`1.`, "
+    "  `2.`, …) — NEVER a bulleted list (`-`). The exact format for each "
+    "  topic line is:\n"
+    "    `N. **Topic Title** (MM:SS - MM:SS):`\n"
+    "  i.e. number + period + bold title + space + parenthesised range + "
+    "  colon. Bold wraps ONLY the title text. The `(MM:SS - MM:SS)` range "
+    "  MUST be outside the `**...**` markers, otherwise the UI can't "
+    "  clickify the timestamps. Wrong: `1. **Topic (00:00 - 03:30)**`. "
+    "  Right: `1. **Topic** (00:00 - 03:30):`.\n"
+    "- Each numbered topic MUST carry its own range — start of the first "
+    "  chunk you draw from for that topic, end of the last. Don't leave "
+    "  any topic without a range.\n"
+    "- Sub-bullets under a topic use `-` and end with a single starting "
+    "  timestamp in parentheses, e.g. `   - the speaker introduces… "
+    "  (00:21)`.\n"
     "- When you state a fact drawn from a specific moment inside a "
     "  paragraph, weave the exact starting timestamp into the sentence, "
     "  e.g. `Around 1:24 the professor explains…`. If the concept appears "
     "  at multiple moments, list each timestamp "
     "  (`…discussed at 5:30 and 6:28`).\n"
     "- Spell timestamps as plain `MM:SS` (or `HH:MM:SS`) digits with a "
-    "  colon — the UI clickifies any such substring. Never replace a "
-    "  timestamp with a generic phrase like 'at the start' or 'later on'. "
-    "  Never invent a timestamp the context didn't give you.\n"
+    "  colon. Never replace a timestamp with a generic phrase like 'at "
+    "  the start' or 'later on'. Never invent a timestamp the context "
+    "  didn't give you. NEVER wrap a timestamp in bold or italic — the UI "
+    "  can only clickify plain `MM:SS` substrings.\n\n"
+    "**Worked example** of a section of a good answer:\n"
+    "```\n"
+    "1. **Introduction to Finite Element Method** (00:00 - 03:30):\n"
+    "   - The professor introduces the displacement-based FEM (00:21).\n"
+    "   - Ties it back to Ritz-Galerkin from earlier lectures (01:42).\n"
+    "2. **Principle of Virtual Displacements** (03:30 - 07:00):\n"
+    "   - States that external virtual work equals internal virtual work "
+    "(03:48).\n"
+    "```\n"
     + _SHARED_STYLE
 )
 
@@ -944,6 +960,56 @@ async def generate_material_summary(
         summary_metadata=summary_metadata,
         created_at=row.created_at,
     )
+
+
+@router.get("/transcript/{material_id}")
+async def get_material_transcript(
+    material_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Return the lecture's transcript in both plain-text and timed-segment
+    form so the frontend can render the same Transcript / Timestamps tab
+    pattern the gallery's TranscriptComponent uses.
+
+    Response shape:
+      {
+        "material_id": str,
+        "material_type": str,
+        "transcript_status": str | null,
+        "transcript_text": str | null,
+        "segments": [{"start": float, "dur": float, "text": str}, ...],
+        "length_seconds": int | null,
+      }
+    For PDF (lecture_notes) materials the segments list will be empty —
+    documents have no audio timeline — but transcript_text may still
+    carry the joined chunk text the chat uses for retrieval.
+    """
+    material = _user_can_access_material(db, current_user["uid"], material_id)
+    segments: List[Dict[str, Any]] = []
+    length_seconds = None
+    if isinstance(material.transcript_json, dict):
+        raw = material.transcript_json.get("transcription") or []
+        for s in raw:
+            if not isinstance(s, dict):
+                continue
+            seg_text = s.get("text") or ""
+            start = s.get("start")
+            dur = s.get("dur")
+            if seg_text and start is not None and dur is not None:
+                segments.append(
+                    {"start": float(start), "dur": float(dur), "text": seg_text}
+                )
+        length_seconds = material.transcript_json.get("lengthInSeconds")
+
+    return {
+        "material_id": material.id,
+        "material_type": material.material_type,
+        "transcript_status": material.transcript_status,
+        "transcript_text": material.transcript_text or "",
+        "segments": segments,
+        "length_seconds": length_seconds,
+    }
 
 
 @router.get("/summary/{summary_id}/download")
