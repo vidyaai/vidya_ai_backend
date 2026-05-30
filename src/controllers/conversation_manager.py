@@ -244,9 +244,11 @@ def store_material_conversation_turn(
     """
     Append a user turn + assistant turn to a MaterialChatSession.
 
-    If session_id is provided and belongs to (course_material_id, firebase_uid),
-    reuse it. Otherwise reuse this user's most-recently-updated session for
-    the material, or create a new one.
+    If session_id is provided AND it belongs to (course_material_id,
+    firebase_uid), reuse it. Otherwise — even if the user has earlier
+    sessions for this material — create a *new* session. That's what
+    the frontend's "New chat" button expects: clearing the active
+    session id and sending the next message starts a fresh thread.
 
     Returns the session_id used (string).
     """
@@ -260,17 +262,6 @@ def store_material_conversation_turn(
                     MaterialChatSession.course_material_id == course_material_id,
                     MaterialChatSession.user_id == firebase_uid,
                 )
-                .first()
-            )
-
-        if session is None:
-            session = (
-                db.query(MaterialChatSession)
-                .filter(
-                    MaterialChatSession.course_material_id == course_material_id,
-                    MaterialChatSession.user_id == firebase_uid,
-                )
-                .order_by(MaterialChatSession.updated_at.desc())
                 .first()
             )
 
