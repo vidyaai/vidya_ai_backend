@@ -275,12 +275,21 @@ def store_material_conversation_turn(
             db.add(session)
             db.flush()  # populate session.id
 
+        # Stamp explicit, strictly-increasing timestamps so a later
+        # order_by(created_at.asc()) puts the user turn first and the
+        # assistant turn second deterministically. Without the explicit
+        # microsecond delta both rows can land on the same instant and
+        # the SQL ordering becomes unstable.
+        from datetime import timedelta as _td
+
+        now = datetime.now(timezone.utc)
         db.add(
             MaterialChatMessage(
                 session_id=session.id,
                 role="user",
                 content=user_message,
                 timestamp_seconds=timestamp_seconds,
+                created_at=now,
             )
         )
         db.add(
@@ -290,6 +299,7 @@ def store_material_conversation_turn(
                 content=ai_response,
                 citations=citations,
                 timestamp_seconds=timestamp_seconds,
+                created_at=now + _td(microseconds=1),
             )
         )
 
@@ -318,6 +328,10 @@ def get_merged_material_conversation_history(
     Database is the only source of truth — no client-supplied history is merged.
     """
     try:
+        # Grab the most-recent `limit` rows in desc order, then reverse to
+        # chronological. Pair ordering is guaranteed inside a turn by the
+        # explicit microsecond delta stamped at write time, so reverse()
+        # is stable across users + assistants.
         rows = (
             db.query(MaterialChatMessage)
             .filter(MaterialChatMessage.session_id == session_id)
@@ -325,7 +339,7 @@ def get_merged_material_conversation_history(
             .limit(limit)
             .all()
         )
-        rows.reverse()  # chronological
+        rows.reverse()
         return [{"role": r.role, "content": r.content} for r in rows]
     except Exception as e:
         logger.error(f"Error retrieving material conversation history: {e}")
