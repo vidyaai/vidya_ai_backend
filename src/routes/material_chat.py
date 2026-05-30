@@ -75,9 +75,17 @@ _SHARED_STYLE = """
   Right: the matrix \\(K\\) **represents…**. Bolding wraps math in raw HTML and breaks rendering.
 - Always explain what the equation means in plain English first.
 
+**Handle follow-ups gracefully:**
+- The student is in an ongoing conversation. Short or pronoun-laden questions
+  like "explain more", "deep dive into point 5", or "what about that?" almost
+  always refer to your previous answer.
+- ALWAYS read the conversation history first to figure out what the student
+  is referring to before deciding the question is off-topic.
+- Only say something is off-topic if it is clearly unrelated to the source
+  AND unrelated to anything you said earlier in the conversation.
+
 **Stay grounded in the source:**
-- Use the provided context as your source of truth.
-- If the question is off-topic, gently redirect to what the source covers.
+- Use the provided context and conversation history as your sources of truth.
 - If the source doesn't cover the question, say so honestly — don't invent.
 """
 
@@ -363,12 +371,20 @@ async def query_material(
                 system_prompt_override=system_prompt,
             )
         else:
-            ai_response = vision_client.ask_text_only(
+            # Use the same augmented path the gallery uses so follow-up
+            # questions like "deep dive into point 5" get rewritten with
+            # conversation context before retrieval / answering. Web search
+            # is off for material chat — answers must stay grounded in the
+            # uploaded source.
+            web_result = vision_client.ask_with_web_augmentation(
                 prompt=body.query,
                 context=context_text,
                 conversation_history=history,
+                video_title=material.title or "",
+                enable_search=False,
                 system_prompt_override=system_prompt,
             )
+            ai_response = web_result.get("response", "")
     finally:
         if frame_path:
             try:
@@ -495,20 +511,36 @@ async def query_material_stream(
                         + "\n\n"
                     )
             else:
-                for delta in vision_client.ask_text_only_stream(
+                # ask_with_web_augmentation_stream yields JSON strings of
+                # {"type":"metadata"|"content"|"done"|"error", "data":...}.
+                # We only re-emit content events under our SSE envelope —
+                # our own metadata + session + done frames are emitted
+                # elsewhere in this function so the frontend contract is
+                # unchanged.
+                for chunk_json in vision_client.ask_with_web_augmentation_stream(
                     prompt=body.query,
                     context=context_text,
                     conversation_history=history,
+                    video_title=material.title or "",
+                    enable_search=False,
                     system_prompt_override=system_prompt,
                 ):
-                    if not delta:
+                    try:
+                        evt = json.loads(chunk_json)
+                    except Exception:
                         continue
-                    full_response += delta
-                    yield (
-                        "data: "
-                        + json.dumps({"type": "content", "data": delta})
-                        + "\n\n"
-                    )
+                    if evt.get("type") == "content":
+                        delta = evt.get("data") or ""
+                        if not delta:
+                            continue
+                        full_response += delta
+                        yield (
+                            "data: "
+                            + json.dumps({"type": "content", "data": delta})
+                            + "\n\n"
+                        )
+                    elif evt.get("type") == "error":
+                        raise RuntimeError(evt.get("data") or "stream error")
 
             if full_response:
                 full_response = normalize_ai_response(full_response)
