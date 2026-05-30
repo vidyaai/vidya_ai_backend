@@ -72,6 +72,13 @@ class MaterialChatQuery(BaseModel):
     material_id: str
     query: str
     session_id: Optional[str] = None
+    # Frame-query support: when is_image_query is True the frontend must
+    # supply a base64-encoded JPEG snapshot of the current video frame as
+    # image_base64 (without a "data:image/..." prefix) plus the timestamp
+    # the frame was captured at.
+    is_image_query: bool = False
+    image_base64: Optional[str] = None
+    timestamp: Optional[float] = None
 
 
 class MaterialChatSessionCreate(BaseModel):

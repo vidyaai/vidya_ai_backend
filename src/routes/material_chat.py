@@ -41,11 +41,10 @@ from schemas import (
     MaterialSummaryRequest,
     MaterialSummaryResponse,
 )
-from openai import OpenAI
 from services.chunking_embedding_service import EmbeddingService
 from utils.db import get_db
 from utils.firebase_auth import get_current_user
-from utils.ml_models import OpenAIQuizClient
+from utils.ml_models import OpenAIQuizClient, OpenAIVisionClient
 from utils.text_utils import normalize_ai_response
 
 
@@ -102,25 +101,27 @@ def _system_prompt_for(material_type: str) -> str:
     return _SYSTEM_PROMPT_VIDEO if material_type == "video" else _SYSTEM_PROMPT_DOC
 
 
-def _build_messages(
-    material_type: str,
-    context_text: str,
-    query: str,
-    history: List[Dict[str, Any]],
-) -> List[Dict[str, str]]:
-    messages: List[Dict[str, str]] = [
-        {"role": "system", "content": _system_prompt_for(material_type)},
-    ]
-    for msg in history or []:
-        if isinstance(msg, dict) and "role" in msg and "content" in msg:
-            messages.append({"role": msg["role"], "content": msg["content"]})
-    messages.append(
-        {
-            "role": "user",
-            "content": f"Context from the source:\n{context_text}\n\nQuestion: {query}",
-        }
-    )
-    return messages
+def _decode_frame_to_tempfile(image_base64: str) -> str:
+    """Decode a base64 JPEG (sans data-uri prefix) to a temp file and return
+    its path. Caller is responsible for unlinking."""
+    import base64
+    import os
+    import tempfile
+
+    if "," in image_base64 and image_base64.lstrip().startswith("data:"):
+        image_base64 = image_base64.split(",", 1)[1]
+    raw = base64.b64decode(image_base64)
+    fd, path = tempfile.mkstemp(prefix="material_frame_", suffix=".jpg")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
+    except Exception:
+        try:
+            os.close(fd)
+        except Exception:
+            pass
+        raise
+    return path
 
 
 # ── Access control ──────────────────────────────────────────────────────
@@ -319,11 +320,24 @@ async def query_material(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> MaterialChatQueryResponse:
+    import os
+
     material = _user_can_access_material(db, current_user["uid"], body.material_id)
 
-    context_text, citations = _retrieve_context(db, material, body.query)
+    # Frame queries only make sense for video materials.
+    if body.is_image_query and material.material_type != "video":
+        raise HTTPException(
+            status_code=400,
+            detail="Frame queries are only supported for video materials.",
+        )
+    if body.is_image_query and not body.image_base64:
+        raise HTTPException(
+            status_code=400,
+            detail="Frame queries require an image_base64 payload.",
+        )
 
-    if not context_text:
+    context_text, citations = _retrieve_context(db, material, body.query)
+    if not context_text and not body.is_image_query:
         msg = _processing_message(material)
         if msg:
             return MaterialChatQueryResponse(
@@ -334,15 +348,34 @@ async def query_material(
     if body.session_id:
         history = get_merged_material_conversation_history(db, body.session_id)
 
-    messages = _build_messages(material.material_type, context_text, body.query, history)
-    client = OpenAI()
-    completion = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages,
-        max_tokens=1500,
-        temperature=0.3,
-    )
-    ai_response = completion.choices[0].message.content or ""
+    system_prompt = _system_prompt_for(material.material_type)
+    vision_client = OpenAIVisionClient()
+
+    frame_path: Optional[str] = None
+    try:
+        if body.is_image_query:
+            frame_path = _decode_frame_to_tempfile(body.image_base64)
+            ai_response = vision_client.ask_with_image(
+                prompt=body.query,
+                image_path=frame_path,
+                context=context_text or "",
+                conversation_history=history,
+                system_prompt_override=system_prompt,
+            )
+        else:
+            ai_response = vision_client.ask_text_only(
+                prompt=body.query,
+                context=context_text,
+                conversation_history=history,
+                system_prompt_override=system_prompt,
+            )
+    finally:
+        if frame_path:
+            try:
+                os.remove(frame_path)
+            except Exception:
+                pass
+
     ai_response = normalize_ai_response(ai_response) if ai_response else ""
 
     session_id = store_material_conversation_turn(
@@ -352,6 +385,7 @@ async def query_material(
         user_message=body.query,
         ai_response=ai_response,
         citations=citations,
+        timestamp_seconds=body.timestamp,
         session_id=body.session_id,
     )
 
@@ -375,14 +409,39 @@ async def query_material_stream(
     """
 
     async def generate_stream():
+        import os
+
+        frame_path: Optional[str] = None
         try:
             material = _user_can_access_material(
                 db, current_user["uid"], body.material_id
             )
 
-            context_text, citations = _retrieve_context(db, material, body.query)
+            # Frame queries: validate + decode upfront so we fail fast if
+            # the client lied about its mode.
+            if body.is_image_query and material.material_type != "video":
+                yield (
+                    "data: "
+                    + json.dumps({
+                        "type": "error",
+                        "data": "Frame queries are only supported for video materials.",
+                    })
+                    + "\n\n"
+                )
+                return
+            if body.is_image_query and not body.image_base64:
+                yield (
+                    "data: "
+                    + json.dumps({
+                        "type": "error",
+                        "data": "Frame queries require an image_base64 payload.",
+                    })
+                    + "\n\n"
+                )
+                return
 
-            if not context_text:
+            context_text, citations = _retrieve_context(db, material, body.query)
+            if not context_text and not body.is_image_query:
                 msg = _processing_message(material)
                 if msg:
                     yield (
@@ -405,34 +464,51 @@ async def query_material_stream(
                         "data": {
                             "citations": citations,
                             "session_id": body.session_id,
+                            "query_type": "image" if body.is_image_query else "text",
                         },
                     }
                 )
                 + "\n\n"
             )
 
-            messages = _build_messages(
-                material.material_type, context_text, body.query, history
-            )
-            client = OpenAI()
-            stream = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=messages,
-                max_tokens=1500,
-                temperature=0.3,
-                stream=True,
-            )
+            system_prompt = _system_prompt_for(material.material_type)
+            vision_client = OpenAIVisionClient()
             full_response = ""
-            for chunk in stream:
-                delta = chunk.choices[0].delta.content if chunk.choices else None
-                if not delta:
-                    continue
-                full_response += delta
-                yield (
-                    "data: "
-                    + json.dumps({"type": "content", "data": delta})
-                    + "\n\n"
+
+            if body.is_image_query:
+                # ask_with_image is non-streaming in the gallery; deliver the
+                # full text as a single content frame to keep the SSE
+                # contract identical.
+                frame_path = _decode_frame_to_tempfile(body.image_base64)
+                ai_response = vision_client.ask_with_image(
+                    prompt=body.query,
+                    image_path=frame_path,
+                    context=context_text or "",
+                    conversation_history=history,
+                    system_prompt_override=system_prompt,
                 )
+                full_response = ai_response or ""
+                if full_response:
+                    yield (
+                        "data: "
+                        + json.dumps({"type": "content", "data": full_response})
+                        + "\n\n"
+                    )
+            else:
+                for delta in vision_client.ask_text_only_stream(
+                    prompt=body.query,
+                    context=context_text,
+                    conversation_history=history,
+                    system_prompt_override=system_prompt,
+                ):
+                    if not delta:
+                        continue
+                    full_response += delta
+                    yield (
+                        "data: "
+                        + json.dumps({"type": "content", "data": delta})
+                        + "\n\n"
+                    )
 
             if full_response:
                 full_response = normalize_ai_response(full_response)
@@ -443,6 +519,7 @@ async def query_material_stream(
                     user_message=body.query,
                     ai_response=full_response,
                     citations=citations,
+                    timestamp_seconds=body.timestamp,
                     session_id=body.session_id,
                 )
                 yield (
@@ -468,6 +545,12 @@ async def query_material_stream(
                 + json.dumps({"type": "error", "data": str(e)})
                 + "\n\n"
             )
+        finally:
+            if frame_path:
+                try:
+                    os.remove(frame_path)
+                except Exception:
+                    pass
 
     return StreamingResponse(
         generate_stream(),
