@@ -98,8 +98,11 @@ _SYSTEM_PROMPT_DOC = (
     "is prefixed with a `[Page N]` marker. When you state a fact drawn from "
     "the document, weave the exact `Page N` reference into the sentence — "
     "e.g. `As explained on Page 3, the matrix \\(K\\) represents…`. Always "
-    "spell it as `Page N` (capital P, space, digits) — the UI renders this "
-    "form as a clickable link that opens the PDF at that page.\n"
+    "spell it as `Page N` (capital P, space, digits). NEVER wrap a `Page N` "
+    "reference in bold (`**...**`) or italic markers — the citation must "
+    "stay as plain text so the UI can turn it into a clickable link. "
+    "Wrong: `**Page 3**`. Right: `Page 3` (bold the surrounding word "
+    "instead, e.g. `as shown on Page 3 the **stiffness matrix** is…`).\n"
     + _SHARED_STYLE
 )
 
@@ -111,10 +114,12 @@ _SYSTEM_PROMPT_VIDEO = (
     "is prefixed with a `[MM:SS]` (or `[HH:MM:SS]`) timestamp from the "
     "lecture. When you state a fact drawn from the lecture, weave the exact "
     "timestamp into the sentence — e.g. `Around 1:24 the professor "
-    "explains…`. Always spell timestamps as `MM:SS` digits with a colon — "
-    "the UI renders any such substring as a clickable button that seeks "
-    "the player. Never replace a timestamp with a generic phrase like 'at "
-    "the start' or 'later on'.\n"
+    "explains…`. Always spell timestamps as `MM:SS` digits with a colon. "
+    "NEVER wrap a timestamp in bold (`**...**`) or italic markers — the "
+    "citation must stay as plain text so the UI can turn it into a "
+    "clickable seek button. Wrong: `**[00:21]**`. Right: `at 0:21` or "
+    "`around 0:21`. Never replace a timestamp with a generic phrase like "
+    "'at the start' or 'later on'.\n"
     + _SHARED_STYLE
 )
 
