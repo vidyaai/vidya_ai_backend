@@ -274,7 +274,10 @@ def format_transcript_background(video_id: str, json_data: dict):
 
 
 def format_uploaded_transcript_background(
-    video_id: str, transcript_text: str, title: str = "Uploaded Video"
+    video_id: str,
+    transcript_text: str,
+    title: str = "Uploaded Video",
+    transcript_json: Optional[Dict[str, Any]] = None,
 ):
     db = SessionLocal()
     try:
@@ -296,7 +299,18 @@ def format_uploaded_transcript_background(
         video.formatting_status = status
         db.add(video)
         db.commit()
-        transcript_data = {"plain_text": transcript_text, "title": title, "duration": 0}
+        # Prefer REAL utterance-level timing (Deepgram transcript_json) so the
+        # formatted transcript reflects when each passage was actually spoken.
+        # Fall back to plain text only when no timed segments are available,
+        # which fabricates approximate 15s-per-chunk timestamps.
+        if isinstance(transcript_json, dict) and transcript_json.get("transcription"):
+            transcript_data = [transcript_json]
+        else:
+            transcript_data = {
+                "plain_text": transcript_text,
+                "title": title,
+                "duration": 0,
+            }
         formatted_transcript_lines = create_formatted_transcript(
             transcript_data, video_id=video_id
         )
