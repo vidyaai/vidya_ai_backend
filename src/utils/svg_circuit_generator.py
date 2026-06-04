@@ -84,21 +84,64 @@ class SVGCircuitGenerator:
    - **NMOS**: No bubble on the gate — direct connection from gate lead to gate plate
    - The channel body should have 3 horizontal stubs connecting to drain (top), source (bottom), and a middle connection
 
-3. **Wiring:**
-   - Use clean, orthogonal (horizontal and vertical) wires only — no diagonal lines
-   - Wires are simple black lines, stroke-width 2
+3. **Wiring (STRICT ORTHOGONAL — NO DIAGONALS):**
+   - ABSOLUTE RULE: Every `<line>` element MUST be either purely horizontal (y1=y2) or purely vertical (x1=x2). NEVER create a line where BOTH x1≠x2 AND y1≠y2 — that is a diagonal and is FORBIDDEN.
+   - To connect two non-aligned points, use TWO line segments with an explicit 90° corner waypoint:
+     ```svg
+     <!-- WRONG — diagonal wire — NEVER DO THIS -->
+     <line x1="50" y1="100" x2="200" y2="250" stroke="black" stroke-width="2"/>
+     <!-- CORRECT — horizontal segment + vertical segment via waypoint -->
+     <line x1="50" y1="100" x2="200" y2="100" stroke="black" stroke-width="2"/>
+     <line x1="200" y1="100" x2="200" y2="250" stroke="black" stroke-width="2"/>
+     ```
+   - For multi-gate circuits (MUX, decoder), draw a full-length vertical bus line first, then tap off horizontally to each gate input:
+     ```svg
+     <!-- Vertical selection bus -->
+     <line x1="120" y1="50" x2="120" y2="400" stroke="black" stroke-width="2"/>
+     <!-- Horizontal tap-offs to each AND gate input (one per gate) -->
+     <line x1="120" y1="120" x2="180" y2="120" stroke="black" stroke-width="2"/>
+     <line x1="120" y1="200" x2="180" y2="200" stroke="black" stroke-width="2"/>
+     <line x1="120" y1="280" x2="180" y2="280" stroke="black" stroke-width="2"/>
+     ```
    - Junction dots (filled circles, r=3) where 3+ wires meet
    - Connection nodes are small open circles (r=4, fill=white, stroke=black) for output terminals
 
-4. **Labels (MUST be readable):**
+4. **Labels (MUST be readable — text MUST NOT sit on wires or gates):**
    - Use clear sans-serif font (font-family="Arial, Helvetica, sans-serif")
-   - **TEXT BACKGROUND (MANDATORY):** Every text label MUST have a white background rectangle behind it for readability. Use this pattern:
+   - **TEXT BACKGROUND (MANDATORY FOR ALL TEXT):** Every `<text>` element MUST have a white background `<rect>` immediately before it. No exceptions. Text written directly over wires, gate bodies, or other elements is unacceptable.
+   - **Simple terminal labels** (single character like A, B, Y at a wire end far from other elements) use a compact background rect:
      ```svg
-     <!-- White background rect behind text, slightly larger than text -->
-     <rect x="TEXT_X-4" y="TEXT_Y-14" width="APPROX_TEXT_WIDTH+8" height="18" rx="3" fill="white" fill-opacity="0.9" stroke="#ccc" stroke-width="0.5"/>
-     <text x="TEXT_X" y="TEXT_Y" font-family="Arial" font-size="15">Label</text>
+     <rect x="TEXT_X-4" y="TEXT_Y-14" width="20" height="18" rx="2" fill="white" fill-opacity="0.95"/>
+     <text x="TEXT_X" y="TEXT_Y" font-family="Arial" font-size="15">A</text>
      ```
-   - For every `<text>` element, place a `<rect>` immediately before it with white fill
+   - **Floating labels near components/wires** (subscripted variables, node names, expressions) MUST have a clearly visible bordered box:
+     ```svg
+     <!-- Bordered text box for any label that could overlap circuit elements -->
+     <rect x="TEXT_X-5" y="TEXT_Y-16" width="APPROX_TEXT_WIDTH+10" height="22"
+           rx="3" fill="white" fill-opacity="1.0" stroke="#aaa" stroke-width="0.8"/>
+     <text x="TEXT_X" y="TEXT_Y" font-family="Arial" font-size="14">D₀ · S̄₁ · S̄₀</text>
+     ```
+   - **Truth tables / selection tables** MUST be in a distinct bordered box with padding:
+     ```svg
+     <!-- Truth table box — must be placed outside the main circuit area -->
+     <rect x="BOX_X" y="BOX_Y" width="BOX_W" height="BOX_H"
+           rx="4" fill="white" stroke="#333" stroke-width="1.5"/>
+     <!-- Table title -->
+     <rect x="BOX_X+2" y="BOX_Y+2" width="BOX_W-4" height="20"
+           rx="2" fill="#f0f0f0" stroke="none"/>
+     <text x="BOX_X+BOX_W/2" y="BOX_Y+16" text-anchor="middle"
+           font-family="Arial" font-size="12" font-weight="bold">Selection</text>
+     <!-- Table rows -->
+     <text x="BOX_X+8" y="BOX_Y+36" font-family="Arial" font-size="11">S₁S₀=00 → Y=D₀</text>
+     <text x="BOX_X+8" y="BOX_Y+52" font-family="Arial" font-size="11">S₁S₀=01 → Y=D₁</text>
+     ```
+   - **Diagram title** MUST be in a prominent box at the top:
+     ```svg
+     <rect x="TITLE_X" y="TITLE_Y" width="TITLE_W" height="30"
+           rx="4" fill="#f8f8f8" stroke="#888" stroke-width="1"/>
+     <text x="CENTER_X" y="TITLE_Y+20" text-anchor="middle"
+           font-family="Arial" font-size="16" font-weight="bold">4-to-1 Multiplexer</text>
+     ```
    - Input labels (A, B, Vin) on the LEFT side
    - Output labels (Out, Vout) on the RIGHT side
    - VDD/VSS labels at top/bottom
@@ -319,11 +362,30 @@ GATE SYMBOL TEMPLATES:
 MULTI-GATE CIRCUIT LAYOUT:
 - Arrange gates in columns left-to-right for multi-stage circuits
 - Space gates ~120px apart horizontally
-- Align wires orthogonally (horizontal + vertical only)
+- ALL wires are orthogonal (horizontal + vertical only) — use waypoints for routing
 - Label all inputs (A, B, C...) on the far left
 - Label the final output (Y, F, Out) on the far right
 - Add truth table below the circuit if specifically requested
 - For NOR-only or NAND-only implementations, show the equivalent circuit using only that gate type
+
+ORTHOGONAL ROUTING FOR CIRCUITS WITH SHARED SIGNAL BUSES:
+When a signal needs to connect to multiple gates/components at different vertical positions:
+1. Draw a full vertical bus line at a fixed x coordinate covering the full height range
+2. Tap off horizontally at each component's y coordinate — always a pure horizontal `<line>`
+3. Add junction dots (filled circles r=3) where the horizontal tap meets the vertical bus
+
+Example pattern for connecting one signal to N components at different heights:
+```svg
+<!-- Step 1: Vertical bus line -->
+<line x1="BUS_X" y1="TOP_Y" x2="BUS_X" y2="BOT_Y" stroke="black" stroke-width="2"/>
+<!-- Step 2: Horizontal tap-offs — one per component, at that component's exact y -->
+<line x1="BUS_X" y1="COMP1_Y" x2="COMP1_X" y2="COMP1_Y" stroke="black" stroke-width="2"/>
+<line x1="BUS_X" y1="COMP2_Y" x2="COMP2_X" y2="COMP2_Y" stroke="black" stroke-width="2"/>
+<!-- Step 3: Junction dots at branch points -->
+<circle cx="BUS_X" cy="COMP1_Y" r="3" fill="black"/>
+<circle cx="BUS_X" cy="COMP2_Y" r="3" fill="black"/>
+```
+This pattern eliminates ALL diagonal wires regardless of circuit type.
 
 **FOR CIRCUITS WITH COMPONENT VALUES:**
 - Add value labels near components: "CL = 2 fF", "I = 10 µA"
@@ -362,11 +424,13 @@ Return ONLY the SVG markup. No explanation. No markdown fences. Just pure SVG st
 **Requirements:**
 1. If this is a CMOS transistor-level circuit: Use VERTICAL layout — VDD at top, GND/VSS at bottom, proper MOSFET symbols (bubble on PMOS gate, no bubble on NMOS)
 2. If this is a digital logic gate circuit (AND, OR, NOT, NAND, NOR, XOR): Use LEFT-TO-RIGHT flow with standard IEEE gate symbols (D-shaped AND, curved OR, triangle NOT with bubble, etc.)
-3. Professional textbook style with clean orthogonal wiring
+3. Professional textbook style with **strictly orthogonal wiring** — every wire must be purely horizontal OR purely vertical
 4. All component values and labels from the question
 5. Input labels on the LEFT, output labels on the RIGHT
 6. Appropriate sizing for the circuit complexity
 7. Properly labeled inputs and outputs
+8. **ZERO DIAGONAL WIRES**: Check every `<line>` — if x1≠x2 AND y1≠y2 simultaneously, split it into two orthogonal segments meeting at a waypoint
+9. **ALL TEXT IN BOXES**: Every `<text>` element must be preceded by a `<rect fill="white">` background. Use bordered boxes for any label that could overlap wires or gate bodies
 
 IMPORTANT: Use block-level logic gate symbols (AND/OR/NOT shapes) for digital logic circuits. Only use transistor-level MOSFET symbols when explicitly asked about CMOS transistor implementation.
 

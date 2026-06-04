@@ -107,11 +107,49 @@ COORDINATE SYSTEM
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 WIRE SYNTAX
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-\draw (x1,y1) -- (x2,y2);                   % plain wire
+\draw (x1,y1) -- (x2,y2);                   % plain wire — ONLY when x1=x2 OR y1=y2
 \draw (A) to[component, options] (B);        % component between two points
 \draw (A) to[short, -o] (B);                 % wire ending in open circle terminal
 \draw (A) to[short, o-] (B);                 % wire starting from open circle
 \draw (A) to[short, *-] (B);                 % wire starting from filled junction dot
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ORTHOGONAL WIRING — ABSOLUTE MANDATORY RULES (NO EXCEPTIONS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ALL circuit wires MUST be strictly horizontal or strictly vertical.
+DIAGONAL WIRES ARE FORBIDDEN. This is the most important rule.
+
+RULE: NEVER write \draw (x1,y1) -- (x2,y2) when x1≠x2 AND y1≠y2.
+That creates a diagonal line, which is UNACCEPTABLE in any circuit diagram.
+
+USE RIGHT-ANGLE ROUTING OPERATORS instead:
+  \draw (A) -| (B);     % go HORIZONTAL first, then turn VERTICAL
+  \draw (A) |- (B);     % go VERTICAL first, then turn HORIZONTAL
+
+These operators force a right-angle bend at the turn point. Use them for
+ANY connection between two points that are not on the same row or column.
+
+CORRECT routing — signal bus to components at different heights:
+  % A signal needs to reach components COMP1, COMP2, COMP3 at different y positions
+  \coordinate (busA) at (3,0);           % vertical bus column x-coordinate
+  \draw (3,0) -- (3,10);                 % draw the full vertical bus line first
+  \draw (3,2) -| (COMP1.in 1);          % horizontal tap to component at y=2
+  \draw (3,5) -| (COMP2.in 1);          % horizontal tap to component at y=5
+  \draw (3,8) -| (COMP3.in 1);          % horizontal tap to component at y=8
+  % Junction dots at tap-off points:
+  \filldraw[black] (3,2) circle (1.5pt);
+  \filldraw[black] (3,5) circle (1.5pt);
+  \filldraw[black] (3,8) circle (1.5pt);
+
+CORRECT: connecting a node to another at a different row (right-angle turn):
+  \draw (nodeA.east) -| (nodeB.west);   % go horizontal then vertical — no diagonal
+
+CORRECT: multi-segment orthogonal routing via explicit waypoints:
+  \draw (A) -- ++(2,0) -- ++(0,3) -- ++(1,0);   % right, up, right (3 orthogonal segments)
+
+WRONG (creates diagonal — DO NOT USE):
+  \draw (0,0) -- (3,4);      % x and y both change — FORBIDDEN
+  \draw (S0) -- (AND1.in 2); % if S0 and AND1.in 2 are not aligned — FORBIDDEN
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PASSIVE COMPONENTS
@@ -226,6 +264,45 @@ POWER NODES
 \draw (3,8) node[vcc] {$V_{DD}$};   % VDD rail (arrow pointing UP at top of wire)
 \draw (3,0) node[ground] {};         % GND symbol (lines at bottom)
 \draw (3,0) node[vee] {$V_{SS}$};   % Negative supply (for differential circuits)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TEXT LABELS — READABILITY RULES (MANDATORY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Text labels MUST NEVER be placed on top of wires or components.
+All floating text that could overlap circuit elements needs a white background box.
+
+RULE: Any label that is NOT a simple terminal label (not directly at a wire end or
+component pin) MUST use draw+fill=white to create a visible background box.
+
+% Simple terminal labels (no box needed — they sit clearly outside the circuit):
+\node[left]  at (AND1.in 1) {$A$};        % input label, floats outside gate
+\node[right] at (AND1.out)  {$Y$};        % output label, floats outside gate
+\node[above] at (x,y) {$V_{DD}$};        % power supply label above circuit
+
+% Floating labels near wires/components MUST have a white background box:
+\node[draw, fill=white, inner sep=3pt, rounded corners=2pt, font=\small]
+    at (x,y) {Label text};
+
+% Gate name labels (AND1, OR2, etc.) — use box to avoid overlap with gate body:
+\node[draw, fill=white, inner sep=2pt, font=\footnotesize]
+    at (x,y) {AND1};
+
+% Truth table or selection table — MUST use a bordered box:
+\node[draw, fill=white, inner sep=5pt, align=left, font=\footnotesize,
+      rounded corners=3pt] at (x,y) {
+  $S_1 S_0 = 00 \Rightarrow Y = D_0$\\
+  $S_1 S_0 = 01 \Rightarrow Y = D_1$\\
+  $S_1 S_0 = 10 \Rightarrow Y = D_2$\\
+  $S_1 S_0 = 11 \Rightarrow Y = D_3$
+};
+
+% Diagram title (top of circuit) — always in a visible box:
+\node[draw, fill=white, inner sep=6pt, font=\normalsize\bfseries,
+      rounded corners=3pt] at (x,y) {4-to-1 Multiplexer};
+
+% Annotation text near components — always box it:
+\node[draw, fill=white, inner sep=3pt, font=\footnotesize, align=center]
+    at (x,y) {Priority\\Truth Table};
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 NODE LABELS AND ANNOTATIONS
@@ -991,7 +1068,12 @@ Return ONLY the complete LaTeX document. Nothing else."""
 4. For logic/schematic circuits: left-to-right signal flow
 5. Label all terminals: D, G, S for MOSFETs; + / − for sources
 6. All values in proper SI units via \\SI{{}}{{}}
-7. Clean orthogonal wiring only — no diagonal wires
+7. **STRICT ORTHOGONAL WIRING**: Every wire MUST be horizontal OR vertical — NO DIAGONALS.
+   Use -| and |- path operators for right-angle routing between non-aligned points.
+   NEVER use \\draw (x1,y1) -- (x2,y2) when x1≠x2 AND y1≠y2.
+8. **TEXT BOXES**: All floating text labels (not simple terminal labels) MUST use
+   \\node[draw, fill=white, inner sep=Xpt] to create a white background box.
+   No text should be written directly on top of wires or components.
 
 Return ONLY the complete LaTeX document starting with \\documentclass."""
 
