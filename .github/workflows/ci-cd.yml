@@ -71,6 +71,13 @@ jobs:
             TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}
             GOOGLE_CSE_API_KEY=${{ secrets.GOOGLE_CSE_API_KEY }}
             GOOGLE_CSE_ID=${{ secrets.GOOGLE_CSE_ID }}
+            AWS_BEARER_TOKEN_BEDROCK=${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
+            BREVO_API_KEY=${{ secrets.BREVO_API_KEY }}
+            BREVO_LIST_ID=${{ secrets.BREVO_LIST_ID }}
+            BREVO_SENDER_EMAIL=${{ secrets.BREVO_SENDER_EMAIL }}
+            BREVO_SENDER_NAME=${{ secrets.BREVO_SENDER_NAME }}
+            INVITE_TOKEN_SECRET=${{ secrets.INVITE_TOKEN_SECRET }}
+            FRONTEND_BASE_URL=${{ secrets.FRONTEND_BASE_URL }}
             REDIS_URL=redis://localhost:6379/0
             EOF
             sudo systemctl start redis-server

@@ -1,0 +1,11 @@
+{% extends "_base.html.j2" %}
+{% block content %}
+<h2 style="margin-top: 0;">You're enrolled in {{ course_title }}</h2>
+{% if course_code %}<p style="color: #555;">Course code: <strong>{{ course_code }}</strong></p>{% endif %}
+<p>You've been added to <strong>{{ course_title }}</strong>{% if role and role != 'student' %} as a {{ role }}{% endif %}. The course is already on your Vidya AI dashboard.</p>
+<p style="margin: 24px 0;">
+  <a href="{{ course_url }}" style="background: #1a73e8; color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 4px; display: inline-block;">
+    Go to course
+  </a>
+</p>
+{% endblock %}
