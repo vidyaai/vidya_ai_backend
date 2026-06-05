@@ -46,7 +46,9 @@ def _timed_transcript(real_duration_s: int = 3426):
     t = 0.0
     # ~3s utterances across the whole real duration
     while t < real_duration_s:
-        segments.append({"start": t, "dur": 3.0, "text": f"sentence at {int(t)} seconds."})
+        segments.append(
+            {"start": t, "dur": 3.0, "text": f"sentence at {int(t)} seconds."}
+        )
         t += 3.0
     segments[-1]["text"] = "Thank you for your attention."
     return {
@@ -62,7 +64,9 @@ def test_timed_segments_yield_real_timestamps(monkeypatch):
 
     # Skip the OpenAI formatting call; we only care about timestamp math here.
     monkeypatch.setattr(
-        format_transcript, "format_with_openai", lambda chunks, video_id=None: list(chunks)
+        format_transcript,
+        "format_with_openai",
+        lambda chunks, video_id=None: list(chunks),
     )
 
     timed = _timed_transcript(real_duration_s=3426)  # 57:06
@@ -82,7 +86,9 @@ def test_plain_text_fabricates_compressed_timeline(monkeypatch):
     from utils import format_transcript
 
     monkeypatch.setattr(
-        format_transcript, "format_with_openai", lambda chunks, video_id=None: list(chunks)
+        format_transcript,
+        "format_with_openai",
+        lambda chunks, video_id=None: list(chunks),
     )
 
     # 30 short sentences from a lecture that (in reality) ran ~57 min.
@@ -114,7 +120,9 @@ def test_uploaded_formatter_uses_timed_segments_when_available(monkeypatch):
     monkeypatch.setattr(background_tasks, "create_formatted_transcript", spy_create)
     monkeypatch.setattr(background_tasks, "s3_client", None)
     monkeypatch.setattr(background_tasks, "AWS_S3_BUCKET", None)
-    monkeypatch.setattr(background_tasks, "update_formatting_status", lambda *a, **k: None)
+    monkeypatch.setattr(
+        background_tasks, "update_formatting_status", lambda *a, **k: None
+    )
     monkeypatch.setattr(
         background_tasks, "get_formatting_status", lambda *a, **k: {"total_chunks": 0}
     )
@@ -136,7 +144,9 @@ def test_uploaded_formatter_uses_timed_segments_when_available(monkeypatch):
     # Must be the timed segments (a list whose [0] carries "transcription"),
     # NOT the fabricating {"plain_text": ...} payload.
     assert isinstance(data, list), f"expected timed list input, got {type(data)}"
-    assert data[0].get("transcription"), "timed segments were not passed to the formatter"
+    assert data[0].get(
+        "transcription"
+    ), "timed segments were not passed to the formatter"
 
 
 if __name__ == "__main__":

@@ -110,7 +110,9 @@ def is_on_time(submitted_at: Optional[datetime], due_date: Optional[datetime]) -
     return submitted_at <= due_date
 
 
-def normalize_weightages(weightages: dict, assignment_ids: list[str]) -> dict[str, float]:
+def normalize_weightages(
+    weightages: dict, assignment_ids: list[str]
+) -> dict[str, float]:
     """Normalize provided weightages over the selected assignment IDs so values sum to 1.0.
 
     Missing/invalid weights default to equal share of the remainder.

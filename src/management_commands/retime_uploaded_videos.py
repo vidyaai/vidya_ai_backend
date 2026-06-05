@@ -38,6 +38,7 @@ import argparse
 import sys
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from controllers.background_tasks import format_uploaded_transcript_background
@@ -93,9 +94,9 @@ def _retime_one(video_id: str, title: str, s3_key: str, reindex: bool) -> bool:
             db.query(TranscriptChunk).filter(
                 TranscriptChunk.video_id == video_id
             ).delete(synchronize_session=False)
-            db.query(VideoSummary).filter(
-                VideoSummary.video_id == video_id
-            ).delete(synchronize_session=False)
+            db.query(VideoSummary).filter(VideoSummary.video_id == video_id).delete(
+                synchronize_session=False
+            )
             db.commit()
     finally:
         db.close()

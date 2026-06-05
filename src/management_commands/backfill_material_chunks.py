@@ -67,11 +67,7 @@ def _retime_video(material_id: str) -> None:
     transcripts to the timed shape the chunker needs."""
     db = SessionLocal()
     try:
-        m = (
-            db.query(CourseMaterial)
-            .filter(CourseMaterial.id == material_id)
-            .first()
-        )
+        m = db.query(CourseMaterial).filter(CourseMaterial.id == material_id).first()
         if not m or not m.s3_key:
             return
         presigned = s3_presign_url(m.s3_key, expires_in=60 * 60 * 12)

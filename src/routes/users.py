@@ -40,9 +40,7 @@ def _claim_pending_share_accesses(db: Session, user: User) -> None:
         return
     pending_uid = f"pending_{user.email.lower()}"
     rows = (
-        db.query(SharedLinkAccess)
-        .filter(SharedLinkAccess.user_id == pending_uid)
-        .all()
+        db.query(SharedLinkAccess).filter(SharedLinkAccess.user_id == pending_uid).all()
     )
     if not rows:
         return

@@ -41,8 +41,12 @@ def _style_header_row(ws, row: int, last_col: int) -> None:
         cell.alignment = _CENTER
 
 
-def _write_raw_data(ws, students: list[dict], assignments: list[dict], weighted_totals: list[float]) -> None:
-    ws.append(["Student", "Email"] + [a["title"] for a in assignments] + ["Weighted Total"])
+def _write_raw_data(
+    ws, students: list[dict], assignments: list[dict], weighted_totals: list[float]
+) -> None:
+    ws.append(
+        ["Student", "Email"] + [a["title"] for a in assignments] + ["Weighted Total"]
+    )
     _style_header_row(ws, 1, 2 + len(assignments) + 1)
     for student, total in zip(students, weighted_totals):
         scores = student.get("scores") or {}
@@ -56,28 +60,42 @@ def _write_raw_data(ws, students: list[dict], assignments: list[dict], weighted_
 
 
 def _write_statistics(ws, assignments: list[dict], weightages: dict[str, float]) -> int:
-    ws.append([
-        "Assignment", "Weight", "Count", "Mean", "Median", "Stdev",
-        "Q1", "Q3", "Min", "Max", "Submission Rate %", "On-Time Rate %",
-    ])
+    ws.append(
+        [
+            "Assignment",
+            "Weight",
+            "Count",
+            "Mean",
+            "Median",
+            "Stdev",
+            "Q1",
+            "Q3",
+            "Min",
+            "Max",
+            "Submission Rate %",
+            "On-Time Rate %",
+        ]
+    )
     _style_header_row(ws, 1, 12)
     for a in assignments:
         st = a.get("stats") or {}
         w_pct = round(100.0 * weightages.get(a["id"], 0.0), 2)
-        ws.append([
-            a.get("title") or "",
-            w_pct,
-            st.get("count") or 0,
-            st.get("mean"),
-            st.get("median"),
-            st.get("stdev"),
-            st.get("q1"),
-            st.get("q3"),
-            st.get("min"),
-            st.get("max"),
-            a.get("submission_rate"),
-            a.get("on_time_rate"),
-        ])
+        ws.append(
+            [
+                a.get("title") or "",
+                w_pct,
+                st.get("count") or 0,
+                st.get("mean"),
+                st.get("median"),
+                st.get("stdev"),
+                st.get("q1"),
+                st.get("q3"),
+                st.get("min"),
+                st.get("max"),
+                a.get("submission_rate"),
+                a.get("on_time_rate"),
+            ]
+        )
     last_row = 1 + len(assignments)
     _autosize(ws)
     return last_row
@@ -197,7 +215,9 @@ def _add_weighted_total_chart(
     chart.x_axis.title = "Weighted score range (%)"
     chart.legend = None
     chart.data_labels = DataLabelList(showVal=True)
-    data = Reference(hist_ws, min_col=start_col, max_col=start_col, min_row=1, max_row=1 + n)
+    data = Reference(
+        hist_ws, min_col=start_col, max_col=start_col, min_row=1, max_row=1 + n
+    )
     cats = Reference(hist_ws, min_col=1, min_row=2, max_row=1 + n)
     chart.add_data(data, titles_from_data=True)
     chart.set_categories(cats)
@@ -229,9 +249,9 @@ def build_workbook(
     location = _write_histograms_sheet(hist_ws, assignments)
 
     charts_ws = wb.create_sheet("Charts")
-    charts_ws.cell(row=1, column=1, value=f"Class performance — {course_title}").font = Font(
-        bold=True, size=14
-    )
+    charts_ws.cell(
+        row=1, column=1, value=f"Class performance — {course_title}"
+    ).font = Font(bold=True, size=14)
 
     next_row = _add_histogram_charts(charts_ws, hist_ws, assignments, location)
     _add_submission_chart(charts_ws, stats_ws, len(assignments), f"B{next_row}")

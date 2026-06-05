@@ -48,7 +48,9 @@ def _build_performance_payload(
         q = q.filter(Assignment.id.in_(assignment_ids))
     else:
         q = q.filter(Assignment.status == "published")
-    assignments = q.order_by(Assignment.due_date.asc().nullslast(), Assignment.created_at.asc()).all()
+    assignments = q.order_by(
+        Assignment.due_date.asc().nullslast(), Assignment.created_at.asc()
+    ).all()
 
     if not assignments:
         return {"assignments": [], "students": [], "trend": []}
@@ -64,14 +66,22 @@ def _build_performance_payload(
         )
         .all()
     )
-    real_uids = [e.user_id for e in students_q if e.user_id and not e.user_id.startswith("pending_")]
+    real_uids = [
+        e.user_id
+        for e in students_q
+        if e.user_id and not e.user_id.startswith("pending_")
+    ]
 
     try:
         fb_records = asyncio.run(get_users_by_uids(real_uids)) if real_uids else []
     except RuntimeError:
         loop = asyncio.new_event_loop()
         try:
-            fb_records = loop.run_until_complete(get_users_by_uids(real_uids)) if real_uids else []
+            fb_records = (
+                loop.run_until_complete(get_users_by_uids(real_uids))
+                if real_uids
+                else []
+            )
         finally:
             loop.close()
     fb_by_uid = {r["uid"]: r for r in fb_records}
@@ -82,7 +92,9 @@ def _build_performance_payload(
         .filter(AssignmentSubmission.status.in_(["submitted", "graded", "returned"]))
         .all()
     )
-    subs_by_assignment: dict[str, list[AssignmentSubmission]] = {aid: [] for aid in aids}
+    subs_by_assignment: dict[str, list[AssignmentSubmission]] = {
+        aid: [] for aid in aids
+    }
     for s in submissions:
         subs_by_assignment.setdefault(s.assignment_id, []).append(s)
 
@@ -134,7 +146,11 @@ def _build_performance_payload(
                 scores[aid] = None
             else:
                 try:
-                    scores[aid] = float(match.percentage) if match.percentage is not None else None
+                    scores[aid] = (
+                        float(match.percentage)
+                        if match.percentage is not None
+                        else None
+                    )
                 except (TypeError, ValueError):
                     scores[aid] = None
         students_out.append(
@@ -182,11 +198,15 @@ def export_class_performance(
     course = _verify_course_owner(course_id, current_user["uid"], db)
 
     if not body.assignment_ids:
-        raise HTTPException(status_code=400, detail="Select at least one assignment to export")
+        raise HTTPException(
+            status_code=400, detail="Select at least one assignment to export"
+        )
 
     payload = _build_performance_payload(course_id, body.assignment_ids, db)
     if not payload["assignments"]:
-        raise HTTPException(status_code=404, detail="No assignments found for the selected IDs")
+        raise HTTPException(
+            status_code=404, detail="No assignments found for the selected IDs"
+        )
 
     actual_ids = [a["id"] for a in payload["assignments"]]
     weights = normalize_weightages(body.weightages, actual_ids)

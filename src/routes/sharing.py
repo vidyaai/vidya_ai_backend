@@ -646,11 +646,7 @@ async def accept_share_invite(
             detail="This invitation was sent to a different email address. Sign in with the invited address.",
         )
 
-    link = (
-        db.query(SharedLink)
-        .filter(SharedLink.id == access.shared_link_id)
-        .first()
-    )
+    link = db.query(SharedLink).filter(SharedLink.id == access.shared_link_id).first()
     if not link:
         raise HTTPException(status_code=404, detail="Shared resource no longer exists")
 

@@ -99,8 +99,7 @@ _SYSTEM_PROMPT_DOC = (
     "the document, weave the exact `Page N` reference into the sentence — "
     "e.g. `As explained on Page 3, the matrix \\(K\\) represents…`. Always "
     "spell it as `Page N` (capital P, space, digits) — the UI renders this "
-    "form as a clickable link that opens the PDF at that page.\n"
-    + _SHARED_STYLE
+    "form as a clickable link that opens the PDF at that page.\n" + _SHARED_STYLE
 )
 
 _SYSTEM_PROMPT_VIDEO = (
@@ -144,8 +143,7 @@ _SYSTEM_PROMPT_VIDEO = (
     "2. **Principle of Virtual Displacements** (03:30 - 07:00):\n"
     "   - States that external virtual work equals internal virtual work "
     "(03:48).\n"
-    "```\n"
-    + _SHARED_STYLE
+    "```\n" + _SHARED_STYLE
 )
 
 
@@ -183,9 +181,7 @@ def _user_can_access_material(
     db: Session, user_uid: str, material_id: str
 ) -> CourseMaterial:
     """Return the CourseMaterial if user_uid is owner or active enrollee, else 4xx."""
-    material = (
-        db.query(CourseMaterial).filter(CourseMaterial.id == material_id).first()
-    )
+    material = db.query(CourseMaterial).filter(CourseMaterial.id == material_id).first()
     if not material:
         raise HTTPException(status_code=404, detail="Material not found")
 
@@ -321,8 +317,7 @@ def _retrieve_context(
         return ""
 
     context_text = "\n\n".join(
-        f"{_fmt_citation_prefix(c)}{c.get('text', '')}"
-        for c in top
+        f"{_fmt_citation_prefix(c)}{c.get('text', '')}" for c in top
     )
 
     citations: List[Dict[str, Any]] = []
@@ -340,7 +335,9 @@ def _retrieve_context(
     citations.sort(
         key=lambda c: (
             c.get("page_number") if c.get("page_number") is not None else float("inf"),
-            c.get("start_seconds") if c.get("start_seconds") is not None else float("inf"),
+            c.get("start_seconds")
+            if c.get("start_seconds") is not None
+            else float("inf"),
             c.get("chunk_index") if c.get("chunk_index") is not None else float("inf"),
         )
     )
@@ -490,20 +487,24 @@ async def query_material_stream(
             if body.is_image_query and material.material_type != "video":
                 yield (
                     "data: "
-                    + json.dumps({
-                        "type": "error",
-                        "data": "Frame queries are only supported for video materials.",
-                    })
+                    + json.dumps(
+                        {
+                            "type": "error",
+                            "data": "Frame queries are only supported for video materials.",
+                        }
+                    )
                     + "\n\n"
                 )
                 return
             if body.is_image_query and not body.image_base64:
                 yield (
                     "data: "
-                    + json.dumps({
-                        "type": "error",
-                        "data": "Frame queries require an image_base64 payload.",
-                    })
+                    + json.dumps(
+                        {
+                            "type": "error",
+                            "data": "Frame queries require an image_base64 payload.",
+                        }
+                    )
                     + "\n\n"
                 )
                 return
@@ -513,9 +514,7 @@ async def query_material_stream(
                 msg = _processing_message(material)
                 if msg:
                     yield (
-                        "data: "
-                        + json.dumps({"type": "content", "data": msg})
-                        + "\n\n"
+                        "data: " + json.dumps({"type": "content", "data": msg}) + "\n\n"
                     )
                     yield "data: " + json.dumps({"type": "done"}) + "\n\n"
                     return
@@ -617,18 +616,10 @@ async def query_material_stream(
             yield "data: " + json.dumps({"type": "done"}) + "\n\n"
 
         except HTTPException as e:
-            yield (
-                "data: "
-                + json.dumps({"type": "error", "data": e.detail})
-                + "\n\n"
-            )
+            yield ("data: " + json.dumps({"type": "error", "data": e.detail}) + "\n\n")
         except Exception as e:
             logger.error(f"[MATERIAL-CHAT STREAM] {e}")
-            yield (
-                "data: "
-                + json.dumps({"type": "error", "data": str(e)})
-                + "\n\n"
-            )
+            yield ("data: " + json.dumps({"type": "error", "data": str(e)}) + "\n\n")
         finally:
             if frame_path:
                 try:
@@ -665,9 +656,7 @@ def list_sessions(
     return sessions
 
 
-@router.post(
-    "/sessions", response_model=MaterialChatSessionOut, status_code=201
-)
+@router.post("/sessions", response_model=MaterialChatSessionOut, status_code=201)
 def create_session(
     body: MaterialChatSessionCreate,
     db: Session = Depends(get_db),
@@ -677,8 +666,7 @@ def create_session(
     session = MaterialChatSession(
         course_material_id=body.material_id,
         user_id=current_user["uid"],
-        title=body.title
-        or f"Chat {datetime.now().strftime('%b %d, %I:%M %p')}",
+        title=body.title or f"Chat {datetime.now().strftime('%b %d, %I:%M %p')}",
     )
     db.add(session)
     db.commit()
@@ -1024,9 +1012,7 @@ async def download_material_summary(
     from controllers.config import s3_client, AWS_S3_BUCKET
 
     user_id = current_user["uid"]
-    summary = (
-        db.query(LectureSummary).filter(LectureSummary.id == summary_id).first()
-    )
+    summary = db.query(LectureSummary).filter(LectureSummary.id == summary_id).first()
     if not summary:
         raise HTTPException(status_code=404, detail="Summary not found")
 
@@ -1038,15 +1024,15 @@ async def download_material_summary(
             raise HTTPException(status_code=403, detail="Not authorized")
 
     if not summary.summary_pdf_s3_key:
-        raise HTTPException(status_code=404, detail="PDF not available for this summary")
+        raise HTTPException(
+            status_code=404, detail="PDF not available for this summary"
+        )
 
     if not s3_client or not AWS_S3_BUCKET:
         raise HTTPException(status_code=500, detail="S3 not configured")
 
     try:
-        obj = s3_client.get_object(
-            Bucket=AWS_S3_BUCKET, Key=summary.summary_pdf_s3_key
-        )
+        obj = s3_client.get_object(Bucket=AWS_S3_BUCKET, Key=summary.summary_pdf_s3_key)
         body = obj["Body"].read()
     except Exception as e:
         logger.error(f"Failed to fetch summary PDF from S3: {e}")

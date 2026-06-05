@@ -311,7 +311,9 @@ class AssignmentSubmission(Base):
 class AssignmentReview(Base):
     __tablename__ = "assignment_reviews"
     __table_args__ = (
-        UniqueConstraint("assignment_id", "user_id", name="uq_assignment_reviews_assignment_user"),
+        UniqueConstraint(
+            "assignment_id", "user_id", name="uq_assignment_reviews_assignment_user"
+        ),
     )
 
     id = Column(String, primary_key=True, default=generate_uuid)
@@ -321,7 +323,9 @@ class AssignmentReview(Base):
         nullable=False,
         index=True,
     )
-    user_id = Column(String, nullable=False, index=True)  # Firebase UID of the reviewer (creator)
+    user_id = Column(
+        String, nullable=False, index=True
+    )  # Firebase UID of the reviewer (creator)
     rating = Column(Integer, nullable=False)  # 1-5
     comment = Column(Text, nullable=True)
 
