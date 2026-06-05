@@ -27,8 +27,8 @@ import subprocess
 import tempfile
 from typing import Optional
 
-from anthropic import Anthropic
 from controllers.config import logger
+from utils.bedrock_client import get_bedrock_client, resolve_model_id
 from utils.latex_repair import (
     canonicalize_tikzlibrary,
     repair_latex,
@@ -238,8 +238,9 @@ class TikZGenerator:
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        self.client = Anthropic(api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
-        self.model = "claude-opus-4-5"
+        del api_key  # Bedrock auth comes from boto3 credential chain
+        self.client = get_bedrock_client()
+        self.model = resolve_model_id("claude-opus-4-5")
 
     async def generate_tikz_latex(
         self,

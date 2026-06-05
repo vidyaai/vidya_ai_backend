@@ -1,0 +1,15 @@
+{% extends "_base.html.j2" %}
+{% block content %}
+<h2 style="margin-top: 0;">New assignment: {{ assignment_title }}</h2>
+{% if course_code %}<p style="color: #555;">{{ course_title }} &middot; {{ course_code }}</p>
+{% else %}<p style="color: #555;">{{ course_title }}</p>{% endif %}
+<p>Your instructor just published a new assignment in <strong>{{ course_title }}</strong>.</p>
+{% if due_str %}
+<p>Due: <strong>{{ due_str }}</strong></p>
+{% endif %}
+<p style="margin: 24px 0;">
+  <a href="{{ assignment_url }}" style="background: #1a73e8; color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 4px; display: inline-block;">
+    View assignment
+  </a>
+</p>
+{% endblock %}

@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
-from models import Video
+from models import Video, MaterialChatSession, MaterialChatMessage
 from controllers.config import logger
 
 
@@ -211,4 +211,136 @@ def get_merged_conversation_history(
     except Exception as e:
         logger.error(f"Error retrieving conversation history: {e}")
         # Return empty list on error - do NOT use client history
+        return []
+
+
+# ── Per-CourseMaterial chat persistence ─────────────────────────────────
+
+
+def _derive_session_title(first_user_message: str, max_chars: int = 48) -> str:
+    """Build a human-readable session title from the first user message.
+
+    Mirrors the gallery's pattern of showing past chats by their opening
+    question instead of by timestamp.
+    """
+    text = (first_user_message or "").strip().replace("\n", " ")
+    if not text:
+        return f"Chat {datetime.now().strftime('%b %d, %I:%M %p')}"
+    if len(text) > max_chars:
+        text = text[: max_chars - 1].rstrip() + "…"
+    return text
+
+
+def store_material_conversation_turn(
+    db: Session,
+    course_material_id: str,
+    firebase_uid: str,
+    user_message: str,
+    ai_response: str,
+    citations: Optional[List[Dict[str, Any]]] = None,
+    timestamp_seconds: Optional[float] = None,
+    session_id: Optional[str] = None,
+) -> str:
+    """
+    Append a user turn + assistant turn to a MaterialChatSession.
+
+    If session_id is provided AND it belongs to (course_material_id,
+    firebase_uid), reuse it. Otherwise — even if the user has earlier
+    sessions for this material — create a *new* session. That's what
+    the frontend's "New chat" button expects: clearing the active
+    session id and sending the next message starts a fresh thread.
+
+    Returns the session_id used (string).
+    """
+    try:
+        session: Optional[MaterialChatSession] = None
+        if session_id:
+            session = (
+                db.query(MaterialChatSession)
+                .filter(
+                    MaterialChatSession.id == session_id,
+                    MaterialChatSession.course_material_id == course_material_id,
+                    MaterialChatSession.user_id == firebase_uid,
+                )
+                .first()
+            )
+
+        is_new_session = session is None
+        if is_new_session:
+            session = MaterialChatSession(
+                course_material_id=course_material_id,
+                user_id=firebase_uid,
+                title=_derive_session_title(user_message),
+            )
+            db.add(session)
+            db.flush()  # populate session.id
+
+        # Stamp explicit, strictly-increasing timestamps so a later
+        # order_by(created_at.asc()) puts the user turn first and the
+        # assistant turn second deterministically. Without the explicit
+        # microsecond delta both rows can land on the same instant and
+        # the SQL ordering becomes unstable.
+        from datetime import timedelta as _td
+
+        now = datetime.now(timezone.utc)
+        db.add(
+            MaterialChatMessage(
+                session_id=session.id,
+                role="user",
+                content=user_message,
+                timestamp_seconds=timestamp_seconds,
+                created_at=now,
+            )
+        )
+        db.add(
+            MaterialChatMessage(
+                session_id=session.id,
+                role="assistant",
+                content=ai_response,
+                citations=citations,
+                timestamp_seconds=timestamp_seconds,
+                created_at=now + _td(microseconds=1),
+            )
+        )
+
+        session.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        logger.info(
+            f"Stored material chat turn in session {session.id} for material {course_material_id}"
+        )
+        return session.id
+
+    except Exception as e:
+        logger.error(f"Error storing material conversation turn: {e}")
+        db.rollback()
+        return session_id or ""
+
+
+def get_merged_material_conversation_history(
+    db: Session,
+    session_id: str,
+    limit: int = 20,
+) -> List[Dict[str, Any]]:
+    """
+    Load up to `limit` most recent messages for a MaterialChatSession,
+    returned in chronological order as OpenAI-style {role, content} dicts.
+
+    Database is the only source of truth — no client-supplied history is merged.
+    """
+    try:
+        # Grab the most-recent `limit` rows in desc order, then reverse to
+        # chronological. Pair ordering is guaranteed inside a turn by the
+        # explicit microsecond delta stamped at write time, so reverse()
+        # is stable across users + assistants.
+        rows = (
+            db.query(MaterialChatMessage)
+            .filter(MaterialChatMessage.session_id == session_id)
+            .order_by(MaterialChatMessage.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        rows.reverse()
+        return [{"role": r.role, "content": r.content} for r in rows]
+    except Exception as e:
+        logger.error(f"Error retrieving material conversation history: {e}")
         return []

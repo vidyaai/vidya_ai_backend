@@ -1095,12 +1095,11 @@ class DiagramTools:
                 )
 
             # Ask Claude to provide the SMILES for the described molecule
-            import os
-            from anthropic import Anthropic
+            from utils.bedrock_client import get_bedrock_client, resolve_model_id
 
-            client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+            client = get_bedrock_client()
             smiles_response = client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model=resolve_model_id("claude-haiku-4-5-20251001"),
                 max_tokens=200,
                 system=(
                     "You are a chemistry expert. Given a molecule description, return ONLY the "
@@ -1188,9 +1187,10 @@ class DiagramTools:
             import os
             import tempfile
             import subprocess
-            from anthropic import Anthropic
+            from utils.bedrock_client import get_bedrock_client, resolve_model_id
 
-            client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+            client = get_bedrock_client()
+            opus_model_id = resolve_model_id("claude-opus-4-5")
 
             guidance_section = (
                 f"\nDrawing instructions: {subject_guidance}"
@@ -1198,7 +1198,7 @@ class DiagramTools:
                 else ""
             )
             plotly_response = client.messages.create(
-                model="claude-opus-4-5",
+                model=opus_model_id,
                 max_tokens=3000,
                 system=(
                     "You are an expert Plotly diagram generator for educational content. "
@@ -1240,7 +1240,7 @@ class DiagramTools:
                         f"Plotly code has syntax error, requesting AI repair: {syn_err}"
                     )
                     repair_response = client.messages.create(
-                        model="claude-opus-4-5",
+                        model=opus_model_id,
                         max_tokens=3000,
                         system=(
                             "You are an expert Python debugger. "
@@ -1292,7 +1292,7 @@ class DiagramTools:
                             f"Plotly execution failed (attempt 1), requesting AI repair: {exec_error[:200]}"
                         )
                         repair_response = client.messages.create(
-                            model="claude-opus-4-5",
+                            model=opus_model_id,
                             max_tokens=3000,
                             system=(
                                 "You are an expert Python debugger. "

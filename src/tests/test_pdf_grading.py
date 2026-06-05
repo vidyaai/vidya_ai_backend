@@ -1,11 +1,14 @@
 """
 Test hand-written pdf submission grading with different models of various providers.
-Providers: OpenAI, Anthropic, Google Gemini
+Providers: OpenAI, Anthropic (via AWS Bedrock), Google Gemini
 Models tested:
 - OpenAI: gpt-4o, gpt-5
-- Anthropic: claude-3-7-sonnet-20250219, claude-3-5-haiku-20241022
-- Google Gemini: gemini-2.0-flash, gemini-1.5-pro
-Output: Save results for all models in a structured format (e.g. CSV and JSON) for easy comparison and analysis.
+- Anthropic (Bedrock): claude-opus-4-6, claude-sonnet-4-20250514, claude-haiku-4-5-20251001
+- Google Gemini: gemini-2.5-flash, gemini-2.5-pro
+
+Claude calls require AWS credentials (boto3 chain) and AWS_BEDROCK_REGION.
+If unavailable, Claude rows will record the error and the test moves on.
+Output: Save results for all models in a structured format (CSV + JSON).
 """
 import dotenv
 
@@ -39,8 +42,8 @@ def test_pdf_grading():
         "gpt-5",
         "gpt-4o",
         "claude-opus-4-6",
-        "claude-sonnet-4-6",
-        "claude-haiku-4-5",
+        "claude-sonnet-4-20250514",
+        "claude-haiku-4-5-20251001",
         "gemini-2.5-flash",
         "gemini-2.5-pro",
     ]
