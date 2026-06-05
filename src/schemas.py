@@ -175,6 +175,7 @@ class CreateSharedLinkRequest(BaseModel):
     expires_at: Optional[datetime] = None
     max_views: Optional[int] = None
     invited_users: List[str] = []  # List of Firebase UIDs
+    invited_emails: List[str] = []  # Raw emails for unregistered invitees
 
 
 class UpdateSharedLinkRequest(BaseModel):
@@ -226,7 +227,8 @@ class ShareEmailSearchRequest(BaseModel):
 
 
 class AddUsersToSharedLinkRequest(BaseModel):
-    user_ids: List[str]  # Firebase UIDs
+    user_ids: List[str] = []  # Firebase UIDs
+    emails: List[str] = []  # Raw emails for unregistered invitees
     permission: str = "view"  # "view" or "edit"
 
 

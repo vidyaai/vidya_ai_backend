@@ -180,6 +180,30 @@ def verify_invite_token(token: str) -> dict[str, Any]:
     return payload
 
 
+def issue_share_invite_token(access_id: str, email: str, share_token: str) -> str:
+    if not INVITE_TOKEN_SECRET:
+        raise RuntimeError("INVITE_TOKEN_SECRET is not configured")
+    payload = {
+        "access_id": access_id,
+        "email": email.lower(),
+        "share_token": share_token,
+        "exp": datetime.now(timezone.utc) + timedelta(days=INVITE_TOKEN_TTL_DAYS),
+        "iat": datetime.now(timezone.utc),
+        "kind": "share_invite",
+    }
+    return jwt.encode(payload, INVITE_TOKEN_SECRET, algorithm="HS256")
+
+
+def verify_share_invite_token(token: str) -> dict[str, Any]:
+    """Decode + validate a share-invite token. Raises jwt.PyJWTError on failure."""
+    if not INVITE_TOKEN_SECRET:
+        raise RuntimeError("INVITE_TOKEN_SECRET is not configured")
+    payload = jwt.decode(token, INVITE_TOKEN_SECRET, algorithms=["HS256"])
+    if payload.get("kind") != "share_invite":
+        raise jwt.InvalidTokenError("wrong token kind")
+    return payload
+
+
 # ── domain-specific senders (welcome / enrollment / updates) ────────────
 
 
@@ -301,6 +325,81 @@ def send_course_material_added_email_background(
         tags=["course-material-added"],
         recipients=recipients,
         ctx=ctx,
+    )
+
+
+def _share_resource_label(share_link, resource_title: str) -> str:
+    """Human label for the share type, e.g. 'a chat' or 'a folder'."""
+    if share_link.share_type == "folder":
+        return f'folder "{resource_title}"' if resource_title else "a folder"
+    if share_link.share_type == "chat":
+        return f'chat "{resource_title}"' if resource_title else "a chat"
+    return f'"{resource_title}"' if resource_title else "a resource"
+
+
+def send_share_invite_registered_email_background(
+    share_link, owner_name: str, to_email: str, resource_title: str
+) -> None:
+    """Send to a registered Firebase user with a direct link to /shared/<token>."""
+    if not to_email:
+        return
+    share_url = f"{FRONTEND_BASE_URL}/shared/{share_link.share_token}"
+    type_label = "chat" if share_link.share_type == "chat" else "folder"
+    title = resource_title or share_link.title or ""
+    ctx = {
+        "owner_name": owner_name or "Someone",
+        "resource_type": type_label,
+        "resource_label": _share_resource_label(share_link, title),
+        "resource_title": title,
+        "description": share_link.description or "",
+        "share_url": share_url,
+    }
+    html, text = _render("share_invite_registered", ctx)
+    subject_title = title or type_label
+    send_transactional_email_background(
+        to_email=to_email,
+        to_name=None,
+        subject=f"{ctx['owner_name']} shared a {type_label} with you: {subject_title}",
+        html=html,
+        text=text,
+        tags=["share-invite-registered"],
+    )
+
+
+def send_share_invite_unregistered_email_background(
+    access, share_link, owner_name: str, resource_title: str
+) -> None:
+    """Send to an unregistered email; recipient signs in/up to accept the share."""
+    if not access.email:
+        return
+    if not INVITE_TOKEN_SECRET:
+        logger.error(
+            "INVITE_TOKEN_SECRET not set; cannot issue share-invite token for access %s",
+            access.id,
+        )
+        return
+    token = issue_share_invite_token(access.id, access.email, share_link.share_token)
+    accept_url = f"{FRONTEND_BASE_URL}/shared/accept?token={token}"
+    type_label = "chat" if share_link.share_type == "chat" else "folder"
+    title = resource_title or share_link.title or ""
+    ctx = {
+        "owner_name": owner_name or "Someone",
+        "resource_type": type_label,
+        "resource_label": _share_resource_label(share_link, title),
+        "resource_title": title,
+        "description": share_link.description or "",
+        "accept_url": accept_url,
+        "expires_days": INVITE_TOKEN_TTL_DAYS,
+    }
+    html, text = _render("share_invite_unregistered", ctx)
+    subject_title = title or type_label
+    send_transactional_email_background(
+        to_email=access.email,
+        to_name=None,
+        subject=f"{ctx['owner_name']} shared a {type_label} with you: {subject_title}",
+        html=html,
+        text=text,
+        tags=["share-invite-unregistered"],
     )
 
 

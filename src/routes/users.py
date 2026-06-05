@@ -33,6 +33,24 @@ from services.email import (
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
 
+def _claim_pending_share_accesses(db: Session, user: User) -> None:
+    """Flip any SharedLinkAccess rows keyed by pending_<email> over to the new
+    Firebase UID. Mirrors _claim_pending_enrollments for the sharing flow."""
+    if not user.email:
+        return
+    pending_uid = f"pending_{user.email.lower()}"
+    rows = (
+        db.query(SharedLinkAccess)
+        .filter(SharedLinkAccess.user_id == pending_uid)
+        .all()
+    )
+    if not rows:
+        return
+    for row in rows:
+        row.user_id = user.firebase_uid
+    db.commit()
+
+
 def _claim_pending_enrollments(db: Session, user: User) -> None:
     """When a user signs up, convert any pending enrollments addressed to their
     email into active ones (defense-in-depth alongside the tokenized accept flow)."""
@@ -80,6 +98,7 @@ def _get_or_create_user(db: Session, current_user: dict) -> User:
                 last_name=parts[1] if len(parts) > 1 else "",
             )
         _claim_pending_enrollments(db, user)
+        _claim_pending_share_accesses(db, user)
     return user
 
 

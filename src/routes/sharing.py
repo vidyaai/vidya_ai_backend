@@ -15,8 +15,15 @@ from utils.firebase_users import (
     search_users_by_email,
     get_users_by_uids,
     get_user_by_uid,
+    get_user_by_email,
     validate_user_exists,
 )
+from services.email import (
+    send_share_invite_registered_email_background,
+    send_share_invite_unregistered_email_background,
+    verify_share_invite_token,
+)
+import jwt as _jwt
 from models import SharedLink, SharedLinkAccess, Folder, Video, Assignment
 from schemas import (
     CreateSharedLinkRequest,
@@ -85,6 +92,127 @@ def validate_shared_video_access(
 def generate_share_token() -> str:
     """Generate a secure share token."""
     return secrets.token_urlsafe(32)
+
+
+def _resolve_resource_title(db: Session, link: SharedLink) -> str:
+    """Best-effort human title for the shared resource (for email subjects)."""
+    if link.title:
+        return link.title
+    if link.share_type == "folder" and link.folder_id:
+        folder = db.query(Folder).filter(Folder.id == link.folder_id).first()
+        if folder and folder.name:
+            return folder.name
+    if link.share_type == "chat" and link.video_id:
+        video = db.query(Video).filter(Video.id == link.video_id).first()
+        if video:
+            # Try chat session label, fall back to video title
+            if link.chat_session_id and video.chat_sessions:
+                for session in video.chat_sessions:
+                    if (
+                        isinstance(session, dict)
+                        and session.get("id") == link.chat_session_id
+                    ):
+                        label = session.get("title") or session.get("name")
+                        if label:
+                            return label
+                        break
+            if video.title:
+                return video.title
+    return ""
+
+
+async def _create_share_accesses_and_notify(
+    db: Session,
+    link: SharedLink,
+    owner_uid: str,
+    uids: list[str],
+    emails: list[str],
+    permission: str,
+) -> None:
+    """Create SharedLinkAccess rows for invitees (registered + raw-email) and send
+    the appropriate invite email. Caller is responsible for the final db.commit().
+
+    - For each UID: look up the Firebase user, create an access row with that uid +
+      email, send the 'registered' email to that email address.
+    - For each raw email: try Firebase. If the user exists, treat as registered.
+      Otherwise, create a pending_<email> row and send the 'unregistered' email
+      (containing a tokenized accept link).
+    Duplicate access rows (same link + uid/email) are skipped silently.
+    """
+    if not uids and not emails:
+        return
+
+    owner = await get_user_by_uid(owner_uid)
+    owner_name = (owner or {}).get("displayName") or "Someone"
+    resource_title = _resolve_resource_title(db, link)
+
+    # Track already-existing accesses on this link to dedupe within and across calls.
+    existing_rows = (
+        db.query(SharedLinkAccess)
+        .filter(SharedLinkAccess.shared_link_id == link.id)
+        .all()
+    )
+    existing_uids = {r.user_id for r in existing_rows}
+    existing_emails = {(r.email or "").lower() for r in existing_rows if r.email}
+
+    # Registered users (by UID)
+    if uids:
+        firebase_users = await get_users_by_uids(uids)
+        for fu in firebase_users:
+            uid = fu["uid"]
+            email = (fu.get("email") or "").lower()
+            if uid == owner_uid or uid in existing_uids:
+                continue
+            access = SharedLinkAccess(
+                shared_link_id=link.id,
+                user_id=uid,
+                email=email or None,
+                permission=permission,
+            )
+            db.add(access)
+            existing_uids.add(uid)
+            if email:
+                existing_emails.add(email)
+                send_share_invite_registered_email_background(
+                    link, owner_name, email, resource_title
+                )
+
+    # Raw emails — resolve against Firebase; registered → uid row, else pending
+    for raw in emails:
+        email = (raw or "").strip().lower()
+        if not email or email in existing_emails:
+            continue
+        fb_user = await get_user_by_email(email)
+        if fb_user:
+            uid = fb_user["uid"]
+            if uid == owner_uid or uid in existing_uids:
+                continue
+            access = SharedLinkAccess(
+                shared_link_id=link.id,
+                user_id=uid,
+                email=email,
+                permission=permission,
+            )
+            db.add(access)
+            existing_uids.add(uid)
+            existing_emails.add(email)
+            send_share_invite_registered_email_background(
+                link, owner_name, email, resource_title
+            )
+        else:
+            access = SharedLinkAccess(
+                shared_link_id=link.id,
+                user_id=f"pending_{email}",
+                email=email,
+                permission=permission,
+            )
+            db.add(access)
+            existing_emails.add(email)
+            # Need access.id for the token — flush so the row gets its UUID default.
+            db.flush()
+            send_share_invite_unregistered_email_background(
+                access, link, owner_name, resource_title
+            )
 
 
 async def populate_user_data(shared_links: List[SharedLink]) -> List[SharedLinkOut]:
@@ -244,12 +372,16 @@ async def create_shared_link(
     db.add(shared_link)
     db.flush()  # Get the ID
 
-    # Add invited users
-    for user_id in request.invited_users:
-        access = SharedLinkAccess(
-            shared_link_id=shared_link.id, user_id=user_id, permission="view"
+    # Add invited users and notify them. Emails fire only on private shares.
+    if not request.is_public:
+        await _create_share_accesses_and_notify(
+            db,
+            shared_link,
+            current_user["uid"],
+            request.invited_users,
+            request.invited_emails,
+            permission="view",
         )
-        db.add(access)
 
     db.commit()
 
@@ -422,25 +554,23 @@ async def add_users_to_shared_link(
         if not await validate_user_exists(user_id):
             raise HTTPException(status_code=400, detail=f"User {user_id} not found")
 
-    # Add users (skip if already exists)
-    for user_id in request.user_ids:
-        existing = (
-            db.query(SharedLinkAccess)
-            .filter(
-                SharedLinkAccess.shared_link_id == link_id,
-                SharedLinkAccess.user_id == user_id,
-            )
-            .first()
+    # Emails fire only on private shares; public shares don't need per-user accesses.
+    if not link.is_public:
+        await _create_share_accesses_and_notify(
+            db,
+            link,
+            current_user["uid"],
+            request.user_ids,
+            request.emails,
+            permission=request.permission,
         )
 
-        if not existing:
-            access = SharedLinkAccess(
-                shared_link_id=link_id, user_id=user_id, permission=request.permission
-            )
-            db.add(access)
-
     db.commit()
-    return {"success": True, "added_users": request.user_ids}
+    return {
+        "success": True,
+        "added_users": request.user_ids,
+        "added_emails": request.emails,
+    }
 
 
 @router.delete("/links/{link_id}/users")
@@ -476,6 +606,68 @@ async def remove_user_from_shared_link(
         db.commit()
 
     return {"success": True}
+
+
+@router.post("/accept")
+async def accept_share_invite(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Convert a 'pending_<email>' SharedLinkAccess row to use the current user's
+    Firebase UID, via a signed share-invite token. The token's email must match
+    the signed-in user's email. Idempotent for already-claimed rows."""
+    token = (payload or {}).get("token")
+    if not token:
+        raise HTTPException(status_code=400, detail="Missing token")
+
+    try:
+        claims = verify_share_invite_token(token)
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=400, detail="Invitation link has expired")
+    except _jwt.PyJWTError:
+        raise HTTPException(status_code=400, detail="Invalid invitation link")
+    except RuntimeError as e:
+        logger.error(f"Share-invite token verification misconfigured: {e}")
+        raise HTTPException(status_code=500, detail="Invitation system not configured")
+
+    access = (
+        db.query(SharedLinkAccess)
+        .filter(SharedLinkAccess.id == claims["access_id"])
+        .first()
+    )
+    if not access:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+
+    user_email = (current_user.get("email") or "").lower()
+    if not user_email or user_email != claims["email"].lower():
+        raise HTTPException(
+            status_code=403,
+            detail="This invitation was sent to a different email address. Sign in with the invited address.",
+        )
+
+    link = (
+        db.query(SharedLink)
+        .filter(SharedLink.id == access.shared_link_id)
+        .first()
+    )
+    if not link:
+        raise HTTPException(status_code=404, detail="Shared resource no longer exists")
+
+    if access.user_id.startswith("pending_"):
+        access.user_id = current_user["uid"]
+        db.commit()
+        db.refresh(access)
+        logger.info(
+            f"Share access {access.id} accepted by {current_user['uid']} "
+            f"for share {link.share_token}"
+        )
+
+    return {
+        "share_token": link.share_token,
+        "share_type": link.share_type,
+        "title": link.title,
+    }
 
 
 @router.post("/claim/{share_token}")
