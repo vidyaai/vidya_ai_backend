@@ -43,7 +43,10 @@ from services.email import (
     send_share_invite_registered_email_background,
     send_share_invite_unregistered_email_background,
 )
-from utils.firebase_users import get_user_by_uid as _get_owner_by_uid, get_users_by_uids as _get_users_by_uids
+from utils.firebase_users import (
+    get_user_by_uid as _get_owner_by_uid,
+    get_users_by_uids as _get_users_by_uids,
+)
 from schemas import (
     AssignmentCreate,
     AssignmentUpdate,
@@ -1311,7 +1314,9 @@ async def share_assignment(
                         access, shared_link, owner_name, resource_title
                     )
                 else:
-                    to_email = (access.email or uid_to_email.get(access.user_id) or "").lower()
+                    to_email = (
+                        access.email or uid_to_email.get(access.user_id) or ""
+                    ).lower()
                     if to_email:
                         send_share_invite_registered_email_background(
                             shared_link, owner_name, to_email, resource_title
