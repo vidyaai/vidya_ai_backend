@@ -1,0 +1,14 @@
+{{ owner_name }} shared a {{ resource_type }} with you on Vidya AI
+{% if resource_title %}
+  {{ resource_title }}
+{% endif %}
+{% if description %}
+{{ description }}
+{% endif %}
+Accept the invitation by opening this link (you'll be asked to sign in or create an account using this email address):
+
+{{ accept_url }}
+
+This invitation expires in {{ expires_days }} days.
+
+— The Vidya AI team

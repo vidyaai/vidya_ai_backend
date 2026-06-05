@@ -1,0 +1,10 @@
+New assignment: {{ assignment_title }}
+{% if course_code %}{{ course_title }} · {{ course_code }}{% else %}{{ course_title }}{% endif %}
+
+Your instructor just published a new assignment in {{ course_title }}.
+{% if due_str %}
+Due: {{ due_str }}
+{% endif %}
+View assignment: {{ assignment_url }}
+
+— The Vidya AI team

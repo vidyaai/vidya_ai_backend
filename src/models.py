@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     JSON,
     Boolean,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -244,6 +245,11 @@ class Assignment(Base):
     shared_links = relationship(
         "SharedLink", back_populates="assignment", cascade="all, delete-orphan"
     )
+    reviews = relationship(
+        "AssignmentReview",
+        back_populates="assignment",
+        cascade="all, delete-orphan",
+    )
     course = relationship("Course", back_populates="assignments")
 
 
@@ -300,6 +306,37 @@ class AssignmentSubmission(Base):
 
     # Relationships
     assignment = relationship("Assignment", back_populates="submissions")
+
+
+class AssignmentReview(Base):
+    __tablename__ = "assignment_reviews"
+    __table_args__ = (
+        UniqueConstraint(
+            "assignment_id", "user_id", name="uq_assignment_reviews_assignment_user"
+        ),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    assignment_id = Column(
+        String,
+        ForeignKey("assignments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        String, nullable=False, index=True
+    )  # Firebase UID of the reviewer (creator)
+    rating = Column(Integer, nullable=False)  # 1-5
+    comment = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=datetime.now(timezone.utc),
+        onupdate=datetime.now(timezone.utc),
+    )
+
+    assignment = relationship("Assignment", back_populates="reviews")
 
 
 class User(Base):
@@ -526,7 +563,13 @@ class CourseMaterial(Base):
 
     # Transcription (for directly uploaded video materials)
     transcript_text = Column(Text, nullable=True)
+    transcript_json = Column(JSONB, nullable=True)  # Deepgram timed segments
     transcript_status = Column(
+        String, nullable=True
+    )  # "pending", "processing", "completed", "failed"
+
+    # PDF/document chunking status (for lecture_notes RAG)
+    chunking_status = Column(
         String, nullable=True
     )  # "pending", "processing", "completed", "failed"
 
@@ -540,6 +583,12 @@ class CourseMaterial(Base):
     # Relationships
     course = relationship("Course", back_populates="materials")
     video = relationship("Video")
+    chunks = relationship(
+        "MaterialChunk", back_populates="material", cascade="all, delete-orphan"
+    )
+    chat_sessions_rel = relationship(
+        "MaterialChatSession", back_populates="material", cascade="all, delete-orphan"
+    )
 
 
 # ── Video Understanding - Phase 1: Semantic Chunking ───────────────────
@@ -626,3 +675,96 @@ class VideoSummary(Base):
 
     # Relationships
     video = relationship("Video", back_populates="video_summary")
+
+
+# ── Course Material Chat: chunks + sessions + messages ───────────────────
+
+
+class MaterialChunk(Base):
+    """
+    Semantic chunks of CourseMaterial documents (PDF lecture notes) with embeddings.
+    Parallel to TranscriptChunk, but keyed to course_materials.id instead of videos.id
+    so PDF-only materials (no Video row) can be queried.
+    """
+
+    __tablename__ = "material_chunks"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    course_material_id = Column(
+        String,
+        ForeignKey("course_materials.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    chunk_index = Column(Integer, nullable=False)
+
+    text = Column(Text, nullable=False)
+    page_number = Column(Integer, nullable=True)  # For PDF citations
+    start_seconds = Column(Float, nullable=True)  # For video citations
+    end_seconds = Column(Float, nullable=True)  # For video citations
+    word_count = Column(Integer, nullable=True)
+
+    embedding = Column(Vector(1536), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+
+    material = relationship("CourseMaterial", back_populates="chunks")
+
+
+class MaterialChatSession(Base):
+    """
+    A per-(material, user) chat session. Each user gets independent sessions
+    for the same CourseMaterial. Separate from Video.chat_sessions (JSONB)
+    used by the standalone /api/query/video module.
+    """
+
+    __tablename__ = "material_chat_sessions"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    course_material_id = Column(
+        String,
+        ForeignKey("course_materials.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    user_id = Column(String, index=True, nullable=False)  # Firebase UID
+    title = Column(String, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=datetime.now(timezone.utc),
+        onupdate=datetime.now(timezone.utc),
+    )
+
+    material = relationship("CourseMaterial", back_populates="chat_sessions_rel")
+    messages = relationship(
+        "MaterialChatMessage",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="MaterialChatMessage.created_at",
+    )
+
+
+class MaterialChatMessage(Base):
+    """
+    A single message in a MaterialChatSession.
+    """
+
+    __tablename__ = "material_chat_messages"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    session_id = Column(
+        String,
+        ForeignKey("material_chat_sessions.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    role = Column(String, nullable=False)  # "user" or "assistant"
+    content = Column(Text, nullable=False)
+    citations = Column(JSONB, nullable=True)
+    timestamp_seconds = Column(Float, nullable=True)  # Optional cue for video citations
+
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+
+    session = relationship("MaterialChatSession", back_populates="messages")
