@@ -328,13 +328,23 @@ def send_course_material_added_email_background(
     )
 
 
+def _share_type_label(share_link) -> str:
+    """Single-word label for the share type used in subject lines."""
+    st = (share_link.share_type or "").lower()
+    if st == "chat":
+        return "chat"
+    if st == "assignment":
+        return "assignment"
+    return "folder"
+
+
 def _share_resource_label(share_link, resource_title: str) -> str:
-    """Human label for the share type, e.g. 'a chat' or 'a folder'."""
-    if share_link.share_type == "folder":
-        return f'folder "{resource_title}"' if resource_title else "a folder"
-    if share_link.share_type == "chat":
-        return f'chat "{resource_title}"' if resource_title else "a chat"
-    return f'"{resource_title}"' if resource_title else "a resource"
+    """Human label for the share type, e.g. 'a chat' or 'assignment \"PS1\"'."""
+    label = _share_type_label(share_link)
+    if resource_title:
+        return f'{label} "{resource_title}"'
+    article = "an" if label[0] in "aeiou" else "a"
+    return f"{article} {label}"
 
 
 def send_share_invite_registered_email_background(
@@ -344,8 +354,9 @@ def send_share_invite_registered_email_background(
     if not to_email:
         return
     share_url = f"{FRONTEND_BASE_URL}/shared/{share_link.share_token}"
-    type_label = "chat" if share_link.share_type == "chat" else "folder"
+    type_label = _share_type_label(share_link)
     title = resource_title or share_link.title or ""
+    article = "an" if type_label[0] in "aeiou" else "a"
     ctx = {
         "owner_name": owner_name or "Someone",
         "resource_type": type_label,
@@ -359,10 +370,10 @@ def send_share_invite_registered_email_background(
     send_transactional_email_background(
         to_email=to_email,
         to_name=None,
-        subject=f"{ctx['owner_name']} shared a {type_label} with you: {subject_title}",
+        subject=f"{ctx['owner_name']} shared {article} {type_label} with you: {subject_title}",
         html=html,
         text=text,
-        tags=["share-invite-registered"],
+        tags=[f"share-invite-{type_label}-registered"],
     )
 
 
@@ -380,8 +391,9 @@ def send_share_invite_unregistered_email_background(
         return
     token = issue_share_invite_token(access.id, access.email, share_link.share_token)
     accept_url = f"{FRONTEND_BASE_URL}/shared/accept?token={token}"
-    type_label = "chat" if share_link.share_type == "chat" else "folder"
+    type_label = _share_type_label(share_link)
     title = resource_title or share_link.title or ""
+    article = "an" if type_label[0] in "aeiou" else "a"
     ctx = {
         "owner_name": owner_name or "Someone",
         "resource_type": type_label,
@@ -396,10 +408,10 @@ def send_share_invite_unregistered_email_background(
     send_transactional_email_background(
         to_email=access.email,
         to_name=None,
-        subject=f"{ctx['owner_name']} shared a {type_label} with you: {subject_title}",
+        subject=f"{ctx['owner_name']} shared {article} {type_label} with you: {subject_title}",
         html=html,
         text=text,
-        tags=["share-invite-unregistered"],
+        tags=[f"share-invite-{type_label}-unregistered"],
     )
 
 
