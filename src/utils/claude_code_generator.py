@@ -52,6 +52,15 @@ class ClaudeCodeGenerator:
                     "Unable to load elements - use basic ones only"
                 )
 
+    def _get_media_type(self, image_bytes: bytes) -> str:
+        """Get media type from image bytes (basic check)"""
+        if image_bytes.startswith(b"\xff\xd8\xff"):
+            return "image/jpeg"
+        elif image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            return "image/png"
+        else:
+            return "application/octet-stream"  # fallback
+
     async def generate_diagram_code(
         self,
         question_text: str,
@@ -98,12 +107,13 @@ class ClaudeCodeGenerator:
             import base64
 
             b64 = base64.standard_b64encode(reference_image_bytes).decode("utf-8")
+            media_type = self._get_media_type(reference_image_bytes)
             message_content = [
                 {
                     "type": "image",
                     "source": {
                         "type": "base64",
-                        "media_type": "image/png",
+                        "media_type": media_type,
                         "data": b64,
                     },
                 },
