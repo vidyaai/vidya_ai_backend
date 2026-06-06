@@ -38,7 +38,15 @@ from models import (
     Course,
     CourseEnrollment,
 )
-from services.email import send_assignment_published_email_background
+from services.email import (
+    send_assignment_published_email_background,
+    send_share_invite_registered_email_background,
+    send_share_invite_unregistered_email_background,
+)
+from utils.firebase_users import (
+    get_user_by_uid as _get_owner_by_uid,
+    get_users_by_uids as _get_users_by_uids,
+)
 from schemas import (
     AssignmentCreate,
     AssignmentUpdate,
@@ -1160,8 +1168,10 @@ async def share_assignment(
             db.add(shared_link)
             db.flush()  # Get the ID
 
-        # Create or update shared access records for each user
+        # Create or update shared access records for each user.
+        # Track only NEWLY-created rows so we email new invitees (not existing ones).
         shared_accesses = []
+        newly_created_accesses: list = []
         for shared_with_user_id in share_data.shared_with_user_ids:
             # Check if user already has access
             existing_access = (
@@ -1188,6 +1198,7 @@ async def share_assignment(
                 )
                 db.add(shared_access)
                 shared_accesses.append(shared_access)
+                newly_created_accesses.append(shared_access)
 
         # Handle pending emails - check if they're registered users or truly pending
         if share_data.pending_emails:
@@ -1229,6 +1240,7 @@ async def share_assignment(
                         )
                         db.add(shared_access)
                         shared_accesses.append(shared_access)
+                        newly_created_accesses.append(shared_access)
                 else:
                     # User not registered - create pending invite
                     pending_user_id = f"pending_{email_lower}"
@@ -1257,6 +1269,7 @@ async def share_assignment(
                         )
                         db.add(shared_access)
                         shared_accesses.append(shared_access)
+                        newly_created_accesses.append(shared_access)
 
         db.commit()
         db.refresh(shared_link)
@@ -1271,6 +1284,44 @@ async def share_assignment(
 
         db.commit()
         db.refresh(shared_link)
+
+        # Notify newly-added invitees by email. Private shares only — public
+        # links don't need per-user emails. Existing invitees from prior calls
+        # are not in newly_created_accesses, so they won't be re-emailed.
+        # (The local `user_id` gets overwritten inside the pending-emails loop
+        # above, so use the canonical owner uid from current_user here.)
+        if not shared_link.is_public and newly_created_accesses:
+            owner_uid = current_user["uid"]
+            owner_data = await _get_owner_by_uid(owner_uid)
+            owner_name = (owner_data or {}).get("displayName") or "Someone"
+            resource_title = shared_link.title or assignment.title or ""
+
+            # Batch-resolve emails for any registered accesses missing email
+            missing_email_uids = [
+                a.user_id
+                for a in newly_created_accesses
+                if not a.user_id.startswith("pending_") and not a.email
+            ]
+            uid_to_email = {}
+            if missing_email_uids:
+                fb_users = await _get_users_by_uids(missing_email_uids)
+                uid_to_email = {
+                    u["uid"]: (u.get("email") or "").lower() for u in fb_users
+                }
+
+            for access in newly_created_accesses:
+                if access.user_id.startswith("pending_"):
+                    send_share_invite_unregistered_email_background(
+                        access, shared_link, owner_name, resource_title
+                    )
+                else:
+                    to_email = (
+                        access.email or uid_to_email.get(access.user_id) or ""
+                    ).lower()
+                    if to_email:
+                        send_share_invite_registered_email_background(
+                            shared_link, owner_name, to_email, resource_title
+                        )
 
         # Prepare response
         assignment = calculate_assignment_stats(assignment)
