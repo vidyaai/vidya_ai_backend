@@ -1599,11 +1599,12 @@ Mode: {mode_description}
                         # Could not get primary bytes — skip secondary calls
                         diagram_data.pop("_image_bytes", None)
 
-                # Default so _current_args is always defined at the save point below.
-                # The review loop overwrites this with dict(tool_arguments) and then
-                # updates it to regen_args after each regeneration, so it always
-                # reflects the description used for the final accepted diagram.
+                # Defaults so _current_args/_current_tool are always defined at the
+                # save point below.  The review loop overwrites both with the final
+                # accepted values; the AI/Imagen path skips the loop, so these
+                # defaults represent the tool that was originally selected.
                 _current_args = tool_arguments
+                _current_tool = tool_name
 
                 if diagram_data:
                     # ── Diagram Review Step ──────────────────────────────
@@ -1618,6 +1619,7 @@ Mode: {mode_description}
                         _MAX_NONAI_REVIEW = 3
                         _current_args = dict(tool_arguments)
                         _current_tool = tool_name
+                        _review_error_msg: str = ""
 
                         # Strip <eq> placeholders once — reused in every iteration
                         clean_question_for_review = re.sub(
@@ -1687,6 +1689,7 @@ Mode: {mode_description}
                                         f"All {_MAX_NONAI_REVIEW} review attempts failed for "
                                         f"Q{question_idx}; keeping last diagram"
                                     )
+                                    _review_error_msg = review_result.get("reason", "")
                                     break
 
                                 # Build corrected description for next attempt
@@ -1989,17 +1992,24 @@ RUBRIC:
                             )
 
                     # Attach diagram data
-                    question["diagram"] = {
+                    _diagram_entry = {
                         "s3_url": diagram_data.get("s3_url"),
                         "s3_key": diagram_data.get("s3_key"),
                         "file_id": diagram_data.get("file_id"),
                         "filename": diagram_data.get("filename"),
-                        # Generation context for offline re-review (review_only.py).
-                        # No effect on generation — metadata only.
+                        # Generation context — used by regeneration to route to the
+                        # same tool and restore the original description.
                         "domain": q_domain,
                         "diagram_type": q_diagram_type,
-                        "description": _current_args.get("description", ""),
+                        "tool_name": _current_tool,
+                        "description": (
+                            _current_args.get("description", "")
+                            or _current_args.get("prompt", "")
+                        ),
                     }
+                    if _review_error_msg:
+                        _diagram_entry["review_error"] = _review_error_msg
+                    question["diagram"] = _diagram_entry
                     question["hasDiagram"] = True
 
                     # ── Auto-convert question type for diagram-dependent questions ──
@@ -3628,6 +3638,96 @@ Return the COMPLETE fixed code. Keep it SIMPLE — under 40 lines.""",
         )
 
         return questions
+
+    async def regenerate_diagram_nonai(
+        self,
+        question_text: str,
+        domain: str,
+        diagram_type: str,
+        original_description: str,
+        user_prompt: str,
+        assignment_id: str,
+        review_error: str = "",
+        reference_image_bytes: Optional[bytes] = None,
+        tool_name: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Regenerate a single diagram in non-AI mode using a user-supplied correction prompt.
+
+        Builds a corrected description from the original + user feedback, then routes to
+        the same tool that generated the original (tool_name bypasses re-routing so the
+        diagram type cannot drift, e.g. circuit → timing diagram).
+        """
+        # If original description is missing, fall back to question text so the
+        # agent has at least some context about what to draw.
+        base_description = original_description.strip() or question_text.strip()
+        parts = [base_description]
+        if user_prompt.strip():
+            parts.append(f"User correction: {user_prompt.strip()}")
+        if review_error.strip():
+            parts.append(f"Previous automated review noted: {review_error.strip()}")
+        corrected_description = "\n\n".join(parts)
+
+        logger.info(
+            f"[regenerate_diagram_nonai] domain={domain} diagram_type={diagram_type} "
+            f"tool_name={tool_name} assignment={assignment_id}"
+        )
+
+        if tool_name and tool_name in ("circuitikz_tool", "svg_circuit_tool"):
+            # Circuit tools expect just description + subject_context.
+            # They compile LaTeX/SVG from the description so the image reference
+            # is not applicable here — the corrected description carries all context.
+            tool_args = {"description": corrected_description, "subject_context": ""}
+        elif tool_name:
+            # Code-based tools (claude_code_tool and specialist tools) expect the
+            # full context dict. Pass reference_image_bytes so Claude can see the
+            # current diagram and apply targeted corrections.
+            tool_args = {
+                "domain": domain,
+                "diagram_type": diagram_type,
+                "tool_type": "matplotlib",
+                "description": corrected_description,
+                "subject_guidance": "",
+                "reference_image_bytes": reference_image_bytes,
+            }
+        else:
+            tool_name, tool_args = self.fallback_router.build_tool_arguments(
+                domain=domain,
+                diagram_type=diagram_type,
+                description=corrected_description,
+                question_text=question_text,
+            )
+            # Always pass the original image for code-based tools so Claude can
+            # see what needs fixing rather than generating from scratch.
+            if tool_name not in ("circuitikz_tool", "svg_circuit_tool"):
+                tool_args["reference_image_bytes"] = reference_image_bytes
+        logger.info(f"[regenerate_diagram_nonai] selected tool: {tool_name}")
+
+        diagram_data = await self.diagram_tools.execute_tool_call(
+            tool_name=tool_name,
+            tool_arguments=tool_args,
+            assignment_id=assignment_id,
+            question_idx=0,
+            question_text=question_text,
+        )
+
+        if not diagram_data:
+            logger.error(
+                f"[regenerate_diagram_nonai] tool '{tool_name}' returned no diagram"
+            )
+            return None
+
+        diagram_data.pop("_image_bytes", None)
+        return {
+            "s3_url": diagram_data.get("s3_url"),
+            "s3_key": diagram_data.get("s3_key"),
+            "file_id": diagram_data.get("file_id"),
+            "filename": diagram_data.get("filename"),
+            "domain": domain,
+            "diagram_type": diagram_type,
+            "tool_name": tool_name,
+            "description": corrected_description,
+        }
 
     def analyze_and_generate_diagrams(
         self,

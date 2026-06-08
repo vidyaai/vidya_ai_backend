@@ -65,6 +65,7 @@ from schemas import (
     DocumentImportResponse,
     DiagramUploadResponse,
     DiagramDeleteResponse,
+    DiagramRegenerateRequest,
     GradeSubmissionRequest,
     GradeSubmissionResponse,
     BatchGradeRequest,
@@ -3846,6 +3847,83 @@ async def download_solution_pdf(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate solution PDF",
+        )
+
+
+@router.post("/api/assignments/{assignment_id}/diagrams/regenerate")
+async def regenerate_assignment_diagram(
+    assignment_id: str,
+    body: DiagramRegenerateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Regenerate a single diagram for a question using a user correction prompt.
+    Only supports non-AI (code-based) diagram generation.
+    """
+    try:
+        user_id = current_user["uid"]
+
+        # Verify user has edit access to this assignment
+        assignment = (
+            db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        )
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+            )
+        if assignment.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to edit this assignment",
+            )
+
+        # Optionally fetch existing diagram bytes as visual reference for Claude
+        reference_image_bytes = None
+        if body.current_s3_key and s3_client and AWS_S3_BUCKET:
+            try:
+                s3_response = s3_client.get_object(
+                    Bucket=AWS_S3_BUCKET, Key=body.current_s3_key
+                )
+                reference_image_bytes = s3_response["Body"].read()
+                logger.info(
+                    f"Fetched {len(reference_image_bytes)} bytes from S3 for regeneration reference"
+                )
+            except Exception as fetch_err:
+                logger.warning(
+                    f"Could not fetch existing diagram from S3 for reference: {fetch_err}"
+                )
+
+        from utils.diagram_agent import DiagramAnalysisAgent
+
+        agent = DiagramAnalysisAgent(engine="nonai", subject=body.domain)
+        diagram_data = await agent.regenerate_diagram_nonai(
+            question_text=body.question_text,
+            domain=body.domain,
+            diagram_type=body.diagram_type,
+            original_description=body.original_description,
+            user_prompt=body.user_prompt,
+            assignment_id=assignment_id,
+            review_error=body.review_error or "",
+            reference_image_bytes=reference_image_bytes,
+            tool_name=body.tool_name or None,
+        )
+
+        if not diagram_data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Diagram regeneration failed — the tool produced no output",
+            )
+
+        return {"diagram": diagram_data}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error regenerating diagram for assignment {assignment_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to regenerate diagram",
         )
 
 

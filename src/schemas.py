@@ -697,6 +697,17 @@ class DiagramDeleteResponse(BaseModel):
     deleted_keys: List[str]
 
 
+class DiagramRegenerateRequest(BaseModel):
+    question_text: str
+    domain: str
+    diagram_type: str
+    original_description: str
+    user_prompt: str
+    current_s3_key: Optional[str] = None
+    review_error: Optional[str] = None
+    tool_name: Optional[str] = None
+
+
 # Update MultiPartSubQuestion to handle forward reference
 MultiPartSubQuestion.model_rebuild()
 
