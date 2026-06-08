@@ -3865,9 +3865,7 @@ async def regenerate_assignment_diagram(
         user_id = current_user["uid"]
 
         # Verify user has edit access to this assignment
-        assignment = (
-            db.query(Assignment).filter(Assignment.id == assignment_id).first()
-        )
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
         if not assignment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
