@@ -322,6 +322,20 @@ class User(Base):
     subscriptions = relationship("Subscription", back_populates="user")
 
 
+class EmbedClient(Base):
+    """An external API customer allowed to embed Vidya AI's UI via JWT handoff."""
+
+    __tablename__ = "embed_clients"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    slug = Column(String, unique=True, nullable=False, index=True)  # JWT "iss"
+    name = Column(String, nullable=False)
+    embed_secret = Column(String, nullable=False)  # HMAC secret for HS256 JWTs
+    default_user_type = Column(String(20), default="student", nullable=False)
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+
+
 class Subscription(Base):
     __tablename__ = "subscriptions"
 

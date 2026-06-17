@@ -21,6 +21,7 @@ from routes.payments import router as payments_router
 from routes.lecture_summary import router as lecture_summary_router
 from routes.courses import router as courses_router
 from routes.users import router as users_router
+from routes.embed import router as embed_router
 from utils.youtube_utils import start_cache_cleanup_thread
 
 
@@ -113,6 +114,7 @@ app.include_router(payments_router)
 app.include_router(lecture_summary_router)
 app.include_router(courses_router)
 app.include_router(users_router)
+app.include_router(embed_router)
 
 
 if __name__ == "__main__":

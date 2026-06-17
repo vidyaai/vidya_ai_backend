@@ -803,3 +803,14 @@ class UserProfileUpdate(BaseModel):
         if v not in ("professor", "student"):
             raise ValueError("user_type must be 'professor' or 'student'")
         return v
+
+
+class EmbedSessionRequest(BaseModel):
+    token: str
+
+
+class EmbedSessionResponse(BaseModel):
+    firebase_token: str
+    course_id: Optional[str] = None
+    video_id: Optional[str] = None
+    user_type: Optional[str] = None
