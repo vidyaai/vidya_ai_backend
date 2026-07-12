@@ -50,3 +50,4 @@ vidyaai_env/
 
 video_chat_test/data/
 fcc_crystal_paper/
+.playwright-mcp/
