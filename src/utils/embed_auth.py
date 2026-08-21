@@ -17,6 +17,8 @@ except Exception:  # pragma: no cover
     fb_auth = None
 
 EMBED_AUDIENCE = "vidyaai-embed"
+# Firebase UID prefix that marks a user as coming from a third-party embed.
+EMBED_UID_PREFIX = "embed_"
 # How old a token's `iat` may be at verification time, regardless of `exp`.
 # Override locally (e.g. EMBED_MAX_TOKEN_AGE_SECONDS=3600) to avoid re-minting
 # test tokens every 5 minutes during manual testing.
@@ -63,7 +65,7 @@ def verify_embed_token(token: str, db: Session) -> Tuple[EmbedClient, Dict[str, 
 def _build_embed_uid(client_slug: str, external_id: str) -> str:
     """Build a Firebase-UID-safe, tenant-namespaced uid for an embed user."""
     safe_external_id = re.sub(r"[^a-zA-Z0-9_-]", "_", external_id)
-    uid = f"embed_{client_slug}_{safe_external_id}"
+    uid = f"{EMBED_UID_PREFIX}{client_slug}_{safe_external_id}"
     return uid[:128]
 
 
