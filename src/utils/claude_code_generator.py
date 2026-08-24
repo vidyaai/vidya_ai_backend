@@ -8,8 +8,8 @@ for ANY technical diagram across all domains.
 import os
 import json
 from typing import Dict, Any, Optional
-from anthropic import Anthropic
 from controllers.config import logger
+from utils.bedrock_client import get_bedrock_client, resolve_model_id
 
 # Import dynamic element detection
 try:
@@ -27,27 +27,16 @@ class ClaudeCodeGenerator:
     """Generates diagram code using Claude 3.5 Sonnet"""
 
     def __init__(self, api_key: Optional[str] = None):
+        """Initialize Claude code generator (routes via AWS Bedrock).
+
+        The ``api_key`` argument is accepted for backwards compatibility but is
+        ignored — Bedrock auth comes from the standard boto3 credential chain.
         """
-        Initialize Claude code generator
-
-        Args:
-            api_key: Anthropic API key (or use ANTHROPIC_API_KEY env var)
-        """
-        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-        if not self.api_key:
-            raise ValueError(
-                "Anthropic API key required. Set ANTHROPIC_API_KEY env var or pass api_key parameter"
-            )
-
-        # Validate key format early
-        if not self.api_key.startswith("sk-ant-"):
-            logger.warning(
-                f"ANTHROPIC_API_KEY doesn't start with 'sk-ant-' — may be invalid (first 12 chars: {self.api_key[:12]}...)"
-            )
-
-        self.client = Anthropic(api_key=self.api_key)
+        del api_key  # noqa: ignore — kept in signature for backwards compatibility
+        self.client = get_bedrock_client()
         self.model = "claude-sonnet-4-20250514"
-        self._api_key_valid = None  # Track whether the key actually works
+        self._resolved_model = resolve_model_id(self.model)
+        self._api_key_valid = None  # Track whether Bedrock auth actually works
 
         # Dynamically load valid schemdraw elements
         self.valid_elements_text = ""
@@ -62,6 +51,15 @@ class ClaudeCodeGenerator:
                 self.valid_elements_text = (
                     "Unable to load elements - use basic ones only"
                 )
+
+    def _get_media_type(self, image_bytes: bytes) -> str:
+        """Get media type from image bytes (basic check)"""
+        if image_bytes.startswith(b"\xff\xd8\xff"):
+            return "image/jpeg"
+        elif image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            return "image/png"
+        else:
+            return "application/octet-stream"  # fallback
 
     async def generate_diagram_code(
         self,
@@ -98,10 +96,10 @@ class ClaudeCodeGenerator:
             execution_error,
         )
 
-        # Skip entirely if we already know the key is invalid
+        # Skip entirely if we already know Bedrock auth is broken
         if self._api_key_valid is False:
             raise RuntimeError(
-                "Claude API key previously failed authentication — skipping to avoid repeated 401 errors"
+                "Bedrock auth previously failed — skipping to avoid repeated errors"
             )
 
         # Build message content — include reference image if provided (for answer-leak fixes)
@@ -109,12 +107,13 @@ class ClaudeCodeGenerator:
             import base64
 
             b64 = base64.standard_b64encode(reference_image_bytes).decode("utf-8")
+            media_type = self._get_media_type(reference_image_bytes)
             message_content = [
                 {
                     "type": "image",
                     "source": {
                         "type": "base64",
-                        "media_type": "image/png",
+                        "media_type": media_type,
                         "data": b64,
                     },
                 },
@@ -133,7 +132,7 @@ class ClaudeCodeGenerator:
 
         try:
             response = self.client.messages.create(
-                model=self.model,
+                model=self._resolved_model,
                 max_tokens=4000,
                 temperature=0.1,  # Low temperature for consistent, accurate code
                 system=system_prompt,
@@ -151,14 +150,16 @@ class ClaudeCodeGenerator:
 
         except Exception as e:
             error_str = str(e)
-            # Mark key as invalid on auth errors so we don't keep retrying
-            if "401" in error_str or "authentication_error" in error_str:
+            # Mark auth as broken on AWS / Bedrock auth errors so we don't keep retrying
+            if (
+                "AccessDeniedException" in error_str
+                or "UnrecognizedClientException" in error_str
+                or "ExpiredTokenException" in error_str
+            ):
                 self._api_key_valid = False
                 logger.error(
-                    f"Claude API key is INVALID (401 auth error). "
-                    f"Check your ANTHROPIC_API_KEY env var. "
-                    f"Key starts with: {self.api_key[:12]}... "
-                    f"All subsequent Claude calls will be skipped."
+                    "Bedrock auth failed — check AWS credentials and "
+                    "AWS_BEDROCK_REGION. All subsequent Claude calls will be skipped."
                 )
             logger.error(f"Claude code generation failed: {error_str}")
             raise

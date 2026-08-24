@@ -33,8 +33,19 @@ from models import (
     SharedLink,
     SharedLinkAccess,
     AssignmentSubmission,
+    AssignmentReview,
     Video,
+    Course,
     CourseEnrollment,
+)
+from services.email import (
+    send_assignment_published_email_background,
+    send_share_invite_registered_email_background,
+    send_share_invite_unregistered_email_background,
+)
+from utils.firebase_users import (
+    get_user_by_uid as _get_owner_by_uid,
+    get_users_by_uids as _get_users_by_uids,
 )
 from schemas import (
     AssignmentCreate,
@@ -48,6 +59,8 @@ from schemas import (
     AssignmentSubmissionUpdate,
     AssignmentSubmissionOut,
     AssignmentGenerateRequest,
+    AssignmentReviewRequest,
+    AssignmentReviewOut,
     DocumentImportRequest,
     DocumentImportResponse,
     DiagramUploadResponse,
@@ -62,6 +75,30 @@ from fastapi.responses import Response, StreamingResponse
 from utils.pdf_generator import AssignmentPDFGenerator
 
 router = APIRouter()
+
+
+def _notify_assignment_published(db: Session, assignment: Assignment) -> None:
+    """Email all active enrollees of the assignment's course. No-op if not course-scoped."""
+    if not assignment.course_id or assignment.status != "published":
+        return
+    course = db.query(Course).filter(Course.id == assignment.course_id).first()
+    if not course:
+        return
+    enrollments = (
+        db.query(CourseEnrollment)
+        .filter(
+            and_(
+                CourseEnrollment.course_id == assignment.course_id,
+                CourseEnrollment.status == "active",
+                CourseEnrollment.email.isnot(None),
+            )
+        )
+        .all()
+    )
+    recipients = [(e.email, None) for e in enrollments if e.email]
+    if not recipients:
+        return
+    send_assignment_published_email_background(course, assignment, recipients)
 
 
 def process_pdf_in_background(
@@ -948,6 +985,7 @@ async def create_assignment(
         db.refresh(assignment)
 
         logger.info(f"Created assignment: {assignment.id} - {assignment.title}")
+        _notify_assignment_published(db, assignment)
         return assignment
 
     except Exception as e:
@@ -993,6 +1031,8 @@ async def update_assignment(
                 detail="Cannot revert a published assignment to draft",
             )
 
+        previous_status = assignment.status
+
         # Update fields
         for field, value in update_data.items():
             setattr(assignment, field, value)
@@ -1007,6 +1047,8 @@ async def update_assignment(
         db.refresh(assignment)
 
         logger.info(f"Updated assignment: {assignment.id} - {assignment.title}")
+        if previous_status != "published" and assignment.status == "published":
+            _notify_assignment_published(db, assignment)
         return assignment
 
     except HTTPException:
@@ -1126,8 +1168,10 @@ async def share_assignment(
             db.add(shared_link)
             db.flush()  # Get the ID
 
-        # Create or update shared access records for each user
+        # Create or update shared access records for each user.
+        # Track only NEWLY-created rows so we email new invitees (not existing ones).
         shared_accesses = []
+        newly_created_accesses: list = []
         for shared_with_user_id in share_data.shared_with_user_ids:
             # Check if user already has access
             existing_access = (
@@ -1154,6 +1198,7 @@ async def share_assignment(
                 )
                 db.add(shared_access)
                 shared_accesses.append(shared_access)
+                newly_created_accesses.append(shared_access)
 
         # Handle pending emails - check if they're registered users or truly pending
         if share_data.pending_emails:
@@ -1195,6 +1240,7 @@ async def share_assignment(
                         )
                         db.add(shared_access)
                         shared_accesses.append(shared_access)
+                        newly_created_accesses.append(shared_access)
                 else:
                     # User not registered - create pending invite
                     pending_user_id = f"pending_{email_lower}"
@@ -1223,6 +1269,7 @@ async def share_assignment(
                         )
                         db.add(shared_access)
                         shared_accesses.append(shared_access)
+                        newly_created_accesses.append(shared_access)
 
         db.commit()
         db.refresh(shared_link)
@@ -1237,6 +1284,44 @@ async def share_assignment(
 
         db.commit()
         db.refresh(shared_link)
+
+        # Notify newly-added invitees by email. Private shares only — public
+        # links don't need per-user emails. Existing invitees from prior calls
+        # are not in newly_created_accesses, so they won't be re-emailed.
+        # (The local `user_id` gets overwritten inside the pending-emails loop
+        # above, so use the canonical owner uid from current_user here.)
+        if not shared_link.is_public and newly_created_accesses:
+            owner_uid = current_user["uid"]
+            owner_data = await _get_owner_by_uid(owner_uid)
+            owner_name = (owner_data or {}).get("displayName") or "Someone"
+            resource_title = shared_link.title or assignment.title or ""
+
+            # Batch-resolve emails for any registered accesses missing email
+            missing_email_uids = [
+                a.user_id
+                for a in newly_created_accesses
+                if not a.user_id.startswith("pending_") and not a.email
+            ]
+            uid_to_email = {}
+            if missing_email_uids:
+                fb_users = await _get_users_by_uids(missing_email_uids)
+                uid_to_email = {
+                    u["uid"]: (u.get("email") or "").lower() for u in fb_users
+                }
+
+            for access in newly_created_accesses:
+                if access.user_id.startswith("pending_"):
+                    send_share_invite_unregistered_email_background(
+                        access, shared_link, owner_name, resource_title
+                    )
+                else:
+                    to_email = (
+                        access.email or uid_to_email.get(access.user_id) or ""
+                    ).lower()
+                    if to_email:
+                        send_share_invite_registered_email_background(
+                            shared_link, owner_name, to_email, resource_title
+                        )
 
         # Prepare response
         assignment = calculate_assignment_stats(assignment)
@@ -3780,9 +3865,7 @@ async def regenerate_assignment_diagram(
         user_id = current_user["uid"]
 
         # Verify user has edit access to this assignment
-        assignment = (
-            db.query(Assignment).filter(Assignment.id == assignment_id).first()
-        )
+        assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
         if not assignment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
@@ -3840,3 +3923,88 @@ async def regenerate_assignment_diagram(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to regenerate diagram",
         )
+
+
+# ─── Assignment review (creator feedback on AI-generated quality) ─────
+
+
+def _get_owned_assignment_or_raise(
+    assignment_id: str, user_id: str, db: Session
+) -> Assignment:
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
+        )
+    if assignment.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the assignment creator can review this assignment",
+        )
+    return assignment
+
+
+@router.post(
+    "/api/assignments/{assignment_id}/review", response_model=AssignmentReviewOut
+)
+def submit_assignment_review(
+    assignment_id: str,
+    payload: AssignmentReviewRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Upsert the creator's review (1-5 stars + optional comment) for an assignment."""
+    user_id = current_user["uid"]
+    _get_owned_assignment_or_raise(assignment_id, user_id, db)
+
+    review = (
+        db.query(AssignmentReview)
+        .filter(
+            AssignmentReview.assignment_id == assignment_id,
+            AssignmentReview.user_id == user_id,
+        )
+        .first()
+    )
+
+    if review:
+        review.rating = payload.rating
+        review.comment = payload.comment
+    else:
+        review = AssignmentReview(
+            assignment_id=assignment_id,
+            user_id=user_id,
+            rating=payload.rating,
+            comment=payload.comment,
+        )
+        db.add(review)
+
+    db.commit()
+    db.refresh(review)
+    return review
+
+
+@router.get(
+    "/api/assignments/{assignment_id}/review", response_model=AssignmentReviewOut
+)
+def get_assignment_review(
+    assignment_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Return the current user's existing review for an assignment, or 404."""
+    user_id = current_user["uid"]
+    _get_owned_assignment_or_raise(assignment_id, user_id, db)
+
+    review = (
+        db.query(AssignmentReview)
+        .filter(
+            AssignmentReview.assignment_id == assignment_id,
+            AssignmentReview.user_id == user_id,
+        )
+        .first()
+    )
+    if not review:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No review found"
+        )
+    return review

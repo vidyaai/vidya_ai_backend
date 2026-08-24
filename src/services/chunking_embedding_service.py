@@ -352,19 +352,56 @@ class SemanticChunker:
             # Fallback: plain chunking without timestamps
             return self._chunk_plain_text(transcript)
 
-        # Group sections into chunks of target size
-        chunks = []
-        current_chunk_text = []
+        return self._group_sections_into_chunks(sections)
+
+    @staticmethod
+    def _seconds_to_hhmmss(seconds: float) -> str:
+        seconds = max(0, int(seconds))
+        h, rem = divmod(seconds, 3600)
+        m, s = divmod(rem, 60)
+        return f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+
+    def chunk_timed_segments(
+        self, segments: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Chunk a list of {start, dur, text} segments (Deepgram utterance shape)
+        into ~chunk_size-token groups, preserving start/end timestamps."""
+        sections: List[Dict[str, Any]] = []
+        for s in segments:
+            if not s.get("text"):
+                continue
+            start_sec = float(s.get("start", 0) or 0)
+            end_sec = start_sec + float(s.get("dur", 0) or 0)
+            sections.append(
+                {
+                    "text": s["text"],
+                    "start_seconds": start_sec,
+                    "end_seconds": end_sec,
+                    "start_time": self._seconds_to_hhmmss(start_sec),
+                    "end_time": self._seconds_to_hhmmss(end_sec),
+                }
+            )
+        if not sections:
+            return []
+        return self._group_sections_into_chunks(sections)
+
+    def _group_sections_into_chunks(
+        self, sections: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Group sections (each with text + start/end times) into chunks of
+        roughly self.chunk_size tokens, preserving timestamps."""
+        chunks: List[Dict[str, Any]] = []
+        current_chunk_text: List[str] = []
         current_start = None
         current_end = None
+        current_start_sec = None
+        current_end_sec = None
 
         for section in sections:
-            # Estimate tokens (rough: 1 token ≈ 4 characters)
             test_text = "\n".join(current_chunk_text + [section["text"]])
             estimated_tokens = len(test_text) // 4
 
             if estimated_tokens <= self.chunk_size or not current_chunk_text:
-                # Add to current chunk
                 current_chunk_text.append(section["text"])
                 if current_start is None:
                     current_start = section["start_time"]
@@ -372,7 +409,6 @@ class SemanticChunker:
                 current_end = section["end_time"]
                 current_end_sec = section["end_seconds"]
             else:
-                # Save current chunk
                 chunks.append(
                     {
                         "text": "\n".join(current_chunk_text),
@@ -384,7 +420,6 @@ class SemanticChunker:
                     }
                 )
 
-                # Start new chunk with overlap
                 overlap_text = self._get_overlap(current_chunk_text)
                 current_chunk_text = (
                     [overlap_text, section["text"]]
@@ -396,7 +431,6 @@ class SemanticChunker:
                 current_end = section["end_time"]
                 current_end_sec = section["end_seconds"]
 
-        # Add final chunk
         if current_chunk_text:
             chunks.append(
                 {

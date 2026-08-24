@@ -13,7 +13,15 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from controllers.config import AWS_S3_BUCKET, logger, s3_client, upload_executor
-from controllers.storage import s3_presign_url, transcribe_video_with_deepgram_url
+from controllers.storage import (
+    s3_presign_url,
+    transcribe_video_with_deepgram_url,
+    transcribe_video_with_deepgram_url_timed,
+)
+from controllers.background_tasks import (
+    chunk_pdf_material_background,
+    chunk_video_material_transcript_background,
+)
 from utils.db import get_db, SessionLocal
 from models import (
     Assignment,
@@ -33,6 +41,13 @@ from schemas import (
     EnrollStudentsRequest,
 )
 from utils.firebase_auth import get_current_user
+from services.email import (
+    send_enrollment_active_email_background,
+    send_enrollment_invite_email_background,
+    send_course_material_added_email_background,
+    verify_invite_token,
+)
+import jwt as _jwt
 
 router = APIRouter()
 
@@ -115,6 +130,34 @@ def _verify_course_access(course_id: str, user_uid: str, db: Session) -> Course:
     return course
 
 
+def _notify_new_enrollments(
+    course: Course, active: list[CourseEnrollment], pending: list[CourseEnrollment]
+) -> None:
+    """Send the appropriate email per new enrollment (post-commit)."""
+    for e in active:
+        send_enrollment_active_email_background(e, course)
+    for e in pending:
+        send_enrollment_invite_email_background(e, course)
+
+
+def _active_enrollee_recipients(
+    db: Session, course_id: str
+) -> list[tuple[str, str | None]]:
+    """Return (email, None) tuples for all active enrollees of a course."""
+    enrollments = (
+        db.query(CourseEnrollment)
+        .filter(
+            and_(
+                CourseEnrollment.course_id == course_id,
+                CourseEnrollment.status == "active",
+                CourseEnrollment.email.isnot(None),
+            )
+        )
+        .all()
+    )
+    return [(e.email, None) for e in enrollments if e.email]
+
+
 def _lookup_firebase_user(email: str):
     """Try to find a Firebase user by email. Returns (uid, found:bool)."""
     try:
@@ -127,13 +170,34 @@ def _lookup_firebase_user(email: str):
 
 
 def _transcribe_course_material_background(material_id: str, s3_key: str) -> None:
-    """Background job: transcribe a directly-uploaded course video and store the result."""
+    """Background job: transcribe a directly-uploaded course video and store the result.
+
+    Uses Deepgram's timed (utterance-level) transcription so MaterialChunk rows
+    can later be tagged with start_seconds for the chat panel's clickable
+    timestamps. Plain transcript_text is preserved for back-compat with any
+    consumer that ignores transcript_json.
+    """
     db = SessionLocal()
     try:
-        # Generate presigned URL so Deepgram can pull from S3 directly
+        transcript_text = ""
+        transcript_json = None
         try:
             presigned = s3_presign_url(s3_key, expires_in=60 * 60 * 12)
-            transcript_text = transcribe_video_with_deepgram_url(presigned)
+            material_pre = (
+                db.query(CourseMaterial)
+                .filter(CourseMaterial.id == material_id)
+                .first()
+            )
+            timed = transcribe_video_with_deepgram_url_timed(
+                presigned, video_title=(material_pre.title if material_pre else "Video")
+            )
+            transcript_json = timed
+            segments = timed.get("transcription") or []
+            transcript_text = " ".join(s.get("text", "") for s in segments).strip()
+            # Fallback to plain transcription if timed yielded nothing usable
+            if not transcript_text:
+                transcript_text = transcribe_video_with_deepgram_url(presigned)
+                transcript_json = None
         except Exception as e:
             logger.error(
                 f"Deepgram URL transcription failed for material {material_id}: {e}"
@@ -145,13 +209,27 @@ def _transcribe_course_material_background(material_id: str, s3_key: str) -> Non
         )
         if material:
             material.transcript_text = transcript_text or None
+            material.transcript_json = transcript_json
             material.transcript_status = "completed" if transcript_text else "failed"
+            # Mark chunking as pending so the UI can show a "indexing for chat" badge
+            # between transcription completing and chunking finishing.
+            if transcript_text and not material.video_id:
+                material.chunking_status = "pending"
             material.updated_at = datetime.now(timezone.utc)
             db.commit()
             logger.info(
                 f"Transcription {'completed' if transcript_text else 'failed'} "
-                f"for course material {material_id}"
+                f"for course material {material_id} "
+                f"({'timed' if transcript_json else 'plain'})"
             )
+
+            # Dispatch downstream chunking so the chat panel can ground answers
+            # in the lecture. Skipped for gallery-linked videos (they use
+            # TranscriptChunk via the existing Chat-with-Video pipeline).
+            if transcript_text and not material.video_id:
+                upload_executor.submit(
+                    chunk_video_material_transcript_background, material_id
+                )
     except Exception as e:
         logger.error(f"Background transcription error for material {material_id}: {e}")
         try:
@@ -377,6 +455,8 @@ def enroll_students(
     for e in all_enrollments:
         db.refresh(e)
 
+    _notify_new_enrollments(course, enrolled, pending)
+
     return {
         "enrolled": len(enrolled),
         "pending": len(pending),
@@ -488,6 +568,8 @@ async def enroll_students_csv(
     all_enrollments = enrolled + pending
     for e in all_enrollments:
         db.refresh(e)
+
+    _notify_new_enrollments(course, enrolled, pending)
 
     return {
         "enrolled": len(enrolled),
@@ -640,6 +722,14 @@ async def upload_course_material(
         logger.error(f"S3 upload failed: {e}")
         raise HTTPException(status_code=500, detail="File upload to S3 failed")
 
+    # Determine whether this material is chat-eligible at upload time
+    is_chunkable_doc = material_type != "video" and (
+        file.content_type == "application/pdf"
+        or fname.endswith(".pdf")
+        or "wordprocessingml" in (file.content_type or "")
+        or fname.endswith(".docx")
+    )
+
     material = CourseMaterial(
         course_id=course_id,
         title=title,
@@ -651,6 +741,7 @@ async def upload_course_material(
         mime_type=file.content_type,
         folder=folder,
         transcript_status="processing" if material_type == "video" else None,
+        chunking_status="pending" if is_chunkable_doc else None,
     )
     db.add(material)
     db.commit()
@@ -662,6 +753,14 @@ async def upload_course_material(
         upload_executor.submit(
             _transcribe_course_material_background, material.id, s3_key
         )
+
+    # Kick off background PDF/DOCX chunking + embedding for chat
+    if is_chunkable_doc:
+        upload_executor.submit(chunk_pdf_material_background, material.id, s3_key)
+
+    send_course_material_added_email_background(
+        course, material, _active_enrollee_recipients(db, course_id)
+    )
 
     return {
         "id": material.id,
@@ -677,6 +776,7 @@ async def upload_course_material(
         "order": material.order,
         "transcript_status": material.transcript_status,
         "transcript_text": material.transcript_text,
+        "chunking_status": material.chunking_status,
         "created_at": material.created_at,
         "updated_at": material.updated_at,
     }
@@ -710,6 +810,11 @@ def link_video_to_course(
     db.add(material)
     db.commit()
     db.refresh(material)
+
+    send_course_material_added_email_background(
+        course, material, _active_enrollee_recipients(db, course_id)
+    )
+
     return {
         "id": material.id,
         "course_id": material.course_id,
@@ -773,6 +878,7 @@ def list_materials(
                 "folder": m.folder,
                 "transcript_text": eff_transcript_text,
                 "transcript_status": eff_transcript_status,
+                "chunking_status": m.chunking_status,
                 "created_at": m.created_at,
                 "updated_at": m.updated_at,
             }
@@ -913,3 +1019,69 @@ def list_course_assignments(
         result.append(assignment_dict)
 
     return result
+
+
+# ── Invite acceptance ────────────────────────────────────────────────────
+
+
+@router.post("/api/enrollments/accept")
+def accept_enrollment_invite(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Convert a 'pending' CourseEnrollment to 'active' via a signed invite token.
+
+    The token's email must match the signed-in user's email (case-insensitive).
+    Idempotent: re-accepting an already-active enrollment succeeds without changes.
+    """
+    token = (payload or {}).get("token")
+    if not token:
+        raise HTTPException(status_code=400, detail="Missing token")
+
+    try:
+        claims = verify_invite_token(token)
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=400, detail="Invitation link has expired")
+    except _jwt.PyJWTError:
+        raise HTTPException(status_code=400, detail="Invalid invitation link")
+    except RuntimeError as e:
+        # INVITE_TOKEN_SECRET unset on the server
+        logger.error(f"Invite token verification misconfigured: {e}")
+        raise HTTPException(status_code=500, detail="Invitation system not configured")
+
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(CourseEnrollment.id == claims["enrollment_id"])
+        .first()
+    )
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+
+    user_email = (current_user.get("email") or "").lower()
+    if not user_email or user_email != claims["email"].lower():
+        raise HTTPException(
+            status_code=403,
+            detail="This invitation was sent to a different email address. Sign in with the invited address.",
+        )
+
+    course = db.query(Course).filter(Course.id == enrollment.course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course no longer exists")
+
+    if enrollment.status == "pending":
+        enrollment.status = "active"
+        enrollment.user_id = current_user["uid"]
+        enrollment.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(enrollment)
+        logger.info(
+            f"Enrollment {enrollment.id} accepted by {current_user['uid']} "
+            f"for course {course.id}"
+        )
+
+    return {
+        "course_id": course.id,
+        "course_title": course.title,
+        "status": enrollment.status,
+    }

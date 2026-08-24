@@ -1,0 +1,14 @@
+{% extends "_base.html.j2" %}
+{% block content %}
+<h2 style="margin-top: 0;">New {{ material_type|replace('_', ' ') }} in {{ course_title }}</h2>
+{% if course_code %}<p style="color: #555;">Course code: <strong>{{ course_code }}</strong></p>{% endif %}
+<p>Your instructor just added a new item to <strong>{{ course_title }}</strong>:</p>
+<p style="background: #f6f8fa; padding: 12px 16px; border-radius: 4px; border-left: 3px solid #1a73e8;">
+  <strong>{{ material_title }}</strong>
+</p>
+<p style="margin: 24px 0;">
+  <a href="{{ course_url }}" style="background: #1a73e8; color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 4px; display: inline-block;">
+    Open course
+  </a>
+</p>
+{% endblock %}

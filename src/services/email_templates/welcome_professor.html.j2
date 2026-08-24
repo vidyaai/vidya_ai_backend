@@ -1,0 +1,12 @@
+{% extends "_base.html.j2" %}
+{% block content %}
+<h2 style="margin-top: 0;">Welcome to Vidya AI, {{ first_name }}!</h2>
+<p>Your <strong>instructor</strong> workspace is ready.</p>
+<p>You can now create courses, upload lecture materials, generate or import assignments, and enroll students by email or CSV. Students you enroll will get an invitation email and can claim their seat by signing in.</p>
+<p style="margin: 24px 0;">
+  <a href="{{ frontend_url }}" style="background: #1a73e8; color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 4px; display: inline-block;">
+    Open your dashboard
+  </a>
+</p>
+<p>Need help getting started? Hit reply — we read every message.</p>
+{% endblock %}

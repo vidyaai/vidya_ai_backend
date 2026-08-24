@@ -12,12 +12,14 @@ import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-from anthropic import Anthropic
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+from utils.bedrock_client import get_bedrock_client, resolve_model_id  # noqa: E402
+
+client = get_bedrock_client()
+MODEL_ID = resolve_model_id("claude-opus-4-6")
 
 REVIEW_PROMPT_TEMPLATE = """You are reviewing an educational diagram for correctness and appropriateness as an exam question aid.
 
@@ -50,7 +52,7 @@ def review_with_claude(img_bytes: bytes, question_text: str) -> dict:
     prompt = REVIEW_PROMPT_TEMPLATE.format(question=question_text[:600])
 
     response = client.messages.create(
-        model="claude-opus-4-6",
+        model=MODEL_ID,
         max_tokens=400,
         messages=[
             {

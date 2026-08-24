@@ -20,6 +20,8 @@ from controllers.storage import (
     generate_thumbnail,
     transcribe_video_with_deepgram,
     transcribe_video_with_deepgram_url,
+    transcribe_video_with_deepgram_timed,
+    transcribe_video_with_deepgram_url_timed,
 )
 from controllers.db_helpers import update_upload_status, get_upload_status
 from controllers.background_tasks import format_uploaded_transcript_background
@@ -186,15 +188,42 @@ def process_upload_background(
             },
         )
         transcript_text = ""
-        # Prefer server-to-server URL pull by Deepgram to avoid write timeouts
+        transcript_json = None
+        # Prefer server-to-server URL pull by Deepgram WITH utterance-level
+        # timing so the formatted transcript carries REAL timestamps. Without
+        # this the formatter falls back to fabricated 15s-per-chunk timing.
         try:
             presigned = s3_presign_url(s3_key, expires_in=60 * 60 * 12)
-            transcript_text = transcribe_video_with_deepgram_url(presigned)
+            timed = transcribe_video_with_deepgram_url_timed(
+                presigned, video_title=(original_filename or "Uploaded Video")
+            )
+            segments = (timed or {}).get("transcription") or []
+            transcript_text = " ".join(s.get("text", "") for s in segments).strip()
+            if transcript_text:
+                transcript_json = timed
+            else:
+                # Timed transcription yielded nothing usable; fall back to plain.
+                transcript_text = transcribe_video_with_deepgram_url(presigned)
+                transcript_json = None
         except Exception:
             transcript_text = ""
-        # Fallback to local chunked transcription if URL approach fails
+            transcript_json = None
+        # Fallback to local timed transcription if the URL approach fails entirely
         if not transcript_text:
-            transcript_text = transcribe_video_with_deepgram(temp_path)
+            try:
+                timed_local = transcribe_video_with_deepgram_timed(
+                    temp_path, video_title=(original_filename or "Uploaded Video")
+                )
+                segments = (timed_local or {}).get("transcription") or []
+                transcript_text = " ".join(s.get("text", "") for s in segments).strip()
+                transcript_json = timed_local if transcript_text else None
+            except Exception:
+                transcript_text = ""
+                transcript_json = None
+            # Last resort: plain local transcription (no timing available).
+            if not transcript_text:
+                transcript_text = transcribe_video_with_deepgram(temp_path)
+                transcript_json = None
         if transcript_text:
             with tempfile.NamedTemporaryFile(
                 "w", encoding="utf-8", delete=False, suffix=".txt"
@@ -231,6 +260,7 @@ def process_upload_background(
             video_row.transcript_s3_key = transcript_key
             video_row.local_path = local_copy
             video_row.transcript_text = transcript_text or None
+            video_row.transcript_json = transcript_json
             db.add(video_row)
             db.commit()
         else:
@@ -244,6 +274,7 @@ def process_upload_background(
                 transcript_s3_key=transcript_key,
                 local_path=local_copy,
                 transcript_text=transcript_text or None,
+                transcript_json=transcript_json,
             )
             db.add(video_row)
             db.commit()
@@ -279,7 +310,10 @@ def process_upload_background(
     finally:
         if transcript_text:
             format_uploaded_transcript_background(
-                vid, transcript_text, original_filename or "Uploaded Video"
+                vid,
+                transcript_text,
+                original_filename or "Uploaded Video",
+                transcript_json=transcript_json,
             )
         try:
             db.close()

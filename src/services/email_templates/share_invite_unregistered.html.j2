@@ -1,0 +1,20 @@
+{% extends "_base.html.j2" %}
+{% block content %}
+<h2 style="margin-top: 0;">{{ owner_name }} shared a {{ resource_type }} with you</h2>
+{% if resource_title %}
+<p style="background: #f6f8fa; padding: 12px 16px; border-radius: 4px; border-left: 3px solid #1a73e8;">
+  <strong>{{ resource_title }}</strong>
+</p>
+{% endif %}
+{% if description %}
+<p style="color: #555;">{{ description }}</p>
+{% endif %}
+<p>You've been invited to view this {{ resource_label }} on Vidya AI. Click below to accept — you'll be asked to sign in (or create an account) using this email address.</p>
+<p style="margin: 24px 0;">
+  <a href="{{ accept_url }}" style="background: #1a73e8; color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 4px; display: inline-block;">
+    Accept invitation
+  </a>
+</p>
+<p style="font-size: 13px; color: #666;">This invitation expires in {{ expires_days }} days. If the button doesn't work, copy and paste this link into your browser:<br>
+<span style="word-break: break-all; color: #444;">{{ accept_url }}</span></p>
+{% endblock %}

@@ -27,8 +27,16 @@ class OpenAIVisionClient:
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
-    def ask_text_only(self, prompt, context="", conversation_history=None):
-        """Ask a text-only question with the appropriate system prompt based on transcript type"""
+    def ask_text_only(
+        self, prompt, context="", conversation_history=None, system_prompt_override=None
+    ):
+        """Ask a text-only question with the appropriate system prompt based on transcript type.
+
+        Pass ``system_prompt_override`` to use a caller-supplied system prompt
+        instead of the video-flavoured CONVERSATIONAL defaults — used by the
+        course material chat where the source might be a PDF or a lecture
+        recording and the prompt needs to refer to the right thing.
+        """
         try:
             # Check if the context contains timestamp markers
             has_timestamps = False
@@ -42,7 +50,7 @@ class OpenAIVisionClient:
 
             # Select the appropriate system prompt based on timestamp availability
             # Use conversational prompts for natural, friendly interactions
-            system_prompt = (
+            system_prompt = system_prompt_override or (
                 SYSTEM_PROMPT_CONVERSATIONAL_FORMATTED
                 if has_timestamps
                 else SYSTEM_PROMPT_CONVERSATIONAL_INITIAL
@@ -104,7 +112,11 @@ class OpenAIVisionClient:
             return f"Error: {str(e)}"
 
     def ask_text_only_stream(
-        self, prompt, context="", conversation_history=None
+        self,
+        prompt,
+        context="",
+        conversation_history=None,
+        system_prompt_override=None,
     ) -> Iterator[str]:
         """
         Stream AI response word-by-word for better UX.
@@ -113,6 +125,9 @@ class OpenAIVisionClient:
             prompt: User question
             context: Video transcript context
             conversation_history: Previous messages
+            system_prompt_override: caller-supplied system prompt that
+                replaces the video-flavoured default (used by material chat
+                where the source can be a PDF or a lecture).
 
         Yields:
             Response chunks as they're generated
@@ -128,7 +143,7 @@ class OpenAIVisionClient:
                 )
 
             # Select appropriate system prompt
-            system_prompt = (
+            system_prompt = system_prompt_override or (
                 SYSTEM_PROMPT_CONVERSATIONAL_FORMATTED
                 if has_timestamps
                 else SYSTEM_PROMPT_CONVERSATIONAL_INITIAL
@@ -171,8 +186,20 @@ class OpenAIVisionClient:
             logger.error(f"Streaming error: {e}")
             yield f"Error: {str(e)}"
 
-    def ask_with_image(self, prompt, image_path, context="", conversation_history=None):
-        """Ask a question with both text prompt and image with the appropriate system prompt"""
+    def ask_with_image(
+        self,
+        prompt,
+        image_path,
+        context="",
+        conversation_history=None,
+        system_prompt_override=None,
+    ):
+        """Ask a question with both text prompt and image with the appropriate system prompt.
+
+        Pass ``system_prompt_override`` for callers that want a custom system
+        prompt (e.g. the course material chat) instead of the default
+        video-flavoured CONVERSATIONAL prompts.
+        """
         try:
             # Check if the context contains timestamp markers
             has_timestamps = False
@@ -186,7 +213,7 @@ class OpenAIVisionClient:
 
             # Select the appropriate system prompt based on timestamp availability
             # Use conversational prompts for natural, friendly interactions
-            system_prompt = (
+            system_prompt = system_prompt_override or (
                 SYSTEM_PROMPT_CONVERSATIONAL_FORMATTED
                 if has_timestamps
                 else SYSTEM_PROMPT_CONVERSATIONAL_INITIAL
@@ -659,6 +686,7 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
         conversation_history: Optional[List[Dict[str, Any]]] = None,
         video_title: str = "",
         enable_search: bool = True,
+        system_prompt_override: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Answer question with optional web search augmentation.
@@ -763,6 +791,7 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
                 contextualized_prompt,
                 context,
                 conversation_history,  # Use rewritten query
+                system_prompt_override=system_prompt_override,
             )
             result["used_web_search"] = False
 
@@ -774,7 +803,10 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
             fallback_query = prompt
             return {
                 "response": self.ask_text_only(
-                    fallback_query, context, conversation_history
+                    fallback_query,
+                    context,
+                    conversation_history,
+                    system_prompt_override=system_prompt_override,
                 ),
                 "sources": [],
                 "used_web_search": False,
@@ -788,6 +820,7 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
         conversation_history: Optional[List[Dict[str, Any]]] = None,
         video_title: str = "",
         enable_search: bool = True,
+        system_prompt_override: Optional[str] = None,
     ) -> Iterator[str]:
         """
         Stream answer with optional web search augmentation.
@@ -895,7 +928,10 @@ Now process the ACTUAL conversation provided above (NOT the examples):"""
 
             # Stream response
             for chunk in self.ask_text_only_stream(
-                contextualized_prompt, context, conversation_history
+                contextualized_prompt,
+                context,
+                conversation_history,
+                system_prompt_override=system_prompt_override,
             ):
                 yield json.dumps({"type": "content", "data": chunk}) + "\n"
 

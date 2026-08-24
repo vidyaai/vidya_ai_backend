@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -68,6 +68,59 @@ class VideoQuery(BaseModel):
     session_id: Optional[str] = None
 
 
+class MaterialChatQuery(BaseModel):
+    material_id: str
+    query: str
+    session_id: Optional[str] = None
+    # Frame-query support: when is_image_query is True the frontend must
+    # supply a base64-encoded JPEG snapshot of the current video frame as
+    # image_base64 (without a "data:image/..." prefix) plus the timestamp
+    # the frame was captured at.
+    is_image_query: bool = False
+    image_base64: Optional[str] = None
+    timestamp: Optional[float] = None
+
+
+class MaterialChatSessionCreate(BaseModel):
+    material_id: str
+    title: Optional[str] = None
+
+
+class MaterialChatSessionRename(BaseModel):
+    title: str
+
+
+class MaterialChatSessionOut(BaseModel):
+    id: str
+    course_material_id: str
+    user_id: str
+    title: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MaterialChatMessageOut(BaseModel):
+    id: str
+    session_id: str
+    role: str
+    content: str
+    citations: Optional[List[Dict[str, Any]]] = None
+    timestamp_seconds: Optional[float] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MaterialChatQueryResponse(BaseModel):
+    response: str
+    session_id: str
+    citations: List[Dict[str, Any]] = []
+
+
 class TranslationRequest(BaseModel):
     youtube_url: str
     source_language: str = "en"
@@ -80,6 +133,27 @@ class QuizRequest(BaseModel):
     difficulty: str = "medium"
     include_explanations: bool = True
     language: str = "en"
+
+
+class MaterialQuizRequest(BaseModel):
+    material_id: str
+    num_questions: int = 5
+    difficulty: str = "medium"
+    include_explanations: bool = True
+    language: str = "en"
+
+
+class MaterialSummaryRequest(BaseModel):
+    material_id: str
+    force_regenerate: bool = False
+
+
+class MaterialSummaryResponse(BaseModel):
+    summary_id: str
+    material_id: str
+    summary: str
+    summary_metadata: Optional[dict] = None
+    created_at: datetime
 
 
 # Sharing-related schemas
@@ -101,6 +175,7 @@ class CreateSharedLinkRequest(BaseModel):
     expires_at: Optional[datetime] = None
     max_views: Optional[int] = None
     invited_users: List[str] = []  # List of Firebase UIDs
+    invited_emails: List[str] = []  # Raw emails for unregistered invitees
 
 
 class UpdateSharedLinkRequest(BaseModel):
@@ -152,7 +227,8 @@ class ShareEmailSearchRequest(BaseModel):
 
 
 class AddUsersToSharedLinkRequest(BaseModel):
-    user_ids: List[str]  # Firebase UIDs
+    user_ids: List[str] = []  # Firebase UIDs
+    emails: List[str] = []  # Raw emails for unregistered invitees
     permission: str = "view"  # "view" or "edit"
 
 
@@ -282,6 +358,24 @@ class AssignmentOut(BaseModel):
     google_form_url: Optional[str] = None
     google_form_response_url: Optional[str] = None
     ai_penalty_percentage: Optional[float] = 50.0
+
+    class Config:
+        from_attributes = True
+
+
+class AssignmentReviewRequest(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    comment: Optional[str] = None
+
+
+class AssignmentReviewOut(BaseModel):
+    id: str
+    assignment_id: str
+    user_id: str
+    rating: int
+    comment: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True

@@ -1,0 +1,14 @@
+{% extends "_base.html.j2" %}
+{% block content %}
+<h2 style="margin-top: 0;">You're invited to join {{ course_title }}</h2>
+{% if course_code %}<p style="color: #555;">Course code: <strong>{{ course_code }}</strong></p>{% endif %}
+<p>An instructor has invited you to enroll in <strong>{{ course_title }}</strong> on Vidya AI.</p>
+<p>Click the button below to accept. You'll be asked to sign in (or create an account) using this email address.</p>
+<p style="margin: 24px 0;">
+  <a href="{{ accept_url }}" style="background: #1a73e8; color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 4px; display: inline-block;">
+    Accept invitation
+  </a>
+</p>
+<p style="font-size: 13px; color: #666;">This invitation expires in {{ expires_days }} days. If the button doesn't work, copy and paste this link into your browser:<br>
+<span style="word-break: break-all; color: #444;">{{ accept_url }}</span></p>
+{% endblock %}
