@@ -7,6 +7,7 @@ import stripe
 from firebase_admin import auth as fb_auth
 from utils.db import get_db
 from utils.firebase_auth import get_current_user
+from utils.user_utils import get_or_create_user
 from controllers.config import logger, s3_client, AWS_S3_BUCKET
 from models import (
     User,
@@ -76,28 +77,12 @@ def _claim_pending_enrollments(db: Session, user: User) -> None:
 
 def _get_or_create_user(db: Session, current_user: dict) -> User:
     """Get existing user or create one if not found."""
-    user = db.query(User).filter(User.firebase_uid == current_user["uid"]).first()
-    if not user:
-        email = current_user.get("email")
-        name = current_user.get("name") or ""
-        user = User(
-            firebase_uid=current_user["uid"],
-            email=email,
-            name=name,
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        if email:
-            parts = name.split(" ", 1)
-            add_contact_to_brevo(
-                email=email,
-                first_name=parts[0] if parts else "",
-                last_name=parts[1] if len(parts) > 1 else "",
-            )
-        _claim_pending_enrollments(db, user)
-        _claim_pending_share_accesses(db, user)
-    return user
+    return get_or_create_user(
+        db,
+        firebase_uid=current_user["uid"],
+        email=current_user.get("email"),
+        name=current_user.get("name"),
+    )
 
 
 @router.get("/profile", response_model=UserProfileResponse)

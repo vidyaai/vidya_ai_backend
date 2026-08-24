@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from models import User, Subscription, PricingPlan, UserUsage
 from controllers.config import logger
+from utils.embed_auth import EMBED_UID_PREFIX
 import os
 
 # Developer accounts with unlimited access (bypasses all subscription limits)
@@ -21,6 +22,12 @@ def is_developer_account(db: Session, user_id: str) -> bool:
 
     # Check against developer whitelist
     return user.email.lower() in [email.lower() for email in DEVELOPER_EMAILS]
+
+
+def is_embed_account(db: Session, user_id: str) -> bool:
+    """Check if user signed in through a third-party embed (no subscription limits)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    return bool(user and user.firebase_uid.startswith(EMBED_UID_PREFIX))
 
 
 def initialize_pricing_plans(db: Session):
@@ -251,6 +258,10 @@ def check_usage_limits(
             "current": 0,
             "is_developer": True,
         }
+
+    # Embed users on third-party sites have unlimited access
+    if is_embed_account(db, user_id):
+        return {"allowed": True, "limit": "unlimited", "current": 0, "is_embed": True}
 
     subscription = get_user_subscription(db, user_id)
     if not subscription or not subscription.plan:
