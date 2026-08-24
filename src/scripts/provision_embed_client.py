@@ -33,7 +33,9 @@ def main() -> None:
     try:
         existing = db.query(EmbedClient).filter(EmbedClient.slug == args.slug).first()
         if existing:
-            print(f"Embed client with slug '{args.slug}' already exists.", file=sys.stderr)
+            print(
+                f"Embed client with slug '{args.slug}' already exists.", file=sys.stderr
+            )
             sys.exit(1)
 
         secret = secrets.token_urlsafe(32)
